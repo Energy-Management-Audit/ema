@@ -49,6 +49,9 @@ which keeps the repo free of markdown sprawl.
     S17b (screens).
   - Two screens still to design in the same language during S17b: **Clienți** and **Raportare
     manager energetic**.
+- 2026-09-21 **Repo swap done (§8):** library out, campaign archived, 21 GB of ARGUS build output
+  to the Trash, and `Energy-Management-Audit/ema` created with the skeleton — gates, import
+  contracts, empty packages, plan, `AGENTS.md`, ADR 0001 — CI green on `prod` and `dev`.
 - **Next:**
   1. **Codex review** of the whole architecture, including the frontend contract (bounded, 2
      rounds). The state-model types drafted from the handoff (§5.4) go into that review.
@@ -988,7 +991,11 @@ ema/
 | `hotfix/<issue>` | urgent production fix | `prod` | `prod` (PR, patch tag) **and** `dev` |
 | `release/x.y` | only if releases ever need stabilization | `dev` | `prod` + `dev` |
 
-- **Protection on `prod`/`dev`:** PR + green CI required; nobody pushes directly, agents included.
+- **Protection on `prod`/`dev`:** PR + green CI expected; nobody pushes directly, agents included.
+  **Not enforced by GitHub** — the org is on the free plan, where branch protection needs a paid
+  tier on private repositories. It rests on the convention, on CI being visible on every push and
+  PR, and on the review loop in §6.4. Revisit if the org ever upgrades, or if a second engineer
+  joins.
 - Conventional Commits; features squash-merged.
 - SemVer: a release bumps the minor version, a hotfix the patch.
 - Golden tests run locally before feature PRs and before every release PR.
@@ -1085,15 +1092,24 @@ ema/
 
 ## 8. Moving from the old world to the new
 
-1. Move `reference/` → `~/Code/projects/ema-reference/`. Set `EMA_REFERENCE` for tests.
-2. Rename the campaign folder → `~/Code/projects/_archive/ema-campaign/` (read-only). Its
-   `.git` stays intact, so ARGUS and the legacy repos remain readable for porting.
-3. Create `~/Code/projects/ema/` and the private GitHub repo `Energy-Management-Audit/ema`
-   (`prod` + `dev`, branch protection). This file becomes `docs/PLAN.md`; `FRONTEND_BRIEF.md` goes
-   to the design tool.
-4. Codex runs S0/S1 in Conductor.
-5. Port the code per §5.19 in its slices (always from the archive, never by wholesale copy).
-6. After Ema's first real delivered job:
+**Done on 2026-09-21:**
+1. ✅ The library moved to `~/Code/projects/ema-reference/` (`$EMA_REFERENCE`); the scripts inside
+   it were repointed and still reproduce the CLIENT-P1 PIEE.
+2. ✅ The campaign is archived at `~/Code/projects/_archive/ema-campaign/`, with its final state
+   committed. ARGUS and the three legacy repos kept their `.git`, so they stay readable for
+   porting; their uncommitted work was committed locally and not pushed.
+3. ✅ ARGUS build output (20 GB `target/`, `node_modules`, `artifacts`) moved to
+   `~/.Trash/ema-cleanup-2026-09-21/`. The archive is 4.7 GB.
+4. ✅ `~/Code/projects/ema/` is the new repository, pushed to the private
+   `Energy-Management-Audit/ema` with `prod` and `dev` (default `dev`), CI green on both. It holds
+   the skeleton only: gates, import contracts, empty packages, this plan, `AGENTS.md` and ADR
+   0001. `FRONTEND_BRIEF-2026-09-19.md` moved into the library beside the handoff.
+
+**Remaining:**
+5. Codex runs S0/S1 in Conductor.
+6. Port the code per §5.19 in its slices (always from the archive, never by wholesale copy). The
+   legacy repos are retired only once their parts are ported (S3, S7, S9), not before.
+7. After Ema's first real delivered job:
    - archive the legacy GitHub repos (read-only)
    - delete `_archive/ema-campaign/` (this also deletes ARGUS, as accepted)
    - remove the old app from the auditor's PC (if installed)
