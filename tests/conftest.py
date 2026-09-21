@@ -1,0 +1,23 @@
+"""Golden tests read the real reference library and are skipped without it.
+
+The library lives outside this repository and never enters git (docs/PLAN.md §5.15).
+Point EMA_REFERENCE at it to run them: export EMA_REFERENCE=~/Code/projects/ema-reference
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+
+
+@pytest.fixture(scope="session")
+def reference_library() -> Path:
+    location = os.environ.get("EMA_REFERENCE")
+    if not location:
+        pytest.skip("EMA_REFERENCE is not set — golden tests need the reference library")
+    path = Path(location).expanduser()
+    if not path.is_dir():
+        pytest.skip(f"EMA_REFERENCE points at {path}, which does not exist")
+    return path

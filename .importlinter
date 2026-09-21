@@ -1,0 +1,43 @@
+[importlinter]
+root_package = ema
+include_external_packages = True
+
+# The architecture of docs/PLAN.md §5.1, enforced. A violation is a failed build,
+# not a review comment.
+
+[importlinter:contract:layers]
+name = Interfaces -> workflows -> domain -> core
+type = layers
+layers =
+    ema.api : ema.cli : ema.mcp
+    ema.invoices : ema.piee : ema.reporting : ema.audit
+    ema.consumption_analysis
+    ema.energy_data
+    ema.clients
+    ema.core
+
+[importlinter:contract:workflows-independent]
+name = Workflow modules never import each other
+type = independence
+modules =
+    ema.invoices
+    ema.piee
+    ema.reporting
+    ema.audit
+
+[importlinter:contract:core-is-self-contained]
+name = core imports nothing else from Ema
+type = forbidden
+source_modules =
+    ema.core
+forbidden_modules =
+    ema.clients
+    ema.energy_data
+    ema.consumption_analysis
+    ema.invoices
+    ema.piee
+    ema.reporting
+    ema.audit
+    ema.api
+    ema.cli
+    ema.mcp

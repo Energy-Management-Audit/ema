@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+dist/
+build/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+
+# Packaging output
+packaging/build/
+packaging/dist/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Runtime data — client material never enters git (docs/PLAN.md §5.15)
+workspace/
+outputs/
+client-data/
+reference/
+*.log
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

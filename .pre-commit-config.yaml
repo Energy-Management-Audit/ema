@@ -1,0 +1,43 @@
+# One gate: what runs here runs in CI, and nothing else does (docs/PLAN.md §6.3).
+# Install once with: uv run pre-commit install
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: file-size
+        name: file size (400 lines)
+        entry: python scripts/check_file_size.py
+        language: system
+        types: [python]
+
+      - id: pyright
+        name: pyright (strict on src)
+        entry: uv run pyright
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: import-linter
+        name: import contracts
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        types: [python]
