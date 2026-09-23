@@ -38,7 +38,7 @@ window using Edge WebView2, which ships with Windows 10 and 11.
    strings. PyInstaller cannot see them, and the import contracts cannot check them.
 3. **Never write next to the executable.** The installation directory is read-only in practice.
    The workspace defaults to `%APPDATA%\Ema` and is configurable; logs, jobs and outputs live there.
-4. **External binaries through configuration.** Tesseract ships with us; LibreOffice and Word may
+4. **External binaries through configuration.** Tesseract ships with us; Word may
    or may not exist on the machine. Their locations are settings with sensible defaults, never a
    bare `PATH` lookup, and a missing one degrades that feature only.
 5. **Threads, not process pools.** A single user's jobs run on worker threads in

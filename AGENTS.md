@@ -67,7 +67,7 @@ The Windows build is a frozen one-folder PyInstaller bundle. Therefore:
   helper. No module builds its own path to a bundled file.
 - Imports stay static. No dynamic import, no plugin discovery.
 - Nothing is ever written next to the executable: the workspace is a configured directory.
-- External binaries (Tesseract, LibreOffice, Word) are located through configuration, never assumed
+- External binaries (Tesseract, Word) are located through configuration, never assumed
   on `PATH`.
 
 `docs/decisions/0001-packaging-and-resources.md` has the reasoning.
