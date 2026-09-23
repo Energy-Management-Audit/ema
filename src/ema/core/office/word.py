@@ -11,6 +11,7 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Protocol
 
 from ema.core.office.errors import OfficeError
@@ -21,6 +22,12 @@ class OsaResult:
     returncode: int
     stdout: str
     stderr: str
+
+
+@dataclass(frozen=True)
+class DocText:
+    text: str
+    tables: int
 
 
 class OsaRunner(Protocol):
@@ -101,7 +108,7 @@ class WordMac:
             check=True,
         )
 
-    def _script(self, action: str, document: Path, pdf: Path | None = None) -> str:
+    def _script(self, action: str, document: Path, output: Path | None = None) -> str:
         path = _apple_string(str(document))
         name = _apple_string(document.name)
         commands = [
@@ -110,9 +117,26 @@ class WordMac:
         ]
         if action == "toc":
             commands.extend(["update page numbers of table of contents 1 of d", "save d"])
-        elif action == "pdf" and pdf is not None:
-            commands.append(f"save as d file name {_apple_string(str(pdf))} file format format PDF")
+        elif action == "pdf" and output is not None:
+            commands.append(
+                f"save as d file name {_apple_string(str(output))} file format format PDF"
+            )
+        elif action == "docx" and output is not None:
+            commands.append(
+                f"save as d file name {_apple_string(str(output))} file format format document"
+            )
+            commands.append(f"set d to document {_apple_string(output.name)}")
+        elif action == "text" and output is not None:
+            commands.extend(
+                [
+                    "set table_count to count of tables of d",
+                    f"save as d file name {_apple_string(str(output))} file format format text",
+                    f"set d to document {_apple_string(output.name)}",
+                ]
+            )
         commands.append("close d saving no")
+        if action == "text":
+            commands.append("return table_count as string")
         body = "\n".join(commands)
         seconds = max(1, int(self.timeout_s))
         return (
@@ -121,12 +145,14 @@ class WordMac:
             f"{body}\nend tell\nend timeout"
         )
 
-    def _close_failed_open(self, copy: Path) -> str:
-        script = (
-            'tell application "Microsoft Word"\n'
-            f"close document {_apple_string(copy.name)} saving no\n"
-            "end tell"
+    def _close_failed_open(self, copy: Path, output: Path | None = None) -> str:
+        names = [copy.name] if output is None else [output.name, copy.name]
+        closers = "\n".join(
+            f"if exists document {_apple_string(name)} then "
+            f"close document {_apple_string(name)} saving no"
+            for name in names
         )
+        script = f'tell application "Microsoft Word"\n{closers}\nend tell'
         try:
             result = self.runner(script, self.timeout_s + 5)
             if result.returncode == 0:
@@ -140,7 +166,7 @@ class WordMac:
             raise OfficeError("word_restart", f"{detail}; cleanup: {exc}") from exc
         return f"; cleanup forced Word quit: {detail}"
 
-    def _failed_script(self, result: OsaResult, copy: Path) -> None:
+    def _failed_script(self, result: OsaResult, copy: Path, output: Path | None) -> None:
         if "-1743" in result.stderr:
             raise OfficeError(
                 "word_permission",
@@ -157,18 +183,35 @@ class WordMac:
             raise TimeoutError(result.stderr)
         detail = result.stderr or result.stdout
         try:
-            detail += self._close_failed_open(copy)
+            detail += self._close_failed_open(copy, output)
         except OfficeError as exc:
             raise OfficeError("word_restart", f"{detail}; cleanup: {exc.detail}") from exc
         raise OfficeError("word_automation", detail)
 
-    def _attempt(self, action: str, docx: Path, pdf: Path | None) -> None:
+    def _copy_result(
+        self, action: str, source: Path, target: Path | None, result: OsaResult
+    ) -> int | None:
+        if target is not None:
+            if not source.is_file():
+                code = {"pdf": "word_pdf", "docx": "word_docx", "text": "word_text"}[action]
+                raise OfficeError(code, f"Word reported success without a {source.suffix} file")
+            shutil.copy2(source, target)
+        if action == "text":
+            try:
+                return int(result.stdout.strip())
+            except ValueError as exc:
+                raise OfficeError("word_text", f"Invalid table count: {result.stdout!r}") from exc
+        return None
+
+    def _attempt(self, action: str, document: Path, target: Path | None) -> int | None:
         folder = self.work_root / str(uuid.uuid4())
         folder.mkdir(parents=True)
-        copy = folder / f"{uuid.uuid4()}-{docx.name}"
-        output = folder / "render.pdf" if pdf is not None else None
+        copy = folder / f"{uuid.uuid4()}-{document.name}"
+        suffix = {"pdf": ".pdf", "docx": ".docx", "text": ".txt"}.get(action)
+        basename = uuid.uuid4().hex if action in {"docx", "text"} else "converted"
+        output = folder / f"{basename}{suffix}" if suffix is not None else None
         try:
-            shutil.copy2(docx, copy)
+            shutil.copy2(document, copy)
             try:
                 result = self.runner(self._script(action, copy, output), self.timeout_s + 5)
             except (TimeoutError, subprocess.TimeoutExpired) as exc:
@@ -181,31 +224,29 @@ class WordMac:
                 raise OfficeError("word_launch", str(exc)) from exc
             except Exception as exc:
                 try:
-                    detail = str(exc) + self._close_failed_open(copy)
+                    detail = str(exc) + self._close_failed_open(copy, output)
                 except OfficeError as cleanup_exc:
                     raise OfficeError(
                         "word_restart", f"{exc}; cleanup: {cleanup_exc.detail}"
                     ) from exc
                 raise OfficeError("word_automation", detail) from exc
             if result.returncode:
-                self._failed_script(result, copy)
+                self._failed_script(result, copy, output)
             if action == "toc":
-                shutil.copy2(copy, docx)
-            if action == "pdf" and pdf is not None and output is not None:
-                if not output.is_file():
-                    raise OfficeError("word_pdf", "Word reported success without a PDF")
-                shutil.copy2(output, pdf)
+                shutil.copy2(copy, document)
+            if output is not None:
+                return self._copy_result(action, output, target, result)
+            return None
         finally:
             shutil.rmtree(folder)
 
-    def _perform(self, action: str, docx: Path, pdf: Path | None = None) -> None:
+    def _perform(self, action: str, document: Path, target: Path | None = None) -> int | None:
         if not self.app.is_dir():
             raise OfficeError("word_missing", f"Word is missing at {self.app}")
         with self._lock, self._process_lock():
             for attempt in range(2):
                 try:
-                    self._attempt(action, docx, pdf)
-                    return
+                    return self._attempt(action, document, target)
                 except (TimeoutError, subprocess.TimeoutExpired) as exc:
                     detail = str(exc)
                     if isinstance(exc, subprocess.TimeoutExpired) and exc.stderr:
@@ -224,6 +265,22 @@ class WordMac:
 
     def render_pdf(self, docx: Path, pdf: Path) -> None:
         self._perform("pdf", docx, pdf)
+
+    def convert_doc(self, doc: Path, out_docx: Path) -> None:
+        self._perform("docx", doc, out_docx)
+
+    def doc_text(self, doc: Path) -> DocText:
+        with TemporaryDirectory() as directory:
+            text_path = Path(directory) / "original.txt"
+            tables = self._perform("text", doc, text_path)
+            raw = text_path.read_bytes()
+        try:
+            content = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            content = raw.decode("utf-16")
+        if tables is None:
+            raise OfficeError("word_text", "Word did not return a table count")
+        return DocText(content, tables)
 
     def open_check(self, docx: Path) -> None:
         """Check that Word opens and closes; only a human can rule out a repair prompt."""

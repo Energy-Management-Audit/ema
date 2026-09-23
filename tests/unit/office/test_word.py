@@ -1,9 +1,11 @@
 """Word supervision and serialization without starting Word."""
 
 import multiprocessing
+import re
 import subprocess
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -279,3 +281,68 @@ def test_threads_are_serialized(tmp_path):
     for thread in threads:
         thread.join()
     assert maximum == 1
+
+
+def test_doc_actions_copy_results_and_count_tables(tmp_path):
+    scripts = []
+
+    def runner(script, _timeout):
+        scripts.append(script)
+        match = re.search(r'save as d file name "([^"]+)" file format', script)
+        assert match is not None
+        output = Path(match.group(1))
+        output.write_bytes(b"converted" if output.suffix == ".docx" else b"alpha beta")
+        return OsaResult(0, "2" if output.suffix == ".txt" else "", "")
+
+    word, source = adapter(tmp_path, runner)
+    source = source.with_suffix(".doc")
+    source.write_bytes(b"legacy")
+    target = tmp_path / "converted.docx"
+    word.convert_doc(source, target)
+    extracted = word.doc_text(source)
+    assert target.read_bytes() == b"converted"
+    assert extracted.text == "alpha beta"
+    assert extracted.tables == 2
+    assert "file format format document" in scripts[0]
+    assert "set d to save as d" not in scripts[0]
+    assert re.search(
+        r'file format format document\nset d to document "[0-9a-f]{32}\.docx"\nclose d saving no',
+        scripts[0],
+    )
+    assert "count of tables of d" in scripts[1]
+    assert "file format format text" in scripts[1]
+    assert "set d to save as d" not in scripts[1]
+    assert re.search(
+        r'file format format text\nset d to document "[0-9a-f]{32}\.txt"\nclose d saving no',
+        scripts[1],
+    )
+    assert "set d to active document" not in scripts[0] + scripts[1]
+    assert re.search(r"/[0-9a-f]{32}\.docx", scripts[0])
+    assert re.search(r"/[0-9a-f]{32}\.txt", scripts[1])
+    assert copies(word) == []
+
+
+def test_failed_save_as_cleanup_addresses_old_and_new_names(tmp_path):
+    scripts = []
+
+    def runner(script, _timeout):
+        scripts.append(script)
+        if len(scripts) == 1:
+            return OsaResult(1, "", "save failed")
+        return OsaResult(0, "", "")
+
+    word, source = adapter(tmp_path, runner)
+    target = tmp_path / "converted.docx"
+    with pytest.raises(OfficeError):
+        word.convert_doc(source, target)
+    match = re.search(r'file name "([^"]+\.docx)"', scripts[0])
+    assert match is not None
+    assert f'if exists document "{Path(match.group(1)).name}"' in scripts[1]
+    assert source.name in scripts[1]
+    assert copies(word) == []
+
+
+def test_unknown_office_code_keeps_generic_message():
+    error = OfficeError("unlisted", "private detail")
+    assert error.user_message_ro == "Operația Office a eșuat."
+    assert error.detail == "private detail"

@@ -13,6 +13,8 @@ _USER_MESSAGES_RO = {
     "word_restart": "Microsoft Word nu a putut fi repornit în siguranță.",
     "word_launch": "Automatizarea Microsoft Word nu a putut fi pornită.",
     "word_pdf": "Microsoft Word nu a creat fișierul PDF.",
+    "word_docx": "Microsoft Word nu a creat fișierul DOCX.",
+    "word_text": "Microsoft Word nu a extras textul documentului.",
     "chart_formula": "Formula seriei din grafic nu este validă.",
     "chart_cache": "Datele memorate ale graficului lipsesc.",
     "chart_location": "Graficul nu a fost găsit în document.",
@@ -34,4 +36,4 @@ _USER_MESSAGES_RO = {
 
 class OfficeError(EmaError):
     def __init__(self, code: str, detail: str) -> None:
-        super().__init__(code, _USER_MESSAGES_RO[code], detail)
+        super().__init__(code, _USER_MESSAGES_RO.get(code, "Operația Office a eșuat."), detail)

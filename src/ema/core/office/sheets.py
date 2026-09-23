@@ -16,6 +16,7 @@ from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from ema.core.office.errors import OfficeError
+from ema.core.office.sniff import FileKind, sniff
 
 type Scalar = str | float | int | datetime | None
 
@@ -249,13 +250,14 @@ class _XlsBook:
 
 
 def open_book(path: Path) -> Book:
-    with path.open("rb") as stream:
-        lead = stream.read(8)
-    if lead.startswith(b"PK\x03\x04"):
+    detected = sniff(path)
+    if detected.kind == FileKind.XLSX:
         return _XlsxBook(
             load_workbook(path, read_only=False, data_only=True),
             load_workbook(path, read_only=False, data_only=False),
         )
-    if lead == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+    if detected.kind == FileKind.XLS:
         return _XlsBook(xlrd.open_workbook(str(path)))
-    raise OfficeError("unsupported_format", f"{path.name}: leading bytes {lead.hex()}")
+    raise OfficeError(
+        "unsupported_format", f"{path.name}: {detected.kind.value}; {detected.detail}"
+    )

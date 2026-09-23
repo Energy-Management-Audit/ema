@@ -42,15 +42,6 @@ def _word_default() -> Path:
     return Path("/Applications/Microsoft Word.app")
 
 
-def _libreoffice_default() -> Path:
-    if sys.platform == "win32":
-        return (
-            Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"))
-            / "LibreOffice/program/soffice.exe"
-        )
-    return Path("/Applications/LibreOffice.app/Contents/MacOS/soffice")
-
-
 def _tesseract_default() -> Path:
     if sys.platform == "win32":
         return resource_path("tesseract", "tesseract.exe")
@@ -60,7 +51,7 @@ def _tesseract_default() -> Path:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="EMA_", extra="ignore")
     word_path: Path = Field(default_factory=_word_default)
-    libreoffice_path: Path = Field(default_factory=_libreoffice_default)
+    word_timeout_s: float = Field(default=120, gt=0)
     tesseract_path: Path = Field(default_factory=_tesseract_default)
     provider: str | None = None
     model: str | None = None

@@ -17,6 +17,7 @@ dependencies = [
     "python-docx>=1.1",
     "openpyxl>=3.1",
     "xlrd>=2.0",          # legacy .xls, read-only
+    "olefile>=0.47",      # inspect legacy Office streams without trusting extensions
     "lxml>=5.2",          # chart parts and raw OOXML work
     # pdf + ocr (permissive licences only — no PyMuPDF, see docs/PLAN.md §4)
     "pypdfium2>=4.30",

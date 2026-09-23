@@ -13,7 +13,16 @@ from ema.cli.review import job_review_app
 from ema.core.backup import backup, restore
 from ema.core.config import workspace_path
 from ema.core.errors import EmaError
-from ema.core.jobs import list_jobs, recover, status
+from ema.core.intake import ItemOutcome, intake_legacy
+from ema.core.jobs import (
+    StageContext,
+    StageOutcome,
+    list_jobs,
+    recover,
+    run_stage,
+    status,
+    subscribe,
+)
 from ema.core.logging import write_event
 from ema.core.workspace import Workspace
 from ema.invoices import run_batch
@@ -86,6 +95,44 @@ def invoices_extract(folder: Path, client: str = typer.Option(..., "--client")) 
     typer.echo(result.client_notice)
     if result.workbook is not None:
         typer.echo(str(result.workbook))
+
+
+@_app.command("intake")
+def intake_command(job: str, collection: str) -> None:
+    ws = _workspace()
+    results: list[ItemOutcome] = []
+
+    def stage(ctx: StageContext) -> StageOutcome:
+        return intake_legacy(ctx, collection, results.append)
+
+    run = run_stage(ws, job, "intake", stage)
+    for _ in subscribe(ws, job):
+        pass
+    current = status(ws, job)
+    recorded = next(entry for entry in current.runs if entry["id"] == run)
+    if recorded["state"] == "failed":
+        raise EmaError("intake_failed", "Prelucrarea fișierului a eșuat.", str(recorded["error"]))
+    if recorded["state"] == "cancelled":
+        raise EmaError("intake_cancelled", "Prelucrarea fișierului a fost anulată.", collection)
+    for item in results:
+        typer.echo(
+            json.dumps(
+                {
+                    "slot": item.slot,
+                    "version": item.version,
+                    "sha": item.file_sha[:12],
+                    "kind": item.kind.value,
+                    "status": item.status,
+                    "words_original": item.original_words,
+                    "words_converted": item.converted_words,
+                    "shape_words": item.shape_words,
+                    "warning": item.warning,
+                    "error_code": item.error_code,
+                    "detail": item.detail,
+                },
+                ensure_ascii=False,
+            )
+        )
 
 
 @_app.command("serve")
