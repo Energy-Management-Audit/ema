@@ -29,12 +29,13 @@ dependencies = [
     "httpx>=0.27",
     # platform
     "platformdirs>=4.2",
+    "filelock>=3.16",
+    "psutil>=6",
     "keyring>=25.3",
 ]
 
-# Declared in S1, together with the Typer app it points at:
-# [project.scripts]
-# ema = "ema.cli:app"
+[project.scripts]
+ema = "ema.cli:app"
 
 [dependency-groups]
 dev = [

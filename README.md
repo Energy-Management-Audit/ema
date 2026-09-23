@@ -10,15 +10,15 @@ it in a native Windows window, and the same use cases run headless from the CLI.
 
 ## Status
 
-Repository skeleton. Tooling, architecture contracts and the plan are in place; the code arrives
-slice by slice, starting with S0 and S1 in `docs/PLAN.md` §7.
+The core workspace, job store, backup, CLI and health API are available. Other workflows arrive
+slice by slice under `docs/PLAN.md` §7.
 
 ## Getting started
 
 ```bash
 uv sync --all-groups        # Python 3.12 toolchain and dependencies
-uv run pre-commit install   # the same gates CI runs
-uv run pytest -m "not golden"
+uv run pre-commit install --install-hooks -t pre-commit -t pre-push
+scripts/check              # non-mutating gate, same command as CI and pre-push
 ```
 
 Golden tests read the real reference library, which lives outside this repository and never enters

@@ -26,8 +26,10 @@ interfaces (api, cli, mcp) -> workflows (invoices, piee, audit, reporting)
 
 ## Gates
 
-`uv run pre-commit run -a` locally is exactly what CI runs: ruff format and check, the 400-line
-file limit, pyright strict on `src/`, the import contracts, and unit tests.
+`scripts/check` is the non-mutating gate run by CI and the pre-push hook: ruff format and check,
+the 400-line file limit, pyright strict on `src/`, import contracts, and non-golden unit tests.
+Commit hooks may fix formatting. Install both with
+`uv run pre-commit install --install-hooks -t pre-commit -t pre-push`.
 
 Golden tests are the real acceptance: they run against the reference library (`EMA_REFERENCE`) and
 compare against documents the auditor actually delivered. They stay local — client material never

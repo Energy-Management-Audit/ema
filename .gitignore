@@ -26,6 +26,7 @@ packaging/dist/
 
 # Runtime data — client material never enters git (docs/PLAN.md §5.15)
 workspace/
+!src/ema/core/workspace/
 outputs/
 client-data/
 reference/

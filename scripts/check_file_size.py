@@ -6,6 +6,7 @@ as a gate rather than as review advice.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,6 +14,8 @@ LIMIT = 400
 
 
 def main(argv: list[str]) -> int:
+    if not argv:
+        argv = subprocess.check_output(["git", "ls-files", "-z", "--", "*.py"]).decode().split("\0")
     too_long = []
     for name in argv:
         path = Path(name)

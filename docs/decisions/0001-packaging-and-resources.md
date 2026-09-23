@@ -41,8 +41,8 @@ window using Edge WebView2, which ships with Windows 10 and 11.
 4. **External binaries through configuration.** Tesseract ships with us; LibreOffice and Word may
    or may not exist on the machine. Their locations are settings with sensible defaults, never a
    bare `PATH` lookup, and a missing one degrades that feature only.
-5. **Threads, not process pools.** A single user's jobs run on worker threads behind the
-   `JobRunner` interface. Multiprocessing in a frozen app needs `freeze_support()` and pays for
+5. **Threads, not process pools.** A single user's jobs run on worker threads in
+   `core.jobs`. Multiprocessing in a frozen app needs `freeze_support()` and pays for
    re-imports; if a hosted version ever needs real workers, it replaces the runner.
 6. **One version constant.** `ema.__version__` feeds the update check, the installer and the
    diagnostics bundle.
