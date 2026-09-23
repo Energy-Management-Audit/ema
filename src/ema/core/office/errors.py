@@ -19,6 +19,16 @@ _USER_MESSAGES_RO = {
     "chart_series": "Seriile graficului nu corespund datelor sursă.",
     "chart_title": "Titlul graficului nu a putut fi actualizat.",
     "chart_style": "Stilul graficului nu a putut fi preluat.",
+    "label_missing": "Eticheta nu a fost găsită în foaia de calcul.",
+    "label_ambiguous": "Eticheta apare de mai multe ori în foaia de calcul.",
+    "formula_uncached": "Formula din foaia de calcul nu are o valoare memorată.",
+    "cell_error": "Celula conține o eroare Excel.",
+    "mixed_run_replacement": "Textul nu poate fi aliniat la formatarea modelului.",
+    "sheet_missing": "Foaia de calcul nu a fost găsită.",
+    "unsupported_format": "Formatul fișierului nu este acceptat.",
+    "numbering_conflict": "Numerotarea figurilor sau tabelelor este în conflict.",
+    "block_reference": "Referința la figură sau tabel nu a fost găsită.",
+    "block_prototype": "Modelul de document lipsește sau nu este valid.",
 }
 
 

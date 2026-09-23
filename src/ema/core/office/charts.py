@@ -7,13 +7,13 @@ from __future__ import annotations
 import copy
 import posixpath
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
 from lxml import etree
 
 from ema.core.office.chart_ids import refresh_unique_ids
+from ema.core.office.chart_series import Series, SeriesRefs, _ref, read_series
 from ema.core.office.errors import OfficeError
 from ema.core.office.package import (
     CT_CHART,
@@ -34,62 +34,17 @@ from ema.core.office.package import (
 from ema.core.office.workbook import (
     assign_series_formulas,
     build_workbook,
-    cache_values,
     formula_cells,
 )
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 CT = "http://schemas.openxmlformats.org/package/2006/content-types"
+__all__ = ["Series", "SeriesRefs", "build_column_chart", "clone_chart", "embed_data", "read_series"]
 
 
 def _elements(root: etree._Element, query: str, **namespaces: str) -> list[etree._Element]:
     return cast("list[etree._Element]", root.xpath(query, namespaces=namespaces))
-
-
-@dataclass(frozen=True)
-class SeriesRefs:
-    name: str | None
-    categories: str | None
-    values: str | None
-
-
-@dataclass(frozen=True)
-class Series:
-    name: str
-    categories: list[str]
-    values: list[float | None]
-    refs: SeriesRefs | None = None
-
-
-def _ref(ser: etree._Element, field: str) -> etree._Element | None:
-    node = ser.find(f"{{{C}}}{field}")
-    if node is None:
-        return None
-    kinds = {f"{{{C}}}strRef", f"{{{C}}}numRef"}
-    return next((child for child in node if child.tag in kinds), None)
-
-
-def _series(root: etree._Element) -> list[Series]:
-    result: list[Series] = []
-    for ser in root.iter(f"{{{C}}}ser"):
-        name_ref, cat_ref, value_ref = (_ref(ser, key) for key in ("tx", "cat", "val"))
-        if value_ref is None:
-            continue
-        values = [float(value) if value is not None else None for value in cache_values(value_ref)]
-        name = next((value for value in cache_values(name_ref) if value is not None), "")
-        refs = SeriesRefs(
-            *(
-                ref.findtext(f"{{{C}}}f") if ref is not None else None
-                for ref in (name_ref, cat_ref, value_ref)
-            )
-        )
-        result.append(Series(name, [value or "" for value in cache_values(cat_ref)], values, refs))
-    return result
-
-
-def read_series(docx: Path, part: str) -> list[Series]:
-    return _series(xml(read_parts(docx), part))
 
 
 def _write_cache(ref: etree._Element, values: list[str] | list[float | None]) -> None:
@@ -219,11 +174,28 @@ def _copy_chart_resources(parts: dict[str, bytes], source: str, new_part: str) -
     parts["[Content_Types].xml"] = encoded(types)
 
 
-def _new_chart(parts: dict[str, bytes], source: str, after: str, root: etree._Element) -> str:
+def _new_chart(
+    parts: dict[str, bytes],
+    source: str,
+    after: str,
+    root: etree._Element,
+    *,
+    detached: bool = False,
+    prototype_paragraph: etree._Element | None = None,
+) -> tuple[str, etree._Element]:
     new_part = _next_part(parts, "word/charts", "chart", ".xml")
     _copy_chart_resources(parts, source, new_part)
     _embed(parts, new_part, root)
-    owner, doc_root, paragraph, chart_node = _source_paragraph(parts, after)
+    if prototype_paragraph is None:
+        owner, doc_root, paragraph, chart_node = _source_paragraph(parts, after)
+    else:
+        owner = "word/document.xml"
+        doc_root = xml(parts, owner)
+        paragraph = prototype_paragraph
+        chart_nodes = _elements(paragraph, ".//*[local-name()='chart']")
+        if len(chart_nodes) != 1:
+            raise OfficeError("chart_location", "Prototype paragraph needs exactly one chart")
+        chart_node = chart_nodes[0]
     drawing = next(iter(_elements(chart_node, "ancestor::w:drawing", w=W)), None)
     source_run = drawing.getparent() if drawing is not None else None
     if source_run is None or source_run.tag != f"{{{W}}}r":
@@ -263,13 +235,14 @@ def _new_chart(parts: dict[str, bytes], source: str, after: str, root: etree._El
     )
     for node in _elements(clone, ".//*[local-name()='chart']"):
         node.set(f"{{{R}}}id", rid)
-    paragraph.addnext(clone)
+    if not detached:
+        paragraph.addnext(clone)
     parts[owner] = encoded(doc_root)
     parts[owner_rels_path] = encoded(owner_rels)
     types = xml(parts, "[Content_Types].xml")
     etree.SubElement(types, f"{{{CT}}}Override", PartName="/" + new_part, ContentType=CT_CHART)
     parts["[Content_Types].xml"] = encoded(types)
-    return new_part
+    return new_part, clone
 
 
 def _set_series(root: etree._Element, series: list[Series], title: str | None) -> None:
@@ -329,7 +302,7 @@ def clone_chart(docx: Path, part: str, series: list[Series], title: str | None, 
     parts = read_parts(docx)
     root = copy.deepcopy(xml(parts, part))
     _set_series(root, series, title)
-    new_part = _new_chart(parts, part, part, root)
+    new_part, _ = _new_chart(parts, part, part, root)
     write_parts(parts, out)
     return new_part
 
@@ -343,8 +316,16 @@ def build_column_chart(
     after_part: str | None = None,
 ) -> str:
     parts = read_parts(docx)
-    source = xml(parts, style_source_part)
-    root = copy.deepcopy(source)
+    root = _column_root(parts, style_source_part, series, axis_title)
+    new_part, _ = _new_chart(parts, style_source_part, after_part or style_source_part, root)
+    write_parts(parts, out)
+    return new_part
+
+
+def _column_root(
+    parts: dict[str, bytes], style_source_part: str, series: list[Series], axis_title: str
+) -> etree._Element:
+    root = copy.deepcopy(xml(parts, style_source_part))
     plot = root.find(f"{{{C}}}chart/{{{C}}}plotArea")
     if plot is None:
         raise OfficeError("chart_style", "Source has no plot area")
@@ -378,6 +359,4 @@ def build_column_chart(
         )
         if titles:
             titles[0].text = axis_title
-    new_part = _new_chart(parts, style_source_part, after_part or style_source_part, root)
-    write_parts(parts, out)
-    return new_part
+    return root

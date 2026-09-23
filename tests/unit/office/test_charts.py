@@ -7,6 +7,7 @@ from docx import Document
 from lxml import etree
 from openpyxl import load_workbook
 
+from ema.core.office.chart_blocks import build_column_chart_detached, clone_chart_detached
 from ema.core.office.charts import Series, build_column_chart, clone_chart, embed_data, read_series
 from ema.core.office.package import C, P, R, check_standalone, inspect, read_parts, write_parts
 from ema.core.office.workbook import extend_formula, formula_cells
@@ -111,6 +112,39 @@ def test_clone_and_build_have_unique_parts_relationships_and_ids(tmp_path):
     assert {
         item.get("PartName") for item in types if "chartstyle" in item.get("ContentType", "")
     } == {"/word/charts/style1.xml", "/word/charts/style2.xml", "/word/charts/style3.xml"}
+
+
+def test_detached_charts_reuse_s0_builders_without_inserting(tmp_path):
+    source = package(tmp_path)
+    root = etree.fromstring(read_parts(source)["word/document.xml"])
+    prototype = root.xpath("//*[local-name()='p' and .//*[local-name()='chart']]")[0]
+    series = [Series("Gas", ["Jan", "Feb"], [1.0, 2.0])]
+    cloned_file = tmp_path / "detached-clone.docx"
+    built_file = tmp_path / "detached-built.docx"
+    cloned, clone_paragraph = clone_chart_detached(
+        source, "word/charts/chart1.xml", series, None, cloned_file, prototype
+    )
+    built, built_paragraph = build_column_chart_detached(
+        cloned_file, "word/charts/chart1.xml", series, "tep", built_file, prototype
+    )
+    report = inspect(built_file)
+    assert {cloned, built}.issubset({chart.part for chart in report.charts})
+    assert all(
+        chart.embedded and chart.external is None
+        for chart in report.charts
+        if chart.part in {cloned, built}
+    )
+    assert len(root.xpath("//*[local-name()='p' and .//*[local-name()='chart']]")) == 1
+    assert (
+        len(
+            etree.fromstring(read_parts(built_file)["word/document.xml"]).xpath(
+                "//*[local-name()='p' and .//*[local-name()='chart']]"
+            )
+        )
+        == 1
+    )
+    assert clone_paragraph.xpath(".//*[local-name()='chart']")
+    assert built_paragraph.xpath(".//*[local-name()='chart']")
 
 
 def test_inspect_planted_orphan_and_missing_workbook(tmp_path):
