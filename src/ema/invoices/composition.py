@@ -1,0 +1,33 @@
+"""Invoice parser composition, shared by the CLI and stage."""
+
+from __future__ import annotations
+
+from ema.core.config import Settings
+from ema.invoices.parsers.eds_parser import EdsInvoiceParser
+from ema.invoices.parsers.engie_parser import EngieInvoiceParser
+from ema.invoices.parsers.incompatible_parser import (
+    EngieEInvoiceCompanionParser,
+    MetNaturalGasInvoiceParser,
+    SeeExclusiveRefactoringParser,
+)
+from ema.invoices.parsers.met_energy_parser import (
+    MetElectricityInvoiceParser,
+)
+from ema.invoices.pipeline import ExtractInvoice, ProcessInvoiceFiles
+from ema.invoices.reader import InvoiceDocumentReader
+
+
+def build_invoice_processor(settings: Settings) -> ProcessInvoiceFiles:
+    return ProcessInvoiceFiles(
+        InvoiceDocumentReader(settings),
+        ExtractInvoice(
+            [
+                EngieInvoiceParser(),
+                EngieEInvoiceCompanionParser(),
+                EdsInvoiceParser(),
+                MetElectricityInvoiceParser(),
+                MetNaturalGasInvoiceParser(),
+                SeeExclusiveRefactoringParser(),
+            ]
+        ),
+    )

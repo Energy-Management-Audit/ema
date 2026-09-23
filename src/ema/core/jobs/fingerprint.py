@@ -1,31 +1,18 @@
-"""Resolve stage read-set revisions at publish and export."""
+"""Current-read checks shared by stage publication and output export."""
 
+from __future__ import annotations
+
+import hashlib
+import json
 import re
 import sqlite3
 
 from ema.core.errors import EmaError
-from ema.core.jobs.fingerprint import collection_revision
-from ema.core.workspace import Workspace
 
 
-def get_job(ws: Workspace, job: str) -> dict[str, object]:
-    with ws.connect() as db:
-        row = db.execute(
-            "SELECT id,type,client_slug,year,state FROM jobs WHERE id=? AND deleted=0", (job,)
-        ).fetchone()
-    if row is None:
-        raise EmaError("job_missing", "Lucrarea nu există.", job)
-    return dict(row)
-
-
-def latest_ready_run(ws: Workspace, job: str, stage: str) -> str | None:
-    with ws.connect() as db:
-        row = db.execute(
-            "SELECT id FROM runs WHERE job_id=? AND stage=? AND state='ready' "
-            "AND publication='current' ORDER BY ended_at DESC LIMIT 1",
-            (job, stage),
-        ).fetchone()
-    return str(row["id"]) if row else None
+def collection_revision(names: list[str]) -> int:
+    digest = hashlib.sha256(json.dumps(names).encode()).digest()
+    return int.from_bytes(digest[:8], "big") & ((1 << 63) - 1)
 
 
 def revision(db: sqlite3.Connection, table: str, row_id: str) -> int | None:
@@ -57,8 +44,11 @@ def revision(db: sqlite3.Connection, table: str, row_id: str) -> int | None:
     return int(row["revision"]) if row else None
 
 
-def run_current(db: sqlite3.Connection, run_id: str) -> bool:
-    reads = db.execute(
-        "SELECT table_name,row_id,revision FROM run_reads WHERE run_id=?", (run_id,)
+def run_current(db: sqlite3.Connection, run: str) -> bool:
+    rows = db.execute(
+        "SELECT table_name,row_id,revision FROM run_reads WHERE run_id=?", (run,)
     ).fetchall()
-    return all(revision(db, row["table_name"], row["row_id"]) == row["revision"] for row in reads)
+    return bool(rows) and all(
+        revision(db, str(row["table_name"]), str(row["row_id"])) == int(row["revision"])
+        for row in rows
+    )

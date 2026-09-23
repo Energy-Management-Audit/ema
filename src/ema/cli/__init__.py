@@ -16,13 +16,16 @@ from ema.core.errors import EmaError
 from ema.core.jobs import list_jobs, recover, status
 from ema.core.logging import write_event
 from ema.core.workspace import Workspace
+from ema.invoices import run_batch
 
 _app = typer.Typer(no_args_is_help=True, invoke_without_command=True)
 workspace_app = typer.Typer()
 job_app = typer.Typer()
+invoices_app = typer.Typer()
 _app.add_typer(workspace_app, name="workspace")
 _app.add_typer(job_app, name="job")
 job_app.add_typer(job_review_app)
+_app.add_typer(invoices_app, name="invoices")
 
 
 def _workspace() -> Workspace:
@@ -63,6 +66,26 @@ def job_list() -> None:
 def job_status(job: str) -> None:
     result = status(_workspace(), job)
     typer.echo(json.dumps(result.__dict__, ensure_ascii=False))
+
+
+@invoices_app.command("extract")
+def invoices_extract(folder: Path, client: str = typer.Option(..., "--client")) -> None:
+    if not folder.is_dir():
+        raise EmaError("invoice_folder", "Dosarul facturilor nu există.", str(folder))
+    sources = sorted(
+        path for path in folder.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"
+    )
+    result = run_batch(_workspace(), client, sources)
+    for outcome in result.outcomes:
+        reason = f" — {outcome['reason']}" if outcome["reason"] else ""
+        detail = outcome["metadata"]["technical_detail"] if outcome["status"] == "failed" else None
+        cause = f": {detail}" if detail else ""
+        typer.echo(f"{outcome['source_path']}: {outcome['status']}{reason}{cause}")
+    if result.omitted:
+        typer.echo(f"Omise din Excel ({len(result.omitted)}): {', '.join(result.omitted)}")
+    typer.echo(result.client_notice)
+    if result.workbook is not None:
+        typer.echo(str(result.workbook))
 
 
 @_app.command("serve")

@@ -16,12 +16,27 @@ from typing import Any, Literal
 
 from ema import __version__
 from ema.core.errors import EmaError
-from ema.core.jobs.reads import revision
+from ema.core.jobs.fingerprint import collection_revision
+from ema.core.jobs.reads import (
+    get_job,
+    latest_ready_run,
+    revision,
+)
 from ema.core.jobs.runner import owner, recover
 from ema.core.logging import log_exception, write_event
 from ema.core.workspace import SlotVersion, Workspace
 
-__all__ = ["cancel", "create_job", "list_jobs", "recover", "run_stage", "status", "subscribe"]
+__all__ = [
+    "cancel",
+    "create_job",
+    "get_job",
+    "latest_ready_run",
+    "list_jobs",
+    "recover",
+    "run_stage",
+    "status",
+    "subscribe",
+]
 
 JobType = Literal["invoices", "piee", "audit", "reporting"]
 JobState = Literal["created", "running", "ready", "failed", "cancelled", "open"]
@@ -138,6 +153,11 @@ class StageContext:
             row["converted_from"],
         )
 
+    def read_slots(self, prefix: str) -> list[SlotVersion]:
+        names = self.ws.list_slots(self.job, prefix)
+        self.record_read("slots.collection", f"{self.job}:{prefix}", collection_revision(names))
+        return [self.read_slot(slot) for slot in names]
+
     def record_read(self, table: str, row_id: str, revision: int) -> None:
         key = (table, row_id)
         if key in self.reads and self.reads[key] != revision:
@@ -231,8 +251,8 @@ def _finish(
         if row is None or row["state"] != "running":
             return
         stale = context.changed_reads or any(
-            revision(db, table, row_id) != read_revision
-            for (table, row_id), read_revision in context.reads.items()
+            revision(db, table, row_id) != expected_revision
+            for (table, row_id), expected_revision in context.reads.items()
         )
         cancelled = bool(row["cancel_requested"])
         state = "cancelled" if cancelled else "failed" if error else "ready"

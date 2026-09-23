@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import shutil
 import sqlite3
-import tempfile
 import time
 import uuid
-import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
@@ -18,10 +15,12 @@ from typing import IO, Literal
 
 from ema.core.errors import EmaError
 from ema.core.logging import log_exception
+from ema.core.workspace.backup_install import install_backup
 from ema.core.workspace.cleanup import delete_job_rows
 from ema.core.workspace.lock import workspace_lock
 from ema.core.workspace.references import evidence_uses_file, referenced_files
 from ema.core.workspace.schema import migrate
+from ema.core.workspace.settings import write_settings
 
 
 def _file_sha(path: Path) -> str:
@@ -211,6 +210,27 @@ class Workspace:
             for r in rows
         ]
 
+    def list_slots(self, job: str, prefix: str) -> list[str]:
+        """List active collection items in stable allocation order."""
+        collection = f"{prefix}/"
+        with self.connect() as db:
+            rows = db.execute(
+                "SELECT name FROM slots WHERE job_id=? AND substr(name,1,?)=? "
+                "AND active_version IS NOT NULL ORDER BY name",
+                (job, len(collection), collection),
+            ).fetchall()
+        return [str(row["name"]) for row in rows]
+
+    def file_path(self, client_slug: str, file_sha: str) -> Path:
+        with self.connect() as db:
+            row = db.execute(
+                "SELECT relative_path FROM files WHERE client_slug=? AND sha=?",
+                (client_slug, file_sha),
+            ).fetchone()
+        if row is None:
+            raise EmaError("file_missing", "Fișierul nu există.", file_sha)
+        return self.path(str(row["relative_path"]))
+
     def remove_version(self, job: str, slot: str, version: int) -> None:
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -362,28 +382,9 @@ class Workspace:
                 ),
             )
 
-    @staticmethod
-    def install_backup(archive: zipfile.ZipFile, names: set[str], target: Path) -> None:
-        with tempfile.TemporaryDirectory(dir=target.parent) as temp:
-            staging = Path(temp) / "workspace"
-            staging.mkdir()
-            with workspace_lock(staging):
-                for relative in names:
-                    path = staging / relative
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    with archive.open(relative) as source, path.open("wb") as dest:
-                        shutil.copyfileobj(source, dest)
-                staging.rename(target)
+    install_backup = staticmethod(install_backup)
 
-    def write_settings(self, job: str, values: dict[str, object]) -> None:
-        with self.connect() as db:
-            cursor = db.execute(
-                "UPDATE jobs SET settings=?,settings_revision=settings_revision+1 "
-                "WHERE id=? AND deleted=0",
-                (json.dumps(values), job),
-            )
-            if cursor.rowcount == 0:
-                raise EmaError("job_missing", "Lucrarea nu există.", job)
+    write_settings = write_settings
 
 
 add_file = Workspace.add_file
