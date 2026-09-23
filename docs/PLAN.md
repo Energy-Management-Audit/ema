@@ -31,7 +31,8 @@ which keeps the repo free of markdown sprawl.
 - 2026-09-18 **Step 3 done:** Festival/camp dropped, new repo, git flow, standards (§3.3, §6).
 - 2026-09-19 **Step 4 drafted:** architecture (§5) + roadmap (§7) + frontend brief.
 - 2026-09-19 CLIENT-A2 final audit + original `.rar` added to the library. **This is the first complete
-  input→final audit pair**; its ch. 4 tables supply the 2023–2025 dataset (§9).
+  input→final audit pair**; its ch. 4 tables supply the 2023–2025 dataset (§9). *Corrected
+  09-23: the final was produced with an agent, so only its inputs are used (§5.16).*
 - 2026-09-19 pywebview and repo layout confirmed; CLIENT-A2 electrical photos added (the case is
   now complete); Downloads duplicates moved to Trash.
 - 2026-09-19 Telemetry: none. Export = deliverables only, import = input data (no job transfer).
@@ -52,11 +53,46 @@ which keeps the repo free of markdown sprawl.
 - 2026-09-21 **Repo swap done (§8):** library out, campaign archived, 21 GB of ARGUS build output
   to the Trash, and `Energy-Management-Audit/ema` created with the skeleton — gates, import
   contracts, empty packages, plan, `AGENTS.md`, ADR 0001 — CI green on `prod` and `dev`.
+- 2026-09-23 **Architecture review, round 1 (Codex): 19 findings answered** (11 accepted,
+  8 in part, none rejected outright). Applied here:
+  - SQLite is the single job store, with field revisions and stage fingerprints (§5.3).
+  - Review, decisions and readiness come before the first PIEE (new slice S1b; §5.9).
+  - Typed evidence and field states (§5.4, §5.18); the PIEE base's anchor map (§5.10).
+  - Office runs behind a supervised adapter (§5.5); Word sets the TOC page numbers, and S0
+    proves the PIEE path too (§5.7).
+  - Backup and restore (§5.3); the source policy (§5.6); enrichment and loopback boundaries
+    (§5.11, §5.15); the real gates and a Windows build from S1 (§6.3); golden evidence levels
+    (§5.16).
+  - Open for Vlad: §9.
+- 2026-09-23 **Vlad's answers to round 1:**
+  - The CLIENT-A2 final was produced with an agent, not by the auditor: its inputs stay as test
+    inputs, its text is never a reference or base (§5.16). The audit base is AUDIT-01 2026.
+  - The goal, restated: her exact results, automated (§2.1). Audits work like the PIEE: her
+    latest finished audit filled in, by an AI agent under the hood (§5.7, §5.9 W3).
+  - **Mac first**, Windows port after (R17, S18); this replaces round 1's "Windows build from S1".
+  - TOC page numbers: Word sets them, on the Mac through AppleScript, proven the same day on the
+    approved PIEE (§5.7).
+  - The design handoff is implemented as made; Claude draws the missing screens and checks them
+    visually (R20, §5.18).
+  - the auditor approved the CLIENT-P1 PIEE, pies included (§5.10).
+  - Online research: the agent chooses and judges its sources (§5.11).
+- 2026-09-23 **Architecture review, round 2 (Codex, the last): 8 findings**, 7 accepted and 1 in
+  part:
+  - stages are fingerprinted by everything they read, and backup pins files (§5.3)
+  - only the backed API is frozen early, and S10 is split from the audit base S10b (§7)
+  - a hung Word for Mac is force-quit, restarted and retried (§5.5, Vlad's F3)
+  - the outbound-data boundary is enforced in code (§5.11)
+  - drafts report traceability coverage, not truth, and vision readings wait for a human (§5.12)
+  - final export needs a human approval, and R14 is a policy with guardrails (§5.9)
+  - Word edits happen on a working copy (§5.18); the dev loop is same-origin (§5.1)
+  - Vlad, the same day: the CLIENT-A2 final was produced with an agent, so it is inputs only,
+    and the audit base is AUDIT-01 2026 (§5.7, §5.16)
+  - The review is closed; the decisions left for Vlad are in `/tmp/ema-review/r2-claude.md`.
 - **Next:**
-  1. **Codex review** of the whole architecture, including the frontend contract (bounded, 2
-     rounds). The state-model types drafted from the handoff (§5.4) go into that review.
-  2. Then the S0 + S1 slice specs.
-  3. The repo swap (§8).
+  1. ~~Vlad's final decisions on the review~~: F1–F3 decided 09-23 (§4).
+  2. The S0, S1 and S1b slice specs. S1 also aligns `AGENTS.md` and ADR 0001 with §5.3,
+     §5.5 and §6.3.
+  3. Claude draws the missing screens (§5.18).
 
 ---
 
@@ -69,12 +105,18 @@ which keeps the repo free of markdown sprawl.
   Assistant" and E.M.A.
 - She prepares EMA's recurring paperwork so the auditor can focus on analysis, site visits and
   client relationships.
+- **The goal (Vlad, 09-23): automate the auditor's workflows by producing her exact results.** Every
+  deliverable is her own document — her template, same style, same layout — filled in for the
+  client, as the approved CLIENT-P1 PIEE is. Under the hood an AI agent does the filling where rules
+  cannot (the audit); nothing in the output differs from what she would make.
 - The UI speaks as Ema, in Romanian. Code, documentation and specs are in English, using the
   Romanian business terms (anexa, tep, Necesar info, Prelucrare date).
 
 ### 2.2 Users and scale
 
-- **the auditor** (and later possibly colleagues) on **Windows**, through the UI. She will
+- **Now: Vlad on his Mac, through the UI** (decided 09-23). He runs the PIEEs and audits with the
+  app until it works well; the Windows port comes after (R17).
+- **Then: the auditor** (and later possibly colleagues) on **Windows**, through the UI. She will
   eventually do most of the work.
 - **Vlad + AI agents** headless (CLI now, MCP later): bulk runs, fixes, automation.
 - **Scaling goal:** more clients and audits **without more staff**, i.e. agents doing more of the
@@ -137,18 +179,26 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 **Operation**
 - R13 Every workflow runs **without the UI** (CLI/agents), with the same code path as the UI.
 - R14 Agents may prepare and draft; **only a human marks audit sections done and exports the
-  final version**.
+  final version**. On one machine where agents run under the same account with a shell, Ema
+  cannot tell a human from an agent, so this is an **operating policy with guardrails** (§5.9),
+  not a security boundary.
 - R15 AI providers: **OpenAI and Gemini** (allowed to see client documents).
 - R16 Maps: a free source first (OpenStreetMap-based, attributed). Otherwise the map is a `later`
   item that the auditor fills from Google Maps.
-- R17 Windows first (desktop app), macOS second.
+- R17 **Mac first, then Windows** (decided 09-23): the app is built and used locally on Vlad's
+  Mac until it works well, then ported to Windows for the auditor. Vlad's Windows PC is the Windows
+  test machine. Nothing Mac-only enters the code: the port adds, it does not rewrite.
 
 **Interface (from the design handoff, 2026-09-21 — §5.18)**
-- R18 **Every proposed value opens its source:** the page crop with the value highlighted, the
-  sentence around it, and why it is uncertain; `sheet!cell` for spreadsheets.
+- R18 **Every proposed value opens its evidence:** the page crop with the value highlighted, the
+  sentence around it, and why it is uncertain; `sheet!cell` or a range for spreadsheets; URL, date
+  and quote for online facts; the inputs of a calculation. Where no highlight is possible (a
+  converted `.doc`, a failed OCR box) the snippet says so instead of guessing.
 - R19 **Every accept, correction and bulk action is reversible and logged** in the job's „Jurnal".
-- R20 **The UI follows the handoff:** its tokens, components and ids; paper never inverts; the
-  focus ring is never removed without its replacement; Romanian copy verbatim.
+- R20 **The UI is the handoff, implemented as made** (Vlad, 09-23: a design he likes, not a
+  suggestion): its layout, tokens, components, states and ids; paper never inverts; the focus
+  ring is never removed without its replacement; Romanian copy verbatim. The only adaptations are
+  resizing across desktop sizes and the data corrections of §5.18.
 - R21 **Errors and empty states are per item and actionable:** the concrete cause, and the next
   step or two real exits. A failed item never stops the rest.
 
@@ -289,6 +339,13 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 | 09-21 | Window: **designed at 1400×900, built resizable from 1280×800** |
 | 09-21 | Design ids (3b, 7d…) are the shared vocabulary: they appear in **component names and commit messages** |
 | 09-19 | **Docker: not for the product now** (hosted backend later); **Windows `.exe`: yes** (PyInstaller one-folder + installer, built on a Windows CI runner) (§10) |
+| 09-23 | **Review closed (F1–F3):** research queries stay free text, and code refuses any carrying the job's private values (§5.11). R14 is a light policy: the 7a export click in the UI, one y/N in the CLI, and UI-only once the auditor takes over (§5.9). A hung Word on the Mac may be force-quit, since Vlad does not use Word there (§5.5) |
+| 09-23 | **D4: the API contract is written early** — S16a follows S1b + S10, and the frontend track runs in parallel with the PIEE backend |
+| 09-23 | **Audits work like the PIEE:** her latest finished audit cloned and filled in, same style and layout; an AI agent does the filling under the hood (§5.7, §5.9 W3, §5.12). The goal is her exact results, automated, nothing different (§2.1) |
+| 09-23 | **Online research: the agent is free** to find information and judge whether a source is legitimate; no site or field allowlist; every fact stays traceable (§5.11) |
+| 09-23 | **The handoff is implemented as made**, resizable across desktop sizes (R20); Claude draws the missing screens in its direction and checks them visually (§5.18) |
+| 09-23 | **the auditor approved the CLIENT-P1 PIEE** (Vlad showed it to her): the S8 golden is approved, and the pies stay exactly as made |
+| 09-23 | **Mac first, Windows after** (R17): quick development to get the app working locally and well; Vlad runs the jobs with it meanwhile; then the Windows port (S18) on Vlad's Windows PC |
 
 ---
 
@@ -330,8 +387,10 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
     of the Mac screen, right-click menus outside the web page, a system-tray icon and built-in
     auto-update. Ema's own menus inside the window are unaffected; the rest can be added later if
     ever needed.
-- **Dev loop:** `uv run ema serve` + `npm run dev` in a normal browser. A frozen build only for
-  releases.
+- **Dev loop:** `uv run ema serve` + `npm run dev` in a normal browser, **same-origin**: the Vite
+  dev server proxies `/session`, the API routes, `/evidence` and SSE to `ema serve`, so the browser
+  sees one origin and the §5.15 checks stay on. Integration checks run the built frontend served by
+  FastAPI. S16a acceptance includes this two-process loop. A frozen build only for releases.
 - **Dependency rules** (enforced by `import-linter` in CI):
   - `interfaces → workflow modules → {consumption_analysis, energy_data, clients} → core`
   - Workflow modules never import each other.
@@ -343,67 +402,118 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 | Module | Owns | Public entry points (use cases) |
 |---|---|---|
 | `core.workspace` | workspace folders, content-addressed files, file slots + versions | `add_file`, `set_slot`, `list_versions`, `remove_version` |
-| `core.jobs` | job records, stage runs, runner, cancellation, progress events | `create_job`, `run_stage`, `cancel`, `status`, `subscribe` |
-| `core.office` | xls/xlsx label-finding readers, file-type sniffing, `.doc` conversion, docx block engine, native charts | `find_label`, `read_block`, `sniff`, `convert_doc`, `render(template, blocks)` |
+| `core.jobs` | the job store (SQLite, §5.3), stage runs + fingerprints, runner, cancellation, progress events | `create_job`, `run_stage`, `cancel`, `status`, `subscribe` |
+| `core.review` | fields and their evidence, decisions (the Jurnal), conflicts, undo — the same for every workflow | `fields`, `decide` (accept / correct / reject / choose), `undo`, `conflicts` |
+| `core.office` | xls/xlsx label-finding readers, file-type sniffing, docx block engine, native charts, the supervised Office adapter (§5.5) | `find_label`, `read_block`, `sniff`, `render(template, blocks)`, `convert_doc`, `render_pdf`, `update_toc_pages` |
 | `core.pdf` | text extraction, OCR (Tesseract ron+eng) | `text(pdf)`, `ocr(pdf)` |
-| `core.llm` | OpenAI + Gemini behind one interface, structured output, cost logging | `complete_json(schema, prompt, context)` |
+| `core.llm` | OpenAI + Gemini behind one interface, structured output, the tool-calling agent loop, cost logging | `complete_json(schema, prompt, context)`, `run_agent(instructions, tools, context, limits)` |
 | `core.web` | allow-listed HTTP fetch + search for enrichment, caching, rate limits | `search`, `fetch` |
 | `clients` | client identity (CUI, name, addresses, CAEN, contacts, sites), ANAF lookup | `get_or_create_by_cui`, `refresh_from_registry` |
 | `energy_data` | canonical per-client/year dataset, carrier vocabulary, factors, readers, calculations, *Prelucrare* writer | `import_anexa`, `import_necesar_info`, `import_prelucrare`, `build_dataset`, `indicators`, `write_prelucrare` |
 | `consumption_analysis` | PIEE / audit-ch. 4 blocks (tables, native charts, phrased commentary) | `blocks(dataset, scope)` |
-| `invoices` | the ported extractor, batch identity, workbook export | `extract_batch`, `confirm_client`, `export` |
-| `piee` | PIEE job | `generate(client, year)` |
+| `invoices` | the ported extractor, batch identity, workbook export | `extract_batch`, `confirm_client`, `readiness`, `export` |
+| `piee` | PIEE job | `generate(client, year)`, `readiness`, `export` |
 | `reporting` | energy-manager report | `generate(years, clients)` |
-| `audit` | the audit job: intake, extract, enrich, facts, sections, draft, render | stage functions (§5.9) |
+| `audit` | the audit job: intake, extract, enrich, facts, sections, draft, render | stage functions (§5.9), `readiness`, `export` |
 
 ### 5.3 Storage, jobs and the scaling path
 
 ```
 <workspace>/                              default %APPDATA%\Ema (Windows), ~/Ema (mac); configurable
-  ema.sqlite                              index: clients, files, slots, jobs, stage_runs, sections
+  ema.sqlite                              the job store: clients, files, slots, jobs, stage runs, fields,
+                                          decisions (the Jurnal), sections
   clients/<client-slug>/
-    files/<sha256>.<ext>                  every uploaded/converted file once
+    files/<sha256>.<ext>                  every uploaded/converted file once; immutable
     jobs/<year>-<type>-<short-id>/
-      job.json                            slots → file versions, options, status (relative paths only)
-      work/                               dataset.json, facts.json, sections/<id>.json, enrichment/, cache/
-      outputs/                            deliverables (.docx / .xlsx), one per run, versioned
+      work/<stage>/<run-id>/              stage artifacts (dataset.json, facts.json, sections/<id>.json,
+                                          enrichment/); immutable once the run ends
+      cache/                              rebuildable (page renders, OCR text)
+      outputs/                            deliverables (.docx / .xlsx), one per run, versioned, never overwritten
+      edits/                              working copies opened in Word („Deschide în Word"); never an output
       log.jsonl                           steps, warnings, errors + tracebacks, LLM calls (model, tokens, cost)
 ```
 
+- **One authority: SQLite.** Everything that changes — slots, field values, decisions, section
+  statuses, job status — lives in `ema.sqlite` and changes in one transaction. Files are either
+  immutable (inputs, stage artifacts, outputs) or rebuildable caches, so no file can disagree with
+  the database. There is no `job.json`; the diagnostics bundle writes a snapshot of the job's rows.
+  `log.jsonl` is the technical log, not state: the Jurnal (R19) is the `decisions` table.
+- **Revisions.** Every mutable row a stage can read carries a revision: fields, slots (the
+  active version), section statuses, the client record, and the job's settings (provider,
+  model). A decision names the revision it was made on, and a decision on an outdated revision is
+  refused (HTTP 409 / a CLI error), never applied over the newer value. This is the real race: a
+  stage re-run proposing values while the auditor accepts them.
+- **Stage fingerprint** = the read set — every `(row, revision)` the run read, recorded by
+  `core.jobs` as it reads — + the input file hashes + the template, factor-table and prompt
+  versions + the model + the Ema version.
+- **Publishing checks the read set.** When a run ends, and again at final export, the read set is
+  compared with the current revisions in the same transaction that publishes. On a mismatch the
+  artifact is stored as `stale`, not as current, and so is everything downstream of it (§5.9
+  section transitions). A test changes a slot and a section decision in the middle of a run.
+- **Undo = a compensating decision** against one Jurnal entry. If a later decision changed the
+  same field, the undo is refused and names the entry that superseded it; nothing cascades
+  silently.
 - **File slots with versions.** Each job declares named slots (`anexa_2_3`, `necesar_info`,
   `prelucrare_date`, `dossier[]`, `visit[]`, `invoices[]`). A new upload or conversion adds a
-  version; the newest is active; any version can be removed. Nothing is ever "stuck in history".
+  version; the newest is active; any version can be removed from the slot. Nothing is ever
+  "stuck in history".
 - **Job lifecycle:** `created → running(stage) → ready | failed | cancelled`. Audit jobs stay
   `open` for weeks, and each stage can be re-run.
-  - A stage run is recorded with its inputs (file hashes), duration, outcome, warnings and error.
+  - A stage run is recorded with its fingerprint, duration, outcome, warnings and error.
   - **A failed file or section never fails the whole job.**
-- **Runner:** in-process worker threads now (a single user). It sits behind a `JobRunner`
-  interface, so a queue with separate workers can replace it for a hosted version without
-  touching modules.
-- **No local-only assumptions:** relative paths in `job.json`; storage behind `core.workspace`
-  (local folder now, S3-compatible later); SQLite now (Postgres possible later); secrets behind an
-  interface (OS keyring now, environment/secret store on a server).
-- **Backup** = copy the workspace folder. **Delete** = remove the folder + its index rows.
+- **Runner:** in-process worker threads (a single user). `core.jobs` is the only place a stage
+  is started, so a hosted version replaces that module's internals. No pluggable runner interface
+  until a second runner exists.
+- **Portable, not abstracted:** relative paths in the job store; `core.workspace` is the only
+  module that touches workspace files; plain SQL. Secrets come from the OS keyring (the auditor) or
+  the environment (agents, CI): two real sources behind one function. Storage, queue and
+  database adapters for a hosted version (S3, Postgres) are designed only when that version is.
+- **Backup** = a consistent snapshot, never a copy of the live folder: SQLite's online backup
+  API, every file the job store references, and a manifest with checksums, in one dated zip.
+  Backup and file garbage collection take the same workspace lock, so no referenced file can
+  disappear while the zip is written. **Restore** opens a backup as a new workspace after
+  verifying the manifest. S1 tests backup → restore into a clean folder → the same jobs list and
+  export, and a backup running while a job is deleted. Shipped before the first real
+  deployment (§10.3).
+- **Delete** is two-step: the rows are marked deleted in one transaction, then the folders are
+  removed; an interrupted delete is finished on the next start. Removing a slot version only
+  unlinks it. A file is garbage-collected only when no slot version, stage run or output
+  references it.
 - **Export** = the deliverables the app produces (`outputs/*.docx|.xlsx`), saved wherever the user
   chooses. **Import** = loading input files into a job's slots. There is no job transfer between
   machines: each machine has its own workspace (decided 09-19).
 
 ### 5.4 Data model (the key types)
 
-- **`Source`:** where a value came from
-  - `{file_sha, locator, method, retrieved_at, quote?}`
-  - `locator ∈ {page, bbox?} | sheet!cell | url` — the bbox is what makes the snippet crop
-    possible (R18)
+- **`Evidence`:** one immutable piece of proof for a value
+  - `{id, file_sha?, locator, method, retrieved_at, quote?, highlight}`
+  - `file_sha` names the exact file version (content-addressed), so evidence never drifts to a
+    newer upload.
+  - `locator` is typed: `pdf_region {page, bbox}` · `pdf_text {page, span}` · `cell {sheet, ref}`
+    (a cell or a range, `F2!C14:C25`) · `docx {paragraph | table, row, col}` · `photo {region?}` ·
+    `url {url, snapshot_sha}` · `manual {who, note?}`
+  - `highlight ∈ exact | page | none` — what the snippet can honestly show (R18). OCR keeps its
+    word boxes (Tesseract TSV), so a scan gets `exact` when the word is found.
   - `method ∈ questionnaire | anexa | prelucrare | invoice | online | manual | calc`
-- **`Value[T]`:** `{value, unit?, source, state, review, history[]}`
+  - Readers capture evidence as they read: it is part of every reader's acceptance (S4, S5, S9,
+    S12), with a crop/quote test on a scanned PDF and a spreadsheet.
+- **`Value[T]`:** `{value?, unit?, evidence[], derivation?, state, presence, review, revision}`
   - `state` = where it came from: `supplied | extracted | enriched | calculated | manual`
-  - `review` = what the auditor did with it: `pending | accepted | corrected | rejected | missing`
-    (`missing` = not found anywhere; the UI asks for it)
-  - `history[]` = `{at, actor (ema|user), from, to, action, batch_id?}` — every entry is
-    undoable, including bulk accepts (R19)
-  - Two conflicting values are both kept, and the job shows a conflict until one is chosen.
-    „Accept exact matches automatically" (3i) may pre-accept identical values; they stay in the
-    log and can be undone.
+  - `presence` = what Ema's search found: `found | not_found | failed` (`not_found` = no expected
+    source has it, and the UI asks for it; `failed` = a reader error with its cause, R21)
+  - `review` = what the auditor did with it: `pending | accepted | corrected | rejected`.
+    `rejected` is a verdict on a found value; readiness then treats the field as missing.
+  - `derivation` (calculated values): `{formula_id, inputs: field ids, factor_version}`; the
+    snippet shows the inputs, each with its own evidence.
+  - A value is absent exactly when `presence` is not `found` and nobody typed one; a typed value
+    is `state: manual` with `manual` evidence.
+  - its history is the job's decisions: `{id, at, actor (ema|user|agent), field, on_revision,
+    action, before, after, batch_id?, undone_by?}` — each one undoable per §5.3, bulk accepts
+    included (R19)
+  - Two conflicting values are both kept as alternatives, each with its evidence, and the job
+    shows a conflict until one is chosen.
+    „Accept exact matches automatically" (3i) may pre-accept identical values (never vision
+    readings, §5.12); they stay in the log and can be undone.
 - **`Client`:** CUI (normalized), legal name, registration no., address, work sites,
   CAEN + description, contacts, energy manager, ownership.
 - **`EnergyDataset(client, years)`:**
@@ -429,14 +539,18 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
     `FleetFacts`, `MeteringFacts`, `AutomationFacts`
   - `EquipmentFacts[]` (+ enrichment), `MeasurementFacts` (visit), `MeasureFacts[]`
   - Every field is a `Value`.
+- **Field catalogue** (per workflow, per template version): key, type, unit, `required` (for a
+  final).
 - **`SectionStatus`:**
-  - `ready | missing(facts) | later(visit | thermography | electrical | map) | n/a | done`
-  - plus `stale` (inputs changed since the draft)
+  - `ready | missing(facts) | later(visit | thermography | electrical | map) | n/a | drafted | done`
+  - plus a `stale` flag (an input in the draft's fingerprint changed); transitions in §5.9
 
 ### 5.5 Readers and legacy formats
 
 - **Label-based readers:** find a label (case/diacritics-insensitive, alias list), then read
-  relative to it. No fixed cell address anywhere.
+  relative to it. Regions are always found by label; inside a recognized form version, a
+  documented relative column is allowed (the commissioning year in column C, R10). No absolute
+  cell address is ever used to find data.
   - **Anexa 2–3:**
     - both form generations; sheet-name aliases (the 6 variants of „Solutii EE…")
     - contact block located by label
@@ -453,11 +567,40 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
   - File type detected from content, not extension (catches HTML saved as `.xls`).
   - `.xls` read directly (`xlrd`).
   - `.doc` converted on intake:
-    1. Word automation (Windows COM, hidden, one at a time, hard timeout)
+    1. Word automation through the supervised adapter below (AppleScript on the Mac, COM from the
+       Windows port)
     2. otherwise LibreOffice headless
     3. otherwise flagged *needs conversion* (the rest continues)
   - The converted `.docx` is a new version (`converted_from`), and word/table counts are checked
     against the original.
+- **External programs run supervised, outside the app's process.** LibreOffice and Tesseract are
+  each called from a short-lived child process that the app waits on with a per-item timeout. On
+  a timeout or crash the child is killed, temporary files are removed, the item fails with its
+  cause (R21), and the rest continue.
+- **Word for Mac (now) is Ema's to restart.** Vlad does not use Word on this Mac for his own
+  documents (09-23), so a hung Word may be force-quit. Killing `osascript` alone does not stop
+  Word, so Ema acts on Word itself:
+  - Word calls are serialized. Ema works on its own copies, under unique names in its folder
+    inside Word's container.
+  - Every call has an AppleScript timeout. On a timeout Ema force-quits Word, removes its copies,
+    relaunches Word and retries the item once with a fresh copy under a new name (so no stale
+    lock blocks it). A second failure fails that item with its cause (R21), and the batch goes
+    on.
+  - A missing Automation permission (AppleScript error -1743) is reported with the steps to grant
+    it.
+  - S0 tests a denied permission and a forced timeout: Word is restarted, the item is retried,
+    and the batch continues.
+  - This holds only while Word on the machine is Ema's alone. On the auditor's PC her Word is never
+    touched (below).
+  - **At the Windows port**, Word runs in a supervised child: `Ema.exe` itself started with an
+    internal subcommand, driving a private Word instance recorded by PID, which is killed with it.
+    **the auditor's own open Word is never touched.** Word calls are serialized, one instance at a
+    time; COM is initialized and torn down inside the child, never in the app's threads.
+  - Cancelling a job stops after the current item or kills the child. A job always reaches a
+    terminal state (`cancelled` / `failed`); nothing stays „running" forever.
+  - The same adapter does the `.docx → PDF` render (preview) and the TOC page numbers (§5.7).
+  - Domain work stays on threads (ADR 0001, rule 5): these children are process boundaries that
+    Office already imposes, not a worker pool.
 
 ### 5.6 Calculations and factors
 
@@ -467,27 +610,100 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
   conversie in MWh" (Eurostat) and „impact de mediu" sheets). A factor change never rewrites a
   past job.
 - **Verified** by reproducing her *Prelucrare date* numbers (CLIENT-P1, CLIENT-P2, CLIENT-A3).
+- **Source policy, per field and year.** When sources differ, Ema proposes a winner in this order
+  and shows the conflict for a human to choose; nothing is averaged or adjusted:
+  1. the auditor's *Prelucrare date*, for the years it covers (R8)
+  2. Necesar info
+  3. Anexa 2–3
+  4. last year's job
+
+  Her answer to §9 („which one wins") can change only this order, not the mechanism, so S8 does
+  not wait for it.
+- **Filed and recomputed values are both kept**, each with its evidence and the recomputed one
+  with its derivation. The document shows the chosen one.
+- **Units and precision:** values are stored at full precision in their source unit; rounding
+  happens only at presentation (§5.10 formats).
+- **Reconciliation tolerance:** a recomputed total matches a filed one when the difference is
+  within the rounding both carry (half a unit of each input's and the filed value's last shown
+  decimal, propagated through the sum). Anything larger is a conflict (the §5.10 „Date anuale"
+  cross-check).
+- **Her workbook's factors are read with her values.** When her *Prelucrare date* is imported, the
+  factors on its sheets are recorded with it; a difference from Ema's factor table shows in the
+  conflict's derivation instead of being recomputed away.
+- Goldens cover a matching total, a real mismatch, and a year without monthly data (CLIENT-P1
+  2025 PV). If the library holds no real mismatch, S3 uses a unit fixture and says so.
 
 ### 5.7 Document engine (template + slots + blocks)
 
+**Who writes what.** The agent never edits Word or the `.docx`. It works on data:
+1. **The agent** returns each section as JSON in that section's schema (a pydantic model derived
+   from her section in the base) — for „2.3 Istoria companiei", say,
+   `{paragraphs: [{kind: body, text: "Societatea a fost înființată în {{f:founded_year}}…"}]}`;
+   for a table, its rows; for a figure, which chart or photo. **The agent never types a number:**
+   it writes a reference to a recorded fact, and the engine inserts the value, formatted the
+   Romanian way. A number it needs that is not a fact yet (a percentage change) it gets from a
+   calculation tool, which records it as a calculated fact first.
+2. **The engine** (deterministic Python, the way the CLIENT-P1 script works) opens her document,
+   finds the section's anchors, and writes the content into her own paragraphs, tables and
+   charts, inside her runs, cloning her element where the client needs more of them.
+3. **Word** then lays the result out: TOC page numbers and the PDF (below).
+
+The schema in between is what makes the output checkable and repeatable: every number is matched
+to a fact, and every leftover or AI mention is caught, before anything reaches the document.
+Regenerating a section rewrites only its anchors.
+
 - **Templates** in `templates/`, built from the auditor's real documents:
-  - `audit_master.docx`: her full chapter tree, **with all client data removed**; fixed ch. 1 and
-    ch. 7 text; header, styles, green table style, captions, TOC field
+  - `audit_master.docx`: **her latest finished audit, cloned** exactly as the PIEE is, with its
+    anchor map. **Provisional base: AUDIT-01 2026**, her latest own audit in the library (last
+    saved 6 Aug). The CLIENT-A2 final is newer but was produced with an agent, so it is never a
+    base or a style reference (R1). the auditor may name another (§9); a change of base re-runs S10b
+    only; the §5.10 anchor rules and leftover check apply.
+    Fixed chapters (1, 6.1–6.2, 7), header, footer, styles, green tables, captions and the TOC
+    stay verbatim; client sections are filled in place. Where a client needs more or fewer of a
+    unit (a process, an equipment table, a measured panel, a carrier), the engine clones her own
+    heading, paragraphs, table and figure for it, so every added part is formatted exactly like
+    hers. A test case is never filled into its own base.
+  - **Her reference set: all her own audits in the library, used together** (Vlad, 09-23). One
+    document is the base to clone (AUDIT-01), but all of them feed the rest:
+    - her 2026 audits: **AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04**, and **AUDIT-05** (`Cap 2-3-4 V2`,
+      ch. 2–4). They are the source for the section catalogue and its variants, the phrase bank,
+      the agent's style guide and worked examples, and the prototypes for a section or unit the
+      base lacks. They share her template and styles, so a prototype taken from one of them fits
+      the base.
+    - **CLIENT-A3 2022** is the older template, by the previous auditor: a content and domain
+      reference only (what a section covers, what data it needs), never style, layout or wording.
+    - The CLIENT-A2 final: never (§5.16).
   - `piee_master.docx`: **her latest finished PIEE kept verbatim** (today the CLIENT-I5
-    `MODEL_2026.docx`) plus an anchor map (paragraphs, tables and charts to fill). Client content is
-    replaced in place per §5.10, never re-laid out.
+    `MODEL_2026.docx`) plus its anchor map, which classifies every element as fixed or variable
+    (§5.10). Client content is replaced in place per §5.10, never re-laid out.
   - `energy_manager_report.xlsx`, `prelucrare_date.xlsx`: her layouts
 - **Slots:** named anchors in the templates (e.g. `ch2.date_generale`, `ch4.electricitate.grafic`).
-  A slot left unfilled in a draft stays visible only in the preview. **Final export requires every
-  slot filled or its section `n/a`.**
-- **Blocks:** Paragraph (style), BulletList, Table (house style; header row green/white; widths
+  A slot left unfilled in a draft shows a marker (`[de completat]` in an audit draft, the red
+  marker of R4c in a PIEE). What blocks a **final** export is the workflow's readiness (§5.9).
+- **Blocks** are instantiated from prototypes taken from her document (a paragraph of that
+  style, her table, her caption, her chart), never styled from scratch: Paragraph, BulletList, Table (house style; header row green/white; widths
   from content), Figure (image + caption), **NativeChart** (a real Word chart with its embedded
   worksheet: column/line/pie, her colours), PageBreak. Numbering of figures and tables, and the
   „În figura numărul X… / Conform tabelului numărul Y…" references, are resolved in one pass
   at render.
 - **Output settings:**
-  - TOC page numbers are computed from the engine's own PDF render and written into the TOC
-    field result. There is no update-fields prompt on open (§5.10).
+  - **TOC page numbers are written by the engine**, into the existing entries (her spacing kept),
+    with no update-fields prompt on open (§5.10). Writing them is easy; *knowing* them needs a
+    layout engine, because a `.docx` holds no pages: where a heading lands depends on fonts, line
+    breaks, table heights and chart sizes, worked out only when a program lays the document out.
+  - **Word lays the document out, on the Mac too.** Through the Office adapter, Word for Mac is
+    driven by AppleScript: open the filled `.docx`, *update page numbers* on the TOC (numbers
+    only; entries and spacing untouched), save, *save as PDF*, close. **Proven 2026-09-23** on a
+    copy of the approved CLIENT-P1 PIEE with all 28 TOC numbers scrambled to 99: Word restored
+    exactly the approved numbers, the TOC paragraphs were unchanged, and the PDF had its 33 pages.
+    Needs the macOS Automation permission for Word (granted), and the files placed in Word's
+    sandbox container (`~/Library/Containers/com.microsoft.Word/Data/`) for the operation, then
+    copied back, so Word never asks for file access.
+  - **From the Windows port:** the same steps through COM.
+  - **Without Word** (CI, a machine without Office): a LibreOffice render; the engine writes the
+    numbers, re-renders and repeats until stable (at most 3 passes), and the check says the
+    numbers were not set by Word.
+  - Added or removed headings keep their `_Toc` bookmarks and the entries' `PAGEREF`s in step.
   - Romanian number formatting (`1.234,56`).
   - Fonts with full Romanian diacritics in charts.
 - **Annual reuse:** a client's confirmed facts carry into next
@@ -497,7 +713,16 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
   - **Partly proven (2026-09-19, CLIENT-P1 PIEE):** the result opened cleanly in Word for Mac,
     with editable data. That covered rewriting her existing chart parts, embedding their
     workbooks, and adding native 3D pies.
-  - **S0 still proves:** Word on Windows, and charts built from scratch for the audit.
+  - **S0 still proves, in Word for Mac** (Windows Word again at the port), three separate
+    things; none stands in for another:
+    1. the PIEE path, as a repeatable check: the CLIENT-P1 golden (rewritten charts, removed series
+       and figures, embedded workbooks, native pies) opens without repair, Edit Data works on a
+       bar chart and a pie, and the package has zero external relationships and one workbook per
+       chart
+    2. the audit path: one of her audit charts cloned for a carrier her base lacks, and one built
+       from scratch (the fallback), open, are editable, and match her chart
+    3. the TOC page numbers (§5.7), productized: Word's update on a scrambled golden restores the
+       approved numbers and keeps her TOC formatting (proven by hand on 2026-09-23)
 
 ### 5.8 `consumption_analysis`
 
@@ -510,13 +735,51 @@ PIEE).
   trends), and sentences from **her real phrase patterns**, with numbers inserted and rule-based
   choices (creștere/scădere/constantă; the largest share; notable months).
 - Deterministic; no LLM.
-- The phrase bank is extracted from her audits and PIEEs (S7).
+- The phrase bank is extracted from all her own 2026 audits and her PIEEs (S7; §5.7 reference set).
 - **Two consumers, one analysis:**
-  - Audit ch. 4 renders the blocks as new content.
+  - Audit ch. 4 does the same in her audit's own ch. 4 tables and charts, cloned per carrier where
+    the client has more than her base.
   - The PIEE writes the same numbers and phrases into her existing tables, charts and sentences
     (§5.10).
 
 ### 5.9 Workflows in detail
+
+**Readiness: one function per workflow.** `readiness(job) → {draft_ok, final_ok, blocking[],
+warnings[], next[]}`. The CLI (`ema job checks`), the API (`/export/checks`) and 7a all show its
+answer, and export calls it; no interface keeps its own rules.
+
+| Workflow | Draft export | Final export is blocked by |
+|---|---|---|
+| W1 Facturi | n/a (the workbook is the only output) | an unconfirmed batch client. Flagged invoices export flagged, as in today's contract (R11) |
+| W2 PIEE | always: missing data in red (R4c); an unresolved conflict renders its proposed value and is listed | an unresolved conflict (the „Date anuale" cross-check included), a failed §5.10 package check, an untouched variable anchor (§5.10) |
+| W3 Audit | always, with `[de completat]` markers | a section not `done` or `n/a`, a `stale` section, an unresolved conflict in a fact a section uses |
+| W4 Raportare | n/a | nothing: gaps go to the Exceptions sheet |
+
+**Audit section transitions:**
+
+| From → to | Who | When |
+|---|---|---|
+| `missing` ↔ `ready` | Ema | computed from the facts the section needs |
+| `ready` → `drafted` | Ema or an agent | the Draft stage ran |
+| `drafted` → `done` | **a human only** (R14) | |
+| `done` → `drafted` + `stale` | Ema | an input in the draft's fingerprint changed; the Jurnal records which |
+| `drafted` + `stale` → `drafted` | Ema or an agent | the section was re-drafted |
+| any → `later(reason)` | a human; Ema only for visit / measurements / thermography / map while that material is absent | |
+| `later` → computed | a human, or Ema when the awaited material arrives | |
+| any ↔ `n/a` | a human only | |
+
+**Human-only actions (R14), guardrails not security:**
+- A final export needs a **human approval**: a decision bound to the exact artifact revision and
+  readiness it approves. Any later change voids it. The shared export use case checks it,
+  whichever interface calls, so a caller cannot pass `actor=user` to skip it.
+- **No extra burden on the user** (Vlad, 09-23: no checks that aren't real). In the UI the
+  approval *is* the designed 7a export action, with no added dialog. In the CLI, `--final` and
+  `done` / `n/a` ask one plain y/N confirmation; a non-interactive call refuses them, and MCP
+  does not expose them.
+- `AGENTS.md` forbids agents from making them. An agent determined to fake a terminal could, which
+  is why this is a policy.
+- While Vlad is the operator on the Mac, the CLI path stays open. When the auditor takes over, these
+  actions become UI-only (decided 09-23).
 
 #### W1 Facturi (`invoices`)
 
@@ -538,9 +801,11 @@ Gas and SEE documents are reported as "not supported yet".
    - Anexa 2–3 (year N)
    - Necesar info (year N)
    - optionally the auditor's *Prelucrare date*
-3. Import into the dataset. The previous years come from last year's job or from her workbook.
-4. Review the conflicts.
-5. Generate from `piee_master.docx` (her latest finished PIEE), following the **PIEE format
+3. Import into the dataset: every value becomes a field with its evidence (§5.4). The previous
+   years come from last year's job or from her workbook.
+4. Review through `core.review`, the same use cases as the audit, from the CLI or the UI:
+   conflicts (the „Date anuale" cross-check included), missing fields, uncertain values.
+5. Generate a draft from `piee_master.docx` (her latest finished PIEE), following the **PIEE format
    contract (§5.10)**:
    - **Date generale** ← clients + anexa (+ online for what the anexa lacks)
    - **Analiză** ← `consumption_analysis`, written into her existing tables and charts
@@ -548,26 +813,45 @@ Gas and SEE documents are reported as "not supported yet".
    - **Măsuri** ← „Solutii EE planificate"
    - **Bibliografie** ← anexa title + last audit (year, auditor)
 6. Render to PDF, write the TOC page numbers, and run the contract's acceptance checks.
-7. Output: `.docx` + generated *Prelucrare date* `.xlsx` (her layout, live formulas; a working
+7. Final export when readiness allows it. Output: `.docx` + generated *Prelucrare date* `.xlsx` (her layout, live formulas; a working
    file, not linked from the `.docx`).
 
 #### W3 Audit (`audit`)
 
-A long-lived job. Each stage is a function over the job folder, re-runnable
-on its own:
+A long-lived job that fills her latest finished audit (§5.7) for a new client. The numbers come
+from deterministic readers and the shared analysis; everything else is found and written by an
+**AI agent** (§5.12), because no fixed rule set can read an arbitrary dossier, research a company
+and write her chapters. Each stage is re-runnable on its own, and per section:
 
 | Stage | Does | Output |
 |---|---|---|
-| 1 Intake | upload in batches; sniff/convert; classify each file against the 13-item checklist + Necesar info + visit material; per-file status | `work/intake.json`, completeness („lipsesc: 6, 10") |
-| 2 Extract | deterministic readers (Necesar info: energy, equipment, fleet, buildings, employees; Anexa 2–3; meter exports) + LLM extraction from permits, process-flow docs, schemes (structured output, source quote + page) | `facts.json` (state `extracted`), `dataset.json` |
-| 3 Enrich | company (ANAF CUI service, registries), CAEN description, history (company site), location (public sources), map (OSM-based), equipment (brand + model → description, function, energy features, image) | facts (state `enriched`, URL + date) |
-| 4 Confirm | the auditor confirms or edits facts and resolves conflicts; confirmed facts carry into next year | facts (state `confirmed`) |
-| 5 Plan | compute each section's status from the template's section catalogue; user overrides (later / n/a) | `sections` |
-| 6 Draft | per section: fixed text / data blocks / LLM narrative from facts only | `work/sections/<id>.json` |
-| 7 Preview | the rendered `.docx` → PDF → a **paged, scrollable viewer** (all pages, like a PDF); per section: jump to its pages | `outputs/draft-<n>.docx` + `.pdf` |
-| 8 Export | all sections `done` or `n/a` → final `.docx` | `outputs/final-<n>.docx` |
+| 1 Intake | upload in batches; sniff/convert (deterministic); the agent classifies each file against the 13-item checklist + Necesar info + visit material; per-file status | intake records, completeness („lipsesc: 6, 10") |
+| 2 Read | deterministic readers for the structured inputs (Necesar info: energy, equipment, fleet, buildings, employees; Anexa 2–3; meter exports) — the numbers | dataset + fields with evidence |
+| 3 Fill (agent) | per section of the catalogue, the agent gathers what that part of her audit needs: reads the dossier (text, OCR, vision on photos, schemes and meter displays), uses the dataset, researches online (§5.11), and records each fact with its evidence; what it cannot find is recorded `missing` or `later` | facts (state `extracted` / `enriched`), section statuses |
+| 4 Review | the auditor or Vlad confirms or corrects facts and resolves conflicts (`core.review`); confirmed facts carry into next year | decisions |
+| 5 Draft (agent) | writes each section as she would, in her patterns, from recorded facts only; ch. 4 from `consumption_analysis` (deterministic, the PIEE's); fixed chapters from the base. Drafting does not wait for review: a fact changed later makes its sections `stale` (§5.9) | section drafts |
+| 6 Preview | the filled `.docx` → PDF → a **paged, scrollable viewer** (all pages, like a PDF); per section: jump to its pages | `outputs/draft-<n>.docx` + `.pdf` |
+| 7 Export | readiness allows it (every section `done` or `n/a`, none `stale`) → final `.docx` | `outputs/final-<n>.docx` |
 
-**Audit section catalogue** (the template tree with each section's kind and sources):
+**Audit section catalogue: one general structure built from all her audits** (Vlad, 09-23).
+Her audits differ by client: AUDIT-01 and AUDIT-02 have no measurement chapter (their „Măsuri" is
+ch. 5), while AUDIT-04 and AUDIT-03 have ch. 5 „Bilanțurile energetice", with both an electrical
+part (bilanț, fișă, rezultate, concluzii) and a thermal part (bilanț, fișă, rezultate). CLIENT-A3
+2022 (the old template) has electrical measurements only. So:
+- **The catalogue is the union** of every section in her audits (the §5.7 reference set). Each
+  section records **when it applies** (e.g. electrical part: meter/analyser photos received;
+  thermal part: thermal images received) and **which of her audits supplies its prototype** when
+  the base lacks it (ch. 5 comes from AUDIT-03 or AUDIT-04, since AUDIT-01 has none).
+- **Nothing is dropped silently.** For every catalogue section the Fill stage records whether it
+  applies and why (the input that triggers it, or its absence). A section that applies is filled
+  or `later`; one that doesn't is proposed `n/a` with its reason, and only a human confirms `n/a`
+  (§5.9), so readiness lists every section until each has an answer. Chapters and captions renumber
+  when a chapter is absent.
+- **Something none of her audits has** (a client needing an analysis she has never written) is
+  never invented: the agent raises it as a review item for the auditor, who decides whether it
+  becomes a new catalogue section.
+
+The catalogue (each section's kind and sources):
 
 | Section | Kind | Sources |
 |---|---|---|
@@ -585,8 +869,11 @@ on its own:
 | 7 Surse de finanțare | fixed text | template |
 
 **Draft rules for AI narrative:**
-- Only facts with a source may appear. A missing fact produces a `missing` status, never
-  invented text.
+- Only recorded facts may appear. A missing fact produces a `missing` status (and a marker in the
+  draft), never invented text. What the checks can and cannot establish is in §5.12; flagged or
+  uncited sentences go to review, never silently into the document.
+- The text reads as hers: no mention of AI, no disclaimers, no notes on how it was produced (R2);
+  a check refuses a draft that has any.
 - Her patterns: announce → figure/table → observe → enumerate; process stages with their
   purpose; indicator explanations; equipment explained for a non-technical reader.
 - Regenerating a section never touches the others.
@@ -606,7 +893,9 @@ on its own:
 Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically, with no LLM.
 
 - **Golden:** `$EMA_REFERENCE/piee/cases/piee-case-a/generated/Program de îmbunătățire a eficienței
-  energetice CLIENT-P1 SA_2026.docx`, prepared for the auditor on 2026-09-19.
+  energetice CLIENT-P1 SA_2026.docx`, prepared for the auditor on 2026-09-19. **Approved by
+  the auditor** (reported 09-23), pies included: evidence level 4 (§5.16). The format is proven; S8
+  makes the system produce it for any client.
 - **Reference implementation:** `…/piee-case-a/working/CLIENT-I5-format-generator/`
   (`data_tg.py`, `build_tg.py`, `charts_tg.py`). These are one-off scripts, not product code. S8
   re-implements them inside `piee` + the document engine and must reproduce the golden.
@@ -618,6 +907,34 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
   footer, caption styles, table styles, and the signature/stamp images.
 - Text is replaced **inside the existing runs**, so mixed formatting survives. Never rebuild a
   paragraph.
+
+**Anchor map (the replacement contract)**
+- Every element of the base is classified **fixed** or **variable** in an anchor map versioned
+  with it: paragraphs, table cells and row groups, charts (series, caches, embedded workbook),
+  pictures, headers and footers, text boxes, hyperlinks, bookmarks and document properties.
+  Paragraph/cell/chart-part granularity; runs are an implementation detail.
+- **Anchors are found by id, never by their words or position.** When a base version's map is
+  built, each variable anchor is stamped with a hidden bookmark (`_ema_<slot>`; Word hides
+  bookmarks starting with `_`). The engine finds anchors only by those bookmarks: not by
+  paragraph index (the one-off CLIENT-P1 script's `P(237)`, which breaks as soon as a paragraph
+  moves), and not by matching the text in them. The `_ema_` bookmarks are stripped from the
+  exported file. Words are used only where nothing else is stable: once, to build a base's map,
+  checked by a human preview (§10.6); in the leftover check; and in the readers of client files,
+  where labels are the only stable handle (§5.5, with aliases and a loud failure when a label is
+  missing or ambiguous).
+- The engine records every variable anchor it writes or removes. **A variable anchor left
+  untouched blocks the final export** (§5.9); a draft lists it. This is what catches a stale
+  number: no figure survives from the base unless its anchor is fixed.
+- An element the map does not classify fails the **base's** validation, not a client's export: a
+  new base is not used until its map is complete and the auditor has seen its preview (§10.6).
+- **Leftover check over the whole package**, not only the body: every XML part (headers, footers,
+  footnotes, text boxes, chart XML, relationship targets, alt text, comments,
+  `docProps/core.xml` + `app.xml`) and every embedded workbook. The denylist is the base client's
+  identity: name and short forms, CUI, registration no., address, phone, website, contact person,
+  product words.
+- Negative fixtures (unit): a base-client string planted in a header, a chart cache, an embedded
+  workbook cell, a hyperlink target, alt text and `docProps` each fail the check.
+- The engine counts as reusable only once both S8 cases pass: CLIENT-P1 (the golden) and piee-case-b.
 
 **Client identity**
 - The client name is replaced everywhere: body, captions, tables, **TOC hyperlink text**,
@@ -662,7 +979,7 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
   „figura/tabelul numărul X" reference is updated.
 - **TOC:**
   - Edit the entries: client name, added or removed headings, their numbers.
-  - Then refresh **page numbers only**, computed from the engine's own PDF render.
+  - Then refresh **page numbers only** (§5.7: Word's own update, on the Mac and on Windows).
   - Never regenerate the whole TOC: that resets her compact entry spacing.
   - Never rely on update-fields-on-open, which shows the client a dialog.
 - **Variable-length tables** (audit measures, implemented measures, planned measures):
@@ -688,7 +1005,8 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
   - axis titles are auto-placed
   - where the labels are much wider than in her data (≥ 5–6 digits), the plot area is also
     auto-laid out, so titles don't overlap the labels
-- **Pies:** her pasted pie pictures become **native 3D pie charts** of the same size:
+- **Pies:** her pasted pie pictures become **native 3D pie charts** of the same size. the auditor
+  approved the CLIENT-P1 pies and wants them **exactly like that** (09-23), so this spec is fixed:
   - common style:
     - colours `4F81BD` / `C0504D` / `9BBB59`
     - Times New Roman
@@ -702,26 +1020,51 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
 - Word opens it with no repair prompt.
 - Zero external relationships other than hyperlinks.
 - One embedded workbook per chart.
-- No string from the previous client remains: name, address, product words, contact person,
-  website.
+- No string from the base client remains anywhere in the package (the leftover check above), and
+  no variable anchor is untouched.
 - A page-by-page render is compared with her template: same styles and visuals, content changed.
 
-### 5.11 Online enrichment (R5, R6)
+### 5.11 Online research (R5, R6)
 
-- **What leaves the machine:** only public identifiers (CUI, company name, brand/model, locality)
-  go to search/fetch. **Client documents never go to search.** They go only to the configured LLM
-  provider (R15).
-- **Sources, in order of trust:**
+- **The agent is free to research** (decided 09-23): it searches, follows links, reads what it
+  finds, and decides for itself whether a source is legitimate. There is no list of allowed sites
+  or fields. The order below is guidance in its instructions, not a gate:
   1. official registries (ANAF CUI web service, ONRC data)
   2. the company's own website
   3. equipment manufacturers' pages / datasheets
   4. reputable encyclopaedic sources (locality/county data)
-  5. general web (accepted only with a quoted snippet + URL, and flagged for review)
-- **Every enriched fact stores:** URL, retrieval date, quoted snippet, confidence. It is shown
-  with a "sursă" chip in the UI.
+  5. the general web
+- **Supplied first (R5):** a value the client supplied stays active; a differing online value is
+  shown as an alternative for review, never swapped in.
+- **What leaves the machine, enforced by code.** Search queries are the agent's own free text
+  (the decision above), so the boundary is checked on every outbound query and URL, not asked of
+  the agent:
+  - code builds the job's **private values** from its facts — figures from the dataset and the
+    documents (consumptions, costs, production), contact data (e-mails, phones, people's names),
+    account and contract numbers — and refuses any query or URL containing one
+  - queries are length-capped, so no passage of a document can be pasted into a search
+  - every outbound query and URL is logged in the job's log
+  - **client documents never go to search.** They go only to the configured LLM provider (R15).
+- **Traceable, whatever the source.** Every online fact stores URL, retrieval date, the quoted
+  snippet and the agent's one-line reason for trusting the source; it is shown with a „sursă"
+  chip. Every fetched page is kept as a dated snapshot (the evidence's `snapshot_sha`), so the
+  snippet shows what was read even after the site changes. A quote the agent reports must appear
+  verbatim in its snapshot, otherwise the value is not recorded: this checks that the fact was
+  read, not where it came from.
 - **Images:** a manufacturer or open-licence source with attribution, otherwise a `later` item
   (a visit photo).
 - Results are cached per client and per equipment model, so the same model is looked up only once.
+- **Safety rails that do not limit research:**
+  - the fetcher reaches only the public internet (`http(s)`, public addresses, re-checked on every
+    redirect; size, type and time limits), so a link can never reach the auditor's network or Ema's
+    own API; S13 tests a local address and a redirect to one
+  - web text is treated as hostile: it reaches the model delimited as untrusted data, and what a
+    page could make the agent do is **contained by its tools**, not prevented by the prompt. The
+    tools are scoped per stage (Fill: read, search, fetch, record a fact; Draft: read facts, write
+    a draft; no web in Draft), and every tool is bound to the current job by code, so no tool can
+    write outside it
+  - S13 tests a page that tries to make the agent search with private data and write outside the
+    job: both are refused and logged
 
 ### 5.12 LLM layer
 
@@ -735,8 +1078,28 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
   only offers models with vision.
 - **Structured output only:** pydantic schema in, validated JSON out. It retries once on a schema
   failure, then records a visible error.
-- Prompts are versioned in code (`audit/prompts/…`), with style-guide excerpts from her real
-  audits.
+- **The agent loop** (`run_agent`, the audit's Fill and Draft stages, intake classification): the
+  selected provider's tool calling in our own small loop, no agent framework. Its tools are Ema's
+  use cases: read a file (text, OCR, page image), read the dataset, search, fetch, look up a
+  registry, record a fact, mark a field missing or a section `later`, write a section draft.
+  - The agent has freedom in *how* it works (what to read, where to search, what to trust); the
+    product's rules are enforced by the tools, not by trust: a fact enters only through
+    record-fact with evidence, and for a text source its quote must be found verbatim in the file
+    text or snapshot.
+  - **Vision readings** (meter displays, FLIR overlays) have no text to match. They are recorded
+    with their photo region and stay `needs confirmation` — never auto-accepted, not even by
+    „Accept exact matches automatically" — until a human checks the value against the region.
+  - **What code can check in a draft, and what it cannot.** Checked mechanically: every number
+    is a fact reference; every paragraph lists the fact ids it rests on, and each must exist;
+    names (client, people, equipment, places) must match facts; no AI mention. Not provable by
+    code: whether a sentence is *true to* its facts — a qualitative claim („echipamente moderne,
+    eficiente"), an overstatement. For those, a second model pass flags sentences their cited
+    facts do not support, and the flags plus any uncited sentence go to review. The result is
+    reported as **traceability coverage**, never as proof of truth.
+  - A per-section step limit stops a runaway loop as a visible, resumable error; costs are
+    logged, with no cap (§4).
+- Prompts are versioned in code (`audit/prompts/…`), with style-guide excerpts and worked
+  examples from all her 2026 audits (§5.7 reference set).
 - Every call is logged: provider, model, prompt version, tokens, estimated cost, duration. The job
   shows its total AI cost. No cap for now. No keys in logs.
 - **Offline or provider error:** deterministic stages keep working; AI stages show a clear
@@ -767,10 +1130,10 @@ GET/PUT    /settings                     (providers + keys → keyring, workspac
 
 added for the design handoff (§5.18):
 GET        /jobs/{id}/fields             ?status=pending|uncertain|accepted   (3c, 3f, 3g rows)
-POST       /jobs/{id}/fields/{f}/accept  {value?}          POST /jobs/{id}/fields/accept-batch
+POST       /jobs/{id}/fields/{f}/decide  {action, value?, onRevision}   POST /jobs/{id}/fields/accept-batch
 GET        /jobs/{id}/log                POST /jobs/{id}/log/{entry}/undo     (Jurnal, R19)
-GET        /sources/{source_id}/snippet.png   ?highlight=1  (page crop, R18)
-GET        /sources/{source_id}/page.png      GET /sources/{source_id}/quote
+GET        /evidence/{id}/snippet.png    ?highlight=1  (page crop, R18)
+GET        /evidence/{id}/page.png       GET /evidence/{id}/quote
 GET        /jobs/{id}/export/checks      POST /jobs/{id}/export               (7a)
 POST       /settings/providers/{p}/test  (the „verificată acum 2 h" state in 3i)
 ```
@@ -781,6 +1144,11 @@ POST       /settings/providers/{p}/test  (the „verificată acum 2 h" state in 
 ema serve
 ema invoices extract <folder> --client <cui>
 ema piee generate --client <cui> --year 2025 --anexa <file> --necesar <file> [--prelucrare <file>]
+                                          (job + slots + import + draft in one call; never a final)
+ema job fields <job> [--status pending|conflict|missing]
+ema job decide <job> <field> accept | correct <value> | reject | choose <alternative>
+ema job log <job> ; ema job undo <job> <entry>
+ema job checks <job> ; ema job export <job> [--final]    (--final: one y/N human confirmation)
 ema reporting generate --years 2023-2025
 ema audit new --client <cui> --year 2026 ; ema audit add <job> <files…> ; ema audit run <job> <stage>
 ema audit status <job>
@@ -797,15 +1165,30 @@ ema audit status <job>
   The UI shows the Romanian message; the detail and traceback go to `log.jsonl`.
 - **Nothing is swallowed.** A worker's stderr is part of the log. A failed file or section
   shows its own error inline.
-- The job log is the single place to debug. A "copy diagnostics" button in the UI zips the log +
-  `job.json` (no client files).
+- The job log is the single place to debug. A "copy diagnostics" button in the UI zips a
+  redacted log + a snapshot of the job's rows (§5.15).
 
 ### 5.15 Security and privacy
 
 - **Local-first:** client data stays in the workspace. Data leaves the machine only via (a) LLM
   calls to the configured provider and (b) enrichment searches with public identifiers.
 - Keys live in the OS keyring. Never in files, logs or the frontend.
-- The API binds to `127.0.0.1` only, with a per-launch token between the window and the API.
+- **The API binds to `127.0.0.1` and checks every route** — JSON, SSE, the PDF preview, snippet
+  images, downloads:
+  - `Host` must be `127.0.0.1:<port>` (stops DNS rebinding); `Origin`, when present, must be the
+    app's own. No CORS headers at all.
+  - The window opens `/` with a one-time launch code in the URL **fragment**. A fragment is never
+    sent in an HTTP request, so the code never reaches the server's request log. The page posts it
+    to `/session` and gets a host-only `HttpOnly; SameSite=Strict` session cookie (no `Secure`
+    flag: the origin is plain `http://127.0.0.1:<port>`); the code is then spent. Images, pdf.js
+    and SSE then work with no token in any request URL. `ema serve` prints the same kind of link
+    for the dev browser (through the Vite proxy).
+  - No token or code appears in a request URL, a log or the diagnostics.
+- **Diagnostics are redacted.** The bundle keeps error codes, stages, timings, traceback frames
+  (file, line, function; paths workspace-relative), models and token counts. It drops values,
+  quotes, client and file names, exception messages other than `EmaError` codes, and provider
+  responses. A unit test plants each of these and checks that none survives. Full logs stay on the
+  machine: client material never goes into a bug report.
 - Client data never enters git (the reference library is outside the repo; tests read
   `$EMA_REFERENCE`).
 
@@ -817,7 +1200,26 @@ ema audit status <job>
 | Golden (real data) | each slice's real case from the reference library: exact numbers, structure (heading tree, tables, captions, chart count), and invoice outputs matching delivered workbooks | local only (`$EMA_REFERENCE`), required before PRs |
 | Document checks | generated docx vs the auditor's: heading tree, styles, fonts, table header colour, caption format, native charts present; for PIEEs the §5.10 acceptance list | golden |
 | Contract | OpenAPI schema snapshot; import-linter | CI |
-| AI | recorded LLM responses; a "no invented facts" check (every narrative sentence cites facts) | CI + golden |
+| AI | recorded LLM responses; the traceability checks (fact references, cited ids, names, no AI mention) and the support pass (§5.12), reported as coverage; a golden case plants a plausible unsupported qualitative sentence that must be flagged | CI + golden |
+
+**Evidence levels.** Every golden case states its level, and a slice reports the level it
+reached, never just „passed":
+1. **regression** — equals an output a script or an earlier Ema produced (catches change, not
+   correctness)
+2. **reference** — numbers and structure equal a document the auditor delivered
+3. **Word-visual** — opened and checked in native Word on Windows
+4. **approved** — the auditor accepted this output
+
+- The CLIENT-P1 2026 PIEE golden is level 4: the auditor approved it, pies included (09-23). CLIENT-P2
+  2025 is level 2.
+- S7 is level 2 for presentation only (its datasets come from her audits' own ch. 4 tables).
+  Extraction from original inputs is tested in S5, on the cases that have a Necesar info.
+- **The CLIENT-A2 final is not a reference** (09-23): it was produced with an agent, not written
+  by the auditor. Its inputs (dossier, thermal images, the 36 meter photos) are real test inputs; its
+  text and figures are never compared against, mined for phrases, or used as a style guide (R1).
+- S14/S15 are compared with her own audits (structure, patterns, level of detail) and reviewed by
+  the auditor, not measured for equality. An input the case lacks is reported as not tested, not as
+  passed.
 
 ### 5.17 Configuration
 
@@ -845,8 +1247,11 @@ was asked for.
 
 - **Authority:** the HTML wins over the README where they disagree; the README wins over this
   section; this section wins on **what the data actually is** (the reconciliation below).
-- The HTML files are **design references, not code to port.** No inline styles are copied: the
-  token table becomes the theme, and the components are rebuilt in our stack.
+- **Implemented as made** (R20). The screens must look like the HTML — layout, spacing, type,
+  colour, components and states — at 1400×900 and scale from 1280×800 up. The HTML is not
+  pasted in as code: the token table becomes the theme and the components are rebuilt in our
+  stack, and the rebuilt screen is then compared with the HTML screenshot side by side (S17a,
+  S17b). A difference is a bug, unless it is one of the data corrections below.
 - **Design ids are the shared vocabulary.** Component names and commit messages carry them
   (`FieldReviewRow` "3c", `feat(ui/3c): …`), so any screen can be traced back to the design.
 
@@ -880,8 +1285,8 @@ without redesign.
 | 3e / 6a | **Acasă** | job list + what needs attention (§5.3) |
 | 3b / 6b | **Documente** | job slots and versions, intake status per file, OCR, failures (W3 stage 1) |
 | 3c / 3h | **Revizuire** | the core screen: one row per proposed value with its source page; accept / correct / leave pending (W3 stage 4, conflicts) |
-| 3j | **Structura raportului** | the section board: statuses, subsections, what holds a chapter, week view, client deadline (W3 stage 5) |
-| 3d | **Raport Word** | generation watched chapter by chapter + the paged preview (W3 stages 6–7) |
+| 3j | **Structura raportului** | the section board: statuses, subsections, what holds a chapter, week view, client deadline (W3 section statuses, §5.9) |
+| 3d | **Raport Word** | generation watched chapter by chapter + the paged preview (W3 stages 5–6) |
 | 3f | **Facturi** | the invoice table with per-cell sources and anomalies (W1) |
 | 3g / 6c | **PIEE** | the measures table with sources and completeness (W2) |
 | 3i | **Setări** | settings, no Save button; Gemini and OpenAI as independent keys, one marked IMPLICIT (§5.12) |
@@ -890,8 +1295,14 @@ without redesign.
 | 7c | Three dialogs | delete module · re-run extraction · report already exists |
 | 7d / 7e | Component sheet | the implementation reference, light and dark |
 
-**Missing from the handoff, to be designed in the same language during S17b** (full list in
-`OVERRIDES.md` §5):
+**Missing from the handoff, designed before S16a** (full list in `OVERRIDES.md` §5). They are
+**drawn by Claude** (decided 09-23) in the handoff's visual direction, from 7d/7e components and
+real cases: the data shown, the actions, the states, the copy. They are drawn as HTML screens like
+the handoff's, kept beside it in the library (`$EMA_REFERENCE/design/`, never in git, because
+they show real client data), and **checked visually**: rendered at 1400×900 in both themes and
+compared with the neighbouring handoff screens before they are used. New Romanian copy is marked
+**provisional** and goes to the auditor in the copy pass (§10.10). For these screens the drawing is
+the reference, and S16a's OpenAPI is derived from them plus the review use cases (S1b):
 - **Clienți** (list + client detail with CUI, ANAF data, sites, contacts) — the design addresses
   jobs directly and assumes few clients; the auditor has ~40.
 - **Raportare manager energetic** (W4): years + clients → workbook + exceptions.
@@ -917,7 +1328,7 @@ so they are visible to whoever opens the design rather than only here.
 | PIEE = measures taken from **our audit** ch. 6, with an ANRE 1 % target | The PIEE is her 33-page document; its measures come from the client's **Anexa 2–3** („Solutii EE planificate"), and the audit only when EMA did it (§5.10) | Keep the screen (measures table, source chips, per-row missing markers, export bar). Sources = anexa first, audit second. The KPI bar shows production, total tep, CO₂ and **the cross-check against „Date anuale"**, not an ANRE target |
 | Facturi = **gas** invoices, „Trimite în audit" | Electricity only (R12); the deliverable is the Excel workbook (R11) | Keep the table, anomaly and source pattern. Primary action „Exportă Excel"; feeding consumption into a job is a later workflow (§10.9) |
 | „Şablon: ANRE 2024", nine chapters | Her own master template, seven chapters (§3.2) | The template name is hers; the chapter tree comes from the section catalogue |
-| The report exports with `[de completat]` gaps | True for drafts. The **final** audit export needs every section done or n/a (§5.7); a PIEE marks missing data in red (R4c) | Draft export always allowed with the markers; final export keeps its gate |
+| The report exports with `[de completat]` gaps | True for drafts. The **final** audit export needs every section done or n/a (§5.9 readiness); a PIEE marks missing data in red (R4c) | Draft export always allowed with the markers; final export keeps its gate |
 | Signature attached on 7a | Her signature and stamp are already images in her template, and the client submits to ANRE | 7a is the **export** screen; no e-signature (decided 09-21) |
 | Fixed 1400×900 | Windows, large screen | Designed at 1400×900, resizable from 1280×800 (decided 09-21) |
 
@@ -937,32 +1348,53 @@ Derived from the handoff README's prose state model and §5.4. Not yet in the AP
 becomes the S16a OpenAPI schema. Enum values are English; Romanian lives only in display copy.
 
 ```ts
-Field       { id, chapter, key, label, value, unit?,
+Field       { id, chapter, key, label, valueType: number|text|year|date|enum, unit?, required,
+              value?, revision,
               state: extracted|supplied|enriched|calculated|manual,   // where it came from
-              review: pending|accepted|corrected|rejected|missing,    // what the auditor did
+              presence: found|not_found|failed,                     // what Ema's search found
+              review: pending|accepted|corrected|rejected,          // what the auditor did
               confidence: exact|partial|conflict|none,
-              source?: SourceRef, alternatives?: {value, source}[],   // the two-document conflict
-              reason?, history: {at, actor, from, to, action, batchId?}[] }
-SourceRef   { id, docId, page?, bbox?, cell?, url?, retrievedAt?, quote? }
+              evidence: EvidenceRef[], derivation?: {formula, inputs: FieldId[]},
+              alternatives?: {id, value, evidence: EvidenceRef[]}[], chosen?,  // the conflict
+              failure?: {cause, threshold?, exits[]}, reason? }
+EvidenceRef { id, docId?, kind: pdf_region|pdf_text|cell|docx|photo|url|manual,
+              page?, bbox?, cell?, url?, retrievedAt?, quote?, highlight: exact|page|none }
+Decision    { id, at, actor: ema|user|agent, fieldId, onRevision,
+              action: accept|correct|reject|choose|undo, before, after, batchId?, undoneBy? }
 Measure     { id, name, detail?, investmentLei?, savingsMWh?, savingsTep?, paybackYears?,
-              term?, responsible?, funding?, origin: anexa|audit|manual, source?,
-              missing: (term|responsible|funding)[] }
-SectionNode { id, number, title, status: ready|missing|later|na|drafted|done,
+              term?, responsible?, funding?, origin: anexa|audit|manual, evidence[],
+              missing: (keyof Measure)[] }                          // any optional column
+SectionNode { id, number, title, status: ready|missing|later|na|drafted|done, stale,
               later?: {reason: visit|measurements|thermography|map|chapter, date?, ref?},
               pages?, children[], note? }
 JobDocument { id, name, kind, slot, pages?, sizeBytes, versions[],
               intake: read|reading|failed|needs_ocr|protected,
               failure?: {cause, threshold?, exits[]}, found?: string[] }
-Report      { generatedAt?, editedExternallyAt?, version, path?, template }
+Report      { id, version, kind: draft|final, generatedAt, template, editedExternally }
 Package     { files: {name, sizeBytes, kind}[], checks: {label, ok, detail}[] }
 Settings    { theme, providers: {gemini, openai} each {present, maskedKey?, verifiedAt?},
               defaultProvider, extraction: {ocr, flagUncertain, autoAcceptExact} }
 ```
 
-Three choices to challenge: the README's single field `status` is split into **state + review +
-confidence**, because facts also arrive from enrichment and calculation, which the design never
-had to show; `alternatives[]` carries the conflict rule; `missing[]` on a measure drives the
-per-row „lipseşte" markers instead of a validation error.
+Settled in review round 1 (2026-09-23):
+- The README's single field `status` is split into **state + presence + review + confidence**:
+  facts also arrive from enrichment and calculation, and „not found", „reader failed" and
+  „rejected by the auditor" are different things with different next steps.
+- Valid combinations: `value` is absent only when `presence` is not `found` and no manual value
+  exists; `confidence: conflict` ⇔ two or more `alternatives` and no `chosen`.
+- Commands carry the field's `revision`; the Jurnal is typed `Decision`s, so undo and readiness
+  read the same records (§5.3).
+- `missing[]` on a measure drives the per-row „lipseşte" markers for any optional column.
+- Artifacts are addressed by id, never by path. **Outputs are immutable:** the 7c „report
+  already exists" dialog creates a new version.
+- „Deschide în Word" opens a **working copy** in the job's `edits/`, never the output itself.
+  `editedExternally` = the working copy's hash differs from its output's. The UI then offers to
+  take the edits in (new copy, marked provisional), which creates a new output revision with
+  origin `manual_edit`.
+- Final export uses the revision the human approves (§5.9), the newest by default. Regenerating
+  after a manual edit makes a new generated revision and says plainly that the manual edits are
+  not in it. Copies exported elsewhere are not tracked, and the UI does not claim to know about
+  them. S17b tests the 7c flow against an edited working copy.
 
 **Stack:** React + TypeScript strict + Vite; pdf.js for the paged preview; Geist + Geist Mono
 bundled (not from Google Fonts); the same format/lint/type gates as the backend.
@@ -1007,7 +1439,7 @@ Repo layout:
 ema/
   AGENTS.md  CLAUDE.md→AGENTS.md  README.md  pyproject.toml  uv.lock
   .pre-commit-config.yaml  .importlinter  .github/workflows/ci.yml
-  docs/PLAN.md (this file)  docs/ARCHITECTURE.md (1–2 pages, from §5, in S1)  docs/decisions/0001-packaging-and-resources.md
+  docs/PLAN.md (this file; §5 is the architecture)  docs/decisions/0001-packaging-and-resources.md
   src/ema/  core/ clients/ energy_data/ consumption_analysis/ invoices/ piee/ reporting/ audit/ api/ cli/ mcp/
   templates/  audit_master.docx  piee_master.docx  energy_manager_report.xlsx  prelucrare_date.xlsx
   tests/unit/  tests/golden/      (golden reads $EMA_REFERENCE; skipped when absent)
@@ -1049,13 +1481,24 @@ ema/
 | Architecture | `import-linter` contracts (§5.1) |
 | File size | a CI check: modules > ~400 lines fail |
 | Tests | `pytest` unit (CI) + golden (local) |
-| One gate | `pre-commit` locally = GitHub Actions CI |
+| One gate | `scripts/check`, non-mutating: format check, lint, file size on tracked files, pyright, import contracts, non-golden unit tests, and the frontend checks once `frontend/` exists. CI runs exactly it; the pre-push hook runs it; commit hooks may auto-fix. (Today's `.pre-commit-config.yaml` has no tests and fixes instead of checking, so "pre-commit = CI" is not yet true: S1 aligns it and `AGENTS.md`.) |
 | Design traceability | frontend commits and component names carry the design id (`feat(ui/3c): …`, `FieldReviewRow` "3c") (§5.18) |
+
+**Where each gate runs:**
+
+| Gate | Runs on | When |
+|---|---|---|
+| `scripts/check` | Linux CI + every dev machine | every push and PR |
+| Golden | a machine with `$EMA_REFERENCE` (Vlad's Mac) | before feature and release PRs |
+| Word check: the output opens in Word with no repair prompt, charts open with Edit Data, the TOC numbers are right | Word for Mac now; Vlad's Windows PC from the port | every slice that produces a document; every release |
+| Windows build smoke: the frozen one-folder build loads its resources, starts the server, runs one headless job | Windows CI runner | from the port (S18): every push to `dev`, every tag |
+| Windows Office checks: Word COM conversion, PDF render, TOC page numbers; the window on WebView2 | Vlad's Windows PC | from the port: every slice that adds Office automation, an external binary or a bundled resource; every release |
 
 **Principles (the one page in `AGENTS.md`):**
 - SOLID applied pragmatically:
   - one responsibility per module/function
-  - small interfaces only at real boundaries (readers, docx engine, LLM, storage, runner)
+  - small interfaces only at real boundaries (readers, docx engine, LLM, the Office adapter);
+    storage and the runner are module seams, not interfaces, until a second implementation exists
   - composition over inheritance
   - pure calculations
 - No abstraction without a second real use.
@@ -1063,8 +1506,8 @@ ema/
 - Errors surface with context.
 - Domain names in business terms.
 - Comments only for the non-obvious *why*.
-- **Docs allowed:** README, AGENTS.md, PLAN.md, ARCHITECTURE.md, a few ADRs. No evidence files or
-  AI artefacts.
+- **Docs allowed:** README, AGENTS.md, PLAN.md, a few ADRs. No second architecture document: §5
+  is it, and AGENTS.md only points there. No evidence files or AI artefacts.
 
 ### 6.4 Working model: Claude designs, Codex builds (in Conductor)
 
@@ -1080,7 +1523,7 @@ ema/
   6. **Golden acceptance**: the exact command + expected result on the reference library.
   7. **Unit tests required.**
   8. **Out of scope.**
-  9. **Done**: `uv run pre-commit run -a` · `uv run pytest` · the golden command.
+  9. **Done**: `scripts/check` · the golden command · the Word check where §6.3 asks for it.
 - **Bounded review loop** (max 2 rounds each):
   1. Codex critiques the spec before building.
   2. Claude reviews the diff against the spec and the golden output.
@@ -1088,7 +1531,11 @@ ema/
 - **How the two agents work together in Conductor:** one workspace per slice, with a Claude chat
   and a Codex chat on the same branch. Claude writes or revises; Conductor's **Review** action,
   with Codex as the review model, reviews the branch diff; findings go back to Claude from the
-  diff viewer as inline comments. Codex implements in its own chat; the Review action (Claude or
+  diff viewer as inline comments. Both agents have the Conductor MCP (09-23): each can leave
+  comments on the branch diff and read the other's, so review findings travel as diff comments
+  without being copied by hand. Through the Conductor API an agent can also start a session with
+  another agent (`create_session`), e.g. Claude asking Codex for a review; this is available only
+  to sessions started after that server was added. Codex implements in its own chat; the Review action (Claude or
   Codex) checks it. Two rounds at most, then Vlad decides what remains, and the PR description
   records the outcome.
 
@@ -1098,36 +1545,38 @@ ema/
 
 | # | Slice | Golden acceptance (real data) | Depends |
 |---|---|---|---|
-| S0 | **Spike:** native Word chart + house-style table/caption from Python | Chart opens and is editable in Word (Windows + Mac) and matches a AUDIT-01 chart visually | none |
-| S1 | Repo skeleton: tooling, CI, import contracts, `core` workspace/jobs/logging/errors, CLI + API health | CI green; `ema --help`; job-folder round-trip | none |
+| S0 | **Spike:** native Word charts (the PIEE edit path and the audit build path) + house-style table/caption + the TOC page-number cycle | The three proofs of §5.7, in Word for Mac | none |
+| S1 | Repo skeleton: tooling, `scripts/check` = CI, import contracts, `core` workspace/jobs/logging/errors, backup/restore, CLI + API health, the resource path helper | CI green; `ema --help`; job-folder round-trip; backup → restore into a clean folder; an interrupted delete finished on restart | none |
+| S1b | Review core: fields + evidence, decisions (Jurnal) + undo, conflicts, readiness contract; the `ema job …` CLI | On a synthetic job: correction → re-run → undo → export; a decision on an old revision refused; an undo superseded by a later decision refused; the same outcomes through the CLI and the use cases the API will call | S1 |
 | S2 | `core.office`: label-finding xls/xlsx readers; docx block engine (from S0) | A sample section rendered in her style, checked against her audit | S0, S1 |
-| S2b | Legacy intake: type sniffing (incl. HTML-as-`.xls`) + `.doc` conversion with versions | All 12 CLIENT-A1 legacy files usable (5 `.xls` read, 7 `.doc` converted, text verified) | S1 |
+| S2b | Legacy intake: type sniffing (incl. HTML-as-`.xls`) + `.doc` conversion with versions | All 12 CLIENT-A1 legacy files usable (5 `.xls` read, 7 `.doc` converted, text verified, with LibreOffice); a deliberately hung conversion is killed at its timeout and the batch continues | S1 |
 | S3 | `energy_data` model, carriers + aliases, factors, `calc` | Reproduces CLIENT-P1 / CLIENT-P2 / CLIENT-A3 *Prelucrare* tep, specific consumption, emissions | S1 |
 | S4 | Anexa 2–3 reader | All 38 real annexes parse; exact values on 5 (both form generations, 3 fuel-header variants) | S2, S3 |
 | S5 | Necesar info reader (PIEE + audit versions) | CLIENT-P1, CLIENT-A3, CLIENT-A1 parse; monthly values match the sheets | S2, S3 |
 | S5b | *Prelucrare date* reader (authoritative) + writer (her layout, formulas) | Reads CLIENT-P1 / CLIENT-A3 / CLIENT-P2; the generated CLIENT-P1 2023–2025 matches the reconstructed one | S3, S5 |
 | S6 | Energy-manager report | Reproduces the delivered 2023 (37 companies) and 2025 CLIENT-R1/client-r2 reports | S4 |
-| S7 | `consumption_analysis` + phrase bank | **CLIENT-A2** ch. 4 regenerated from the dataset taken from its own tables (then AUDIT-05 / AUDIT-02): same sections, tables, chart types, phrasing, numbers | S2, S3 |
-| S8 | PIEE per the format contract (§5.10): clone her latest PIEE, change client content only | CLIENT-P1 2026 regenerated equals the golden (text, tables, chart caches, embedded workbooks, pies); piee-case-b: numbers match her final | S4, S5, S5b, S7 |
+| S7 | `consumption_analysis` + phrase bank (from her own audits and PIEEs only) | **AUDIT-01** ch. 4 regenerated from the dataset taken from its own tables (then AUDIT-02 / AUDIT-05): same sections, tables, chart types, phrasing, numbers | S2, S3 |
+| S8 | PIEE per the format contract (§5.10): clone her latest PIEE, change client content only | The Word check passes on the generated CLIENT-P1 PIEE. CLIENT-P1 2026 regenerated equals the golden (text, tables, chart caches, embedded workbooks, pies); piee-case-b: numbers match her final. Both run through `core.review` via the CLI: one conflict resolved by a decision, one missing field rendered red, the final export refused until the conflict is resolved | S1b, S4, S5, S5b, S7 |
 | S9 | Invoices port (**pypdfium2 + pdfplumber** instead of PyMuPDF) + batch identity + ALIVE OCR fix | 29/29 text invoices unchanged; CLIENT-I2 24 + ALIVE 13 exportable after one confirmation | S1 |
-| S10 | Audit master template + section catalogue/status model + fixed chapters | Ch. 1 and ch. 7 identical to her text for a new client | S2 |
-| S11 | Audit intake + checklist classification + completeness | CLIENT-A1 dossier fully read; checklist report correct | S2b, S10 |
-| S12 | Structured extraction + ch. 2 identity + ch. 4 via S7 | CLIENT-A1 ch. 2 identity + ch. 4 from its Necesar info | S5, S7, S11 |
-| S13 | Enrichment: company, location, map, equipment | CLIENT-A1: CAEN, address, location text, map, 10 equipment entries with sources | S12 |
-| S14 | AI narrative drafting (ch. 2–3) + style guide | **CLIENT-A2** ch. 2–3 drafted from its dossier + enrichment and compared with her final; then CLIENT-A1 ch. 2–3 reviewed by the auditor: her structure, no invented facts | S13 |
-| S15 | Ch. 5 from visit material (meter-display photos + thermal images → readings via vision → her measurement-sheet model) + ch. 6 measures and financials | **CLIENT-A2** ch. 5.1/5.2 readings match the values in her final; measures table + NPV/payback matching her method | S14 |
-| S16a | API contract (OpenAPI) from the design handoff + mock server | Every screen in §5.18 maps to endpoints (including sources/snippet, fields, log/undo, export checks); frontend runs on mocks | S10 |
-| S16 | Full HTTP API + SSE progress | OpenAPI covers every CLI use case | S8, S9, S12 |
-| S17a | Design system: tokens (both themes) + the component layer from 7d/7e | The component sheet reproduced in light and dark; focus rings, row/button states, toggles match; paper stays paper in dark | S16a |
-| S17b | Screens assembled from those components (3b–3j, 6a–6c, 7a–7c) + Clienți and Raportare | the auditor's journeys work end-to-end on the real API; each screen checked against its design id | S16, S17a |
-| S18 | Windows packaging (pywebview + PyInstaller + Inno Setup) + settings + in-app update check | Installs, runs a PIEE job on Windows, detects a newer release | S17b |
+| S10 | Audit section catalogue + status transitions (§5.9) + an inventory of the base's repeatable units (processes, equipment tables, measured panels, carriers) | Every heading of every audit in the reference set (AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05; CLIENT-A3 2022 for content) maps to a catalogue section, checked by a script that fails on any unmapped heading; each section has its applicability condition and prototype source; each transition in the table, including `done` → `stale` on a changed input | S1b |
+| S10b | Audit base: AUDIT-01 cloned + anchor map + fixed chapters + cloning repeatable units | Ch. 1 and ch. 7 identical to her text for a new client; the base filled for CLIENT-A1 and for CLIENT-A2 (different process counts, carrier mixes and measured panels) keeps her formatting and leaves no untouched anchor | S2, S10 |
+| S11 | Audit intake + the agent loop (`run_agent`) + checklist classification by the agent + completeness | CLIENT-A1 dossier fully read; checklist report correct | S2b, S10 |
+| S12 | Fill (agent): reading the dossier, record-fact with verified evidence; ch. 2 identity + ch. 4 via S7 | CLIENT-A1 ch. 2 identity + ch. 4 from its Necesar info | S1b, S5, S7, S11 |
+| S13 | The agent's online research (§5.11): company, location, map, equipment | CLIENT-A1: CAEN, address, location text, map, 10 equipment entries with sources | S12 |
+| S14 | Draft (agent): ch. 2–3 in her patterns + style guide, rendered into the base | CLIENT-A1 and CLIENT-A2 ch. 2–3 drafted from their dossiers + research, compared with her own audits' ch. 2–3 (structure, patterns, detail); CLIENT-A1 reviewed by the auditor; traceability coverage reported; a planted unsupported qualitative sentence is flagged | S10b, S13 |
+| S15 | Ch. 5 from visit material (meter-display photos + thermal images → readings via vision → her measurement-sheet model) + ch. 6 measures and financials | CLIENT-A2 ch. 5.1/5.2: the readings from the 36 meter photos match an answer key checked by hand against the photos (not the agent-made final), laid out in her measurement-sheet model, every reading `needs confirmation` until checked; measures table + NPV/payback matching her method | S14 |
+| S16a | API contract (OpenAPI) + mock server. **Frozen:** the job, slot, field, evidence, decision, Jurnal, section and readiness endpoints, backed by S1b/S10. **Provisional** (marked `x-provisional`): the workflow-specific ones (PIEE generation, invoices, reporting, audit stages, export packages), drawn from the screens | Every screen in §5.18 maps to endpoints; every frozen endpoint calls an existing use case; frontend runs on mocks; the two-process dev loop (Vite proxy + `ema serve`) passes the §5.15 session checks | S1b, S10 |
+| S16 | Full HTTP API + SSE progress; every provisional endpoint reconciled with its slice (S6, S8, S9, S12), with a versioned contract diff | OpenAPI covers every CLI use case, nothing left `x-provisional`; the S1b scenario and a real PIEE journey pass through the API | S6, S8, S9, S12 |
+| S17a | Design system: tokens (both themes) + the component layer from 7d/7e | The component sheet reproduced in light and dark and matching 7d/7e screenshots side by side; focus rings, row/button states, toggles match; paper stays paper in dark | S16a |
+| S17b | Screens assembled from those components (3b–3j, 6a–6c, 7a–7c) + the screens contracted before S16a. **The PIEE journey (data review → draft → export) first, shown to the auditor before the rest** | the auditor's journeys work end-to-end on the real API; each screen matches its handoff (or Claude-drawn) screenshot side by side at 1400×900, and holds at 1280×800 | S16, S17a |
+| S18 | **Windows port:** frozen one-folder build + its smoke job in CI, Word in the Office adapter (conversion, PDF render, TOC page numbers), the Windows Office checks on Vlad's PC, installer (Inno Setup), in-app update check | Installs per-user without admin rights; a PIEE and an audit job give the same outputs as on the Mac; a hung Word conversion is killed without touching an open Word; detects a newer release | S17b |
 | S19 | MCP server | An agent generates a PIEE and drafts an audit section headlessly | S16 |
 
 **Parallel tracks:**
 - S9 at any time after S1
 - S3 alongside S0/S2
 - S6 right after S4 (an early win for the auditor)
-- design handoff in hand → S16a → S17a → S17b
+- design handoff in hand → the missing screens drawn and checked → S16a → S17a → S17b
 
 ---
 
@@ -1155,17 +1604,26 @@ ema/
    - delete `_archive/ema-campaign/` (this also deletes ARGUS, as accepted)
    - remove the old app from the auditor's PC (if installed)
 
-Security to-dos (any time): rotate the Gemini key; change the shared mailbox password.
+Security to-dos: rotate the Gemini key and change the shared mailbox password, before real client
+use; not urgent while the app is in development (Vlad, 09-23).
 
 ---
 
 ## 9. Open questions and what we need
 
 **From Vlad**
-1. ~~pywebview~~ and ~~repo layout/name~~: confirmed 09-19. The date of the §8 swap is still open.
-2. Share the Claude Design output when ready (code export or screens).
+1. ~~pywebview~~, ~~repo layout/name~~ and ~~the §8 swap~~: done.
+2. ~~Share the Claude Design output~~: received 09-21 (§5.18).
 3. Optional: install LibreOffice on the auditor's PC as a backup converter.
 4. The topics in §10.
+5. ~~The Windows + Word machine~~: Vlad's Windows PC, from the Windows port (S18); until then
+   the app is built and run on the Mac (09-23).
+5b. Optional: LibreOffice on the Mac, as the fallback when Word is not available.
+6. ~~A final PIEE whose TOC page numbers were not set by Word~~: Word sets them, on the Mac
+   through AppleScript (proven 09-23, §5.7).
+7. ~~Who draws the screens the handoff lacks~~: Claude, in the handoff's direction, checked
+   visually (09-23, §5.18).
+8. ~~the auditor's verdict on the CLIENT-P1 PIEE~~: approved, pies included (09-23).
 
 **From the auditor**, ranked by how much they unblock:
 1. ~~CLIENT-A2 inputs~~ **resolved (2026-09-19):**
@@ -1180,10 +1638,11 @@ Security to-dos (any time): rotate the Gemini key; change the shared mailbox pas
      analyser screen photos. Together with the 26 thermal images (ch. 5.2), CLIENT-A2 now covers
      every chapter.
    - Nice to have only: CLIENT-A2's Necesar info / *Prelucrare date*.
-2. **Her blank base templates**, if they exist: the audit's metadata creator „Matrix" suggests a
-   base Word template (.dotx/.docx) with her styles. That would replace reconstructing it (S10).
+2. **Which finished audit is her current base.** Provisional: AUDIT-01 2026, her latest own audit
+   in the library (§5.7); work does not wait for the answer. A blank template is no longer needed.
 3. Confirm that her *Prelucrare date* values are always taken as-is from the client's Necesar
-   info, and which one wins if they differ.
+   info, and which one wins if they differ (the proposed order is in §5.6; her answer changes only
+   that order).
 4. Anexa 2–3 + Necesar info for **CLIENT-I5 2025** (so the CLIENT-I5 PIEE has a matching input set).
 5. Invoice examples for **Next Energy, Getica, Electric Planners, Hidroelectrica, Enel/PPC**, and
    the CLIENT-I7 / CLIENT-I3 / invoice-case-d 2023–2024 PDFs if still available.
@@ -1204,20 +1663,23 @@ objects.
    GitHub release (release notes + download link); SmartScreen warning accepted.
 3. **Backup and protection of client data on the auditor's PC.** *Default:*
    - the workspace stays on the local disk
-   - a weekly **"Backup" button + reminder** that writes a dated zip to a folder she chooses (e.g.
-     OneDrive or an external disk); never a live-synced SQLite
+   - a weekly **"Backup" button + reminder** that writes the §5.3 snapshot to a folder she
+     chooses (e.g. OneDrive or an external disk); never a live-synced SQLite
+   - `ema backup` / `ema restore` exist from S1; the button and reminder come with S17b
    - recommend BitLocker disk encryption
 4. **PDF licence:** pypdfium2 + pdfplumber replace PyMuPDF in S9 (PyMuPDF is AGPL-3.0).
 5. **Document preview (decided 09-19):** a **paged, scrollable preview of the whole document**, like
    a PDF viewer (all pages, zoom, jump to a section's pages). **No editing engine** (out of scope).
-   - Pipeline: the draft `.docx` → PDF via **Word** on Windows (`ExportAsFixedFormat`, exact
-     fidelity) or **LibreOffice** headless (Mac/dev) → shown with **pdf.js** (Apache-2.0).
+   - Pipeline: the draft `.docx` → PDF via **Word** (AppleScript on the Mac, COM on Windows;
+     exact fidelity), or **LibreOffice** headless where Word is missing → shown with **pdf.js**
+     (Apache-2.0).
    - Plus a "Deschide în Word" button for the real `.docx`.
 6. **Template and legislation upkeep.** *Default:*
    - templates are versioned per year
    - the auditor uploads a new template version in Settings, and Ema checks that its slots are intact
-   - for the PIEE, her newest finished PIEE becomes the new base. Ema checks its anchor map
-     (headings, tables, the 31 charts + pies) before using it.
+   - for the PIEE, her newest finished PIEE becomes the new base. Ema validates its anchor map
+     (every element classified, §5.10) and shows her a preview; she promotes it, and only then is
+     it used.
    - past jobs keep the template version they used
 7. **AI:**
    - manual provider choice (Gemini default, OpenAI optional)
@@ -1236,10 +1698,10 @@ objects.
     used verbatim; a review pass with the auditor is expected after S17b, and it only touches strings.
 11. **Risk register:**
     - native Word charts (S0 spike; the PIEE path is already proven on Mac, §5.7)
-    - TOC page numbers need a PDF render (Word on Windows, LibreOffice elsewhere), and
-      LibreOffice pagination can differ from Word's
+    - Word automation on the Mac (AppleScript): proven for the TOC and PDF on 2026-09-23; an
+      earlier hang was the unanswered macOS permission prompt
     - vision reading of meter photos (accuracy + confirmation UX)
-    - LLM narrative quality vs the auditor's bar (S14 compared against the CLIENT-A2 final)
+    - LLM narrative quality vs the auditor's bar (S14 compared with her own audits, reviewed by her)
     - `.doc` conversion on machines without Office
 
 **Docker: not for the product now.**
@@ -1279,7 +1741,7 @@ sha256 and original location. Also: `README.md`, `_requirements/auditor-requirem
 | Area | Contents |
 |---|---|
 | `audit/finished-audits/` | 6 human-written audits: AUDIT-02, AUDIT-01, AUDIT-04, AUDIT-03 (2026), CLIENT-A3 2022 (previous auditor), AUDIT-05 (`Cap 2-3-4 V2.docx`, ch. 1–4) |
-| `audit/cases/` | CLIENT-A1 2026 (27 received files); audit-case-b (4 received + the original `.rar`; `visit/thermography/` 26 thermal images; `visit/electrical/tablou-electric-1..4/` 36 PAC3220 display photos + `electro.rar`; the auditor's final audit under `final/`); audit-case-c (Necesar info + Prelucrare) |
+| `audit/cases/` | CLIENT-A1 2026 (27 received files); audit-case-b (4 received + the original `.rar`; `visit/thermography/` 26 thermal images; `visit/electrical/tablou-electric-1..4/` 36 PAC3220 display photos + `electro.rar`; the delivered final under `final/`, **produced with an agent: inputs only, never a reference**); audit-case-c (Necesar info + Prelucrare) |
 | `piee/` | 36 Anexa 2–3 (2025); CLIENT-I5 PIEE `MODEL_2026` (the auditor; the current PIEE base); CLIENT-P1 case (inputs; reconstructed workbook; `working/CLIENT-I5-format-generator/` scripts; `generated/`: the 18 Sep ARGUS version and **the 19 Sep CLIENT-I5-format golden**); CLIENT-P2 case (inputs, legacy output, final) |
 | `invoices/` | 79 real invoices + 6 supporting docs by client (invoice-case-d, CLIENT-I5, CLIENT-I6, CLIENT-I2, CLIENT-I1); accepted workbooks; `by-supplier/` symlinks |
 | `energy-manager-reporting/` | the auditor's model + delivered 2023, 2023–2025, 2025 CLIENT-R1/client-r2 reports |
