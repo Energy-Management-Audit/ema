@@ -175,11 +175,18 @@ def export(
             )
             raise EmaError(code, message, output_id)
         if final:
-            readiness = workflow.readiness(ws, job)
+            in_tx = getattr(workflow, "readiness_in_tx", None)
+            readiness = in_tx(ws, job, db) if in_tx is not None else workflow.readiness(ws, job)
+            if not readiness.final_ok:
+                db.commit()  # Persist audit staleness before refusing the export.
             _require_ready(readiness, True, job)
-            digest = _hash(
-                readiness, _field_revisions(db, job), workflow.readiness_snapshot(ws, job)
+            snapshot_in_tx = getattr(workflow, "readiness_snapshot_in_tx", None)
+            workflow_snapshot = (
+                snapshot_in_tx(db, job)
+                if snapshot_in_tx is not None
+                else workflow.readiness_snapshot(ws, job)
             )
+            digest = _hash(readiness, _field_revisions(db, job), workflow_snapshot)
             approval_row = db.execute(
                 "SELECT 1 FROM approvals WHERE job_id=? AND output_id=? "
                 "AND readiness_hash=? AND on_decision IS ? LIMIT 1",

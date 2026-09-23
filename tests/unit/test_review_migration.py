@@ -17,7 +17,7 @@ def test_schema_three_preserves_decision_order(tmp_path: Path) -> None:
         db.execute("PRAGMA user_version = 3")
         db.commit()
         workspace_schema.migrate(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 6
         assert db.execute("SELECT id FROM decisions ORDER BY seq").fetchall() == [("z",), ("a",)]
         db.execute("DELETE FROM decisions WHERE id='z'")
         db.commit()
@@ -25,3 +25,6 @@ def test_schema_three_preserves_decision_order(tmp_path: Path) -> None:
         assert db.execute("SELECT seq FROM decisions WHERE id='a'").fetchone()[0] == 2
         assert "kind" in {row[1] for row in db.execute("PRAGMA table_info(outputs)")}
         assert db.execute("SELECT seq FROM outputs WHERE id='old-output'").fetchone()[0] == 1
+        assert "section_states" in {
+            row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }

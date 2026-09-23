@@ -10,6 +10,9 @@ from typing import Annotated, Any
 
 import typer
 
+from ema.audit.catalogue import CATALOGUE
+from ema.audit.sections import Status, set_status, statuses
+from ema.audit.workflow import AuditWorkflow
 from ema.core.config import workspace_path
 from ema.core.errors import EmaError
 from ema.core.review import (
@@ -28,7 +31,7 @@ from ema.core.workspace import Workspace
 job_review_app = typer.Typer()
 
 # Workflow slices populate these entries through static imports as they land.
-WORKFLOWS: dict[str, Workflow] = {}
+WORKFLOWS: dict[str, Workflow] = {"audit": AuditWorkflow()}
 
 
 def _ws() -> Workspace:
@@ -54,6 +57,36 @@ def _workflow(ws: Workspace, job: str) -> Workflow:
 
 def _print(value: Any) -> None:
     typer.echo(json.dumps(value, ensure_ascii=False, default=str))
+
+
+@job_review_app.command("sections")
+def sections_command(job: str) -> None:
+    names = {section.id: section.title for section in CATALOGUE}
+    typer.echo("ID | Stare | Secțiune | Motiv")
+    for state in statuses(_ws(), job):
+        label = state.status.value + (" (depășit)" if state.stale else "")
+        typer.echo(
+            f"{state.section_id} | {label} | {names[state.section_id]} | {state.reason or ''}"
+        )
+
+
+@job_review_app.command("section")
+def section_command(
+    job: str,
+    section_id: str,
+    to: str,
+    reason: str | None = typer.Option(None, "--reason"),
+) -> None:
+    if to not in ("done", "n/a", "later"):
+        raise EmaError("status_invalid", "Starea secțiunii este invalidă.", to)
+    if to in ("done", "n/a"):
+        if not _terminal():
+            raise EmaError(
+                "confirmation_requires_terminal", "Confirmarea necesită un terminal.", to
+            )
+        if not typer.confirm(f"Confirmați {to} pentru {section_id}?", default=False):
+            raise typer.Exit(code=2)
+    _print(set_status(_ws(), job, section_id, Status(to), "user", reason).payload())
 
 
 @job_review_app.command("fields")

@@ -3,7 +3,7 @@
 import sqlite3
 import time
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 def migrate(db: sqlite3.Connection) -> None:
@@ -64,6 +64,25 @@ def migrate(db: sqlite3.Connection) -> None:
             UPDATE outputs SET seq=rowid;
             CREATE UNIQUE INDEX outputs_seq ON outputs(seq);
             PRAGMA user_version = 5;
+            COMMIT;
+        """)
+        version = 5
+    if version == 5:
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            CREATE TABLE section_states (
+                job_id TEXT NOT NULL, section_id TEXT NOT NULL,
+                revision INTEGER NOT NULL, data TEXT NOT NULL,
+                PRIMARY KEY (job_id, section_id),
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            CREATE TABLE audit_materials (
+                job_id TEXT NOT NULL, kind TEXT NOT NULL,
+                present INTEGER NOT NULL, source TEXT NOT NULL,
+                PRIMARY KEY (job_id, kind),
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            PRAGMA user_version = 6;
             COMMIT;
         """)
         return

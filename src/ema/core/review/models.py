@@ -169,10 +169,12 @@ class Decision(BaseModel):
     at: datetime
     actor: Actor
     field_id: str
+    target_kind: Literal["field", "section"] = "field"
     on_revision: int
-    action: Literal["accept", "correct", "reject", "choose", "undo"]
-    before: Field
-    after: Field
+    action: Literal["accept", "correct", "reject", "choose", "status", "undo"]
+    detail: str | None = None
+    before: Field | dict[str, Any]
+    after: Field | dict[str, Any]
     batch_id: str | None = None
     undone_by: str | None = None
 
