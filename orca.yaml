@@ -1,0 +1,4 @@
+# Orca worktree setup (docs/PLAN.md §6.2). Agent instructions live in AGENTS.md, not here.
+scripts:
+  setup: |
+    uv sync --all-groups && uv run pre-commit install --install-hooks -t pre-commit -t pre-push

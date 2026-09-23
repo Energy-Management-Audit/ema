@@ -12,7 +12,7 @@ The design handoff it refers to lives in the reference library (§5.18), togethe
 |---|---|---|---|
 | 1. Product | §2–§4 of this doc | who, what, why, requirements, decisions | user + Claude |
 | 2. Design | §5–§6 of this doc | modules, data, flows, contracts, rules | Claude |
-| 3. Slice spec | the Conductor workspace prompt + PR description (not a file in the repo) | one slice: exact files, signatures, golden case, out of scope, done commands | Claude writes, Codex reviews |
+| 3. Slice spec | the worker's dispatch + PR description (not a file in the repo) | one slice: exact files, signatures, golden case, out of scope, done commands | Claude writes, Codex reviews |
 | 4. Code + tests | the repo | implementation; the golden test permanently encodes the acceptance | Codex |
 
 Each level only narrows the one above. If Codex finds the level above wrong or unbuildable, it
@@ -90,6 +90,8 @@ which keeps the repo free of markdown sprawl.
   - The review is closed; Vlad's decisions on it are F1–F3 in §4.
 - 2026-09-23 **Ready for implementation:** the plan is on `dev`, and the S0, S1 and S1b slice
   specs are written (level 3, §0); Codex starts S0 and S1 in parallel.
+- 2026-09-23 **Orca replaces Conductor** for running the agents: `orca.yaml` holds the worktree
+  setup, and §6.4 describes the coordinator loop. Wave 1 is S0, S1 and S3.
 - **Next:**
   1. ~~Vlad's final decisions on the review~~: F1–F3 decided 09-23 (§4).
   2. ~~The S0, S1 and S1b slice specs~~: written 09-23. S1 also aligns `AGENTS.md` and ADR 0001
@@ -1457,7 +1459,7 @@ ema/
 |---|---|---|---|
 | `prod` | production: what the auditor runs; each merge = a tagged release `v0.x.y` → the installer build | n/a | n/a |
 | `dev` | integration; always green | `prod` (once) | `prod` via a release PR |
-| `feature/<slice>` | one slice = one branch = one Conductor workspace | `dev` | `dev` (PR, squash) |
+| `feature/<slice>` | one slice = one branch = one Orca worktree | `dev` | `dev` (PR, squash) |
 | `hotfix/<issue>` | urgent production fix | `prod` | `prod` (PR, patch tag) **and** `dev` |
 | `release/x.y` | only if releases ever need stabilization | `dev` | `prod` + `dev` |
 
@@ -1469,12 +1471,12 @@ ema/
 - Conventional Commits; features squash-merged.
 - SemVer: a release bumps the minor version, a hotfix the patch.
 - Golden tests run locally before feature PRs and before every release PR.
-- **Conductor** setup lives in `.conductor/settings.toml` (committed): the setup script
-  (`uv sync --all-groups && uv run pre-commit install`), branches deleted on archive, workspaces
-  archived when their PR merges, and a branch-naming prompt (`feature/…`, `review/…`, `docs/…`,
-  `hotfix/…`). Agent instructions are **not** repeated there: both agents load `AGENTS.md` on their
-  own. `EMA_REFERENCE` reaches the agents through `.conductor/settings.local.toml`, gitignored
-  because the path is this machine's. Workspaces start from `dev`.
+- **Orca** runs the agents (09-23; it replaced Conductor). `orca.yaml` (committed) holds the
+  worktree setup script: `uv sync --all-groups` and both hook types (`pre-commit install -t
+  pre-commit -t pre-push`). Agent instructions
+  are **not** repeated there: every agent loads `AGENTS.md` on its own. `EMA_REFERENCE` reaches
+  agent terminals from the login shell's environment (`.zshenv`), because the path is this
+  machine's. Worktrees start from `dev`.
 
 ### 6.3 Coding standards (tools, not prose)
 
@@ -1514,12 +1516,11 @@ ema/
 - **Docs allowed:** README, AGENTS.md, PLAN.md, a few ADRs. No second architecture document: §5
   is it, and AGENTS.md only points there. No evidence files or AI artefacts.
 
-### 6.4 Working model: Claude designs, Codex builds (in Conductor)
+### 6.4 Working model: Claude designs, Codex builds (in Orca)
 
 - **Claude** (product/design lead): this document, slice specs, acceptance, design review of
   diffs. **Codex** (lead engineer): implementation. **The user** arbitrates and merges.
-- **Slice spec template** (level 3; lives in the Conductor workspace prompt + the PR
-  description):
+- **Slice spec template** (level 3; lives in the worker's dispatch + the PR description):
   1. **Goal**: 1–2 sentences + the requirement IDs (R…).
   2. **Context**: links to the § of this document.
   3. **Scope**: modules/files to create or change.
@@ -1533,24 +1534,38 @@ ema/
   1. Codex critiques the spec before building.
   2. Claude reviews the diff against the spec and the golden output.
   3. Codex adversarial review for engineering risk.
-- **How the two agents work together in Conductor:** one workspace per slice, with a Claude chat
-  and a Codex chat on the same branch. Claude writes or revises; Conductor's **Review** action,
-  with Codex as the review model, reviews the branch diff; findings go back to Claude from the
-  diff viewer as inline comments. Both agents have the Conductor MCP (09-23): each can leave
-  comments on the branch diff and read the other's, so review findings travel as diff comments
-  without being copied by hand. Through the Conductor API an agent can also start a session with
-  another agent (`create_session`), e.g. Claude asking Codex for a review; this is available only
-  to sessions started after that server was added. Codex implements in its own chat; the Review action (Claude or
-  Codex) checks it. Two rounds at most, then Vlad decides what remains, and the PR description
-  records the outcome.
+- **How the agents work together in Orca:** Claude is the coordinator, in the primary
+  checkout on `dev`; it writes specs, dispatches, reviews and prepares merges, and writes no
+  product code. The primary checkout stays on `dev` and is only read and pulled: nobody switches
+  branch or commits there. Every change, docs PRs included, is made in its own Orca worktree from
+  `dev`, so every open branch shows in Orca. Per slice, from §7:
+  1. **Spec** with the template above, narrowing this document; if the plan is wrong, this
+     document is fixed first (docs PR).
+  2. **Dispatch** one Codex worker (`orca orchestration worker-start`) in a new top-level
+     worktree from `dev`, branch `feature/<slice>`, with the spec and a preamble: read
+     `AGENTS.md`, critique the spec before coding, Conventional Commits, a PR into `dev` titled
+     with the slice id.
+  3. **Spec critique** (review round 1): Claude answers, fixes the spec and, if needed, this
+     document; then the worker builds.
+  4. **Review:** on `worker_done`, Claude runs `scripts/check` and the golden command in the
+     worker's worktree and reviews the diff against the spec; findings go back to the same
+     worker.
+  5. **Adversarial review:** a second Codex worker in the same worktree, engineering risks only.
+  6. **PR** description: the spec, the golden output with its evidence level (§5.16), the
+     review outcome, and what Vlad checks by hand in Word. No client data, file names only.
+  7. **Merge** (Vlad), then the worker is released and §1 is updated.
+
+  At most 3–4 workers at once. Only one worker at a time runs tests that drive Word for Mac
+  (§5.5): Claude serializes those golden runs. Two rounds per review step at most, then Vlad
+  decides what remains, and the PR description records the outcome.
 
 ---
 
-## 7. Roadmap (one slice = one `feature/…` branch = one Conductor workspace)
+## 7. Roadmap (one slice = one `feature/…` branch = one Orca worktree)
 
 | # | Slice | Golden acceptance (real data) | Depends |
 |---|---|---|---|
-| S0 | **Spike:** native Word charts (the PIEE edit path and the audit build path) + house-style table/caption + the TOC page-number cycle | The three proofs of §5.7, in Word for Mac | none |
+| S0 | **Spike:** native Word charts (the PIEE edit path and the audit build path) + the TOC page-number cycle, through the Word for Mac adapter (the table/caption blocks are S2) | The three proofs of §5.7, in Word for Mac | none |
 | S1 | Repo skeleton: tooling, `scripts/check` = CI, import contracts, `core` workspace/jobs/logging/errors, backup/restore, CLI + API health, the resource path helper | CI green; `ema --help`; job-folder round-trip; backup → restore into a clean folder; an interrupted delete finished on restart | none |
 | S1b | Review core: fields + evidence, decisions (Jurnal) + undo, conflicts, readiness contract; the `ema job …` CLI | On a synthetic job: correction → re-run → undo → export; a decision on an old revision refused; an undo superseded by a later decision refused; the same outcomes through the CLI and the use cases the API will call | S1 |
 | S2 | `core.office`: label-finding xls/xlsx readers; docx block engine (from S0) | A sample section rendered in her style, checked against her audit | S0, S1 |
@@ -1601,7 +1616,7 @@ ema/
    0001. `FRONTEND_BRIEF-2026-09-19.md` moved into the library beside the handoff.
 
 **Remaining:**
-5. Codex runs S0/S1 in Conductor.
+5. Codex workers build the slices in Orca (§6.4), starting with S0, S1 and S3.
 6. Port the code per §5.19 in its slices (always from the archive, never by wholesale copy). The
    legacy repos are retired only once their parts are ported (S3, S7, S9), not before.
 7. After Ema's first real delivered job:
@@ -1712,7 +1727,7 @@ objects.
 **Docker: not for the product now.**
 - the auditor needs a normal Windows app. Docker Desktop on Windows needs WSL2 and is heavy and
   unfamiliar.
-- For development, `uv` already gives reproducible Python environments, and Conductor isolates
+- For development, `uv` already gives reproducible Python environments, and Orca isolates
   work in worktrees.
 - Docker becomes worth it for the future hosted backend (10.1) and possibly for CI jobs that need
   LibreOffice/Tesseract.
