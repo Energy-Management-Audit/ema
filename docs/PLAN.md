@@ -87,12 +87,14 @@ which keeps the repo free of markdown sprawl.
   - Word edits happen on a working copy (§5.18); the dev loop is same-origin (§5.1)
   - Vlad, the same day: the CLIENT-A2 final was produced with an agent, so it is inputs only,
     and the audit base is AUDIT-01 2026 (§5.7, §5.16)
-  - The review is closed; the decisions left for Vlad are in `/tmp/ema-review/r2-claude.md`.
+  - The review is closed; Vlad's decisions on it are F1–F3 in §4.
+- 2026-09-23 **Ready for implementation:** the plan is on `dev`, and the S0, S1 and S1b slice
+  specs are written (level 3, §0); Codex starts S0 and S1 in parallel.
 - **Next:**
   1. ~~Vlad's final decisions on the review~~: F1–F3 decided 09-23 (§4).
-  2. The S0, S1 and S1b slice specs. S1 also aligns `AGENTS.md` and ADR 0001 with §5.3,
-     §5.5 and §6.3.
-  3. Claude draws the missing screens (§5.18).
+  2. ~~The S0, S1 and S1b slice specs~~: written 09-23. S1 also aligns `AGENTS.md` and ADR 0001
+     with §5.3, §5.5 and §6.3.
+  3. Claude draws the missing screens (§5.18); needed before S16a.
 
 ---
 
@@ -713,6 +715,9 @@ Regenerating a section rewrites only its anchors.
   - **Partly proven (2026-09-19, CLIENT-P1 PIEE):** the result opened cleanly in Word for Mac,
     with editable data. That covered rewriting her existing chart parts, embedding their
     workbooks, and adding native 3D pies.
+  - **Her audits link their charts too** (found 09-23): all 30 charts of AUDIT-01 point at her
+    OneDrive copy of the client's Necesar info (`'Consum Gaz'!$C$7`…). So the audit base needs the
+    same link → embedded-workbook rewrite as the PIEE, and it is one piece of code for both.
   - **S0 still proves, in Word for Mac** (Windows Word again at the port), three separate
     things; none stands in for another:
     1. the PIEE path, as a repeatable check: the CLIENT-P1 golden (rewritten charts, removed series
@@ -1207,7 +1212,7 @@ reached, never just „passed":
 1. **regression** — equals an output a script or an earlier Ema produced (catches change, not
    correctness)
 2. **reference** — numbers and structure equal a document the auditor delivered
-3. **Word-visual** — opened and checked in native Word on Windows
+3. **Word-visual** — opened and checked in native Word (Word for Mac now, Windows from the port)
 4. **approved** — the auditor accepted this output
 
 - The CLIENT-P1 2026 PIEE golden is level 4: the auditor approved it, pies included (09-23). CLIENT-P2
