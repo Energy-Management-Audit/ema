@@ -18,7 +18,9 @@ from typing import IO, Literal
 
 from ema.core.errors import EmaError
 from ema.core.logging import log_exception
+from ema.core.workspace.cleanup import delete_job_rows
 from ema.core.workspace.lock import workspace_lock
+from ema.core.workspace.references import evidence_uses_file, referenced_files
 from ema.core.workspace.schema import migrate
 
 
@@ -259,15 +261,7 @@ class Workspace:
                     continue
                 with self.connect() as db:
                     db.execute("BEGIN IMMEDIATE")
-                    for table in ("run_inputs", "run_files", "run_reads"):
-                        db.execute(
-                            f"DELETE FROM {table} WHERE run_id IN "
-                            "(SELECT id FROM runs WHERE job_id=?)",
-                            (row["id"],),
-                        )
-                    for table in ("outputs", "runs", "slot_versions", "slots"):
-                        db.execute(f"DELETE FROM {table} WHERE job_id=?", (row["id"],))
-                    db.execute("DELETE FROM jobs WHERE id=?", (row["id"],))
+                    delete_job_rows(db, str(row["id"]))
 
     def gc(self) -> None:
         with workspace_lock(self.root), self.connect() as db:
@@ -306,7 +300,9 @@ class Workspace:
                         "SELECT 1 FROM run_inputs WHERE file_sha=? AND client_slug=? LIMIT 1",
                         (row["sha"], row["client_slug"]),
                     ).fetchone()
-                if used is None:
+                if used is None and not evidence_uses_file(
+                    db, str(row["sha"]), str(row["client_slug"])
+                ):
                     self.path(str(row["relative_path"])).unlink(missing_ok=True)
                     db.execute(
                         "DELETE FROM files WHERE sha=? AND client_slug=?",
@@ -314,16 +310,7 @@ class Workspace:
                     )
 
     def referenced_files(self, db: sqlite3.Connection) -> list[tuple[str, str, int]]:
-        rows = db.execute(
-            "SELECT DISTINCT f.relative_path,f.sha,f.size FROM files f "
-            "JOIN slot_versions v ON v.file_sha=f.sha "
-            "JOIN jobs j ON j.id=v.job_id AND j.client_slug=f.client_slug "
-            "WHERE j.deleted=0 UNION SELECT f.relative_path,f.sha,f.size FROM files f "
-            "JOIN run_inputs i ON i.file_sha=f.sha AND i.client_slug=f.client_slug "
-            "UNION SELECT relative_path,sha,size FROM run_files "
-            "UNION SELECT relative_path,sha,size FROM outputs"
-        ).fetchall()
-        return [(str(r[0]), str(r[1]), int(r[2])) for r in rows]
+        return referenced_files(db)
 
     def record_artifacts(self, db: sqlite3.Connection, run: str, directory: Path) -> None:
         for path in directory.rglob("*"):
@@ -355,10 +342,14 @@ class Workspace:
             temp.unlink(missing_ok=True)
         return target
 
-    def record_outputs(self, db: sqlite3.Connection, job: str, run: str, paths: list[Path]) -> None:
-        for target in paths:
+    def record_outputs(
+        self, db: sqlite3.Connection, job: str, run: str, paths: list[tuple[Path, str]]
+    ) -> None:
+        for target, kind in paths:
+            seq = int(db.execute("SELECT COALESCE(MAX(seq),0)+1 FROM outputs").fetchone()[0])
             db.execute(
-                "INSERT INTO outputs VALUES (?,?,?,?,?,?)",
+                "INSERT INTO outputs (id,job_id,run_id,relative_path,sha,size,kind,seq) "
+                "VALUES (?,?,?,?,?,?,?,?)",
                 (
                     uuid.uuid4().hex,
                     job,
@@ -366,6 +357,8 @@ class Workspace:
                     target.relative_to(self.root).as_posix(),
                     _file_sha(target),
                     target.stat().st_size,
+                    kind,
+                    seq,
                 ),
             )
 

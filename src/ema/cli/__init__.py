@@ -9,6 +9,7 @@ import uvicorn
 
 from ema import __version__
 from ema.api import create_app
+from ema.cli.review import job_review_app
 from ema.core.backup import backup, restore
 from ema.core.config import workspace_path
 from ema.core.errors import EmaError
@@ -21,6 +22,7 @@ workspace_app = typer.Typer()
 job_app = typer.Typer()
 _app.add_typer(workspace_app, name="workspace")
 _app.add_typer(job_app, name="job")
+job_app.add_typer(job_review_app)
 
 
 def _workspace() -> Workspace:

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
-import sqlite3
 import sys
 import threading
 import traceback
@@ -18,6 +16,7 @@ from typing import Any, Literal
 
 from ema import __version__
 from ema.core.errors import EmaError
+from ema.core.jobs.reads import revision
 from ema.core.jobs.runner import owner, recover
 from ema.core.logging import log_exception, write_event
 from ema.core.workspace import SlotVersion, Workspace
@@ -109,7 +108,7 @@ class StageContext:
         self.reads: dict[tuple[str, str], int] = {}
         self.inputs: dict[str, str] = {}
         self.changed_reads = False
-        self.outputs: list[Path] = []
+        self.outputs: list[tuple[Path, str]] = []
 
     def read_slot(self, slot: str) -> SlotVersion:
         with self.ws.connect() as db:
@@ -145,6 +144,19 @@ class StageContext:
             self.changed_reads = True
         self.reads.setdefault(key, revision)
 
+    def read_review_row(self, table: Literal["fields", "decisions"], row_id: str) -> str:
+        if table not in ("fields", "decisions"):
+            raise EmaError("read_table", "Tipul datelor citite este invalid.", table)
+        with self.ws.connect() as db:
+            row = db.execute(
+                f'SELECT revision,data FROM "{table}" WHERE id=? AND job_id=?',
+                (row_id, self.job),
+            ).fetchone()
+        if row is None:
+            raise EmaError("review_row_missing", "Datele de revizuire lipsesc.", row_id)
+        self.record_read(table, row_id, int(row["revision"]))
+        return str(row["data"])
+
     def read_setting(self, key: str) -> Any:
         with self.ws.connect() as db:
             row = db.execute(
@@ -176,10 +188,12 @@ class StageContext:
         with self.ws.connect() as db:
             return self.ws.artifact_dir(db, self.job, self.stage, self.run_id)
 
-    def save_output(self, source: Path, name: str) -> Path:
+    def save_output(self, source: Path, name: str, *, kind: str = "draft") -> Path:
+        if kind not in ("draft", "final"):
+            raise EmaError("output_kind", "Tipul documentului este invalid.", kind)
         with self.ws.connect() as db:
             output = self.ws.save_output(db, self.job, self.run_id, source, name)
-        self.outputs.append(output)
+        self.outputs.append((output, kind))
         return output
 
     def progress(self, done: int, total: int, message: str) -> None:
@@ -196,26 +210,6 @@ class StageContext:
                 "SELECT cancel_requested FROM runs WHERE id=?", (self.run_id,)
             ).fetchone()
         return bool(row and row["cancel_requested"])
-
-
-def _revision(db: sqlite3.Connection, table: str, row_id: str) -> int | None:
-    if table == "slots":
-        job, slot = row_id.split(":", 1)
-        row = db.execute(
-            "SELECT revision FROM slots WHERE job_id=? AND name=?", (job, slot)
-        ).fetchone()
-    elif table == "jobs.settings":
-        row = db.execute(
-            "SELECT settings_revision AS revision FROM jobs WHERE id=? AND deleted=0", (row_id,)
-        ).fetchone()
-    else:
-        if not re.fullmatch(r"[a-z][a-z0-9_]*", table):
-            raise EmaError("read_table", "Tipul datelor citite este invalid.", table)
-        columns = {entry["name"] for entry in db.execute(f'PRAGMA table_info("{table}")')}
-        if not {"id", "revision"} <= columns:
-            raise EmaError("read_table", "Tipul datelor citite este invalid.", table)
-        row = db.execute(f'SELECT revision FROM "{table}" WHERE id=?', (row_id,)).fetchone()
-    return int(row["revision"]) if row else None
 
 
 def _finish(
@@ -237,19 +231,23 @@ def _finish(
         if row is None or row["state"] != "running":
             return
         stale = context.changed_reads or any(
-            _revision(db, table, row_id) != revision
-            for (table, row_id), revision in context.reads.items()
+            revision(db, table, row_id) != read_revision
+            for (table, row_id), read_revision in context.reads.items()
         )
         cancelled = bool(row["cancel_requested"])
         state = "cancelled" if cancelled else "failed" if error else "ready"
         publication = "stale" if stale else "current" if state == "ready" else None
+        if state != "ready":
+            for path, _kind in context.outputs:
+                path.unlink(missing_ok=True)
         directory = context.artifact_dir()
         ws.record_artifacts(db, context.run_id, directory)
         if state == "ready":
             ws.record_outputs(db, context.job, context.run_id, context.outputs)
-        for (table, row_id), revision in context.reads.items():
+        for (table, row_id), read_revision in context.reads.items():
             db.execute(
-                "INSERT INTO run_reads VALUES (?,?,?,?)", (context.run_id, table, row_id, revision)
+                "INSERT INTO run_reads VALUES (?,?,?,?)",
+                (context.run_id, table, row_id, read_revision),
             )
         db.execute(
             "UPDATE runs SET state=?,publication=?,fingerprint=?,outcome=?,error=?,ended_at=? "
@@ -350,7 +348,7 @@ def _execute_stage(context: StageContext, fn: Callable[[StageContext], StageOutc
             with ws.connect() as db:
                 row = db.execute("SELECT state FROM runs WHERE id=?", (run,)).fetchone()
             if row is None or row["state"] != "ready":
-                for path in context.outputs:
+                for path, _kind in context.outputs:
                     path.unlink(missing_ok=True)
     if fatal is not None:
         raise fatal

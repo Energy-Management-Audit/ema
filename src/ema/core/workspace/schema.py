@@ -3,7 +3,7 @@
 import sqlite3
 import time
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 5
 
 
 def migrate(db: sqlite3.Connection) -> None:
@@ -18,6 +18,54 @@ def migrate(db: sqlite3.Connection) -> None:
         db.execute("UPDATE files SET added_at=?", (time.time(),))
         db.execute("ALTER TABLE runs ADD COLUMN cancel_requested INTEGER NOT NULL DEFAULT 0")
         db.execute("PRAGMA user_version = 2")
+        version = 2
+    if version == 2:
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            CREATE TABLE fields (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL, key TEXT NOT NULL,
+                revision INTEGER NOT NULL, data TEXT NOT NULL,
+                UNIQUE(job_id, key), FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            CREATE TABLE evidence (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL, data TEXT NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            CREATE TABLE decisions (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL, field_id TEXT NOT NULL,
+                at TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            CREATE TABLE approvals (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL, output_id TEXT NOT NULL,
+                readiness_hash TEXT NOT NULL, on_decision TEXT,
+                at TEXT NOT NULL, actor TEXT NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            PRAGMA user_version = 3;
+            COMMIT;
+        """)
+        version = 3
+    if version == 3:
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            ALTER TABLE outputs ADD COLUMN kind TEXT NOT NULL DEFAULT 'draft';
+            ALTER TABLE decisions ADD COLUMN seq INTEGER NOT NULL DEFAULT 0;
+            UPDATE decisions SET seq=rowid;
+            CREATE UNIQUE INDEX decisions_seq ON decisions(seq);
+            PRAGMA user_version = 4;
+            COMMIT;
+        """)
+        version = 4
+    if version == 4:
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            ALTER TABLE outputs ADD COLUMN seq INTEGER NOT NULL DEFAULT 0;
+            UPDATE outputs SET seq=rowid;
+            CREATE UNIQUE INDEX outputs_seq ON outputs(seq);
+            PRAGMA user_version = 5;
+            COMMIT;
+        """)
         return
     db.executescript("""
             BEGIN IMMEDIATE;
@@ -73,6 +121,27 @@ def migrate(db: sqlite3.Connection) -> None:
                 id TEXT PRIMARY KEY, job_id TEXT NOT NULL, run_id TEXT NOT NULL,
                 relative_path TEXT NOT NULL, sha TEXT NOT NULL, size INTEGER NOT NULL
             );
-            PRAGMA user_version = 2;
+            CREATE TABLE fields (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL, key TEXT NOT NULL,
+                revision INTEGER NOT NULL, data TEXT NOT NULL,
+                UNIQUE(job_id, key), FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            CREATE TABLE evidence (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL, data TEXT NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            CREATE TABLE decisions (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL, field_id TEXT NOT NULL,
+                at TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            CREATE TABLE approvals (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL, output_id TEXT NOT NULL,
+                readiness_hash TEXT NOT NULL, on_decision TEXT,
+                at TEXT NOT NULL, actor TEXT NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            PRAGMA user_version = 3;
             COMMIT;
     """)
+    migrate(db)
