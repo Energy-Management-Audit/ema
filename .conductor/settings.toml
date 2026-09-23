@@ -1,0 +1,16 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+# Agent instructions live in AGENTS.md (CLAUDE.md links to it), which Claude Code and Codex
+# both load on their own. Nothing here repeats it. Machine-specific values (EMA_REFERENCE)
+# live in settings.local.toml, which is gitignored.
+
+[scripts]
+setup = "uv sync --all-groups && uv run pre-commit install"
+
+[git]
+delete_branch_on_archive = true
+archive_on_merge = true
+worktree_push_auto_setup_remote = true
+
+[prompts]
+rename_branch = "Name the branch <type>/<slug>, lowercase with hyphens: feature/<slice-id>-<word>, review/<topic>, docs/<topic> or hotfix/<issue>."

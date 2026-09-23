@@ -931,6 +931,39 @@ so they are visible to whoever opens the design rather than only here.
 - **anomalies are explained, not just flagged** (the October settlement invoice offers „split over
   Jul–Sep" or „leave in October")
 
+#### Frontend state model (proposed 2026-09-21 — for the architecture review)
+
+Derived from the handoff README's prose state model and §5.4. Not yet in the API: after review it
+becomes the S16a OpenAPI schema. Enum values are English; Romanian lives only in display copy.
+
+```ts
+Field       { id, chapter, key, label, value, unit?,
+              state: extracted|supplied|enriched|calculated|manual,   // where it came from
+              review: pending|accepted|corrected|rejected|missing,    // what the auditor did
+              confidence: exact|partial|conflict|none,
+              source?: SourceRef, alternatives?: {value, source}[],   // the two-document conflict
+              reason?, history: {at, actor, from, to, action, batchId?}[] }
+SourceRef   { id, docId, page?, bbox?, cell?, url?, retrievedAt?, quote? }
+Measure     { id, name, detail?, investmentLei?, savingsMWh?, savingsTep?, paybackYears?,
+              term?, responsible?, funding?, origin: anexa|audit|manual, source?,
+              missing: (term|responsible|funding)[] }
+SectionNode { id, number, title, status: ready|missing|later|na|drafted|done,
+              later?: {reason: visit|measurements|thermography|map|chapter, date?, ref?},
+              pages?, children[], note? }
+JobDocument { id, name, kind, slot, pages?, sizeBytes, versions[],
+              intake: read|reading|failed|needs_ocr|protected,
+              failure?: {cause, threshold?, exits[]}, found?: string[] }
+Report      { generatedAt?, editedExternallyAt?, version, path?, template }
+Package     { files: {name, sizeBytes, kind}[], checks: {label, ok, detail}[] }
+Settings    { theme, providers: {gemini, openai} each {present, maskedKey?, verifiedAt?},
+              defaultProvider, extraction: {ocr, flagUncertain, autoAcceptExact} }
+```
+
+Three choices to challenge: the README's single field `status` is split into **state + review +
+confidence**, because facts also arrive from enrichment and calculation, which the design never
+had to show; `alternatives[]` carries the conflict rule; `missing[]` on a measure drives the
+per-row „lipseşte" markers instead of a validation error.
+
 **Stack:** React + TypeScript strict + Vite; pdf.js for the paged preview; Geist + Geist Mono
 bundled (not from Google Fonts); the same format/lint/type gates as the backend.
 
@@ -999,9 +1032,12 @@ ema/
 - Conventional Commits; features squash-merged.
 - SemVer: a release bumps the minor version, a hotfix the patch.
 - Golden tests run locally before feature PRs and before every release PR.
-- **Conductor:** branch prefix **None**. Feature workspaces start from `dev`, hotfix workspaces
-  from `prod`. Rename auto-generated branches first (`git branch -m feature/<slice>`). Workspace
-  setup script: `uv sync && pre-commit install`.
+- **Conductor** setup lives in `.conductor/settings.toml` (committed): the setup script
+  (`uv sync --all-groups && uv run pre-commit install`), branches deleted on archive, workspaces
+  archived when their PR merges, and a branch-naming prompt (`feature/…`, `review/…`, `docs/…`,
+  `hotfix/…`). Agent instructions are **not** repeated there: both agents load `AGENTS.md` on their
+  own. `EMA_REFERENCE` reaches the agents through `.conductor/settings.local.toml`, gitignored
+  because the path is this machine's. Workspaces start from `dev`.
 
 ### 6.3 Coding standards (tools, not prose)
 
@@ -1049,7 +1085,12 @@ ema/
   1. Codex critiques the spec before building.
   2. Claude reviews the diff against the spec and the golden output.
   3. Codex adversarial review for engineering risk.
-- Both agents read the same `AGENTS.md`.
+- **How the two agents work together in Conductor:** one workspace per slice, with a Claude chat
+  and a Codex chat on the same branch. Claude writes or revises; Conductor's **Review** action,
+  with Codex as the review model, reviews the branch diff; findings go back to Claude from the
+  diff viewer as inline comments. Codex implements in its own chat; the Review action (Claude or
+  Codex) checks it. Two rounds at most, then Vlad decides what remains, and the PR description
+  records the outcome.
 
 ---
 

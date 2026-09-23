@@ -21,6 +21,8 @@ packaging/dist/
 .env
 .env.*
 !.env.example
+.conductor/settings.local.toml
+
 
 # Runtime data — client material never enters git (docs/PLAN.md §5.15)
 workspace/
