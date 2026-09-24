@@ -105,6 +105,7 @@ reportMissingTypeStubs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-q"
 markers = [
     "golden: runs against the real reference library; needs EMA_REFERENCE (skipped without it)",

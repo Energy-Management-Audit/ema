@@ -132,3 +132,20 @@ def test_xlsx_error_cell_is_not_blank(tmp_path: Path) -> None:
     assert error.value.code == "cell_error"
     assert "Calc!A1" in error.value.detail
     loaded.close()
+
+
+def test_xlsx_hyperlink_target_is_preserved(tmp_path: Path) -> None:
+    path = tmp_path / "website.xlsx"
+    book = Workbook()
+    book.active.title = "Date"
+    book.active["B2"] = "Company website"
+    book.active["B2"].hyperlink = "https://example.test/contact"
+    book.save(path)
+
+    loaded = open_book(path)
+    try:
+        cell = loaded.sheet("Date").value(2, 2)
+        assert cell.value == "Company website"
+        assert cell.hyperlink == "https://example.test/contact"
+    finally:
+        loaded.close()

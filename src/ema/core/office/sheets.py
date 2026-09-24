@@ -54,6 +54,7 @@ class CellRange:
 class CellValue:
     value: Scalar
     ref: CellRef
+    hyperlink: str | None = None
 
 
 def _normal(text: str) -> str:
@@ -98,7 +99,12 @@ class _Sheet:
     def value(self, row: int, col: int) -> CellValue:
         if row < 1 or col < 1:
             raise ValueError("Excel coordinates are one-based")
-        return CellValue(self._raw(row, col), CellRef(self.name, row, col))
+        return CellValue(
+            self._raw(row, col), CellRef(self.name, row, col), self._hyperlink(row, col)
+        )
+
+    def _hyperlink(self, row: int, col: int) -> str | None:
+        return None
 
     def _raw(self, row: int, col: int) -> Scalar:
         raise NotImplementedError
@@ -185,6 +191,10 @@ class _XlsxSheet(_Sheet):
             raise OfficeError("formula_uncached", f"{self.name}!{cached.coordinate}: {formula}")
         return cast(Scalar, value if isinstance(value, str | int | float | datetime) else None)
 
+    def _hyperlink(self, row: int, col: int) -> str | None:
+        link = self._formulas.cell(row, col).hyperlink
+        return link.target if link is not None else None
+
 
 class _XlsSheet(_Sheet):
     def __init__(self, sheet: xlrd.sheet.Sheet, datemode: int) -> None:
@@ -207,6 +217,12 @@ class _XlsSheet(_Sheet):
         if cell.ctype == xlrd.XL_CELL_BOOLEAN:
             return int(cell.value)
         return cast(Scalar, cell.value)
+
+    def _hyperlink(self, row: int, col: int) -> str | None:
+        link = self._sheet.hyperlink_map.get((row - 1, col - 1))
+        if link is None:
+            return None
+        return cast(str | None, link.url_or_path or link.target or None)
 
 
 class _XlsxBook:

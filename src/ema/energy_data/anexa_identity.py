@@ -1,0 +1,124 @@
+"""Read the Anexa contact block from labels in both form generations."""
+
+from __future__ import annotations
+
+from ema.core.office.sheets import Book, CellRef, Sheet
+from ema.energy_data.anexa_cells import AnexaData
+from ema.energy_data.source import Located, ReaderIssue, cell_at, filled, normal, right_of_label
+
+
+def _label(sheet: Sheet, names: tuple[str, ...], issues: list[ReaderIssue]) -> CellRef | None:
+    wanted = {normal(name) for name in names}
+    matches: list[CellRef] = []
+    for row in range(1, min(sheet.max_row, 40) + 1):
+        for col in range(1, min(sheet.max_col, 8) + 1):
+            value = cell_at(sheet, row, col, issues).value
+            if isinstance(value, str) and normal(value) in wanted:
+                matches.append(CellRef(sheet.name, row, col))
+    if len(matches) > 1:
+        issues.append(ReaderIssue("label_ambiguous", "/".join(names), matches[0]))
+        return None
+    return matches[0] if matches else None
+
+
+def _following(sheet: Sheet, anchor: CellRef, issues: list[ReaderIssue]) -> Located | None:
+    for col in range(anchor.col + 1, min(sheet.max_col, anchor.col + 3) + 1):
+        value = filled(cell_at(sheet, anchor.row, col, issues))
+        if value is not None:
+            return value
+    return None
+
+
+def read_identity(book: Book, result: AnexaData) -> None:
+    name = next(
+        (n for n in book.sheet_names if normal(n) in {"date generale", "info companie"}),
+        None,
+    )
+    if name is None:
+        result.issues.append(ReaderIssue("sheet_missing", "Date generale / Info companie"))
+        return
+    sheet = book.sheet(name)
+    _primary(sheet, result)
+    _contact_fields(sheet, result)
+    _ownership(sheet, result)
+    _contact_person(sheet, result)
+
+
+def _primary(sheet: Sheet, result: AnexaData) -> None:
+    for key, labels in {
+        "name": ("Denumirea operatorului economic", "Denumirea unităţii"),
+        "address": ("Adresa poștală", "Adresa poştală"),
+        "cui": ("CUI",),
+    }.items():
+        value = right_of_label(sheet, labels, result.issues)
+        if value is not None:
+            result.identity[key] = value
+
+
+def _contact_fields(sheet: Sheet, result: AnexaData) -> None:
+    for key, labels in {
+        "phone": ("Telefon",),
+        "fax": ("Fax",),
+        "website": ("Pag. Internet", "Pagina Internet", "Site web"),
+        "caen_code": ("Cod CAEN",),
+        "caen_description": ("Sector de activitate",),
+        "registrul_comertului": ("Registrul Comerțului", "Nr. Registrul Comerțului"),
+    }.items():
+        anchor = _label(sheet, labels, result.issues)
+        if anchor is None:
+            continue
+        value = _following(sheet, anchor, result.issues)
+        if value is not None:
+            result.identity[key] = value
+            if key == "website":
+                cell = cell_at(sheet, value.ref.row, value.ref.col, result.issues)
+                if cell.hyperlink:
+                    result.identity["website_target"] = Located(cell.hyperlink, value.ref)
+                else:
+                    result.issues.append(ReaderIssue("hyperlink_missing", "website", value.ref))
+
+
+def _ownership(sheet: Sheet, result: AnexaData) -> None:
+    # The form calls these ownership percentages, not monetary capital.
+    for key, label in (("ownership_state", "Stat"), ("ownership_private", "Privat")):
+        anchor = _label(sheet, (label,), result.issues)
+        if anchor is None:
+            continue
+        value = _following(sheet, anchor, result.issues)
+        if value is None:
+            continue
+        raw = value.value
+        if isinstance(raw, str) and "%" in raw:
+            result.identity[key] = Located(raw, value.ref, "%")
+        else:
+            result.identity[key] = value
+            result.issues.append(ReaderIssue("ownership_flag", key, value.ref))
+
+
+def _contact_person(sheet: Sheet, result: AnexaData) -> None:
+    contact = _label(
+        sheet,
+        ("Persoana de contact", "Persoana de contact din partea companiei"),
+        result.issues,
+    )
+    if contact is None:
+        contact = _label(
+            sheet,
+            (
+                "Manager energetic sau Persoana de contact",
+                "Manager energetic sau persoana de contact",
+            ),
+            result.issues,
+        )
+    if contact is not None:
+        for row in range(contact.row + 1, min(contact.row + 4, sheet.max_row) + 1):
+            heading = cell_at(sheet, row, contact.col, result.issues).value
+            if isinstance(heading, str) and normal(heading) in {
+                "nume prenume",
+                "nume",
+                "nume si prenume persoana de contact",
+            }:
+                value = _following(sheet, CellRef(sheet.name, row, contact.col), result.issues)
+                if value is not None:
+                    result.identity["contact_person"] = value
+                break
