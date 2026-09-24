@@ -177,6 +177,7 @@ class ResearchTools:
             raise EmaError("registry_present", "Registrul conține numărul.", "")
         evidence = Evidence(
             id=hashlib.sha256(f"{self.job}:{snapshot.sha}:nrRegCom:missing".encode()).hexdigest(),
+            provenance="online",
             file_sha=snapshot.sha,
             locator=Url(url=snapshot.url, snapshot_sha=snapshot.sha),
             method="online",
@@ -243,6 +244,7 @@ class ResearchTools:
             raise EmaError("value_unverified", "Valoarea nu apare în fragment.", key)
         evidence = Evidence(
             id=hashlib.sha256(f"{self.job}:{sha}:{quote}".encode()).hexdigest(),
+            provenance="online",
             file_sha=sha,
             locator=Url(url=snapshot.url, snapshot_sha=sha),
             method="online",

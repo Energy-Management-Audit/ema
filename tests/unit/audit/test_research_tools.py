@@ -87,6 +87,7 @@ def test_online_quote_and_supplied_first(tmp_path: Path) -> None:
     tools, ws, job = setup(tmp_path)
     evidence = Evidence(
         id="manual",
+        provenance="manual",
         locator=Manual(who="user"),
         method="manual",
         retrieved_at=datetime.now(UTC),

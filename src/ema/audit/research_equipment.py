@@ -43,6 +43,7 @@ def _cache_path(ws: Workspace, job: str, model: str) -> tuple[str, Path]:
 def _propose_entry(ws: Workspace, job: str, slug: str, entry: EquipmentEntry) -> None:
     evidence = Evidence(
         id=hashlib.sha256(f"{job}:{entry.snapshot_sha}:{entry.quote}".encode()).hexdigest(),
+        provenance="online",
         file_sha=entry.snapshot_sha,
         locator=Url(url=entry.source_url, snapshot_sha=entry.snapshot_sha),
         method="online",

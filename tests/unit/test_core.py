@@ -213,7 +213,7 @@ def test_health_host_and_origin(ws: Workspace) -> None:
     client = TestClient(create_app(ws, 8000), base_url="http://127.0.0.1:8000")
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": __version__, "workspace": str(ws.root)}
+    assert response.json() == {"status": "ok", "version": __version__}
     assert client.get("/health", headers={"host": "evil.example"}).status_code == 421
     assert client.get("/health", headers={"origin": "http://evil.example"}).status_code == 403
 
@@ -313,18 +313,20 @@ def test_recovery_preserves_live_runner(ws: Workspace) -> None:
 
 
 def test_interface_errors_hide_detail(ws: Workspace, monkeypatch: pytest.MonkeyPatch) -> None:
-    app = create_app(ws, 8000)
+    app = create_app(ws, 8000, launch_code="synthetic-launch-code")
 
     @app.get("/broken")
     def broken() -> None:
         raise EmaError("broken", "Eroare vizibilă.", "private diagnostic detail")
 
     client = TestClient(app, base_url="http://127.0.0.1:8000")
+    assert client.get("/broken").status_code == 403
+    assert client.post("/session", json={"code": "synthetic-launch-code"}).status_code == 200
     response = client.get("/broken")
     assert response.status_code == 400
     assert response.headers["content-type"] == "application/problem+json"
     assert "private diagnostic detail" not in response.text
-    assert "private diagnostic detail" in (ws.root / "logs" / "ema.jsonl").read_text()
+    assert "private diagnostic detail" not in (ws.root / "logs" / "ema.jsonl").read_text()
     monkeypatch.setenv("EMA_WORKSPACE", str(ws.root))
     executable = Path(sys.executable).parent / "ema"
     result = subprocess.run(

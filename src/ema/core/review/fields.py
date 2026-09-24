@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 import uuid
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
 from ema.core.errors import EmaError
@@ -28,6 +28,26 @@ def _candidate(value: Any, evidence: list[str]) -> Candidate:
 
 def _changed(field: Field, **updates: Any) -> Field:
     return Field.model_validate({**field.model_dump(), **updates, "revision": field.revision + 1})
+
+
+def _correction_value(field: Field, value: Any) -> Any:
+    if isinstance(value, bool):
+        raise EmaError("value_invalid", "Valoarea este invalidă.", field.id)
+    if field.value_type == "number":
+        try:
+            result = Decimal(str(value))
+            if not result.is_finite():
+                raise InvalidOperation
+            return result
+        except (InvalidOperation, ValueError) as exc:
+            raise EmaError("value_invalid", "Valoarea este invalidă.", field.id) from exc
+    if field.value_type == "year":
+        if isinstance(value, int) or (isinstance(value, str) and value.isdigit()):
+            return int(value)
+        raise EmaError("value_invalid", "Valoarea este invalidă.", field.id)
+    if not isinstance(value, str):
+        raise EmaError("value_invalid", "Valoarea este invalidă.", field.id)
+    return value
 
 
 def propose(  # noqa: PLR0913
@@ -197,8 +217,10 @@ def _apply(
     if action == "correct":
         if value is None:
             raise EmaError("value_missing", "Valoarea corectată lipsește.", field.id)
+        value = _correction_value(field, value)
         evidence = Evidence(
             id=uuid.uuid4().hex,
+            provenance="manual",
             locator=Manual(who=actor),
             method="manual",
             retrieved_at=datetime.now(UTC),

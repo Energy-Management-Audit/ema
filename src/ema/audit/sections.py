@@ -168,30 +168,48 @@ def _computed(
     )
 
 
-def set_status(
-    ws: Workspace, job: str, section_id: str, to: Status, actor: Actor, reason: str | None = None
+def set_status(  # noqa: PLR0913
+    ws: Workspace,
+    job: str,
+    section_id: str,
+    to: Status,
+    actor: Actor,
+    reason: str | None = None,
+    *,
+    on_revision: int | None = None,
 ) -> SectionState:
     section = _section(section_id)
-    before = get_status(ws, job, section_id)
-    materials, facts = _inputs(ws, job)
-    if to == Status.NA_PROPOSED and applies(section.applies_when, materials, facts) is not False:
-        raise EmaError("na_trigger", "Secțiunea nu poate fi propusă n/a.", section_id)
-    auto_later = (
-        actor == "ema"
-        and bool(section.awaits)
-        and any(materials.get(kind.value) is False for kind in section.awaits)
-    )
-    after = transition(
-        before,
-        to,
-        actor,
-        reason,
-        auto_later=auto_later,
-        computed=_computed(section, before, materials, facts),
-    )
-    if to in (Status.NA, Status.NA_PROPOSED):
-        after = replace(after, na_applicable=applies(section.applies_when, materials, facts))
-    return _save(ws, job, before, after, actor, reason if actor == "ema" else None)
+    with ws.connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        before = get_status(ws, job, section_id)
+        if on_revision is not None and before.revision != on_revision:
+            raise EmaError(
+                "stale_revision",
+                "Secțiunea s-a modificat între timp.",
+                f"current revision: {before.revision}",
+            )
+        materials, facts = _inputs(ws, job, db)
+        if (
+            to == Status.NA_PROPOSED
+            and applies(section.applies_when, materials, facts) is not False
+        ):
+            raise EmaError("na_trigger", "Secțiunea nu poate fi propusă n/a.", section_id)
+        auto_later = (
+            actor == "ema"
+            and bool(section.awaits)
+            and any(materials.get(kind.value) is False for kind in section.awaits)
+        )
+        after = transition(
+            before,
+            to,
+            actor,
+            reason,
+            auto_later=auto_later,
+            computed=_computed(section, before, materials, facts),
+        )
+        if to in (Status.NA, Status.NA_PROPOSED):
+            after = replace(after, na_applicable=applies(section.applies_when, materials, facts))
+        return _save(ws, job, before, after, actor, reason if actor == "ema" else None, db=db)
 
 
 def recompute_ready(ws: Workspace, job: str) -> list[SectionState]:

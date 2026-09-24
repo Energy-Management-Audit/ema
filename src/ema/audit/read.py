@@ -53,6 +53,7 @@ def _record(  # noqa: PLR0913
         ).fetchone()
     evidence = Evidence(
         id=evidence_id,
+        provenance="document",
         file_sha=sha,
         locator=Cell(sheet=ref.sheet, ref=ref.a1.split("!", 1)[1]),
         method=method,  # type: ignore[arg-type]
@@ -212,8 +213,18 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
             previous = db.execute(
                 "SELECT data FROM evidence WHERE id=? AND job_id=?", (evidence_id, job)
             ).fetchone()
+        derivation = Derivation(
+            formula_id="tep_total_threshold_1000",
+            inputs=(
+                [field_key("carrier_tep", carrier.value, year) for carrier in info.carriers]
+                if total.origin == "filed"
+                else [field_key("carrier", carrier.value, year) for carrier in info.carriers]
+            ),
+            factor_version="filed" if total.origin == "filed" else FACTORS_2026.version,
+        )
         evidence = Evidence(
             id=evidence_id,
+            provenance="calculated",
             locator=Manual(who="ema", note="tep_total threshold from dataset"),
             method="calc",
             retrieved_at=(
@@ -222,6 +233,7 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
                 else datetime.now(UTC)
             ),
             highlight="none",
+            derivation=derivation,
         )
         result.append(
             propose(
@@ -233,17 +245,7 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
                 "at_least_1000_tep" if total.value >= 1000 else "below_1000_tep",
                 [evidence],
                 state="calculated",
-                derivation=Derivation(
-                    formula_id="tep_total_threshold_1000",
-                    inputs=(
-                        [field_key("carrier_tep", carrier.value, year) for carrier in info.carriers]
-                        if total.origin == "filed"
-                        else [
-                            field_key("carrier", carrier.value, year) for carrier in info.carriers
-                        ]
-                    ),
-                    factor_version="filed" if total.origin == "filed" else FACTORS_2026.version,
-                ),
+                derivation=derivation,
             )
         )
     recompute_ready(ws, job)

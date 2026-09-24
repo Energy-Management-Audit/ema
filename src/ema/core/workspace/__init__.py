@@ -212,7 +212,7 @@ class Workspace:
 
     def list_slots(self, job: str, prefix: str) -> list[str]:
         """List active collection items in stable allocation order."""
-        collection = f"{prefix}/"
+        collection = f"{prefix}/" if prefix else ""
         with self.connect() as db:
             rows = db.execute(
                 "SELECT name FROM slots WHERE job_id=? AND substr(name,1,?)=? "

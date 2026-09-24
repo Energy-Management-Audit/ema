@@ -152,6 +152,7 @@ def build(  # noqa: C901
                     proof.append(
                         Evidence(
                             id=uuid.uuid4().hex,
+                            provenance="document",
                             file_sha=sha_by_name[filename],
                             locator=PdfText(page=int(item["page_number"]), span=snippet),
                             method="invoice",
@@ -187,6 +188,7 @@ def build(  # noqa: C901
         proof.append(
             Evidence(
                 id=uuid.uuid4().hex,
+                provenance="manual",
                 locator=Manual(who="ema", note=f"Memory decision {item.decision_id}"),
                 method="manual",
                 retrieved_at=datetime.now(UTC),

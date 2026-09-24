@@ -55,6 +55,7 @@ def read_owner_cui(extracts: list[Path], company: str) -> LocatedCui:
                     continue
                 evidence = Evidence(
                     id=uuid.uuid4().hex,
+                    provenance="document",
                     file_sha=sha,
                     locator=PdfText(page=page + 1, span=line),
                     method="anexa",

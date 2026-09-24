@@ -157,6 +157,7 @@ class FillTools:
             ).fetchone()
         return Evidence(
             id=evidence_id,
+            provenance="document",
             file_sha=document.sha,
             locator=locator,
             method="questionnaire",

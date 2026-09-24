@@ -1,14 +1,18 @@
 """Command line interface."""
 
 import json
+import secrets
 import socket
+from contextlib import nullcontext
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import typer
 import uvicorn
 
 from ema import __version__
 from ema.api import create_app
+from ema.api.mock import seed as seed_mock
 from ema.cli.review import job_review_app
 from ema.core.backup import backup, restore
 from ema.core.config import workspace_path
@@ -209,13 +213,27 @@ def intake_command(job: str, collection: str) -> None:
 
 
 @_app.command("serve")
-def serve(port: int = typer.Option(0, min=0, max=65535)) -> None:
-    ws = _workspace()
+def serve(
+    port: int = typer.Option(8766, min=0, max=65535),
+    dev_origin: str | None = typer.Option(None, "--dev-origin"),
+    mock: bool = typer.Option(False, "--mock"),
+) -> None:
     if port == 0:
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0))
             port = sock.getsockname()[1]
-    uvicorn.run(create_app(ws, port), host="127.0.0.1", port=port)
+    with TemporaryDirectory(prefix="ema-mock-") if mock else nullcontext() as temp:
+        ws = Workspace(Path(temp)) if temp is not None else _workspace()
+        if mock:
+            seed_mock(ws)
+        code = secrets.token_urlsafe(32)
+        origin = dev_origin or f"http://127.0.0.1:{port}"
+        typer.echo(f"Open {origin}/#code={code}")
+        uvicorn.run(
+            create_app(ws, port, launch_code=code, dev_origin=dev_origin, mock=mock),
+            host="127.0.0.1",
+            port=port,
+        )
 
 
 def app() -> None:

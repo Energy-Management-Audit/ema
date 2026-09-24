@@ -43,6 +43,7 @@ CATALOGUE = [
 def evidence(name: str, *, vision: bool = False) -> Evidence:
     return Evidence(
         id=name,
+        provenance="document",
         file_sha="synthetic",
         locator=Photo() if vision else PdfText(page=1, span=name),
         method="questionnaire",

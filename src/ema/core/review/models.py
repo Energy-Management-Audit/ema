@@ -72,23 +72,49 @@ Actor = Literal["ema", "user", "agent"]
 ValueType = Literal["number", "text", "year", "date", "enum"]
 
 
+class Derivation(BaseModel):
+    formula_id: str
+    inputs: list[str]
+    factor_version: str
+
+
 class Evidence(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: str
+    provenance: Literal["document", "online", "calculated", "manual"]
     file_sha: str | None = None
-    locator: Locator
+    locator: Locator | None = None
     method: Literal["questionnaire", "anexa", "prelucrare", "invoice", "online", "manual", "calc"]
     retrieved_at: datetime
     quote: str | None = None
     trust_reason: str | None = None
     highlight: Literal["exact", "page", "none"]
+    derivation: Derivation | None = None
+    decision_id: str | None = None
 
-
-class Derivation(BaseModel):
-    formula_id: str
-    inputs: list[str]
-    factor_version: str
+    @model_validator(mode="after")
+    def valid_provenance(self) -> Evidence:
+        expected = {
+            "online": "online",
+            "calc": "calculated",
+            "manual": "manual",
+        }.get(self.method, "document")
+        if self.provenance != expected:
+            raise ValueError("provenance and method disagree")
+        if self.provenance == "document" and (
+            not self.file_sha or self.locator is None or isinstance(self.locator, Url | Manual)
+        ):
+            raise ValueError("document evidence needs a file version and document locator")
+        if self.provenance == "online" and (
+            not isinstance(self.locator, Url) or not (self.quote or self.trust_reason)
+        ):
+            raise ValueError("online evidence needs a URL, snapshot, and quote or trust reason")
+        if self.provenance == "calculated" and self.derivation is None:
+            raise ValueError("calculated evidence needs formula, inputs and factor version")
+        if self.provenance == "manual" and not isinstance(self.locator, Manual):
+            raise ValueError("manual evidence needs an actor")
+        return self
 
 
 class Candidate(BaseModel):
