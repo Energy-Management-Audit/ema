@@ -96,6 +96,9 @@ which keeps the repo free of markdown sprawl.
   `/health`, after two coordinator review rounds and an adversarial review (5 findings, all fixed).
   The same day: LibreOffice dropped from the project (Word is required for conversion, TOC page
   numbers and the preview), and S9 split into S9a/S9b.
+- 2026-09-24 **Checkpoint:** `dev` holds S0, S1, S1b, S2, S2b, S3, S9a and S10 (PRs #4–#12), each after a spec
+  critique, a coordinator review and an adversarial review. S9 families re-split (§7): S9b takes OMV Petrom and
+  ALIVE, whose invoices its golden needs.
 - **Next:**
   1. ~~Vlad's final decisions on the review~~: F1–F3 decided 09-23 (§4).
   2. ~~The S0, S1 and S1b slice specs~~: written 09-23. S1 also aligns `AGENTS.md` and ADR 0001
@@ -464,7 +467,9 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 - **File slots with versions.** Each job declares named slots (`anexa_2_3`, `necesar_info`,
   `prelucrare_date`, `dossier[]`, `visit[]`, `invoices[]`). A new upload or conversion adds a
   version; the newest is active; any version can be removed from the slot. Nothing is ever
-  "stuck in history".
+  "stuck in history". A slot that holds many files is a collection: its slots are named
+  `<collection>/NNNN` (`invoices/0001`, …), numbered in upload order, listed with `list_slots` and
+  read together with `read_slots`, which records every slot read for the stage fingerprint.
 - **Job lifecycle:** `created → running(stage) → ready | failed | cancelled`. Audit jobs stay
   `open` for weeks, and each stage can be re-run.
   - A stage run is recorded with its fingerprint, duration, outcome, warnings and error.
@@ -800,7 +805,9 @@ answer, and export calls it; no interface keeps its own rules.
    Planners, Hidroelectrica, Enel/PPC); OCR for scans.
 4. **Batch client identity:** Ema proposes the client (CUI/POD/name) once per batch, the user
    confirms, and the CUI/POD mapping is remembered.
-5. Review the flagged invoices.
+5. Review the flagged invoices. Until S9b, an invoice needing review is not exported: the export
+   lists it as omitted, as the legacy exporter does (R11). From S9b, a reviewed invoice becomes
+   exportable.
 6. Export the workbook (the unchanged contract).
 
 Gas and SEE documents are reported as "not supported yet".
@@ -970,6 +977,8 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
 - **Cross-check: total tep must equal Anexa 2–3 „Date anuale".** A mismatch is a conflict, not a
   warning.
 - Number formats (Romanian, `1.234,56`):
+  - presentation follows her prototype table by table (its `Num.grouping`): her AUDIT-01 tables write numbers ≥ 1000
+    without a thousands separator. `1.234,56` is the default only where the prototype does not say.
   - monthly tables and annual lines: 2 decimals
   - specific consumption and intensity: 4 decimals
   - CO₂ table: integers
@@ -1582,7 +1591,8 @@ ema/
 | S7 | `consumption_analysis` + phrase bank (from her own audits and PIEEs only) | **AUDIT-01** ch. 4 regenerated from the dataset taken from its own tables (then AUDIT-02 / AUDIT-05): same sections, tables, chart types, phrasing, numbers | S2, S3 |
 | S8 | PIEE per the format contract (§5.10): clone her latest PIEE, change client content only | The Word check passes on the generated CLIENT-P1 PIEE. CLIENT-P1 2026 regenerated equals the golden (text, tables, chart caches, embedded workbooks, pies); piee-case-b: numbers match her final. Both run through `core.review` via the CLI: one conflict resolved by a decision, one missing field rendered red, the final export refused until the conflict is resolved | S1b, S4, S5, S5b, S7 |
 | S9a | Invoices port (**pypdfium2 + pdfplumber** instead of PyMuPDF), the unchanged workbook contract, `core.pdf` | 29/29 text invoices unchanged vs the legacy output; the 2025 rows equal the delivered CLIENT-I5 and invoice-case-d workbooks | S1 |
-| S9b | Batch client identity (confirmed once, through `core.review`) + the CUI/POD memory + the ALIVE OCR fix | CLIENT-I2 24 + ALIVE 13 exportable after one confirmation | S1b, S9a |
+| S9b | Batch client identity (confirmed once, through `core.review`) + the CUI/POD memory + the OMV Petrom and ALIVE parsers (ALIVE through OCR, with the ALIVE OCR fix) | CLIENT-I2 24 + ALIVE 13 exportable after one confirmation | S1b, S9a |
+| S9a2 | The remaining invoice parser families: Next Energy (e-Factura), Getica, Electric Planners, Hidroelectrica, Enel/PPC | Each family's legacy cases unchanged vs the legacy output (the by-supplier library) | S9a |
 | S10 | Audit section catalogue + status transitions (§5.9) + an inventory of the base's repeatable units (processes, equipment tables, measured panels, carriers) | Every heading of every audit in the reference set (AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05; CLIENT-A3 2022 for content) maps to a catalogue section, checked by a script that fails on any unmapped heading; each section has its applicability condition and prototype source; each transition in the table, including `done` → `stale` on a changed input | S1b |
 | S10b | Audit base: AUDIT-01 cloned + anchor map + fixed chapters + cloning repeatable units | Ch. 1 and ch. 7 identical to her text for a new client; the base filled for CLIENT-A1 and for CLIENT-A2 (different process counts, carrier mixes and measured panels) keeps her formatting and leaves no untouched anchor | S2, S10 |
 | S11 | Audit intake + the agent loop (`run_agent`) + checklist classification by the agent + completeness | CLIENT-A1 dossier fully read; checklist report correct | S2b, S10 |
@@ -1598,7 +1608,7 @@ ema/
 | S19 | MCP server | An agent generates a PIEE and drafts an audit section headlessly | S16 |
 
 **Parallel tracks:**
-- S9a at any time after S1; S9b after S1b (S9 was split 09-23 so each PR can be reviewed)
+- S9a at any time after S1; S9b after S1b; S9a2 after S9a (S9 was split 09-23, re-split 09-24, so each PR can be reviewed)
 - S3 alongside S0/S2
 - S6 right after S4 (an early win for the auditor)
 - design handoff in hand → the missing screens drawn and checked → S16a → S17a → S17b
