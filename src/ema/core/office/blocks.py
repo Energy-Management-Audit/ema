@@ -97,7 +97,16 @@ class Missing:
     text: str
 
 
-type Block = Paragraph | BulletList | Table | Caption | NativeChart | Figure | PageBreak | Missing
+@dataclass(frozen=True)
+class Retained:
+    """Existing element kept in a region replacement without changing its OOXML ids."""
+
+    proto: str
+
+
+type Block = (
+    Paragraph | BulletList | Table | Caption | NativeChart | Figure | PageBreak | Missing | Retained
+)
 
 
 @dataclass(frozen=True)
@@ -273,13 +282,21 @@ def render(  # noqa: C901, PLR0912, PLR0915
     after: ElementLocator,
     blocks: list[Block],
     prototypes: Prototypes,
+    *,
+    allow_retained: bool = False,
 ) -> RenderReport:
+    if not allow_retained and any(isinstance(block, Retained) for block in blocks):
+        raise OfficeError("block_prototype", "Retained blocks require region replacement")
     parts = read_parts(docx)
     root = etree.fromstring(parts["word/document.xml"])
     body = root.find(f"{{{W}}}body")
     if body is None or after.body_index < 1 or after.body_index > len(body):
         raise OfficeError("block_prototype", "Invalid insertion locator")
-    numbers = _numbering(body, after.body_index, blocks, prototypes.chapter)
+    numbers = (
+        _numbering(body, after.body_index, blocks, prototypes.chapter)
+        if any(isinstance(block, Caption | Figure) for block in blocks)
+        else []
+    )
     lookup: dict[tuple[Kind, str], str] = {
         (number.kind, number.id): number.number for number in numbers
     }
@@ -311,6 +328,11 @@ def render(  # noqa: C901, PLR0912, PLR0915
         nodes: list[etree._Element] = []
         if isinstance(block, NativeChart):
             nodes = [detached[index]]
+        elif isinstance(block, Retained):
+            original = prototypes.elements.get(block.proto)
+            if original is None or original.tag not in {f"{{{W}}}p", f"{{{W}}}tbl"}:
+                raise OfficeError("block_prototype", f"Invalid retained element: {block.proto}")
+            nodes = [copy.deepcopy(original)]
         elif isinstance(block, BulletList):
             for item in block.items:
                 node = _prototype(prototypes, block.proto, "p")
@@ -345,7 +367,8 @@ def render(  # noqa: C901, PLR0912, PLR0915
             nodes = [node]
         for node in nodes:
             body.insert(cursor, node)
-            _fresh(node, root)
+            if not isinstance(block, Retained):
+                _fresh(node, root)
             cursor += 1
     parts["word/document.xml"] = encoded(root)
     write_parts(parts, out)

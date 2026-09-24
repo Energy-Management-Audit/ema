@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from decimal import ROUND_HALF_UP, Decimal
 
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
 from ema.energy_data.factors import FactorTable
@@ -297,17 +298,24 @@ def change(prev: Derived, cur: Derived) -> Derived:
     )
 
 
-def trend(values: Sequence[float]) -> str:
+def trend(values: Sequence[float], decimals: int = 2) -> str:
+    """Classify the visible, rounded series by its least-squares slope."""
     if len(values) < 2:
         raise ValueError("trend needs at least two values")
     if any(not math.isfinite(value) for value in values):
         raise ValueError("trend needs finite values")
-    if len({round(value, 2) for value in values}) == 1:
+    if decimals < 0:
+        raise ValueError("trend decimals must be nonnegative")
+    quantum = Decimal(1).scaleb(-decimals)
+    visible = [Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP) for value in values]
+    length = len(visible)
+    numerator = sum(
+        (Decimal(2 * index - length + 1) * value for index, value in enumerate(visible)),
+        Decimal(0),
+    )
+    if numerator == 0:
         return "constantă"
-    center = (len(values) - 1) / 2
-    mean = sum(values) / len(values)
-    slope_numerator = sum((i - center) * (value - mean) for i, value in enumerate(values))
-    if slope_numerator > 0:
+    if numerator > 0:
         return "creștere"
     return "scădere"
 

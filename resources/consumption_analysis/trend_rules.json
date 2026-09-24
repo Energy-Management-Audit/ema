@@ -1,0 +1,43 @@
+{
+  "method": "least_squares_slope",
+  "rounding": "ROUND_HALF_UP to the source prototype's displayed decimals first",
+  "growth": "rounded slope > 0",
+  "decline": "rounded slope < 0",
+  "constant": "rounded slope == 0",
+  "source_references": {
+    "growth": [
+      {
+        "source_document": "audit-01",
+        "paragraph": 838
+      },
+      {
+        "source_document": "audit-01",
+        "paragraph": 843
+      },
+      {
+        "source_document": "audit-02",
+        "paragraph": 694
+      }
+    ],
+    "decline": [
+      {
+        "source_document": "audit-01",
+        "paragraph": 848
+      },
+      {
+        "source_document": "audit-01",
+        "paragraph": 859
+      },
+      {
+        "source_document": "audit-02",
+        "paragraph": 777
+      }
+    ],
+    "constant": [
+      {
+        "source_document": "piee-03",
+        "paragraph": 135
+      }
+    ]
+  }
+}

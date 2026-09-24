@@ -7,9 +7,18 @@ from docx import Document
 from lxml import etree
 from openpyxl import load_workbook
 
+from ema.core.office.blocks import ElementLocator, NativeChart, Paragraph, Prototypes, Retained
 from ema.core.office.chart_blocks import build_column_chart_detached, clone_chart_detached
-from ema.core.office.charts import Series, build_column_chart, clone_chart, embed_data, read_series
+from ema.core.office.charts import (
+    Series,
+    build_column_chart,
+    clone_chart,
+    embed_all_data,
+    embed_data,
+    read_series,
+)
 from ema.core.office.package import C, P, R, check_standalone, inspect, read_parts, write_parts
+from ema.core.office.region import replace_region
 from ema.core.office.workbook import extend_formula, formula_cells
 
 
@@ -87,6 +96,85 @@ def test_embed_link_and_cache(tmp_path):
     assert book["Sheet1"]["B1"].value == "Șir"
     assert book["Sheet1"]["B2"].value == 1.234567
     assert b'Extension="xlsx"' in read_parts(result)["[Content_Types].xml"]
+
+
+def test_embed_all_links(tmp_path):
+    source = package(tmp_path)
+    out = tmp_path / "all.docx"
+    embed_all_data(source, out)
+    assert check_standalone(out) == []
+
+
+def test_replace_region_removes_old_chart_and_embedded_resources(tmp_path):
+    source = package(tmp_path)
+    embedded = tmp_path / "embedded.docx"
+    embed_data(source, "word/charts/chart1.xml", embedded)
+    parts = read_parts(embedded)
+    root = etree.fromstring(parts["word/document.xml"])
+    body = root.find("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body")
+    assert body is not None
+    w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+    def paragraph(value):
+        node = etree.Element(w + "p")
+        etree.SubElement(etree.SubElement(node, w + "r"), w + "t").text = value
+        return node
+
+    before = paragraph("Before")
+    start = paragraph("Start")
+    end = paragraph("End")
+    body.insert(0, before)
+    body.insert(1, start)
+    body.insert(3, end)
+    parts["word/document.xml"] = etree.tostring(root)
+    write_parts(parts, embedded)
+    out = tmp_path / "replaced.docx"
+    replace_region(
+        embedded,
+        out,
+        ElementLocator(2),
+        ElementLocator(4),
+        [Paragraph("body", ["Replacement"])],
+        Prototypes({"body": paragraph("Prototype")}, 4),
+    )
+    result = read_parts(out)
+    doc = etree.fromstring(result["word/document.xml"])
+    texts = [item.text for item in doc.iter(w + "t")]
+    assert texts == ["Before", "Start", "Replacement", "End"]
+    assert inspect(out).charts == []
+    assert not any(part.startswith("word/embeddings/") for part in result)
+    assert check_standalone(out) == []
+
+    chart_out = tmp_path / "replaced-chart.docx"
+    replace_region(
+        embedded,
+        chart_out,
+        ElementLocator(2),
+        ElementLocator(4),
+        [
+            NativeChart(
+                "chart", "word/charts/chart1.xml", [Series("Gaz", ["Ian", "Feb"], [3.5, 4.5])]
+            )
+        ],
+        Prototypes({"chart": body[2]}, 4),
+    )
+    charts = inspect(chart_out).charts
+    assert len(charts) == 1
+    assert charts[0].part != "word/charts/chart1.xml"
+    assert read_series(chart_out, charts[0].part)[0].values == [3.5, 4.5]
+    assert check_standalone(chart_out) == []
+
+    retained_out = tmp_path / "retained-chart.docx"
+    replace_region(
+        embedded,
+        retained_out,
+        ElementLocator(2),
+        ElementLocator(4),
+        [Retained("chart")],
+        Prototypes({"chart": body[2]}, 4),
+    )
+    assert len(inspect(retained_out).charts) == 1
+    assert check_standalone(retained_out) == []
 
 
 def test_clone_and_build_have_unique_parts_relationships_and_ids(tmp_path):

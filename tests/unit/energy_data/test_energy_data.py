@@ -212,11 +212,16 @@ def test_change_requires_consecutive_years() -> None:
         ([3, 2, 1], "scădere"),
         ([1, 1, 1], "constantă"),
         ([1.001, 1.002, 1.003], "constantă"),
-        ([1, 2, 1], "scădere"),
+        ([1, 2, 1], "constantă"),
     ],
 )
 def test_trend(values: list[float], expected: str) -> None:
     assert trend(values) == expected
+
+
+def test_trend_uses_prototype_precision() -> None:
+    assert trend([1.001, 1.002, 1.003], decimals=3) == "creștere"
+    assert trend([1.005, 1.005, 1.004], decimals=2) == "scădere"
 
 
 def test_reconciliation_propagates_input_and_filed_rounding() -> None:

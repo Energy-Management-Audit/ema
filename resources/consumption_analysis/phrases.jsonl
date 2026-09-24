@@ -1,0 +1,354 @@
+{"direction": "decline", "paragraph": 859, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a producției pe care compania a obținut-o în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 861, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an;", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 862, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an; ", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 863, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an.", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 886, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de scădere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 891, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 896, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 907, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de energie electrică din SEN înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 909, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 910, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 911, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 936, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}. ", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 942, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}. ", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 947, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}. ", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 959, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a consumului de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 961, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 962, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 963, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 976, "pattern": "Conform figurii numărul {figure_number} a) se observă că motorina este resursa cu ponderea cea mai mare în total consum de carburant, cu o tendința de creștere a consumului lunar înregistrat la nivelul anului {year}. ", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 981, "pattern": "Conform figurii numărul {figure_number} b) se observă că motorina este resursa cu ponderea cea mai mare în total consum de carburant, cu o tendința de creștere a consumului lunar înregistrat la nivelul anului {year}. ", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 986, "pattern": "Conform figurii numărul {figure_number} c) se observă că motorina este resursa cu ponderea cea mai mare în total consum de carburant, cu o tendința de scădere a consumului lunar înregistrat la nivelul anului {year}. ", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 997, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a consumului de carburant înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 999, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, din care:", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1003, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, din care:", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1007, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, din care:", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 1018, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de creștere a consumului lunar de apă înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 1023, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de creștere a consumului lunar de apă înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 1028, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de apă înregistrat de către societate la nivelul anului {year}. ", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 1040, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de apă înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1042, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1043, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an, ", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1044, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an.", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 1068, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului total echivalent de energie electrică din SEN înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1070, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an;", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1071, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an;", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1072, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 1085, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului echivalent de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1087, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1088, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1089, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 1102, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului echivalent de carburant înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1104, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1105, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1106, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 1119, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului total echivalent de energie înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1121, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1122, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1123, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 1158, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de energie electrică înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1160, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei;", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1161, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei;", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1162, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 1169, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului specific echivalent de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1171, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1172, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1173, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone.", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 1180, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului specific echivalent de carburant înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1182, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei;", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1183, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei;", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1184, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 1191, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului specific echivalent total de energie înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1193, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1194, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1195, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone.", "source_document": "audit-01"}
+{"direction": "decline", "paragraph": 1202, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific de apă înregistrat de către societate în perioada de analiză.", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1204, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1205, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei,", "source_document": "audit-01"}
+{"direction": "value", "paragraph": 1206, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei.", "source_document": "audit-01"}
+{"direction": "growth", "paragraph": 694, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a valorii cifrei nete de afaceri înregistrată de către societate în perioada {year} – {year}.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 697, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an, ", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 698, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an, ", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 699, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 718, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de scădere a consumului lunar de energie electrică înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 724, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a consumului lunar de energie electrică înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 729, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de energie electrică înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 741, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de energie electrică înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 743, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 744, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 745, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 754, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 760, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 765, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 777, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 779, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 780, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 781, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "audit-02"}
+{"direction": "growth", "paragraph": 789, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de creștere a consumului lunar de benzină și motorină înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-02"}
+{"direction": "growth", "paragraph": 795, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de creștere a consumului lunar de benzină și motorină înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-02"}
+{"direction": "growth", "paragraph": 800, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de creștere a consumului lunar de carburant înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 816, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de carburant înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 818, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, din care:", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 821, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, din care:", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 824, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, din care:", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 847, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului echivalent de energie electrică înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 849, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 850, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 851, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 864, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului echivalent de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 866, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 867, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 868, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 883, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului echivalent de carburant înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 885, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an, din care:", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 888, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an, din care:", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 891, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an, din care:", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 906, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului total annual echivalent de energie înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 935, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de energie electrică înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 937, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 938, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 939, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 946, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 948, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 949, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 950, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 957, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de carburant înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 959, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 960, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 961, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 968, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent total de energie înregistrat de către societate în perioada de analiză.", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 970, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 971, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-02"}
+{"direction": "value", "paragraph": 972, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-02"}
+{"direction": "decline", "paragraph": 1512, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a valorii cifrei nete de afaceri pe care compania a obținut-o în perioada de analiză.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1514, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1515, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1516, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1558, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1559, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1560, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1594, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1595, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1596, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "audit-03"}
+{"direction": "growth", "paragraph": 1607, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de creștere a consumului lunar de motorină, în timp ce consumul lunar de benzină înregistrat o tendința de creștere la nivelul anului {year}. ", "source_document": "audit-03"}
+{"direction": "growth", "paragraph": 1612, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere atât a consumului lunar de motorină, cât și a consumului lunar de benzină înregistrat o tendința de creștere la nivelul anului {year}.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1648, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1649, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1650, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1658, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1659, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1660, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1669, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1670, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1671, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1680, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1681, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1682, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1727, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1728, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an, ", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1729, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1745, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1746, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1747, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1756, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1757, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1758, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1767, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1768, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1769, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1778, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1779, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1780, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1789, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1790, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei,", "source_document": "audit-03"}
+{"direction": "value", "paragraph": 1791, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei.", "source_document": "audit-03"}
+{"direction": "decline", "paragraph": 416, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a populației la nivelul municipiului Oras.", "source_document": "audit-04"}
+{"direction": "decline", "paragraph": 937, "pattern": "Conform figurii numărul {figure_number} se poate observa că pe parcursul întregii perioade de analiză, consumul anual de energie echivalentă a înregistrat o tendință de scădere.", "source_document": "audit-04"}
+{"direction": "decline", "paragraph": 954, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de energie electrică, cu un maxim înregistrat nivelul anului {year}.", "source_document": "audit-04"}
+{"direction": "decline", "paragraph": 965, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de gaz natural, cu un maxim înregistrat nivelul anului {year}.", "source_document": "audit-04"}
+{"direction": "decline", "paragraph": 976, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de energie totală, cu un maxim înregistrat nivelul anului {year}.", "source_document": "audit-04"}
+{"direction": "decline", "paragraph": 1002, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a gazelor cu efect de seră, cu un maxim înregistrat nivelul anului {year}.", "source_document": "audit-04"}
+{"direction": "decline", "paragraph": 630, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a cifrei nete de afaceri pe care compania a obținut-o în anul {year}.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 637, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a cifrei nete de afaceri pe care compania a obținut-o în anul {year}.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 648, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a cifrei nete de afaceri pe care compania a obținut-o în perioada {year} - {year}.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 650, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an, ", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 651, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an, ", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 652, "pattern": "pentru anul {year} s-au înregistrat {number} lei/an.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 672, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de creștere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 678, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 684, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de creștere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 696, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a consumului de energie electrică din SEN înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 698, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 699, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 700, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 728, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de creștere a consumului lunar de energie electrică din parcul propriu fotovoltaic înregistrat de către societate la nivelul anului {year}. Consumul de energie electrică din parcul fotovoltaic propriu a urmat curba solară de producție.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 734, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a consumului lunar de energie electrică din parcul propriu fotovoltaic înregistrat de către societate la nivelul anului {year}. Consumul de energie electrică din parcul fotovoltaic propriu a urmat curba solară de producție.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 739, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de energie electrică din parcul propriu fotovoltaic înregistrat de către societate la nivelul anului {year}. Consumul de energie electrică din parcul fotovoltaic propriu a urmat curba solară de producție.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 750, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a consumului de energie electrică din parcul propriu fotovoltaic înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 752, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 753, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 754, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 783, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de creștere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 789, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de creștere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 795, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 807, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a consumului de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 809, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 810, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 811, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 835, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de carburant înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 837, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, din care:", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 840, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, din care:", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 843, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, din care:", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 856, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului de apă potabilă înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 858, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 859, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 860, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 882, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului echivalent total de energie electrică înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 884, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 885, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 886, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 901, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului echivalent de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 903, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 904, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 905, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 914, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului echivalent de carburant înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 916, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 917, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 918, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 927, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului total echivalent de energie înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 929, "pattern": "pentru anul {year} s-au înregistrat {number} tep/an, din care:", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 934, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an, din care:", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 939, "pattern": "pentru anul {year} s-au înregistrat {number} tep /an, din care:", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 974, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de energie electrică înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 976, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 977, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 978, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-05"}
+{"direction": "growth", "paragraph": 985, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului specific echivalent de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 987, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 988, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 989, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 996, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de carburant înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 998, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 999, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 1000, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 1007, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent total de energie înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 1009, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 1010, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 1011, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mil lei.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 1018, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific de apă potabilă înregistrat de către societate în perioada de analiză.", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 1020, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 1021, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei,", "source_document": "audit-05"}
+{"direction": "value", "paragraph": 1022, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei.", "source_document": "audit-05"}
+{"direction": "decline", "paragraph": 54, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a producției pe care compania a obținut-o în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 56, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an;", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 57, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an; ", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 58, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 85, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de scădere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}. Curba de consum a energiei electrice ține cont de programul de lucru, de temperaturile exterioare, fiind factori variabili relevanță în ceea ce privește indicatorii energetici ai societății.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 90, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}.Curba de consum a energiei electrice ține cont de programul de lucru, de temperaturile exterioare, fiind factori variabili relevanță în ceea ce privește indicatorii energetici ai societății.", "source_document": "piee-01"}
+{"direction": "growth", "paragraph": 95, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de creștere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}. Curba de consum a energiei electrice ține cont de programul de lucru, de temperaturile exterioare, fiind factori variabili relevanță în ceea ce privește indicatorii energetici ai societății.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 106, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de energie electrică din SEN înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 108, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 109, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 110, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "piee-01"}
+{"direction": "growth", "paragraph": 138, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a consumului de energie electrică din parcul fotovoltaic propriu înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 140, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 141, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 142, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 162, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}. ", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 167, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 172, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}. ", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 183, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 185, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 186, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 187, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "piee-01"}
+{"direction": "growth", "paragraph": 197, "pattern": "Conform figurii numărul {figure_number} a) se observă că motorina este resursa cu ponderea cea mai mare în total consum de carburant, cu o tendința de creștere a consumului lunar înregistrat la nivelul anului {year}.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 202, "pattern": "Conform figurii numărul {figure_number} b) se observă că motorina este resursa cu ponderea cea mai mare în total consum de carburant, cu o tendința de scădere a consumului lunar înregistrat la nivelul anului {year}.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 207, "pattern": "Conform figurii numărul {figure_number} c) se observă că motorina este resursa cu ponderea cea mai mare în total consum de carburant, cu o tendința de scădere a consumului lunar înregistrat la nivelul anului {year}.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 218, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de carburant înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 220, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 221, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, ", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 222, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an.", "source_document": "piee-01"}
+{"direction": "growth", "paragraph": 230, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de creștere a consumului lunar de apă înregistrat de către societate la nivelul anului {year}.", "source_document": "piee-01"}
+{"direction": "growth", "paragraph": 235, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de creștere a consumului lunar de apă înregistrat de către societate la nivelul anului {year}.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 240, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de apă înregistrat de către societate la nivelul anului {year}. ", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 252, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de scădere a consumului de apă înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 254, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 255, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an, ", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 256, "pattern": "pentru anul {year} s-au înregistrat {number} m3/an.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 287, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de energie electrică înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 289, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 290, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 291, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone.", "source_document": "piee-01"}
+{"direction": "growth", "paragraph": 299, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului specific echivalent de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 301, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 302, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 303, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 310, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de carburant înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 312, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 313, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 314, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 321, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent total de energie înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 323, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 324, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 325, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/tone.", "source_document": "piee-01"}
+{"direction": "decline", "paragraph": 332, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific de apă înregistrat de către societate în perioada de analiză.", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 334, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 335, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/tone,", "source_document": "piee-01"}
+{"direction": "value", "paragraph": 336, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/tone.", "source_document": "piee-01"}
+{"direction": "fluctuating", "paragraph": 46, "pattern": "În perioada analizată, producția prezintă o evoluție fluctuantă. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mică decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "decline", "paragraph": 62, "pattern": "În perioada analizată, consumul de energie electrică prezintă o tendință de scădere. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mică decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "fluctuating", "paragraph": 76, "pattern": "În perioada analizată, consumul de gaze naturale prezintă o evoluție fluctuantă. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mare decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "fluctuating", "paragraph": 88, "pattern": "În perioada analizată, consumul de motorină prezintă o evoluție fluctuantă. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mare decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "growth", "paragraph": 102, "pattern": "În perioada analizată, consumul de coji de floarea-soarelui prezintă o tendință de creștere. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mare decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "growth", "paragraph": 118, "pattern": "În perioada analizată, consumul total de energie prezintă o tendință de creștere. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mare decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "fluctuating", "paragraph": 124, "pattern": "În perioada analizată, consumul specific anual de energie prezintă o evoluție fluctuantă. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mare decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "fluctuating", "paragraph": 136, "pattern": "În perioada analizată, cifra de afaceri prezintă o evoluție fluctuantă. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mare decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "fluctuating", "paragraph": 142, "pattern": "În perioada analizată, cheltuieli energetice totale prezintă o evoluție fluctuantă. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mică decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "fluctuating", "paragraph": 148, "pattern": "În perioada analizată, ponderea cheltuielilor energetice prezintă o evoluție fluctuantă. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mică decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "fluctuating", "paragraph": 176, "pattern": "În perioada analizată, impactul global asupra mediului prezintă o evoluție fluctuantă. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mică decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "fluctuating", "paragraph": 181, "pattern": "În perioada analizată, impactul specific asupra mediului prezintă o evoluție fluctuantă. Valoarea minimă a fost înregistrată în {year}, iar valoarea maximă în {year}. Valoarea ultimului an este cu {number}% mai mare decât cea a primului an.", "source_document": "piee-02"}
+{"direction": "growth", "paragraph": 54, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a producției pe care compania a obținut-o în perioada de analiză.", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 56, "pattern": "pentru anul {year} s-au înregistrat {number} mii MWh/an;", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 57, "pattern": "pentru anul {year} s-au înregistrat {number} mii MWh/an; ", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 58, "pattern": "pentru anul {year} s-au înregistrat {number} mii MWh/an.", "source_document": "piee-03"}
+{"direction": "decline", "paragraph": 85, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de scădere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}. Curba de consum a energiei electrice ține cont de programul de lucru, de temperaturile exterioare, fiind factori variabili relevanță în ceea ce privește indicatorii energetici ai societății.", "source_document": "piee-03"}
+{"direction": "decline", "paragraph": 90, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de scădere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}.Curba de consum a energiei electrice ține cont de programul de lucru, de temperaturile exterioare, fiind factori variabili relevanță în ceea ce privește indicatorii energetici ai societății.", "source_document": "piee-03"}
+{"direction": "decline", "paragraph": 95, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de scădere a consumului lunar de energie electrică din SEN înregistrat de către societate la nivelul anului {year}. Curba de consum a energiei electrice ține cont de programul de lucru, de temperaturile exterioare, fiind factori variabili relevanță în ceea ce privește indicatorii energetici ai societății.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 106, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a consumului de energie electrică din SEN înregistrat de către societate în perioada de analiză.", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 108, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 109, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 110, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "piee-03"}
+{"direction": "constant", "paragraph": 135, "pattern": "Conform figurii numărul {figure_number} d) se observă că valoarea anuală a consumului de energie electrică din parcul fotovoltaic propriu s-a menținut constantă în perioada de analiză.", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 137, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 138, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 139, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 159, "pattern": "Conform figurii numărul {figure_number} a) se observă tendința de creștere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}. ", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 164, "pattern": "Conform figurii numărul {figure_number} b) se observă tendința de creștere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 169, "pattern": "Conform figurii numărul {figure_number} c) se observă tendința de creștere a consumului lunar de gaz natural înregistrat de către societate la nivelul anului {year}. ", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 180, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a consumului de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 182, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 183, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an, ", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 184, "pattern": "pentru anul {year} s-au înregistrat {number} MWh/an.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 194, "pattern": "Conform figurii numărul {figure_number} a) se observă că motorina este resursa cu ponderea cea mai mare în total consum de carburant, cu o tendința de creștere a consumului lunar înregistrat la nivelul anului {year}.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 199, "pattern": "Conform figurii numărul {figure_number} b) se observă că motorina este resursa cu ponderea cea mai mare în total consum de carburant, cu o tendința de creștere a consumului lunar înregistrat la nivelul anului {year}.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 204, "pattern": "Conform figurii numărul {figure_number} c) se observă că motorina este resursa cu ponderea cea mai mare în total consum de carburant, cu o tendința de creștere a consumului lunar înregistrat la nivelul anului {year}.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 215, "pattern": "Conform figurii numărul {figure_number} d) se observă tendința de creștere a consumului de carburant înregistrat de către societate în perioada de analiză.", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 217, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 218, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an, ", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 219, "pattern": "pentru anul {year} s-au înregistrat {number} tone/an.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 255, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului specific echivalent de energie electrică înregistrat de către societate în perioada de analiză.", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 257, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 258, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 259, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 267, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului specific echivalent de gaz natural înregistrat de către societate în perioada de analiză.", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 269, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 270, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 271, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 278, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului specific echivalent de carburant înregistrat de către societate în perioada de analiză.", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 280, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 281, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 282, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh.", "source_document": "piee-03"}
+{"direction": "growth", "paragraph": 289, "pattern": "Conform figurii numărul {figure_number} se observă tendința de creștere a consumului specific echivalent total de energie înregistrat de către societate în perioada de analiză.", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 291, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 292, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh,", "source_document": "piee-03"}
+{"direction": "value", "paragraph": 293, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} tep/mii MWh.", "source_document": "piee-03"}

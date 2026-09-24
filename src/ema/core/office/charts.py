@@ -40,7 +40,15 @@ from ema.core.office.workbook import (
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 CT = "http://schemas.openxmlformats.org/package/2006/content-types"
-__all__ = ["Series", "SeriesRefs", "build_column_chart", "clone_chart", "embed_data", "read_series"]
+__all__ = [
+    "Series",
+    "SeriesRefs",
+    "build_column_chart",
+    "clone_chart",
+    "embed_all_data",
+    "embed_data",
+    "read_series",
+]
 
 
 def _elements(root: etree._Element, query: str, **namespaces: str) -> list[etree._Element]:
@@ -111,6 +119,17 @@ def _embed(parts: dict[str, bytes], part: str, root: etree._Element) -> None:
 def embed_data(docx: Path, part: str, out: Path) -> None:
     parts = read_parts(docx)
     _embed(parts, part, xml(parts, part))
+    write_parts(parts, out)
+
+
+def embed_all_data(docx: Path, out: Path) -> None:
+    """Rewrite every authored chart link into its own embedded workbook."""
+    parts = read_parts(docx)
+    charts = sorted(
+        part for part in parts if part.startswith("word/charts/chart") and part.endswith(".xml")
+    )
+    for part in charts:
+        _embed(parts, part, xml(parts, part))
     write_parts(parts, out)
 
 

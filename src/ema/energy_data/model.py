@@ -25,6 +25,10 @@ def _money() -> dict[int, Reading]:
     return {}
 
 
+def _filed() -> dict[str, dict[int, FiledValue]]:
+    return {}
+
+
 @dataclass(frozen=True)
 class Reading:
     value: float | None
@@ -33,6 +37,18 @@ class Reading:
     def __post_init__(self) -> None:
         if not self.unit or (self.value is not None and not math.isfinite(self.value)):
             raise ValueError("reading needs a unit and a finite value")
+
+
+@dataclass(frozen=True)
+class FiledValue:
+    value: float
+    unit: str
+    decimals: int
+    source: str
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.value) or not self.unit or self.decimals < 0 or not self.source:
+            raise ValueError("filed value needs a finite value, unit, precision, and source")
 
 
 @dataclass(frozen=True)
@@ -53,6 +69,8 @@ class EnergyDataset:
     production_unit: dict[str, str] = field(default_factory=_units)
     turnover_lei: dict[int, Reading] = field(default_factory=_money)
     energy_costs_lei: dict[int, Reading] = field(default_factory=_money)
+    filed_indicators: dict[str, dict[int, FiledValue]] = field(default_factory=_filed)
+    energy_inventory_complete: bool = True
 
     def __post_init__(self) -> None:
         if self.years != tuple(sorted(set(self.years))):
