@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from conftest import artifacts_path
 from ema.cli import _app
 from ema.core.errors import EmaError
 from ema.core.jobs import status, subscribe
@@ -25,7 +26,7 @@ def test_review_decision_and_final_gate(
 ) -> None:
     base = next((reference_library / "piee/finished-programs").glob("*MODEL_2026.docx"))
     monkeypatch.setenv("EMA_PIEE_BASE_DOCUMENT", str(base))
-    monkeypatch.setenv("EMA_PIEE_BASE_DIRECTORY", str(Path.home() / "Ema-dev/s8/base"))
+    monkeypatch.setenv("EMA_PIEE_BASE_DIRECTORY", str(artifacts_path("s8", "base")))
     case = reference_library / "piee/cases" / case_name
     anexa = next(case.rglob("Anexa*.xlsx"))
     necesar = next(case.rglob("Necesar*.xls"), None)
@@ -95,7 +96,7 @@ def test_cli_generate_review_and_refuse_unresolved_final(
     base = next((reference_library / "piee/finished-programs").glob("*MODEL_2026.docx"))
     monkeypatch.setenv("EMA_WORKSPACE", str(tmp_path / "workspace"))
     monkeypatch.setenv("EMA_PIEE_BASE_DOCUMENT", str(base))
-    monkeypatch.setenv("EMA_PIEE_BASE_DIRECTORY", str(Path.home() / "Ema-dev/s8/base"))
+    monkeypatch.setenv("EMA_PIEE_BASE_DIRECTORY", str(artifacts_path("s8", "base")))
     case = reference_library / "piee/cases/piee-case-b"
     anexa = next(case.rglob("Anexa*.xlsx"))
     prelucrare = next(case.rglob("*Prelucrare*.xls*"))

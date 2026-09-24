@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from docx.oxml.ns import qn
 
+from conftest import artifacts_path
 from ema.core.office.anchors import AnchorLedger
 from ema.core.office.base_map import load as load_map
 from ema.core.office.package import read_parts, xml
@@ -46,7 +47,7 @@ def test_CLIENT-P1_monthly_and_equivalent_tables_match_approved(tmp_path: Path) 
         next(case.rglob("Necesar*.xls")),
         next(case.rglob("*Prelucrare*.xls")),
     )
-    base = Path.home() / "Ema-dev/s8/base"
+    base = artifacts_path("s8", "base")
     mapping = load_map(base / "base-map.json")
     output = tmp_path / "tables.docx"
     render_tables(base / "piee-master.docx", data, output, AnchorLedger(mapping.variable_slots))

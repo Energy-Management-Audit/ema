@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
+from conftest import artifacts_path
 from ema.core.errors import EmaError
 from ema.core.jobs import create_job, run_stage, status, subscribe
 from ema.core.workspace import Workspace
@@ -22,7 +23,7 @@ from ema.invoices import (
     extract_batch,
 )
 
-_BASELINE = Path.home() / "Ema-dev/s9a-baseline"
+_BASELINE = artifacts_path("s9a-baseline")
 _TEXT_CASES = ("invoice-case-d", "CLIENT-I5", "invoice-case-a")
 _OUTCOME_CASES = ("CLIENT-I2", "invoice-case-f")
 _SNIPPET_EXCEPTION = (

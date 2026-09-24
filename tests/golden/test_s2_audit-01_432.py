@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
+from conftest import artifacts_path
 from ema.core.office.blocks import (
     BulletList,
     Caption,
@@ -27,7 +28,7 @@ from ema.core.office.sheets import open_book
 pytestmark = pytest.mark.golden
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
-OUTPUT = Path.home() / "Ema-dev/s2"
+OUTPUT = artifacts_path("s2")
 
 
 def _text(node: etree._Element) -> str:

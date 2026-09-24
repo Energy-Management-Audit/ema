@@ -61,7 +61,10 @@ def snapshot(path: Path) -> dict[str, dict[str, dict[str, object]]]:
 
 def main() -> None:
     reference = Path(os.environ["EMA_REFERENCE"])
-    output = Path.home() / "Ema-dev/s5/expected"
+    output = (
+        Path(os.environ.get("EMA_ARTIFACTS", "~/Code/projects/ema/artifacts")).expanduser()
+        / "s5/expected"
+    )
     output.mkdir(parents=True, exist_ok=True)
     for case, relative in CASES.items():
         data = snapshot(reference / relative)

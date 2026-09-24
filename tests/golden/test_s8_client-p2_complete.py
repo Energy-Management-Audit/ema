@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from docx.oxml.ns import qn
 
+from conftest import artifacts_path
 from ema.core.office.chart_series import Series, read_series
 from ema.core.office.package import (
     REL_CHART,
@@ -113,7 +114,7 @@ def test_CLIENT-P2_figure_inventory_and_numbers_match_or_have_pinned_reason(
         final,
     )
     output = tmp_path / "draft.docx"
-    status = compose_draft(data, Path.home() / "Ema-dev/s8/base", output, date(2026, 9, 24))
+    status = compose_draft(data, artifacts_path("s8", "base"), output, date(2026, 9, 24))
     assert not status.package_issues and not status.leftover_parts
     assert not check_standalone(output)
     produced, authored = _order(output), _order(final)

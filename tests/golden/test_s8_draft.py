@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from docx.oxml.ns import qn
 
+from conftest import artifacts_path
 from ema.core.office.package import read_parts, xml
 from ema.piee.compose import compose_draft
 from ema.piee.dataset import load
@@ -27,7 +28,7 @@ def test_draft_is_standalone_and_marks_remaining_fields(tmp_path: Path, case_nam
     data = load(2025, anexa, necesar, prelucrare)
     output = tmp_path / "draft.docx"
 
-    result = compose_draft(data, Path.home() / "Ema-dev/s8/base", output, date(2026, 9, 24))
+    result = compose_draft(data, artifacts_path("s8", "base"), output, date(2026, 9, 24))
 
     assert result.package_issues == ()
     assert result.leftover_parts == ()

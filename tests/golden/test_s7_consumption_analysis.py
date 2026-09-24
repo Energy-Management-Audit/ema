@@ -12,6 +12,7 @@ from tests.golden.s7_coverage import retained_categories
 from tests.golden.s7_layout import build_blocks
 from tests.golden.s7_reader import _monthly, _text, read_chapter
 
+from conftest import artifacts_path
 from ema.audit.headings import map_headings
 from ema.consumption_analysis.analysis import (
     ChartPlan,
@@ -29,7 +30,7 @@ from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FactorTable
 
 pytestmark = pytest.mark.golden
-OUTPUT = Path.home() / "Ema-dev" / "s7"
+OUTPUT = artifacts_path("s7")
 
 
 def _source(name: str) -> Path:

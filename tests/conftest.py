@@ -1,7 +1,8 @@
 """Golden tests read the real reference library and are skipped without it.
 
-The library lives outside this repository and never enters git (docs/PLAN.md §5.15).
-Point EMA_REFERENCE at it to run them: export EMA_REFERENCE=~/Code/projects/ema-reference
+The library and generated artifacts stay outside git (docs/PLAN.md §5.15).
+Point EMA_REFERENCE at it to run them: export EMA_REFERENCE=~/Code/projects/ema/data
+EMA_ARTIFACTS overrides local artifacts (default: ~/Code/projects/ema/artifacts).
 """
 
 from __future__ import annotations
@@ -21,3 +22,9 @@ def reference_library() -> Path:
     if not path.is_dir():
         pytest.skip(f"EMA_REFERENCE points at {path}, which does not exist")
     return path
+
+
+def artifacts_path(*parts: str) -> Path:
+    """Return a path under the local Ema artifacts directory."""
+    root = Path(os.environ.get("EMA_ARTIFACTS", "~/Code/projects/ema/artifacts")).expanduser()
+    return root.joinpath(*parts)

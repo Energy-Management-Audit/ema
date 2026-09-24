@@ -14,6 +14,7 @@ from docx.document import Document as DocxDocument
 from docx.oxml.ns import qn
 from lxml import etree
 
+from conftest import artifacts_path
 from ema.piee.compose import compose_draft
 from ema.piee.dataset import load
 
@@ -168,7 +169,7 @@ def test_CLIENT-P1_text_and_tables_have_only_pinned_differences(  # noqa: C901
     )
     monkeypatch.setattr("ema.piee.compose._strip_bookmarks", shutil.copyfile)
     output = tmp_path / "bookmarked.docx"
-    compose_draft(data, Path.home() / "Ema-dev/s8/base", output, date(2026, 9, 19))
+    compose_draft(data, artifacts_path("s8", "base"), output, date(2026, 9, 19))
     approved = next((case / "generated").glob("Program de îmbunătățire*.docx"))
     left, right = _body(Document(output)), _body(Document(approved))
     a = [(node.tag, _text(node)) for node in left]

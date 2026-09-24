@@ -14,6 +14,7 @@ import pytest
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
+from conftest import artifacts_path
 from ema.core.office.chart_series import Series, read_series
 from ema.core.office.package import REL_PACKAGE, read_parts, relationships, target_part
 from ema.core.office.workbook import formula_cells
@@ -60,7 +61,7 @@ def test_all_CLIENT-P1_charts_and_workbooks_match_approved_semantics(
         next(case.rglob("*Prelucrare*.xls*")),
     )
     output = tmp_path / "draft.docx"
-    compose_draft(data, Path.home() / "Ema-dev/s8/base", output, date(2026, 9, 24))
+    compose_draft(data, artifacts_path("s8", "base"), output, date(2026, 9, 24))
     approved = next((case / "generated").glob("Program de îmbunătățire*.docx"))
     generated_parts, approved_parts = read_parts(output), read_parts(approved)
     expected: dict[tuple[tuple[str, tuple[str, ...]], ...], list[tuple[str, list[Series]]]] = (

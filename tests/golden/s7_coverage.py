@@ -12,6 +12,7 @@ from docx import Document
 from tests.golden.s7_layout import build_blocks
 from tests.golden.s7_reader import Chapter
 
+from conftest import artifacts_path
 from ema.audit.headings import map_headings
 from ema.consumption_analysis.phrases import phrase_bank
 from ema.core.office.blocks import NativeChart, Num, Paragraph, Table
@@ -196,7 +197,7 @@ def main() -> None:
         "AUDIT-02": _audit("AUDIT-02", root),
         "AUDIT-05": _pcm(root),
     }
-    output = Path.home() / "Ema-dev" / "s7" / "coverage.json"
+    output = artifacts_path("s7") / "coverage.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     for name, case in report.items():

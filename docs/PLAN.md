@@ -335,6 +335,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 | 09-19 | `.xls` read directly, `.doc` converted (Word → flag). *09-23: LibreOffice dropped (Vlad)* |
 | 09-19 | Desktop shell: **pywebview + PyInstaller** |
 | 09-19 | Repo `~/Code/projects/ema` = `Energy-Management-Audit/ema`; library at `~/Code/projects/ema-reference` |
+| 2026-09-24 layout: `~/Code/projects/ema/{code,data,docs,tools,artifacts}` |
 | 09-19 | No slice specs are written until the architecture has been challenged with the Codex agent (§10) |
 | 09-19 | Two machines: **separate workspaces, no job transfer feature**. **Export** = the files the app produces (the `.docx` / `.xlsx` deliverables); **import** = loading the input data. A hosted backend later |
 | 09-19 | Windows distribution: **unsigned installer + in-app update check** (SmartScreen warning accepted) |
@@ -1447,16 +1448,18 @@ assembled from those parts.
 ### 6.1 Repository and locations
 
 ```
-~/Code/projects/
-  ema/                  new repo (private GitHub: Energy-Management-Audit/ema)
-  ema-reference/        reference library (moved from the campaign; never in git)
-  _archive/ema-campaign/  old campaign (ARGUS, legacy repos, festivals), read-only; delete after Ema's first real job
+~/Code/projects/ema/
+  code/       repository (private GitHub: Energy-Management-Audit/ema)
+  data/       reference library ($EMA_REFERENCE; never in git)
+  docs/       project documentation
+  tools/      local tools
+  artifacts/  generated local artifacts ($EMA_ARTIFACTS; never in git)
 ```
 
 Repo layout:
 
 ```
-ema/
+code/ (repository root)
   AGENTS.md  CLAUDE.md→AGENTS.md  README.md  pyproject.toml  uv.lock
   .pre-commit-config.yaml  .importlinter  .github/workflows/ci.yml
   docs/PLAN.md (this file; §5 is the architecture)  docs/decisions/0001-packaging-and-resources.md
@@ -1618,7 +1621,7 @@ ema/
 ## 8. Moving from the old world to the new
 
 **Done on 2026-09-21:**
-1. ✅ The library moved to `~/Code/projects/ema-reference/` (`$EMA_REFERENCE`); the scripts inside
+1. ✅ The library moved to `~/Code/projects/ema/data/` (`$EMA_REFERENCE`); the scripts inside
    it were repointed and still reproduce the CLIENT-P1 PIEE.
 2. ✅ The campaign is archived at `~/Code/projects/_archive/ema-campaign/`, with its final state
    committed. ARGUS and the three legacy repos kept their `.git`, so they stay readable for
@@ -1766,7 +1769,7 @@ objects.
 
 ## Appendix A: Reference library
 
-`~/Code/projects/ema-reference/` (`$EMA_REFERENCE`, moved out of the campaign on 2026-09-21):
+`~/Code/projects/ema/data/` (`$EMA_REFERENCE`, moved out of the campaign on 2026-09-21):
 **250 catalogued files, ~203 MB**
 (2026-09-19; 206 files / 161 MB at the Step 1 build). Each file is listed in `catalog.csv` with its
 sha256 and original location. Also: `README.md`, `_requirements/auditor-requirements.md`,

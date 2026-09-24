@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import artifacts_path
 from ema.energy_data.anexa import parse_anexa
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
 from ema.energy_data.source import Located, normal
@@ -57,7 +58,7 @@ def test_read_matches_private_cell_snapshot(reference_library: Path, case: str) 
     assert len(info.carriers) == carrier_count
     assert all(len(block.years) == year_count for block in info.carriers.values())
     assert [(i.code, i.ref.a1 if i.ref else None) for i in info.issues] == expected_issues
-    expected_path = Path.home() / "Ema-dev/s5/expected" / f"{case}.json"
+    expected_path = artifacts_path("s5", "expected") / f"{case}.json"
     assert expected_path.exists(), f"Generate and review the local S5 snapshot: {expected_path}"
     snapshot = json.loads(expected_path.read_text())
     assert set(snapshot) == {carrier.value for carrier in info.carriers}
@@ -125,7 +126,7 @@ def test_other_sheet_structure(reference_library: Path, case: str) -> None:
 
 @pytest.mark.parametrize("case", list(CASES))
 def test_consumption_blocks_match_private_inventory(reference_library: Path, case: str) -> None:
-    inventory = Path.home() / "Ema-dev/s5/blocks.txt"
+    inventory = artifacts_path("s5", "blocks.txt")
     assert inventory.exists(), f"Review the local S5 block inventory: {inventory}"
     expected: set[tuple[str, str, int, str]] = set()
     case_lines = 0

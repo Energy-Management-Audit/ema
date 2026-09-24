@@ -1,7 +1,7 @@
 """Source-inspected differences from legacy ALIVE OCR; values are pinned by digest.
 
 Page renders and the value-level audit live outside git in
-~/Ema-dev/s9b/alive-exceptions/. Each row identifies the changed field or
+EMA_ARTIFACTS/s9b/alive-exceptions/. Each row identifies the changed field or
 zero-based price ordinal. No client values belong in this module.
 """
 

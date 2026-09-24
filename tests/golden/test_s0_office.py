@@ -12,6 +12,7 @@ import pytest
 from lxml import etree
 from openpyxl import load_workbook
 
+from conftest import artifacts_path
 from ema.core.office.charts import (
     Series,
     build_column_chart,
@@ -25,7 +26,7 @@ from ema.core.office.workbook import formula_cells
 
 pytestmark = pytest.mark.golden
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-OUTPUT = Path.home() / "Ema-dev/s0"
+OUTPUT = artifacts_path("s0")
 
 
 @pytest.fixture(scope="module")

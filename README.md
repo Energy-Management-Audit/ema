@@ -25,7 +25,9 @@ Golden tests read the real reference library, which lives outside this repositor
 git. To run them:
 
 ```bash
-export EMA_REFERENCE=~/Code/projects/ema-reference
+export EMA_REFERENCE=~/Code/projects/ema/data
+# Optional; defaults to ~/Code/projects/ema/artifacts
+export EMA_ARTIFACTS=~/Code/projects/ema/artifacts
 uv run pytest -m golden
 ```
 
