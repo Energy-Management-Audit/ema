@@ -89,20 +89,23 @@ def assign_series_formulas(
                 axis = "row" if cells[0][1] == cells[-1][1] else "column"
                 break
     proposed: list[
-        tuple[etree._Element, str, str, list[tuple[int, int]], list[str] | list[float | None]]
+        tuple[str, etree._Element, str, str, list[tuple[int, int]], list[str] | list[float | None]]
     ] = []
-    for _, ref, values in fields:
+    for name, ref, values in fields:
         formula = ref.findtext(f"{{{C}}}f")
         if formula:
             extended = extend_formula(formula, len(values), axis)
             sheet, cells = formula_cells(extended)
-            proposed.append((ref, extended, sheet, cells, values))
+            proposed.append((name, ref, extended, sheet, cells, values))
+    # Series may intentionally share category cells, while their value cells stay independent.
     conflict = any(
-        (sheet, row, col) in occupied for _, _, sheet, cells, _ in proposed for row, col in cells
+        (sheet, row, col) in occupied and (name != "cat" or occupied[sheet, row, col] != value)
+        for name, _, _, sheet, cells, values in proposed
+        for (row, col), value in zip(cells, values, strict=True)
     )
-    first_col = min((col for _, _, _, cells, _ in proposed for _, col in cells), default=0)
+    first_col = min((col for _, _, _, _, cells, _ in proposed for _, col in cells), default=0)
     offset = next_column - first_col if conflict else 0
-    for ref, extended, sheet, cells, values in proposed:
+    for _, ref, extended, sheet, cells, values in proposed:
         assigned_formula, assigned_sheet, assigned_cells = extended, sheet, cells
         if offset:
             row, col = cells[0]

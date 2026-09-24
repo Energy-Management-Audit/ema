@@ -30,6 +30,7 @@ class AnexaData:
         default_factory=dict[str, dict[int, Located]]
     )
     existing_measures: list[Measure] = field(default_factory=list[Measure])
+    audit_measures: list[Measure] = field(default_factory=list[Measure])
     planned_measures: list[Measure] = field(default_factory=list[Measure])
     audit: dict[str, Located] = field(default_factory=dict[str, Located])
     issues: list[ReaderIssue] = field(default_factory=list[ReaderIssue])

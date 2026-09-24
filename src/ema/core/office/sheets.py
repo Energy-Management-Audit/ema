@@ -55,6 +55,7 @@ class CellValue:
     value: Scalar
     ref: CellRef
     hyperlink: str | None = None
+    number_format: str | None = None
 
 
 def _normal(text: str) -> str:
@@ -100,8 +101,14 @@ class _Sheet:
         if row < 1 or col < 1:
             raise ValueError("Excel coordinates are one-based")
         return CellValue(
-            self._raw(row, col), CellRef(self.name, row, col), self._hyperlink(row, col)
+            self._raw(row, col),
+            CellRef(self.name, row, col),
+            self._hyperlink(row, col),
+            self._number_format(row, col),
         )
+
+    def _number_format(self, row: int, col: int) -> str | None:
+        return None
 
     def _hyperlink(self, row: int, col: int) -> str | None:
         return None
@@ -195,12 +202,23 @@ class _XlsxSheet(_Sheet):
         link = self._formulas.cell(row, col).hyperlink
         return link.target if link is not None else None
 
+    def _number_format(self, row: int, col: int) -> str | None:
+        return self._formulas.cell(row, col).number_format
+
 
 class _XlsSheet(_Sheet):
-    def __init__(self, sheet: xlrd.sheet.Sheet, datemode: int) -> None:
+    def __init__(self, sheet: xlrd.sheet.Sheet, book: xlrd.book.Book) -> None:
         super().__init__(sheet.name, sheet.nrows, sheet.ncols)
         self._sheet = sheet
-        self._datemode: Literal[0, 1] = cast(Literal[0, 1], datemode)
+        self._book = book
+        self._datemode: Literal[0, 1] = book.datemode
+
+    def _number_format(self, row: int, col: int) -> str | None:
+        if row > self.max_row or col > self.max_col:
+            return None
+        format_key = self._book.xf_list[self._sheet.cell_xf_index(row - 1, col - 1)].format_key
+        item = self._book.format_map.get(format_key)
+        return str(item.format_str) if item is not None else None
 
     def _raw(self, row: int, col: int) -> Scalar:
         if row > self.max_row or col > self.max_col:
@@ -259,7 +277,7 @@ class _XlsBook:
             raise OfficeError(
                 "sheet_missing", f"{name}; available: {', '.join(self._book.sheet_names())}"
             )
-        return _XlsSheet(self._book.sheet_by_name(name), self._book.datemode)
+        return _XlsSheet(self._book.sheet_by_name(name), self._book)
 
     def close(self) -> None:
         self._book.release_resources()
@@ -273,7 +291,7 @@ def open_book(path: Path) -> Book:
             load_workbook(path, read_only=False, data_only=False),
         )
     if detected.kind == FileKind.XLS:
-        return _XlsBook(xlrd.open_workbook(str(path)))
+        return _XlsBook(xlrd.open_workbook(str(path), formatting_info=True))
     raise OfficeError(
         "unsupported_format", f"{path.name}: {detected.kind.value}; {detected.detail}"
     )

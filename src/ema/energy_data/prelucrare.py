@@ -17,7 +17,7 @@ from ema.energy_data.prelucrare_types import (
     sheet_named,
     year_label,
 )
-from ema.energy_data.source import Located, ReaderIssue, normal
+from ema.energy_data.source import Located, ReaderIssue, located, normal
 
 MONTHS = (
     "ianuarie",
@@ -105,7 +105,7 @@ def _physical(
             value = numeric(cell.value)
             readings[month] = Reading(value, unit)
             if value is not None:
-                out.located[f"carrier.{key}.{year}.{month:02d}"] = Located(value, cell.ref, unit)
+                out.located[f"carrier.{key}.{year}.{month:02d}"] = located(cell, value, unit)
         has_month = any(reading.value is not None for reading in readings.values())
         total = cell_or_blank(sheet, row, max(months.values()) + 1)
         annual_value = numeric(total.value)
@@ -113,7 +113,7 @@ def _physical(
             annual = Reading(annual_value, unit) if annual_value is not None else None
             found[year] = CarrierSeries(readings if has_month else {}, annual)
             if annual_value is not None:
-                out.located[f"carrier.{key}.{year}"] = Located(annual_value, total.ref, unit)
+                out.located[f"carrier.{key}.{year}"] = located(total, annual_value, unit)
     return found
 
 
@@ -143,8 +143,8 @@ def _water_table(
                 value = numeric(cell.value)
                 readings[month] = Reading(value, "m3")
                 if value is not None:
-                    out.located[f"carrier.{carrier.value}.{year}.{month:02d}"] = Located(
-                        value, cell.ref, "m3"
+                    out.located[f"carrier.{carrier.value}.{year}.{month:02d}"] = located(
+                        cell, value, "m3"
                     )
             if any(reading.value is not None for reading in readings.values()):
                 result[year] = CarrierSeries(readings)
@@ -207,7 +207,21 @@ def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dic
                 cell = cell_or_blank(sheet, row, col)
                 value = numeric(cell.value)
                 if value is not None:
-                    out.filed[f"intensity.{year}"] = Located(value, cell.ref, "tep/1000 lei")
+                    out.filed[f"intensity.{year}"] = located(cell, value, "tep/1000 lei")
+        if (
+            "ponderea" in labels
+            and row > 2
+            and any(
+                "valoarea totala a productiei"
+                in normal(str(cell_or_blank(sheet, row - 2, col).value or ""))
+                for col in range(1, sheet.max_col + 1)
+            )
+        ):
+            for year, col in columns.items():
+                cell = cell_or_blank(sheet, row, col)
+                value = numeric(cell.value)
+                if value is not None:
+                    out.filed[f"energy_share.{year}"] = located(cell, value, "%")
 
     def values(row: int | None) -> dict[int, tuple[Reading, Located]]:
         result: dict[int, tuple[Reading, Located]] = {}
@@ -219,7 +233,7 @@ def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dic
             if value is not None:
                 result[year] = (
                     Reading(value, "lei"),
-                    Located(value, cell.ref, "lei", source_labels.get(row)),
+                    located(cell, value, "lei", source_labels.get(row)),
                 )
         return result
 
@@ -277,7 +291,7 @@ def _production(
                     value = numeric(cell.value)
                     if value is not None:
                         result[year] = CarrierSeries(annual=Reading(value, "tone"))
-                        out.located[f"production.main.{year}"] = Located(value, cell.ref, "tone")
+                        out.located[f"production.main.{year}"] = located(cell, value, "tone")
                 return {"main": result}, {"main": "tone"}
     out.issues.append(ReaderIssue("production_missing", "Productii"))
     return {}, {}
@@ -311,9 +325,7 @@ def _filed_tep(book: Book, out: PrelucrareData) -> None:  # noqa: C901
             cell = cell_or_blank(sheet, row, col)
             value = numeric(cell.value)
             if value is not None:
-                out.filed[f"tep.{name}.{current_year}.{month:02d}"] = Located(
-                    value, cell.ref, "tep"
-                )
+                out.filed[f"tep.{name}.{current_year}.{month:02d}"] = located(cell, value, "tep")
         for col in range(
             max(columns.values()) + 1, min(sheet.max_col, max(columns.values()) + 2) + 1
         ):
@@ -324,7 +336,7 @@ def _filed_tep(book: Book, out: PrelucrareData) -> None:  # noqa: C901
                 continue
             value = numeric(cell.value)
             if value is not None:
-                out.filed[f"tep.{name}.{current_year}"] = Located(value, cell.ref, "tep")
+                out.filed[f"tep.{name}.{current_year}"] = located(cell, value, "tep")
 
 
 def _filed_specific(book: Book, out: PrelucrareData) -> None:  # noqa: C901
@@ -353,7 +365,7 @@ def _filed_specific(book: Book, out: PrelucrareData) -> None:  # noqa: C901
                 cell = cell_or_blank(sheet, later, col)
                 value = numeric(cell.value)
                 if value is not None:
-                    out.filed[f"specific.{name}.{year}"] = Located(value, cell.ref)
+                    out.filed[f"specific.{name}.{year}"] = located(cell, value)
         break
 
 

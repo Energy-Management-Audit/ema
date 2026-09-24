@@ -13,6 +13,7 @@ from typing import cast
 from lxml import etree
 
 from ema.core.office.chart_ids import refresh_unique_ids
+from ema.core.office.chart_location import cloned_caption, source_paragraph
 from ema.core.office.chart_series import Series, SeriesRefs, _ref, read_series
 from ema.core.office.errors import OfficeError
 from ema.core.office.package import (
@@ -34,6 +35,7 @@ from ema.core.office.package import (
 from ema.core.office.workbook import (
     assign_series_formulas,
     build_workbook,
+    formula_at,
     formula_cells,
 )
 
@@ -133,36 +135,6 @@ def embed_all_data(docx: Path, out: Path) -> None:
     write_parts(parts, out)
 
 
-def _source_paragraph(
-    parts: dict[str, bytes],
-    part: str,
-) -> tuple[str, etree._Element, etree._Element, etree._Element]:
-    for owner in (p for p in parts if p.startswith("word/") and p.endswith(".xml")):
-        rel = next(
-            (
-                item
-                for item in relationships(parts, owner)
-                if item.get("Type") == REL_CHART
-                and target_part(owner, item.get("Target", "")) == part
-            ),
-            None,
-        )
-        if rel is None:
-            continue
-        root = xml(parts, owner)
-        charts = [
-            node
-            for node in _elements(root, ".//*[local-name()='chart']")
-            if node.get(f"{{{R}}}id") == rel.get("Id")
-        ]
-        if len(charts) != 1:
-            continue
-        paragraphs = _elements(charts[0], "ancestor::w:p", w=W)
-        if len(paragraphs) == 1:
-            return owner, root, paragraphs[0], charts[0]
-    raise OfficeError("chart_location", f"Chart paragraph not found: {part}")
-
-
 def _copy_chart_resources(parts: dict[str, bytes], source: str, new_part: str) -> None:
     source_rels = relationships(parts, source)
     new_rels = etree.Element(f"{{{P}}}Relationships")
@@ -206,7 +178,7 @@ def _new_chart(
     _copy_chart_resources(parts, source, new_part)
     _embed(parts, new_part, root)
     if prototype_paragraph is None:
-        owner, doc_root, paragraph, chart_node = _source_paragraph(parts, after)
+        owner, doc_root, paragraph, chart_node = source_paragraph(parts, after)
     else:
         owner = "word/document.xml"
         doc_root = xml(parts, owner)
@@ -317,11 +289,46 @@ def _set_title(root: etree._Element, title: str) -> None:
         texts[0].text = title
 
 
-def clone_chart(docx: Path, part: str, series: list[Series], title: str | None, out: Path) -> str:
+def clone_chart(  # noqa: PLR0913
+    docx: Path,
+    part: str,
+    series: list[Series],
+    title: str | None,
+    out: Path,
+    *,
+    after_part: str | None = None,
+    caption: str | None = None,
+) -> str:
     parts = read_parts(docx)
     root = copy.deepcopy(xml(parts, part))
+    for authored, item in zip(root.iter(f"{{{C}}}ser"), series, strict=True):
+        for field, size in (("tx", 1), ("cat", len(item.categories)), ("val", len(item.values))):
+            ref = _ref(authored, field)
+            formula_node = ref.find(f"{{{C}}}f") if ref is not None else None
+            if formula_node is None or not formula_node.text:
+                continue
+            _, cells = formula_cells(formula_node.text)
+            axis = "column" if len(cells) > 1 and cells[0][0] == cells[-1][0] else "row"
+            formula_node.text = formula_at(formula_node.text, *cells[0], size, axis)
     _set_series(root, series, title)
-    new_part, _ = _new_chart(parts, part, part, root)
+    new_part, _ = _new_chart(parts, part, after_part or part, root)
+    if caption is not None:
+        _, _, original_paragraph, _ = source_paragraph(parts, part)
+        source_caption = original_paragraph.getnext()
+        if source_caption is None or source_caption.tag != f"{{{W}}}p":
+            raise OfficeError("chart_caption", "Source chart has no caption paragraph")
+        owner, document, new_paragraph, _ = source_paragraph(parts, new_part)
+        following = new_paragraph.getnext()
+        following_text = (
+            "".join(node.text or "" for node in following.iter(f"{{{W}}}t"))
+            if following is not None
+            else ""
+        )
+        if following_text.lstrip().casefold().startswith(("fig.", "figura")):
+            assert following is not None
+            following.addnext(new_paragraph)
+        new_paragraph.addnext(cloned_caption(source_caption, caption))
+        parts[owner] = encoded(document)
     write_parts(parts, out)
     return new_part
 

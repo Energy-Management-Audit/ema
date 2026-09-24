@@ -12,7 +12,7 @@ from ema.energy_data.prelucrare_types import (
     sheet_named,
     year_label,
 )
-from ema.energy_data.source import Located, ReaderIssue, normal
+from ema.energy_data.source import Located, ReaderIssue, located, normal
 
 
 def factors_for_output(imported: PrelucrareData, years: tuple[int, ...]) -> FactorTable:
@@ -38,6 +38,21 @@ def factors_for_output(imported: PrelucrareData, years: tuple[int, ...]) -> Fact
                         for existing in target
                     ):
                         target.append(value)
+        if (
+            year in imported.dataset.years
+            and table.tep_factor(Carrier.electricity_pv, "MWh", year) is None
+        ):
+            documented = FACTORS_2026.tep_factor(Carrier.electricity_pv, "MWh", year)
+            if documented is not None:
+                tep.append(
+                    Factor(
+                        documented.carrier,
+                        documented.unit,
+                        documented.per_unit,
+                        documented.source,
+                        year,
+                    )
+                )
     return FactorTable("prelucrare:output", min(years), tuple(tep), tuple(co2), max(years))
 
 
@@ -63,8 +78,8 @@ def read_factors(  # noqa: C901, PLR0912
                 cell = cell_or_blank(reference, row, col)
                 value = numeric(cell.value)
                 if value is not None:
-                    out.located[f"factor_sheet.{normal(name)}.{labels[0]}.{row}.{col}"] = Located(
-                        value, cell.ref
+                    out.located[f"factor_sheet.{normal(name)}.{labels[0]}.{row}.{col}"] = located(
+                        cell, value
                     )
     for sheet_name, label, carrier, unit in (
         ("Consum Electric", "1 MWh", Carrier.electricity_grid, "MWh"),
@@ -124,7 +139,7 @@ def read_factors(  # noqa: C901, PLR0912
                     if value is not None:
                         unit = "MWh" if carrier == Carrier.electricity_pv else "t"
                         tep.append(Factor(carrier, unit, value, f"{source_file}:{cell.ref.a1}"))
-                        out.located[f"factor.tep.{carrier.value}"] = Located(value, cell.ref)
+                        out.located[f"factor.tep.{carrier.value}"] = located(cell, value)
                     break
                 if any(f.carrier == carrier for f in tep):
                     break
@@ -165,13 +180,13 @@ def _co2_factors(  # noqa: C901, PLR0912
                     cell = cell_or_blank(impact, row, 9)
                     value = numeric(cell.value)
                     if value is not None:
-                        out.filed[f"co2.total.{current_year}"] = Located(value, cell.ref, "t CO2")
+                        out.filed[f"co2.total.{current_year}"] = located(cell, value, "t CO2")
                 continue
             cell = cell_or_blank(impact, row, 9)
             value = numeric(cell.value)
             if value is None:
                 continue
-            out.filed[f"co2.{carrier.value}.{current_year}"] = Located(value, cell.ref, "t CO2")
+            out.filed[f"co2.{carrier.value}.{current_year}"] = located(cell, value, "t CO2")
             if carrier in {Carrier.diesel, Carrier.petrol, Carrier.lpg}:
                 last_fuel = carrier
             factor_col = 6 if carrier in {Carrier.electricity_grid, Carrier.natural_gas} else 8
@@ -188,7 +203,7 @@ def _co2_factors(  # noqa: C901, PLR0912
                         current_year,
                     )
                 )
-                out.located[f"factor.co2.{carrier.value}.{current_year}"] = Located(
-                    factor, factor_cell.ref
+                out.located[f"factor.co2.{carrier.value}.{current_year}"] = located(
+                    factor_cell, factor
                 )
     return co2

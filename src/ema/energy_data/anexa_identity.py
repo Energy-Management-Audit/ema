@@ -124,6 +124,7 @@ def _contact_person(sheet: Sheet, result: AnexaData) -> None:
         ("Persoana de contact", "Persoana de contact din partea companiei"),
         result.issues,
     )
+    consumer_contact = contact is not None
     if contact is None:
         contact = _label(
             sheet,
@@ -144,4 +145,6 @@ def _contact_person(sheet: Sheet, result: AnexaData) -> None:
                 value = _following(sheet, CellRef(sheet.name, row, contact.col), result.issues)
                 if value is not None:
                     result.identity["contact_person"] = value
+                    if consumer_contact:
+                        result.identity["consumer_contact_person"] = value
                 break

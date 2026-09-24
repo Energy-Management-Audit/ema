@@ -18,6 +18,30 @@ class Located:
     ref: CellRef
     unit: str | None = None
     label: str | None = None
+    displayed_decimals: int | None = None
+
+
+def displayed_decimals(number_format: str | None) -> int | None:
+    """Return fixed numeric precision; unknown and variable formats stay unknown."""
+    if not number_format:
+        return None
+    section = number_format.split(";", 1)[0]
+    section = re.sub(r'"[^"]*"|\\.|\[[^]]*\]', "", section)
+    if "%" in section or "E" in section.upper() or not re.search(r"[0#]", section):
+        return None
+    if "." not in section:
+        return 0
+    decimal = section.rsplit(".", 1)[1].strip()
+    return len(decimal) if decimal and set(decimal) <= {"0"} else None
+
+
+def located(
+    cell: CellValue,
+    value: str | float | int | datetime,
+    unit: str | None = None,
+    label: str | None = None,
+) -> Located:
+    return Located(value, cell.ref, unit, label, displayed_decimals(cell.number_format))
 
 
 @dataclass(frozen=True)
@@ -38,7 +62,7 @@ def filled(cell: CellValue) -> Located | None:
     value = cell.value
     if value is None or (isinstance(value, str) and not value.strip()):
         return None
-    return Located(value, cell.ref)
+    return located(cell, value)
 
 
 def cell_at(sheet: Sheet, row: int, col: int, issues: list[ReaderIssue]) -> CellValue:
@@ -74,7 +98,7 @@ def number(
     if not math.isfinite(value):
         issues.append(ReaderIssue("invalid_number", str(value), cell.ref))
         return None
-    return Located(value, cell.ref, unit)
+    return located(cell, value, unit)
 
 
 def row_with(

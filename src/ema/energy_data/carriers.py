@@ -30,6 +30,7 @@ class Carrier(StrEnum):
 
 
 WATER_CARRIERS = frozenset({Carrier.water_potable, Carrier.water_industrial, Carrier.water_storm})
+FAMILY_PARENT: dict[Carrier, Carrier] = {Carrier.sunflower_husks: Carrier.biomass}
 
 
 def _normalize(label: str) -> str:

@@ -27,11 +27,12 @@ from ema.core.review import (
 )
 from ema.core.review.readiness import Workflow
 from ema.core.workspace import Workspace
+from ema.piee.review_workflow import PieeWorkflow
 
 job_review_app = typer.Typer()
 
 # Workflow slices populate these entries through static imports as they land.
-WORKFLOWS: dict[str, Workflow] = {"audit": AuditWorkflow()}
+WORKFLOWS: dict[str, Workflow] = {"audit": AuditWorkflow(), "piee": PieeWorkflow()}
 
 
 def _ws() -> Workspace:

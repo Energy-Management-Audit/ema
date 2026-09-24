@@ -35,6 +35,7 @@ class PackageReport:
     external_relationships: list[tuple[str, str, str]]
     charts_without_workbook: list[str]
     orphan_parts: list[str]
+    chart_workbook_relationships: dict[str, list[str]]
 
 
 def rels_path(part: str) -> str:
@@ -105,6 +106,7 @@ def inspect(docx: Path) -> PackageReport:
     referenced, external, chart_owners = _graph(parts)
     charts: list[ChartRef] = []
     missing: list[str] = []
+    workbook_relationships: dict[str, list[str]] = {}
     chart_parts = sorted(
         p for p in parts if p.startswith("word/charts/chart") and p.endswith(".xml")
     )
@@ -123,6 +125,11 @@ def inspect(docx: Path) -> PackageReport:
         if embedded not in parts:
             missing.append(part)
         charts.append(ChartRef(part, chart_owners.get(part, ""), embedded, linked))
+        workbook_relationships[part] = [
+            target_part(part, rel.get("Target", ""))
+            for rel in relationships(parts, part)
+            if rel.get("Type") == REL_PACKAGE
+        ]
     orphans = sorted(
         p
         for p in parts
@@ -132,7 +139,7 @@ def inspect(docx: Path) -> PackageReport:
         )
         and p not in referenced
     )
-    return PackageReport(charts, external, missing, orphans)
+    return PackageReport(charts, external, missing, orphans, workbook_relationships)
 
 
 def check_standalone(docx: Path) -> list[str]:
@@ -148,4 +155,15 @@ def check_standalone(docx: Path) -> list[str]:
     workbooks = [chart.embedded for chart in report.charts if chart.embedded]
     if len(set(workbooks)) != len(workbooks):
         issues.append("Charts share an embedded workbook")
+    all_workbooks = [
+        workbook
+        for chart_workbooks in report.chart_workbook_relationships.values()
+        for workbook in chart_workbooks
+    ]
+    if len(all_workbooks) != len(report.charts):
+        issues.append("Each chart must have exactly one embedded workbook relationship")
+    if set(all_workbooks) != set(workbooks):
+        issues.append("Chart workbook relationships do not match chart references")
+    if len(set(all_workbooks)) != len(all_workbooks):
+        issues.append("Embedded workbooks must be referenced by exactly one chart")
     return issues

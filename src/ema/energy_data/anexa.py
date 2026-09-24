@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ema.core.office.errors import OfficeError
 from ema.core.office.sheets import Book, CellRef, CellValue, Sheet, open_book
+from ema.energy_data.anexa_audit import read_audit
 from ema.energy_data.anexa_cells import (
     AnexaData,
     Measure,
@@ -22,7 +23,6 @@ from ema.energy_data.source import (
     filled,
     normal,
     number,
-    right_of_label,
     row_with,
 )
 
@@ -157,7 +157,9 @@ def _annual_fuels(sheet: Sheet, result: AnexaData) -> None:
         )
         if raw is not None:
             unit = raw_unit.strip(" []") if isinstance(raw_unit, str) else None
-            result.annual[f"{carrier.value}_raw"] = Located(raw.value, raw.ref, unit)
+            result.annual[f"{carrier.value}_raw"] = Located(
+                raw.value, raw.ref, unit, displayed_decimals=raw.displayed_decimals
+            )
         if tep is not None:
             result.annual[f"{carrier.value}_tep"] = tep
 
@@ -311,23 +313,11 @@ def _measures(sheet: Sheet, kind: str, result: AnexaData) -> list[Measure]:
     return items
 
 
-def _audit(book: Book, result: AnexaData) -> None:
-    sheet = book.sheet("Audit energetic")
-    for key, labels in {
-        "last_audit": ("Data ultimului audit energetic efectuat",),
-        "auditor": ("Persoana fizică / persoana juridică  care a efectuat auditul energetic",),
-        "boundary": ("Contur bilanț energetic",),
-    }.items():
-        value = right_of_label(sheet, labels, result.issues)
-        if value is not None:
-            result.audit[key] = value
-
-
 def read_anexa(book: Book) -> AnexaData:
     """Read independent form sections, retaining usable values when another section fails."""
 
     result = AnexaData()
-    for section in (read_identity, _annual, read_monthly, _measure_sheets, _audit):
+    for section in (read_identity, _annual, read_monthly, _measure_sheets, read_audit):
         try:
             section(book, result)
         except OfficeError as exc:

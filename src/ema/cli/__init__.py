@@ -13,6 +13,7 @@ import uvicorn
 from ema import __version__
 from ema.api import create_app
 from ema.api.mock import seed as seed_mock
+from ema.cli.piee import piee_app
 from ema.cli.review import job_review_app
 from ema.core.backup import backup, restore
 from ema.core.config import workspace_path
@@ -52,6 +53,7 @@ _app.add_typer(workspace_app, name="workspace")
 _app.add_typer(job_app, name="job")
 job_app.add_typer(job_review_app)
 _app.add_typer(invoices_app, name="invoices")
+_app.add_typer(piee_app, name="piee")
 _app.add_typer(reporting_app, name="reporting")
 
 
