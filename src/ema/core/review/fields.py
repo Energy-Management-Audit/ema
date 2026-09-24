@@ -84,7 +84,11 @@ def propose(  # noqa: PLR0913
             )
             if not any(item.value == value for item in candidates):
                 candidates.append(_candidate(value, refs))
-            protected = old.review == "corrected" or old.state == "manual"
+            protected = (
+                old.review == "corrected"
+                or old.state == "manual"
+                or (old.state in {"supplied", "extracted"} and state == "enriched")
+            )
             if protected:
                 field = _changed(
                     old,
@@ -116,18 +120,21 @@ def mark_absent(
     key: str | FieldSpec,
     presence: Literal["not_found", "failed"],
     failure: str | None = None,
+    evidence: list[Evidence] | None = None,
 ) -> Field:
     spec = key if isinstance(key, FieldSpec) else FieldSpec(key=key, label=key, value_type="text")
     if presence == "failed" and not failure:
         raise EmaError("failure_missing", "Cauza erorii lipsește.", spec.key)
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
+        save_evidence(db, job, evidence or [])
+        evidence_ids = [item.id for item in evidence or []]
         row = db.execute(
             "SELECT id FROM fields WHERE job_id=? AND key=?", (job, spec.key)
         ).fetchone()
         if row:
             old = load_field(db, job, row["id"])
-            if old.state == "manual":
+            if old.state == "manual" or (evidence_ids and old.value is not None):
                 return old
             field = _changed(
                 old,
@@ -138,6 +145,7 @@ def mark_absent(
                 confidence="none",
                 alternatives=[],
                 chosen=None,
+                evidence=evidence_ids or old.evidence,
             )
         else:
             field = Field(
@@ -152,6 +160,7 @@ def mark_absent(
                 state="extracted",
                 presence=presence,
                 failure=failure,
+                evidence=evidence_ids,
             )
         save_field(db, field)
         return field

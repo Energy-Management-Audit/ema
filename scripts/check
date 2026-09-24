@@ -17,4 +17,4 @@ fi
 "$python" scripts/check_file_size.py
 "$pyright"
 "$lint"
-"$python" -m pytest -m 'not golden'
+"$python" -m pytest -m 'not golden and not network'

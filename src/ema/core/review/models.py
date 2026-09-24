@@ -81,6 +81,7 @@ class Evidence(BaseModel):
     method: Literal["questionnaire", "anexa", "prelucrare", "invoice", "online", "manual", "calc"]
     retrieved_at: datetime
     quote: str | None = None
+    trust_reason: str | None = None
     highlight: Literal["exact", "page", "none"]
 
 
