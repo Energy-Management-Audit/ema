@@ -3,7 +3,7 @@
 import sqlite3
 import time
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 def migrate(db: sqlite3.Connection) -> None:
@@ -98,6 +98,24 @@ def migrate(db: sqlite3.Connection) -> None:
             );
             CREATE INDEX client_memory_lookup ON client_memory(kind, identifier);
             PRAGMA user_version = 7;
+            COMMIT;
+        """)
+        version = 7
+    if version == 7:
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            CREATE TABLE agent_sessions (
+                job_id TEXT NOT NULL, section TEXT NOT NULL, state TEXT NOT NULL,
+                PRIMARY KEY(job_id, section), FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            CREATE TABLE llm_calls (
+                id INTEGER PRIMARY KEY, job_id TEXT NOT NULL, section TEXT NOT NULL,
+                provider TEXT NOT NULL, model TEXT NOT NULL, prompt_version TEXT NOT NULL,
+                input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+                estimated_cost_usd REAL NOT NULL, duration_ms INTEGER NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+            PRAGMA user_version = 8;
             COMMIT;
         """)
         return

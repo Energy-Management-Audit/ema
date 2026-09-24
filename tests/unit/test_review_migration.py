@@ -17,7 +17,7 @@ def test_schema_three_preserves_decision_order(tmp_path: Path) -> None:
         db.execute("PRAGMA user_version = 3")
         db.commit()
         workspace_schema.migrate(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert db.execute("PRAGMA user_version").fetchone()[0] == workspace_schema.SCHEMA_VERSION
         assert db.execute("SELECT id FROM decisions ORDER BY seq").fetchall() == [("z",), ("a",)]
         db.execute("DELETE FROM decisions WHERE id='z'")
         db.commit()

@@ -1,0 +1,392 @@
+{
+  "source": "hand-authored",
+  "format": "gemini-generate-content",
+  "responses": [
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_1",
+                  "name": "list_files",
+                  "args": {}
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "97c7d03926b49d16a4d7a92e8e4c841627f44c932d130a2e2db22e75cab018dc",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_2",
+                  "name": "read_file",
+                  "args": {
+                    "name": "permit.txt"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "2fa9e6629eb1c136df5b295d518a2e075e979a34b0a3a8ee5a2b9c9fe7b275dd",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_3",
+                  "name": "classify_file",
+                  "args": {
+                    "name": "permit.txt",
+                    "item": 2,
+                    "quote": "fabricated approval"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "b65f0e2cfcbae86145f8dab1676cea661ed9b7f6bc892a27c8df74fe43899ef8",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_4",
+                  "name": "classify_file",
+                  "args": {
+                    "name": "permit.txt",
+                    "item": 2,
+                    "quote": "Permit granted for the workshop"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "8c397f9f54caae498419f33650c7e9ad04594f02adacf8d6d2bf238094499aa3",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_5",
+                  "name": "read_file",
+                  "args": {
+                    "name": "flow.txt"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "d827b754e02888f1e01c867c1400bfc9eb834736832e747ca046dbff7d1c2ca6",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_6",
+                  "name": "classify_file",
+                  "args": {
+                    "name": "flow.txt",
+                    "item": 5,
+                    "quote": "Flow scheme for paint line"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "dde5243a372d599a75ec07df10bd272c7143101d471feeb2f2a5bc6e2e4bc5a2",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_7",
+                  "name": "read_file",
+                  "args": {
+                    "name": "meter.txt"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "2e9f1a3ed91a0e15d8918c8143bddd6e612e704061ec5e948776794f4d1136a3",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_8",
+                  "name": "classify_file",
+                  "args": {
+                    "name": "meter.txt",
+                    "item": 13,
+                    "quote": "Meter export for July"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "84d9e7f03997b9bc48710c4980dd7a7379d064c5273f6b92cc3f90de02c02274",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_9",
+                  "name": "read_file",
+                  "args": {
+                    "name": "photo.txt"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "5a0b1d5f4718f78a456682790597c9f714f394e0eaa4baf5d472b5dfca037301",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_10",
+                  "name": "classify_file",
+                  "args": {
+                    "name": "photo.txt",
+                    "item": 4,
+                    "quote": "Photo of boiler room"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "ed6b362621ced27b48601bb951084fcd656d47949f95ca00a6a6f75895613953",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "call_11",
+                  "name": "mark_missing",
+                  "args": {
+                    "item": 6
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "b9f26ddb63b73b9208e74460fcbd88cb2cbb671845b701000ca18f2b01d30837",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    },
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Intake complete."
+              }
+            ]
+          }
+        }
+      ],
+      "usageMetadata": {
+        "promptTokenCount": 20,
+        "candidatesTokenCount": 10
+      },
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "c9d9852a82272355fab4326c5c7d7b02fbdc873d7bafb1deba01c4346d04e775",
+        "messages": "335510e1dcea0eeb95c97b09b6741e0c0e66c2f84729a37d54ab5ee499e32d27",
+        "tools": "45053bbd4961d7b7ce06873190090aba2f08c94a739cd72bf60278e664d8f8d5",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      }
+    }
+  ]
+}

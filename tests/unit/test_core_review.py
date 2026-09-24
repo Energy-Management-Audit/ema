@@ -361,7 +361,7 @@ def test_schema_one_migrates_to_two() -> None:
         db.execute("PRAGMA user_version = 1")
         db.commit()
         workspace_schema.migrate(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert db.execute("PRAGMA user_version").fetchone()[0] == workspace_schema.SCHEMA_VERSION
         assert "added_at" in {row[1] for row in db.execute("PRAGMA table_info(files)")}
         assert db.execute("SELECT added_at FROM files").fetchone()[0] > 0
         assert "cancel_requested" in {row[1] for row in db.execute("PRAGMA table_info(runs)")}

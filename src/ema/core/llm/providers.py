@@ -1,0 +1,214 @@
+"""Official SDK adapters. Client construction is deliberately opt-in."""
+
+from __future__ import annotations
+
+import json
+import os
+from typing import Any, cast
+
+from google import genai
+from google.genai import types
+from openai import OpenAI
+from openai.types.chat import ChatCompletion
+
+from ema.core.errors import EmaError
+from ema.core.llm.types import Exchange, ToolCall, ToolSpec
+
+
+def _live_key(environment: str) -> str:
+    if os.environ.get("EMA_LLM_LIVE") != "1":
+        raise EmaError("ai_offline", "AI așteaptă activarea explicită.", "EMA_LLM_LIVE")
+    key = os.environ.get(environment)
+    if not key:
+        raise EmaError("ai_key_missing", "Cheia furnizorului AI lipsește.", environment)
+    return key
+
+
+def _openai_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    converted: list[dict[str, Any]] = []
+    for message in messages:
+        if message["role"] == "assistant" and message.get("tool_calls"):
+            converted.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": call["id"],
+                            "type": "function",
+                            "function": {
+                                "name": call["name"],
+                                "arguments": json.dumps(call["arguments"]),
+                            },
+                        }
+                        for call in message["tool_calls"]
+                    ],
+                }
+            )
+        elif message["role"] == "tool":
+            converted.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": message["tool_call_id"],
+                    "content": json.dumps(message["content"], ensure_ascii=False),
+                }
+            )
+        else:
+            converted.append(message)
+    return converted
+
+
+class OpenAIProvider:
+    name = "openai"
+
+    def __init__(self) -> None:
+        self._client = OpenAI(api_key=_live_key("OPENAI_API_KEY"))
+
+    def respond(  # noqa: PLR0913
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        tools: tuple[ToolSpec, ...],
+        schema: dict[str, Any] | None = None,
+        max_output_tokens: int = 4096,
+        synthetic: bool = False,
+        *,
+        prompt_version: str = "",
+    ) -> Exchange:
+        del prompt_version
+        if not synthetic:
+            raise EmaError(
+                "ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", ""
+            )
+        request: dict[str, Any] = {
+            "model": model,
+            "messages": _openai_messages(messages),
+            "max_completion_tokens": max_output_tokens,
+        }
+        if model == "gpt-6-luna":
+            request["reasoning_effort"] = "none"
+        if tools:
+            request["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.parameters,
+                    },
+                }
+                for tool in tools
+            ]
+        if schema is not None:
+            request["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "ema_result", "schema": schema, "strict": True},
+            }
+        response = cast(ChatCompletion, self._client.chat.completions.create(**request))
+        choice = response.choices[0].message
+        calls = tuple(
+            ToolCall(call.id, call.function.name, json.loads(call.function.arguments))
+            for call in (choice.tool_calls or [])
+            if call.type == "function"
+        )
+        usage = response.usage
+        return Exchange(
+            choice.content,
+            calls,
+            usage.prompt_tokens if usage else 0,
+            usage.completion_tokens if usage else 0,
+            cached_input_tokens=(usage.prompt_tokens_details.cached_tokens or 0)
+            if usage and usage.prompt_tokens_details
+            else 0,
+        )
+
+
+class GeminiProvider:
+    name = "gemini"
+
+    def __init__(self) -> None:
+        self._client = genai.Client(api_key=_live_key("GEMINI_API_KEY"))
+
+    def respond(  # noqa: PLR0913
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        tools: tuple[ToolSpec, ...],
+        schema: dict[str, Any] | None = None,
+        max_output_tokens: int = 4096,
+        synthetic: bool = False,
+        *,
+        prompt_version: str = "",
+    ) -> Exchange:
+        del prompt_version
+        if not synthetic:
+            raise EmaError(
+                "ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", ""
+            )
+        contents: list[types.Content] = []
+        system: list[str] = []
+        for message in messages:
+            role = message["role"]
+            if role == "system":
+                system.append(str(message["content"]))
+                continue
+            if role == "tool":
+                part = types.Part.from_function_response(
+                    name=message["name"], response={"result": message["content"]}
+                )
+                if part.function_response is not None:
+                    part.function_response.id = message["tool_call_id"]
+                contents.append(types.Content(role="user", parts=[part]))
+            elif role == "assistant" and message.get("tool_calls"):
+                if content := message.get("provider_content"):
+                    contents.append(types.Content.model_validate(content))
+                else:
+                    parts = [
+                        types.Part.from_function_call(name=call["name"], args=call["arguments"])
+                        for call in message["tool_calls"]
+                    ]
+                    contents.append(types.Content(role="model", parts=parts))
+            else:
+                contents.append(
+                    types.Content(
+                        role="model" if role == "assistant" else "user",
+                        parts=[types.Part.from_text(text=str(message["content"]))],
+                    )
+                )
+        config: dict[str, Any] = {
+            "system_instruction": "\n".join(system),
+            "max_output_tokens": max_output_tokens,
+        }
+        if tools:
+            declarations = [
+                types.FunctionDeclaration(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters_json_schema=tool.parameters,
+                )
+                for tool in tools
+            ]
+            config["tools"] = [types.Tool(function_declarations=declarations)]
+        if schema is not None:
+            config["response_mime_type"] = "application/json"
+            config["response_json_schema"] = schema
+        response = self._client.models.generate_content(
+            model=model, contents=cast(Any, contents), config=types.GenerateContentConfig(**config)
+        )
+        calls = tuple(
+            ToolCall(call.id or str(index), call.name or "", dict(call.args or {}))
+            for index, call in enumerate(response.function_calls or [])
+        )
+        usage = response.usage_metadata
+        candidate = response.candidates[0] if response.candidates else None
+        return Exchange(
+            response.text if not calls else None,
+            calls,
+            (usage.prompt_token_count or 0) if usage else 0,
+            ((usage.candidates_token_count or 0) + (usage.thoughts_token_count or 0))
+            if usage
+            else 0,
+            candidate.content.model_dump(mode="json", exclude_none=True)
+            if candidate and candidate.content
+            else None,
+            (usage.cached_content_token_count or 0) if usage else 0,
+        )
