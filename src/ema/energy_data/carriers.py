@@ -48,6 +48,8 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
         "energie electrică [tep]",
         "electricitate [mwh]",
         "consum electric",
+        "consum energie electrica din SEN",
+        "consum energie electrica din SEN (Sistem Energetic National - facturi)",
     ),
     Carrier.electricity_pv: (
         "energie electrica fotovoltaica",
@@ -57,6 +59,9 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
         "energie electrica surse recuperabile",
         "electricitate fotovoltaica",
         "fotovoltaic",
+        "consum energie electrica din parcul fotovoltaic propriu",
+        "consum energie electrica din fotovoltaic propriu",
+        "consum energie electrica FOTOVOLTAI",
     ),
     Carrier.natural_gas: (
         "gaz",
@@ -67,15 +72,24 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
         "consum gaze naturale",
         "gaze [tep]",
         "gaz [tep]",
+        "consum gaz natural",
     ),
     Carrier.diesel: ("motorina", "motorină", "consum motorina", "motorina [t]", "motorina [tep]"),
-    Carrier.petrol: ("benzina", "benzină", "consum benzina", "benzina [t]", "benzina [tep]"),
+    Carrier.petrol: (
+        "benzina",
+        "benzină",
+        "consum benzina",
+        "consum bezina",
+        "benzina [t]",
+        "benzina [tep]",
+    ),
     Carrier.lpg: (
         "gpl",
         "alti comb gpl",
         "alți comb – gpl",
         "alti combustibili - gpl",
         "gaz petrolier lichefiat",
+        "consum GPL",
     ),
     Carrier.fuel_oil: ("pacura", "păcură", "combustibil lichid greu"),
     Carrier.clu: ("clu", "combustibil lichid usor", "combustibil lichid ușor"),
@@ -102,9 +116,21 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
         "apă potabilă",
         "consum apa potabila",
         "consum apa potabilla",
+        "consum apa potabila - m3",
     ),
-    Carrier.water_industrial: ("apa industriala", "apă industrială", "consum apa industriala"),
-    Carrier.water_storm: ("apa pluviala", "apă pluvială", "apa meteorica", "apă meteorică"),
+    Carrier.water_industrial: (
+        "apa industriala",
+        "apă industrială",
+        "consum apa industriala",
+        "consum apa industriala - m3",
+    ),
+    Carrier.water_storm: (
+        "apa pluviala",
+        "apă pluvială",
+        "apa meteorica",
+        "apă meteorică",
+        "consum apa meteorica, etc",
+    ),
 }
 
 ALIASES = {carrier: tuple(sorted(set(labels))) for carrier, labels in _ALIASES.items()}
