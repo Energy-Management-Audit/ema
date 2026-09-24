@@ -37,6 +37,15 @@ ANALYSIS: tuple[Section, ...] = (
         templates=("Analiza consumului de energie electrică din {source}",),
     ),
     section(
+        "ch4.electricitate_pv",
+        4,
+        "Analiza consumului de energie electrică parcul fotovoltaic propriu",
+        "ch4.consum",
+        "data_blocks",
+        ("consumption_analysis",),
+        prototype="piee_model_2026",
+    ),
+    section(
         "ch4.gaz",
         4,
         "Analiza consumului de gaz natural",
@@ -82,6 +91,15 @@ ANALYSIS: tuple[Section, ...] = (
             "Analiza consumului echivalent de energie electrică",
             "Analiza consumului total echivalent de energie electrică",
         ),
+    ),
+    section(
+        "ch4.echiv_pv",
+        4,
+        "Analiza consumului echivalent de energie electrică fotovoltaică",
+        "ch4.echivalent",
+        "data_blocks",
+        ("consumption_analysis",),
+        prototype="piee_model_2026",
     ),
     section(
         "ch4.echiv_gaz",
@@ -134,6 +152,15 @@ ANALYSIS: tuple[Section, ...] = (
         "data_blocks",
         ("consumption_analysis",),
         aliases=("Analiza consumului specific echivalent total de energie electrică",),
+    ),
+    section(
+        "ch4.specific_pv",
+        4,
+        "Analiza consumului specific echivalent de energie electrică fotovoltaică",
+        "ch4.eficienta",
+        "data_blocks",
+        ("consumption_analysis",),
+        prototype="piee_model_2026",
     ),
     section(
         "ch4.specific_gaz",

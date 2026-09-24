@@ -22,10 +22,24 @@ from ema.audit.catalogue_types import (
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
 
 _FUELS = (Carrier.diesel, Carrier.petrol, Carrier.lpg, Carrier.fuel_oil, Carrier.clu)
-_ELECTRIC = (Carrier.electricity_grid, Carrier.electricity_pv)
+_ELECTRIC = (Carrier.electricity_grid,)
+_PV = (Carrier.electricity_pv,)
 _WATER = tuple(sorted(WATER_CARRIERS))
 _FACTS: dict[str, tuple[FactRef, ...]] = {
-    "ch2.date_generale": (AuditFact.COMPANY_NAME,),
+    "ch2.date_generale": (
+        AuditFact.COMPANY_NAME,
+        AuditFact.CUI,
+        AuditFact.REGISTRATION,
+        AuditFact.ADDRESS,
+        AuditFact.PHONE,
+        AuditFact.WEBSITE,
+        AuditFact.CAEN_CODE,
+        AuditFact.CAEN_DESCRIPTION,
+        AuditFact.OWNERSHIP_STATE,
+        AuditFact.OWNERSHIP_PRIVATE,
+        AuditFact.EMPLOYEES,
+        AuditFact.TEP_CLASS,
+    ),
     "ch2.manager": (AuditFact.ENERGY_MANAGER,),
     "ch2.activitate": (AuditFact.BUSINESS_ACTIVITY,),
     "ch2.localizare": (AuditFact.LOCATION,),
@@ -53,15 +67,18 @@ _FACTS: dict[str, tuple[FactRef, ...]] = {
     "ch4.productie": (AuditFact.PRODUCTION,),
     "ch4.consum": (carrier_fact(),),
     "ch4.electricitate": (carrier_fact(*_ELECTRIC),),
+    "ch4.electricitate_pv": (carrier_fact(*_PV),),
     "ch4.gaz": (carrier_fact(Carrier.natural_gas),),
     "ch4.carburant": (carrier_fact(*_FUELS),),
     "ch4.apa": (carrier_fact(*_WATER),),
     "ch4.echivalent": (carrier_fact(),),
     "ch4.echiv_electric": (carrier_fact(*_ELECTRIC),),
+    "ch4.echiv_pv": (carrier_fact(*_PV),),
     "ch4.echiv_gaz": (carrier_fact(Carrier.natural_gas),),
     "ch4.echiv_carburant": (carrier_fact(*_FUELS),),
     "ch4.echiv_total": (carrier_fact(),),
     "ch4.specific_electric": (carrier_fact(*_ELECTRIC),),
+    "ch4.specific_pv": (carrier_fact(*_PV),),
     "ch4.specific_gaz": (carrier_fact(Carrier.natural_gas),),
     "ch4.specific_carburant": (carrier_fact(*_FUELS),),
     "ch4.specific_total": (carrier_fact(),),
@@ -87,13 +104,16 @@ _CONDITIONS: dict[str, Condition] = {
     "ch3.consumatori": fact(AuditFact.EQUIPMENT),
     "ch4.productie": fact(AuditFact.PRODUCTION),
     "ch4.electricitate": carrier_condition(*_ELECTRIC),
+    "ch4.electricitate_pv": carrier_condition(*_PV),
     "ch4.gaz": carrier_condition(Carrier.natural_gas),
     "ch4.carburant": carrier_condition(*_FUELS),
     "ch4.apa": carrier_condition(*_WATER),
     "ch4.echiv_electric": carrier_condition(*_ELECTRIC),
+    "ch4.echiv_pv": carrier_condition(*_PV),
     "ch4.echiv_gaz": carrier_condition(Carrier.natural_gas),
     "ch4.echiv_carburant": carrier_condition(*_FUELS),
     "ch4.specific_electric": carrier_condition(*_ELECTRIC),
+    "ch4.specific_pv": carrier_condition(*_PV),
     "ch4.specific_gaz": carrier_condition(Carrier.natural_gas),
     "ch4.specific_carburant": carrier_condition(*_FUELS),
     "ch4.specific_apa": carrier_condition(*_WATER),

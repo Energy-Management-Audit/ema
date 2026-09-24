@@ -77,17 +77,17 @@ class EnergyDataset:
             raise ValueError("dataset years must be unique and ascending")
 
 
-Kind = Literal["carrier", "production", "turnover", "energy_costs"]
+Kind = Literal["carrier", "carrier_tep", "production", "turnover", "energy_costs"]
 
 
 def field_key(kind: Kind, name: str | None, year: int, month: int | None = None) -> str:
     """Produce an unambiguous persisted key for a canonical field."""
     if year < 1 or (month is not None and not 1 <= month <= 12):
         raise ValueError("invalid year or month")
-    if kind in {"carrier", "production"}:
+    if kind in {"carrier", "carrier_tep", "production"}:
         if not name or "." in name:
             raise ValueError("carrier and production keys need a dot-free name")
-        if kind == "carrier" and name not in Carrier._value2member_map_:
+        if kind in {"carrier", "carrier_tep"} and name not in Carrier._value2member_map_:
             raise ValueError("unknown carrier")
         prefix = f"{kind}.{name}"
     else:

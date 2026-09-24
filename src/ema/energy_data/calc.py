@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import math
-from collections.abc import Sequence
-from decimal import ROUND_HALF_UP, Decimal
-
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
 from ema.energy_data.factors import FactorTable
 from ema.energy_data.model import (
@@ -16,6 +12,7 @@ from ema.energy_data.model import (
     Kind,
     field_key,
 )
+from ema.energy_data.trend import trend
 
 
 def annual(series: CarrierSeries, kind: Kind, name: str, year: int) -> Derived:
@@ -205,6 +202,20 @@ def specific_consumption(
     ds: EnergyDataset, factors: FactorTable, year: int, carrier: Carrier | None, product: str
 ) -> Derived:
     energy = tep_total(ds, factors, year) if carrier is None else tep(ds, factors, carrier, year)
+    if energy.value is None:
+        filed_key = "tep_total" if carrier is None else f"tep.{carrier.value}"
+        filed = ds.filed_indicators.get(filed_key, {}).get(year)
+        if filed is not None:
+            inputs = (
+                tuple(
+                    field_key("carrier_tep", name.value, year)
+                    for name in ds.carriers
+                    if name not in WATER_CARRIERS and year in ds.carriers[name]
+                )
+                if carrier is None
+                else (field_key("carrier_tep", carrier.value, year),)
+            )
+            energy = Derived(filed.value, "tep", "filed.tep", inputs, "filed", year=year)
     key = field_key("production", product, year)
     series = ds.production.get(product, {}).get(year)
     output_unit = f"tep/{ds.production_unit.get(product, '')}"
@@ -240,8 +251,47 @@ def specific_consumption(
     )
 
 
+def water_specific(ds: EnergyDataset, year: int, carrier: Carrier, product: str) -> Derived:
+    if carrier not in WATER_CARRIERS:
+        raise ValueError("water-specific consumption requires a water carrier")
+    water_series = ds.carriers.get(carrier, {}).get(year)
+    production_series = ds.production.get(product, {}).get(year)
+    water_key = field_key("carrier", carrier.value, year)
+    production_key = field_key("production", product, year)
+    water = annual(water_series, "carrier", carrier.value, year) if water_series else None
+    production = (
+        annual(production_series, "production", product, year) if production_series else None
+    )
+    missing = (
+        *(water.missing if water else (water_key,)),
+        *(production.missing if production else (production_key,)),
+    )
+    if production is not None and production.value == 0:
+        missing = (*missing, "production.zero")
+    return Derived(
+        water.value / production.value
+        if water is not None
+        and water.value is not None
+        and production is not None
+        and production.value
+        else None,
+        f"m³/{ds.production_unit.get(product, '')}",
+        "specific.water",
+        (*(water.inputs if water else ()), *(production.inputs if production else ())),
+        missing=tuple(dict.fromkeys(missing)),
+        year=year,
+    )
+
+
 def energy_intensity(ds: EnergyDataset, factors: FactorTable, year: int) -> Derived:
     energy = tep_total(ds, factors, year)
+    if energy.value is None and (filed := ds.filed_indicators.get("tep_total", {}).get(year)):
+        inputs = tuple(
+            field_key("carrier_tep", carrier.value, year)
+            for carrier in ds.carriers
+            if carrier not in WATER_CARRIERS and year in ds.carriers[carrier]
+        )
+        energy = Derived(filed.value, "tep", "filed.tep", inputs, "filed", year=year)
     key = field_key("turnover", None, year)
     turnover = ds.turnover_lei.get(year)
     missing = list(energy.missing)
@@ -296,28 +346,6 @@ def change(prev: Derived, cur: Derived) -> Derived:
         tuple(dict.fromkeys(missing)),
         year=cur.year,
     )
-
-
-def trend(values: Sequence[float], decimals: int = 2) -> str:
-    """Classify the visible, rounded series by its least-squares slope."""
-    if len(values) < 2:
-        raise ValueError("trend needs at least two values")
-    if any(not math.isfinite(value) for value in values):
-        raise ValueError("trend needs finite values")
-    if decimals < 0:
-        raise ValueError("trend decimals must be nonnegative")
-    quantum = Decimal(1).scaleb(-decimals)
-    visible = [Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP) for value in values]
-    length = len(visible)
-    numerator = sum(
-        (Decimal(2 * index - length + 1) * value for index, value in enumerate(visible)),
-        Decimal(0),
-    )
-    if numerator == 0:
-        return "constantă"
-    if numerator > 0:
-        return "creștere"
-    return "scădere"
 
 
 def indicators(ds: EnergyDataset, factors: FactorTable) -> Indicators:

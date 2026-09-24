@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 import pytest
+from docx import Document
 
 from ema.audit.catalogue import CATALOGUE, AuditFact
 from ema.audit.headings import headings, map_headings
@@ -45,6 +46,11 @@ INVENTORY_KINDS = (
     "water",
     "measures",
 )
+PV_FROM_PIEE = {
+    "ch4.electricitate_pv",
+    "ch4.echiv_pv",
+    "ch4.specific_pv",
+}
 
 
 def _references() -> dict[str, Path]:
@@ -71,7 +77,18 @@ def _condition_inner(condition) -> str:  # type: ignore[no-untyped-def]
     return f"{condition.op}({condition.key})"
 
 
-def test_reference_heading_union_and_inventory() -> None:  # noqa: C901
+def test_pv_source_heading_in_piee() -> None:
+    piee = (
+        Path(os.environ["EMA_REFERENCE"])
+        / "piee/finished-programs/Program de îmbunătățire a eficienței energetice MODEL_2026.docx"
+    )
+    assert piee.is_file()
+    pv_title = next(section.title for section in CATALOGUE if section.id == "ch4.electricitate_pv")
+    found = any(pv_title in paragraph.text for paragraph in Document(piee).paragraphs)
+    assert found, "PIEE PV source heading missing"
+
+
+def test_reference_heading_union_and_inventory() -> None:  # noqa: C901, PLR0912
     paths = _references()
     maps = {audit: map_headings(path, audit) for audit, path in paths.items()}
     print("audit | by level | mapped | NOT_SECTIONS | old_template_only | captions | unmapped")
@@ -99,8 +116,12 @@ def test_reference_heading_union_and_inventory() -> None:  # noqa: C901
             f"{section.id} | {section.kind} | {_condition(section)} | "
             f"{section.prototype.audit} | {','.join(present)}"
         )
-        assert present, section.id
-        assert section.prototype.audit in present, section.id
+        if section.id in PV_FROM_PIEE:
+            assert not present, section.id
+            assert section.prototype.audit == "piee_model_2026"
+        else:
+            assert present, section.id
+            assert section.prototype.audit in present, section.id
     print("audit fact key | sections")
     for key in AuditFact:
         users = [section.id for section in CATALOGUE if key in section.facts]

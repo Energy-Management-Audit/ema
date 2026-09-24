@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import cast
 
 from ema.core.office.sheets import Book, Sheet, open_book
-from ema.energy_data.carriers import WATER_CARRIERS, Carrier
-from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading, field_key
+from ema.energy_data.carriers import Carrier
+from ema.energy_data.model import CarrierSeries, EnergyDataset, FiledValue, Reading, field_key
 from ema.energy_data.necesar_blocks import read_consumption, read_production
 from ema.energy_data.necesar_model import NecesarInfo, YearValues
 from ema.energy_data.necesar_tables import read_economics, read_employees, read_generic, read_other
@@ -92,14 +92,39 @@ def _economic_readings(info: NecesarInfo) -> tuple[dict[int, Reading], dict[int,
     return turnover, energy_costs
 
 
+def _filed_tep(info: NecesarInfo, years: set[int]) -> dict[str, dict[int, FiledValue]]:
+    filed_tep: dict[int, FiledValue] = {}
+    indicators: dict[str, dict[int, FiledValue]] = {}
+    for year in years:
+        sources = [
+            block.years[year].tep_total for block in info.carriers.values() if year in block.years
+        ]
+        if sources and all(source is not None for source in sources):
+            found = [source for source in sources if source is not None]
+            filed_tep[year] = FiledValue(
+                sum(float(cast(int | float, source.value)) for source in found),
+                "tep",
+                2,
+                "+".join(source.ref.a1 for source in found),
+            )
+        for carrier, block in info.carriers.items():
+            values = block.years.get(year)
+            source = values.tep_total if values is not None else None
+            if source is not None:
+                indicators.setdefault(f"tep.{carrier.value}", {})[year] = FiledValue(
+                    float(cast(int | float, source.value)), "tep", 2, source.ref.a1
+                )
+    if filed_tep:
+        indicators["tep_total"] = filed_tep
+    return indicators
+
+
 def to_dataset(info: NecesarInfo) -> EnergyDataset:
     carriers: dict[Carrier, dict[int, CarrierSeries]] = {}
     production: dict[str, dict[int, CarrierSeries]] = {}
     production_unit: dict[str, str] = {}
     years: set[int] = set()
-    for carrier, block in info.carriers.items():
-        if carrier in WATER_CARRIERS:
-            continue
+    for carrier, block in (*info.carriers.items(), *info.water.items()):
         carriers[carrier] = {}
         for year, values in block.years.items():
             unit = next((v.unit for v in (*values.months, values.total) if v and v.unit), None)
@@ -123,5 +148,11 @@ def to_dataset(info: NecesarInfo) -> EnergyDataset:
     years.update(turnover)
     years.update(energy_costs)
     return EnergyDataset(
-        tuple(sorted(years)), carriers, production, production_unit, turnover, energy_costs
+        tuple(sorted(years)),
+        carriers,
+        production,
+        production_unit,
+        turnover,
+        energy_costs,
+        _filed_tep(info, years),
     )

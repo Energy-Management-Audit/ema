@@ -1,0 +1,124 @@
+{
+  "source": "hand-authored",
+  "format": "openai-chat-completions",
+  "responses": [
+    {
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "95b6ff8429349138428207e14d21d1483650d726c5ff985b377ce139cfe4f673",
+        "messages": "c6305916ccf80858adbc0b5c4347f93ada7dd30ba1dac421504761898f998033",
+        "tools": "43726eb8452501587c8e86ce1072bc5aea9f444bd8fe352e0be1c18074ee9fc4",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      },
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "a",
+                "type": "function",
+                "function": {
+                  "name": "read_file",
+                  "arguments": "{\"name\": \"fisa.txt\"}"
+                }
+              },
+              {
+                "id": "b",
+                "type": "function",
+                "function": {
+                  "name": "read_file",
+                  "arguments": "{\"name\": \"permit.pdf\"}"
+                }
+              },
+              {
+                "id": "c",
+                "type": "function",
+                "function": {
+                  "name": "read_dataset",
+                  "arguments": "{\"key\": \"audit.tep_class\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 10
+      }
+    },
+    {
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "95b6ff8429349138428207e14d21d1483650d726c5ff985b377ce139cfe4f673",
+        "messages": "f1c799e428ab83d66b88a14499961689613181190d217168ae97fab7b8c50a31",
+        "tools": "43726eb8452501587c8e86ce1072bc5aea9f444bd8fe352e0be1c18074ee9fc4",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      },
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "d",
+                "type": "function",
+                "function": {
+                  "name": "record_fact",
+                  "arguments": "{\"key\": \"audit.company_name\", \"value\": \"Firma Exemplu SRL\", \"name\": \"fisa.txt\", \"quote\": \"Firma Inventată SRL\"}"
+                }
+              },
+              {
+                "id": "e",
+                "type": "function",
+                "function": {
+                  "name": "record_fact",
+                  "arguments": "{\"key\": \"audit.company_name\", \"value\": \"Firma Exemplu SRL\", \"name\": \"fisa.txt\", \"quote\": \"Firma Exemplu SRL are sediul în Alba.\"}"
+                }
+              },
+              {
+                "id": "g",
+                "type": "function",
+                "function": {
+                  "name": "record_fact",
+                  "arguments": "{\"key\": \"audit.employees\", \"value\": 700, \"name\": \"permit.pdf\", \"quote\": \"500 m²\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 10
+      }
+    },
+    {
+      "request_hashes": {
+        "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
+        "prompt_version": "95b6ff8429349138428207e14d21d1483650d726c5ff985b377ce139cfe4f673",
+        "messages": "39f85960221d58943c659f75b1c2d729448ba671f3de6e01e3cd04cabaa09d00",
+        "tools": "43726eb8452501587c8e86ce1072bc5aea9f444bd8fe352e0be1c18074ee9fc4",
+        "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
+      },
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "done"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 10
+      }
+    }
+  ]
+}

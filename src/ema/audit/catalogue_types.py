@@ -18,6 +18,17 @@ class MaterialKind(StrEnum):
 
 class AuditFact(StrEnum):
     COMPANY_NAME = "audit.company_name"
+    CUI = "audit.cui"
+    REGISTRATION = "audit.registrul_comertului"
+    ADDRESS = "audit.address"
+    PHONE = "audit.phone"
+    WEBSITE = "audit.website"
+    CAEN_CODE = "audit.caen_code"
+    CAEN_DESCRIPTION = "audit.caen_description"
+    OWNERSHIP_STATE = "audit.ownership_state"
+    OWNERSHIP_PRIVATE = "audit.ownership_private"
+    EMPLOYEES = "audit.employees"
+    TEP_CLASS = "audit.tep_class"
     ENERGY_MANAGER = "audit.energy_manager"
     BUSINESS_ACTIVITY = "audit.business_activity"
     LOCATION = "audit.location"

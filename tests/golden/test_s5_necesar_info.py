@@ -85,8 +85,10 @@ def test_read_matches_private_cell_snapshot(reference_library: Path, case: str) 
                 assert total.ref.row == expected["row"]
                 assert total.ref.col == 14
     dataset = to_dataset(info)
-    assert len(dataset.carriers) == carrier_count
-    assert set(dataset.years) == {year for block in info.carriers.values() for year in block.years}
+    assert len(dataset.carriers) == carrier_count + len(info.water)
+    assert set(dataset.years) == {
+        year for block in (*info.carriers.values(), *info.water.values()) for year in block.years
+    }
 
 
 @pytest.mark.parametrize("case", list(CASES))

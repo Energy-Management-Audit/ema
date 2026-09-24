@@ -18,6 +18,7 @@ class Status(StrEnum):
     DONE = "done"
     LATER = "later"
     NA = "n/a"
+    NA_PROPOSED = "n/a proposed"
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,8 @@ class SectionState:
     material_inputs: dict[str, tuple[bool, str] | None] | None = None
     changed_input: str | None = None
     na_applicable: bool | None = None
+    applicability: bool | None = None
+    applicability_reason: str | None = None
 
     def payload(self) -> dict[str, object]:
         return {
@@ -45,6 +48,8 @@ class SectionState:
             "material_inputs": self.material_inputs,
             "changed_input": self.changed_input,
             "na_applicable": self.na_applicable,
+            "applicability": self.applicability,
+            "applicability_reason": self.applicability_reason,
         }
 
     @classmethod
@@ -68,6 +73,8 @@ class SectionState:
             if value.get("changed_input") is not None
             else None,
             na_applicable=value.get("na_applicable"),
+            applicability=value.get("applicability"),
+            applicability_reason=value.get("applicability_reason"),
         )
 
 
@@ -79,7 +86,7 @@ def _forbidden(current: SectionState, to: Status, actor: Actor) -> EmaError:
     )
 
 
-def transition(  # noqa: C901, PLR0913, PLR0911
+def transition(  # noqa: C901, PLR0913, PLR0911, PLR0912
     current: SectionState,
     to: Status,
     actor: Actor,
@@ -93,9 +100,15 @@ def transition(  # noqa: C901, PLR0913, PLR0911
 ) -> SectionState:
     """Apply only the §5.9 edges; callers supply material and fact outcomes."""
     source = current.status
+    if to == Status.NA_PROPOSED and actor in ("ema", "agent") and reason:
+        return replace(current, status=to, stale=False, reason=reason, changed_input=None)
     if to == Status.NA and actor == "user":
         return replace(current, status=to, stale=False, reason=reason, changed_input=None)
-    if to == Status.LATER and reason and (actor == "user" or (actor == "ema" and auto_later)):
+    if (
+        to == Status.LATER
+        and reason
+        and (actor in ("user", "agent") or (actor == "ema" and auto_later))
+    ):
         return replace(current, status=to, stale=False, reason=reason, changed_input=None)
     if source == Status.NA and actor == "user" and to == computed:
         return replace(
@@ -112,7 +125,7 @@ def transition(  # noqa: C901, PLR0913, PLR0911
     ):
         return replace(current, status=to, reason=None)
     if (
-        source in (Status.MISSING, Status.READY)
+        source in (Status.MISSING, Status.READY, Status.NA_PROPOSED)
         and to in (Status.MISSING, Status.READY)
         and actor == "ema"
     ):

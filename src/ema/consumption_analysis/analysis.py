@@ -5,34 +5,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from ema.consumption_analysis.metric_kind import MetricKind
 from ema.consumption_analysis.phrases import phrase_bank, trend_direction, trend_phrase
 from ema.core.office.blocks import Block, NativeChart, Num, Paragraph, Segment, Table
 from ema.core.office.chart_series import Series
-from ema.energy_data.calc import annual, co2, energy_intensity, specific_consumption, tep, tep_total
+from ema.energy_data.calc import (
+    annual,
+    co2,
+    energy_intensity,
+    specific_consumption,
+    tep,
+    tep_total,
+    water_specific,
+)
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FactorTable
 from ema.energy_data.model import EnergyDataset, FiledValue, field_key
-
-ORDER = (
-    "production",
-    "carrier",
-    "equivalent",
-    "conclusions",
-    "specific",
-    "intensity",
-    "environment",
-)
-MetricKind = Literal[
-    "production",
-    "carrier",
-    "tep",
-    "tep_monthly_sum",
-    "tep_total",
-    "specific",
-    "intensity",
-    "co2",
-    "filed",
-]
 
 
 @dataclass(frozen=True)
@@ -157,7 +145,7 @@ def _carriers(ds: EnergyDataset, metric: Metric, year: int) -> tuple[float | Non
     return sum(number for number, _ in readings if number is not None), keys
 
 
-def _derived(  # noqa: C901
+def _derived(  # noqa: C901, PLR0912
     ds: EnergyDataset, factors: FactorTable, metric: Metric, year: int
 ) -> tuple[float | None, str | None]:
     if metric.kind == "tep_total":
@@ -182,6 +170,10 @@ def _derived(  # noqa: C901
         result = specific_consumption(
             ds, factors, year, metric.carriers[0] if metric.carriers else None, metric.product
         )
+    elif metric.kind == "water_specific":
+        if metric.product is None or len(metric.carriers) != 1:
+            raise ValueError("water-specific metric needs a product and water carrier")
+        result = water_specific(ds, year, metric.carriers[0], metric.product)
     elif metric.kind in {"tep", "co2"}:
         if len(metric.carriers) != 1 and (metric.kind == "tep" or metric.carriers):
             raise ValueError(f"{metric.kind} metric needs one carrier or total CO2")
@@ -205,8 +197,12 @@ class ResolvedValue:
 
 
 def _filed_key(metric: Metric) -> str | None:
+    if metric.month is not None:
+        return None
     if metric.kind == "filed":
         return metric.product
+    if metric.kind == "tep" and len(metric.carriers) == 1:
+        return f"tep.{metric.carriers[0].value}"
     if metric.kind in {"intensity", "tep_total"}:
         return metric.kind
     if metric.kind == "co2":
@@ -363,7 +359,16 @@ def analyze(
     """Return ordered, typed blocks; workflows choose and locate document prototypes."""
     if len({plan.id for plan in plans}) != len(plans):
         raise ValueError("section ids must be unique")
-    ordered = sorted(plans, key=lambda plan: ORDER.index(plan.stage))
+    stages = (
+        "production",
+        "carrier",
+        "equivalent",
+        "conclusions",
+        "specific",
+        "intensity",
+        "environment",
+    )
+    ordered = sorted(plans, key=lambda plan: stages.index(plan.stage))
     result: list[AnalysisSection] = []
     for plan in ordered:
         blocks: list[Block] = []

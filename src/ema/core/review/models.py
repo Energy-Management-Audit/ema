@@ -22,6 +22,11 @@ class PdfText(BaseModel):
     span: str
 
 
+class TextLoc(BaseModel):
+    kind: Literal["text"] = "text"
+    span: str
+
+
 class Cell(BaseModel):
     kind: Literal["cell"] = "cell"
     sheet: str
@@ -60,7 +65,8 @@ class Manual(BaseModel):
 
 
 Locator = Annotated[
-    PdfRegion | PdfText | Cell | DocxLoc | Photo | Url | Manual, PydanticField(discriminator="kind")
+    PdfRegion | PdfText | TextLoc | Cell | DocxLoc | Photo | Url | Manual,
+    PydanticField(discriminator="kind"),
 ]
 Actor = Literal["ema", "user", "agent"]
 ValueType = Literal["number", "text", "year", "date", "enum"]

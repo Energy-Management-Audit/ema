@@ -12,6 +12,7 @@ from typing import Literal
 from ema.audit.applicability import applies, fact_fields
 from ema.audit.catalogue import (
     CATALOGUE,
+    Condition,
     MaterialKind,
     Section,
 )
@@ -173,6 +174,8 @@ def set_status(
     section = _section(section_id)
     before = get_status(ws, job, section_id)
     materials, facts = _inputs(ws, job)
+    if to == Status.NA_PROPOSED and applies(section.applies_when, materials, facts) is not False:
+        raise EmaError("na_trigger", "Secțiunea nu poate fi propusă n/a.", section_id)
     auto_later = (
         actor == "ema"
         and bool(section.awaits)
@@ -186,7 +189,7 @@ def set_status(
         auto_later=auto_later,
         computed=_computed(section, before, materials, facts),
     )
-    if to == Status.NA:
+    if to in (Status.NA, Status.NA_PROPOSED):
         after = replace(after, na_applicable=applies(section.applies_when, materials, facts))
     return _save(ws, job, before, after, actor, reason if actor == "ema" else None)
 
@@ -208,6 +211,33 @@ def recompute_ready(ws: Workspace, job: str) -> list[SectionState]:
             after = before
         result.append(_save(ws, job, before, after, "ema"))
     return result
+
+
+def record_applicability(ws: Workspace, job: str, section_id: str) -> SectionState:
+    """Persist the catalogue trigger or its absence for Fill review."""
+    section = _section(section_id)
+    before = get_status(ws, job, section_id)
+    materials, facts = _inputs(ws, job)
+    outcome = applies(section.applies_when, materials, facts)
+
+    def source(item: Condition) -> str:
+        if item.op == "carrier":
+            return "carrier:" + ",".join(carrier.value for carrier in item.carriers)
+        if item.children:
+            return item.op + "(" + ",".join(source(child) for child in item.children) + ")"
+        return item.op + (":" + item.key if item.key else "")
+
+    reason = (
+        "trigger: " if outcome is True else "absent: " if outcome is False else "unknown: "
+    ) + source(section.applies_when)
+    return _save(
+        ws,
+        job,
+        before,
+        replace(before, applicability=outcome, applicability_reason=reason),
+        "ema",
+        reason,
+    )
 
 
 def mark_drafted(
