@@ -17,6 +17,7 @@ from ema.invoices.configuration.field_catalog import (
 from ema.invoices.models import DocumentPage, InputDocument, TextBlock
 from ema.invoices.parsers.eds_parser import EdsInvoiceParser
 from ema.invoices.parsers.engie_parser import EngieInvoiceParser
+from ema.invoices.parsers.incompatible_parser import EngieEInvoiceCompanionParser
 from ema.invoices.parsers.met_energy_parser import (
     MetElectricityInvoiceParser,
 )
@@ -127,6 +128,21 @@ def test_engie_splits_locations_and_preserves_negative_adjustment() -> None:
     assert drafts[0].fields[ACTIVE_ENERGY].value == Decimal("100")
     assert drafts[1].fields[ACTIVE_ENERGY].value == Decimal("-50")
     assert all(draft.is_exportable for draft in drafts)
+
+
+def test_engie_companion_recognition_uses_labeled_client_identity() -> None:
+    parser = EngieEInvoiceCompanionParser()
+    document = InputDocument(
+        Path("synthetic-engie-invoice.pdf"),
+        (_page(1, "ENGIE Romania S.A.\nFactura eFactura\nClient: EXEMPLU CLIENT S.A."),),
+    )
+    without_client = InputDocument(
+        Path("synthetic-engie-invoice.pdf"),
+        (_page(1, "ENGIE Romania S.A.\nFactura eFactura"),),
+    )
+
+    assert parser.recognizes(document)
+    assert not parser.recognizes(without_client)
 
 
 def test_bad_file_does_not_stop_following_invoice(tmp_path: Path) -> None:
