@@ -33,9 +33,14 @@ class FactorTable:
     valid_from_year: int
     tep: tuple[Factor, ...]
     co2: tuple[Factor, ...]
+    valid_to_year: int | None = None
 
     def __post_init__(self) -> None:
-        if not self.version or self.valid_from_year < 1:
+        if (
+            not self.version
+            or self.valid_from_year < 1
+            or (self.valid_to_year is not None and self.valid_to_year < self.valid_from_year)
+        ):
             raise ValueError("factor table needs a version and valid year")
         for group in (self.tep, self.co2):
             keys = [(factor.carrier, factor.unit, factor.year) for factor in group]
@@ -54,45 +59,37 @@ class FactorTable:
         )
 
     def tep_factor(self, carrier: Carrier, unit: str, year: int) -> Factor | None:
-        if year < self.valid_from_year:
+        if year < self.valid_from_year or (
+            self.valid_to_year is not None and year > self.valid_to_year
+        ):
             return None
         return self._find(self.tep, carrier, unit, year)
 
     def co2_factor(self, carrier: Carrier, unit: str, year: int) -> Factor | None:
-        if year < self.valid_from_year:
+        if year < self.valid_from_year or (
+            self.valid_to_year is not None and year > self.valid_to_year
+        ):
             return None
         return self._find(self.co2, carrier, unit, year)
 
 
-_PRIMARY = "the auditor: Principali factori de conversie"
-_EUROSTAT = "the auditor: Factori de conversie in MWh (Eurostat, kgep/kg)"
-_IMPACT = "the auditor: impact de mediu"
+_PLAN_2026 = "docs/PLAN.md §5.10: 2026 document factors for 2023-2025 data"
 FACTORS_2026 = FactorTable(
     version="2026",
-    valid_from_year=2026,
+    valid_from_year=2023,
     tep=(
-        Factor(Carrier.electricity_grid, "MWh", 0.086, _PRIMARY),
-        Factor(Carrier.electricity_grid, "kWh", 0.000086, _PRIMARY),
-        Factor(Carrier.electricity_pv, "MWh", 0.086, _PRIMARY),
-        Factor(Carrier.natural_gas, "MWh", 0.086, "the auditor: Consum Gaz"),
-        Factor(Carrier.natural_gas, "Nm3", 0.000805, _PRIMARY),
-        Factor(Carrier.diesel, "t", 1.015, _PRIMARY),
-        Factor(Carrier.petrol, "t", 1.05, _PRIMARY),
-        Factor(Carrier.fuel_oil, "t", 0.955, _EUROSTAT),
-        Factor(Carrier.coke, "t", 0.676, _EUROSTAT),
-        Factor(Carrier.lpg, "t", 1.099, "the auditor: Consum Carburanti (CLIENT-P2)"),
-        Factor(Carrier.ctl, "t", 0.95, "the auditor: Consum Carburanti (CLIENT-A3)"),
-        Factor(Carrier.sunflower_husks, "Gcal", 0.1, "the auditor: Consum Coji floarea soarelui"),
-        Factor(Carrier.purchased_heat, "Gcal", 0.1, _PRIMARY),
+        Factor(Carrier.electricity_grid, "MWh", 0.086, _PLAN_2026),
+        Factor(Carrier.electricity_grid, "kWh", 0.000086, _PLAN_2026),
+        Factor(Carrier.electricity_pv, "MWh", 0.086, _PLAN_2026),
+        Factor(Carrier.natural_gas, "MWh", 0.086, _PLAN_2026),
+        Factor(Carrier.diesel, "t", 1.015, _PLAN_2026),
+        Factor(Carrier.petrol, "t", 1.05, _PLAN_2026),
     ),
     co2=(
-        Factor(Carrier.electricity_grid, "MWh", 0.226, _IMPACT),
-        Factor(Carrier.natural_gas, "MWh", 0.1787, _IMPACT),
-        Factor(Carrier.diesel, "t", 3.259, _IMPACT),
-        Factor(Carrier.petrol, "t", 3.068, _IMPACT),
-        Factor(Carrier.lpg, "t", 2.776, "the auditor: impact de mediu (CLIENT-P2)"),
-        Factor(
-            Carrier.purchased_heat, "MWh", 0.22111111111111112, "the auditor: impact de mediu (CLIENT-A3)"
-        ),
+        Factor(Carrier.electricity_grid, "MWh", 0.226, _PLAN_2026),
+        Factor(Carrier.natural_gas, "MWh", 0.1787, _PLAN_2026),
+        Factor(Carrier.diesel, "t", 3.259, _PLAN_2026),
+        Factor(Carrier.petrol, "t", 3.068, _PLAN_2026),
     ),
+    valid_to_year=2025,
 )

@@ -1,0 +1,68 @@
+"""Synthetic regressions for Prelucrare economic source fields."""
+
+from pathlib import Path
+
+from openpyxl import Workbook
+
+from ema.energy_data.prelucrare import import_prelucrare
+
+
+def _book(path: Path, *, label_column: int = 3, turnover: int | None = 100) -> Path:
+    book = Workbook()
+    electric = book.active
+    electric.title = "Consum Electric"
+    electric.cell(2, 1, 2025)
+    for column, month in enumerate(
+        (
+            "Ianuarie",
+            "Februarie",
+            "Martie",
+            "Aprilie",
+            "Mai",
+            "Iunie",
+            "Iulie",
+            "August",
+            "Septembrie",
+            "Octombrie",
+            "Noiembrie",
+            "Decembrie",
+        ),
+        4,
+    ):
+        electric.cell(2, column, month)
+    electric.cell(3, 3, "[MWh]")
+    electric.cell(3, 4, 1)
+    economic = book.create_sheet("Chelt-Cifra afaceri")
+    economic.cell(2, label_column, "Anul")
+    economic.cell(2, label_column + 1, 2025)
+    for row, label, value in (
+        (3, "Cifra de afaceri [lei]", turnover),
+        (4, "Valoarea veniturilor din exploatare [lei]", 200),
+        (5, "CHELTUIELI ENERGETICE TOTALE [lei]", 30),
+    ):
+        economic.cell(row, label_column, label)
+        economic.cell(row, label_column + 1, value)
+    book.save(path)
+    return path
+
+
+def test_turnover_precedes_operating_revenue(tmp_path: Path) -> None:
+    imported = import_prelucrare(_book(tmp_path / "economic.xlsx"))
+    assert imported.dataset.turnover_lei[2025].value == 100
+    assert imported.located["turnover.2025"].label == "Cifra de afaceri [lei]"
+
+
+def test_empty_turnover_falls_back_and_records_source_label(tmp_path: Path) -> None:
+    imported = import_prelucrare(_book(tmp_path / "economic.xlsx", turnover=None))
+    assert imported.dataset.turnover_lei[2025].value == 200
+    assert imported.located["turnover.2025"].label == "Valoarea veniturilor din exploatare [lei]"
+
+
+def test_energy_costs_imported_from_labeled_row(tmp_path: Path) -> None:
+    imported = import_prelucrare(_book(tmp_path / "economic.xlsx"))
+    assert imported.dataset.energy_costs_lei[2025].value == 30
+
+
+def test_economic_labels_can_move_column(tmp_path: Path) -> None:
+    imported = import_prelucrare(_book(tmp_path / "economic.xlsx", label_column=4))
+    assert imported.dataset.turnover_lei[2025].value == 100

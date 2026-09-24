@@ -78,6 +78,20 @@ def _production_key(name: str) -> str:
     return normal(name).replace(" ", "_")
 
 
+def _economic_readings(info: NecesarInfo) -> tuple[dict[int, Reading], dict[int, Reading]]:
+    turnover: dict[int, Reading] = {}
+    energy_costs: dict[int, Reading] = {}
+    for key, target in (("turnover_lei", turnover), ("energy_costs_lei", energy_costs)):
+        for year, value in info.economics.get(key, {}).items():
+            field_key("turnover" if key == "turnover_lei" else "energy_costs", None, year)
+            target[year] = Reading(float(cast(int | float, value.value)), "lei")
+    for year, value in info.economics.get("operating_revenue_lei", {}).items():
+        if year not in turnover:
+            field_key("turnover", None, year)
+            turnover[year] = Reading(float(cast(int | float, value.value)), "lei")
+    return turnover, energy_costs
+
+
 def to_dataset(info: NecesarInfo) -> EnergyDataset:
     carriers: dict[Carrier, dict[int, CarrierSeries]] = {}
     production: dict[str, dict[int, CarrierSeries]] = {}
@@ -105,13 +119,9 @@ def to_dataset(info: NecesarInfo) -> EnergyDataset:
             field_key("production", key, year)
             production[key][year] = _series(values, unit)
             years.add(year)
-    turnover: dict[int, Reading] = {}
-    energy_costs: dict[int, Reading] = {}
-    for key, target in (("turnover_lei", turnover), ("energy_costs_lei", energy_costs)):
-        for year, value in info.economics.get(key, {}).items():
-            field_key("turnover" if key == "turnover_lei" else "energy_costs", None, year)
-            target[year] = Reading(float(cast(int | float, value.value)), "lei")
-            years.add(year)
+    turnover, energy_costs = _economic_readings(info)
+    years.update(turnover)
+    years.update(energy_costs)
     return EnergyDataset(
         tuple(sorted(years)), carriers, production, production_unit, turnover, energy_costs
     )

@@ -17,6 +17,7 @@ class Located:
     value: str | float | int | datetime
     ref: CellRef
     unit: str | None = None
+    label: str | None = None
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
@@ -91,6 +91,30 @@ def test_three_years_and_unknown_carrier_are_isolated(tmp_path: Path) -> None:
     assert set(info.carriers[Carrier.petrol].years) == {2023, 2024, 2025}
     assert any(i.code == "carrier_unknown" and i.ref is not None for i in info.issues)
     assert to_dataset(info).years == (2023, 2024, 2025)
+
+
+def test_operating_revenue_fallback_and_energy_costs(tmp_path: Path) -> None:
+    path = _book(tmp_path / "economics.xlsx")
+    book = load_workbook(path)
+    sheet = book["Cifre economice"]
+    sheet.cell(5, 1, "Venituri totale din exploatare [lei]")
+    sheet.cell(5, 2, 101)
+    sheet.cell(6, 1, "CHELTUIELI ENERGETICE TOTALE [lei]")
+    sheet.cell(6, 2, 23)
+    book.save(path)
+    info = parse_necesar_info(path)
+    dataset = to_dataset(info)
+    assert dataset.turnover_lei[2023].value == 100
+    assert dataset.energy_costs_lei[2023].value == 23
+    assert info.economics["turnover_lei"][2023].ref.a1 == "Cifre economice!B4"
+
+    book = load_workbook(path)
+    book["Cifre economice"].cell(4, 2).value = None
+    book.save(path)
+    info = parse_necesar_info(path)
+    dataset = to_dataset(info)
+    assert dataset.turnover_lei[2023].value == 101
+    assert info.economics["operating_revenue_lei"][2023].ref.a1 == "Cifre economice!B5"
 
 
 def test_missing_sheet_is_issue_not_exception(tmp_path: Path) -> None:
