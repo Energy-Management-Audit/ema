@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     word_path: Path = Field(default_factory=_word_default)
     word_timeout_s: float = Field(default=120, gt=0)
     tesseract_path: Path = Field(default_factory=_tesseract_default)
+    audit_base_document: Path | None = None
+    audit_measurement_prototype: Path | None = None
     provider: str | None = None
     model: str | None = None
 
