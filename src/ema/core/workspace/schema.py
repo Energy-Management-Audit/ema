@@ -3,7 +3,7 @@
 import sqlite3
 import time
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 def migrate(db: sqlite3.Connection) -> None:
@@ -83,6 +83,21 @@ def migrate(db: sqlite3.Connection) -> None:
                 FOREIGN KEY(job_id) REFERENCES jobs(id)
             );
             PRAGMA user_version = 6;
+            COMMIT;
+        """)
+        version = 6
+    if version == 6:
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            CREATE TABLE client_memory (
+                kind TEXT NOT NULL, identifier TEXT NOT NULL, legal_name TEXT NOT NULL,
+                tax_id TEXT, job_id TEXT NOT NULL, decision_id TEXT NOT NULL,
+                PRIMARY KEY (kind, identifier, decision_id),
+                FOREIGN KEY(job_id) REFERENCES jobs(id),
+                FOREIGN KEY(decision_id) REFERENCES decisions(id)
+            );
+            CREATE INDEX client_memory_lookup ON client_memory(kind, identifier);
+            PRAGMA user_version = 7;
             COMMIT;
         """)
         return

@@ -56,6 +56,7 @@ ISSUE_MESSAGES: dict[IssueCode, str] = {
     IssueCode.OCR_RUNTIME_UNAVAILABLE: (
         "Factura necesită OCR local, dar componenta Tesseract nu este disponibilă."
     ),
+    IssueCode.OCR_TIMEOUT: "OCR-ul a depășit timpul permis pentru această factură.",
     IssueCode.PDF_READ_FAILED: "Fișierul PDF nu a putut fi citit sau procesat.",
     IssueCode.EXTRACTION_FAILED: (
         "Factura a fost citită, dar datele nu au putut fi extrase în siguranță."

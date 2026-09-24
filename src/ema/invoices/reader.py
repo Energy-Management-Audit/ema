@@ -42,6 +42,11 @@ class InvoiceDocumentReader:
         ocr_pages = (
             {page.page: page for page in pdf.ocr(path, self.settings, pages=scans)} if scans else {}
         )
+        if scans and any("alive capital" in page.text.casefold() for page in ocr_pages.values()):
+            ocr_pages = {
+                page.page: page
+                for page in pdf.ocr(path, self.settings, pages=scans, alternatives=True)
+            }
         result: list[DocumentPage] = []
         is_met = "met romania energy" in " ".join(
             (page.layout_text or page.text).casefold() for page in pages

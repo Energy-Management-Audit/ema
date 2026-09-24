@@ -26,11 +26,33 @@ from ema.core.jobs.reads import run_current
 from ema.core.logging import write_event
 from ema.core.workspace import Workspace
 from ema.invoices.artifact import encode, exportable_drafts
+from ema.invoices.batch_identity import KEY as BATCH_CLIENT_KEY
 from ema.invoices.composition import build_invoice_processor
 from ema.invoices.export.exporter import OpenpyxlWorkbookExporter
+from ema.invoices.identity_review import (
+    batch_client,
+    confirm_client,
+    raw_outcomes,
+    readiness,
+    resolved_outcomes,
+    undo_client,
+)
 from ema.invoices.models import IssueCode
 from ema.invoices.outcomes import DocumentOutcome
 from ema.invoices.pipeline import ProcessInvoiceFiles
+
+__all__ = (
+    "BatchResult",
+    "batch_client",
+    "confirm_client",
+    "export",
+    "extract_batch",
+    "raw_outcomes",
+    "readiness",
+    "resolved_outcomes",
+    "run_batch",
+    "undo_client",
+)
 
 
 @dataclass(frozen=True)
@@ -40,6 +62,8 @@ class BatchResult:
     run_id: str
     client_notice: str
     workbook: Path | None
+    job_id: str
+    client_proposal: dict[str, Any] | None
 
 
 def run_batch(ws: Workspace, client: str, sources: list[Path]) -> BatchResult:
@@ -70,22 +94,17 @@ def run_batch(ws: Workspace, client: str, sources: list[Path]) -> BatchResult:
     matching = next(item for item in result.runs if item["id"] == run)
     if matching["state"] != "ready":
         raise EmaError("invoices_failed", "Extracția facturilor a eșuat.", str(matching["error"]))
-    with ws.connect() as db:
-        artifact = ws.artifact_dir(db, job, "invoices", run) / "outcomes.json"
-        output_dir = ws.job_path(db, job) / "outputs"
-    outcomes = json.loads(artifact.read_text(encoding="utf-8"))
+    outcomes = raw_outcomes(ws, job)
     omitted = [item["source_path"] for item in outcomes if item["status"] != "exportable"]
-    workbook = (
-        export(ws, job, output_dir / "Facturi.xlsx") if len(omitted) < len(outcomes) else None
-    )
+    _, proposed = batch_client(ws, job)
     return BatchResult(
         outcomes=outcomes,
         omitted=omitted,
         run_id=run,
-        client_notice=(
-            "Clientul lotului nu este încă confirmat; exportul folosește identificarea actuală."
-        ),
-        workbook=workbook,
+        client_notice="Clientul lotului nu este încă confirmat; exportul este blocat.",
+        workbook=None,
+        job_id=job,
+        client_proposal=json.loads(proposed.to_json()) if proposed else None,
     )
 
 
@@ -135,7 +154,11 @@ def export(ws: Workspace, job: JobId, dest: Path) -> Path:
         output_dir = ws.job_path(db, job) / "outputs"
     if dest.parent.resolve() != output_dir.resolve():
         raise EmaError("output_path", "Exportul trebuie salvat în lucrare.", str(dest))
-    drafts = exportable_drafts(artifact.read_text(encoding="utf-8"))
+    checks = readiness(ws, job)
+    if not checks.final_ok:
+        raise EmaError("invoices_unconfirmed_client", checks.blocking[0], job)
+    client_field, _ = batch_client(ws, job)
+    drafts = exportable_drafts(json.dumps(resolved_outcomes(ws, job), ensure_ascii=False))
     if not drafts:
         raise EmaError("invoices_no_export", "Nicio factură nu poate fi exportată.", job)
     with tempfile.TemporaryDirectory(dir=artifact.parent) as temporary_dir:
@@ -145,6 +168,18 @@ def export(ws: Workspace, job: JobId, dest: Path) -> Path:
             db.execute("BEGIN IMMEDIATE")
             if not run_current(db, run):
                 raise EmaError("invoices_stale", "Extracția facturilor nu mai este actuală.", job)
+            confirmed = db.execute(
+                "SELECT revision,data FROM fields WHERE job_id=? AND key=?",
+                (job, BATCH_CLIENT_KEY),
+            ).fetchone()
+            if (
+                confirmed is None
+                or confirmed["revision"] != client_field.revision
+                or json.loads(confirmed["data"])["review"] not in {"accepted", "corrected"}
+            ):
+                raise EmaError(
+                    "invoices_unconfirmed_client", "Clientul lotului nu este confirmat.", job
+                )
             output = ws.save_output(db, job, run, temporary, dest.name)
             ws.record_outputs(db, job, run, [(output, "draft")])
     return output

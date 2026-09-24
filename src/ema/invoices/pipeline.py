@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from ema.core.errors import EmaError
 from ema.invoices.configuration.field_catalog import (
     BILLING_PERIOD,
     INVOICE_NUMBER,
@@ -23,6 +24,8 @@ from ema.invoices.outcomes import (
     DocumentOutcome,
     DocumentOutcomeStatus,
     ExtractionMetadata,
+    failed_document,
+    reader_failure_code,
 )
 from ema.invoices.parsers.protocol import SupplierParser
 from ema.invoices.reader import InvoiceDocumentReader
@@ -75,6 +78,10 @@ class ProcessInvoiceFiles:
             seen_digests[digest] = source
         try:
             document = replace(self._reader.read(path), path=source)
+        except EmaError as error:
+            return self.failure_outcome(
+                source, reader_failure_code(error), f"{error.code}: {error.detail}"
+            )
         except Exception as error:  # one bad file must not abort a batch
             return self.failure_outcome(source, IssueCode.PDF_READ_FAILED, str(error))
         try:
@@ -212,30 +219,7 @@ class ProcessInvoiceFiles:
         code: IssueCode,
         detail: str,
     ) -> DocumentOutcome:
-        message = ISSUE_MESSAGES[code]
-        issue = ValidationIssue(
-            field_id=None,
-            severity=IssueSeverity.ERROR,
-            message=message,
-            code=code,
-        )
-        return DocumentOutcome(
-            source_path=path,
-            status=DocumentOutcomeStatus.FAILED,
-            drafts=(),
-            metadata=ExtractionMetadata(
-                parser_name=None,
-                layout_version=None,
-                extraction_methods=(),
-                ocr_pages=(),
-                source_filename=path.name,
-                document_type=None,
-                recognized_supplier=None,
-                technical_detail=detail or None,
-            ),
-            issues=(issue,),
-            reason=message,
-        )
+        return failed_document(path, code, detail, ISSUE_MESSAGES[code])
 
 
 def _compare_invoice_safely(

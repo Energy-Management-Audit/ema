@@ -309,6 +309,27 @@ def decide(  # noqa: PLR0913
     )
 
 
+def decide_in_connection(
+    db: sqlite3.Connection,
+    job: str,
+    field_id: str,
+    on_revision: int,
+    actor: Actor,
+) -> Decision:
+    """Accept a field inside a workflow transaction with related persistence."""
+    return _decide_in_tx(
+        db,
+        job,
+        field_id,
+        "accept",
+        on_revision,
+        actor,
+        value=None,
+        alternative=None,
+        batch_id=None,
+    )
+
+
 def accept_batch(
     ws: Workspace, job: str, field_ids_with_revisions: list[tuple[str, int]], actor: Actor
 ) -> list[Decision]:

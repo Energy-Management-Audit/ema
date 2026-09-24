@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from ema.core.errors import EmaError
 from ema.invoices.models import (
     InvoiceDraft,
     IssueCode,
@@ -19,6 +20,14 @@ class DocumentOutcomeStatus(StrEnum):
     UNSUPPORTED = "unsupported"
     INCOMPATIBLE = "incompatible"
     FAILED = "failed"
+
+
+def reader_failure_code(error: EmaError) -> IssueCode:
+    if error.code == "ocr_timeout":
+        return IssueCode.OCR_TIMEOUT
+    if error.code == "ocr_unavailable":
+        return IssueCode.OCR_RUNTIME_UNAVAILABLE
+    return IssueCode.PDF_READ_FAILED
 
 
 @dataclass(frozen=True)
@@ -116,3 +125,24 @@ class BatchProcessingResult:
                 DocumentOutcomeStatus.FAILED,
             }
         ]
+
+
+def failed_document(path: Path, code: IssueCode, detail: str, message: str) -> DocumentOutcome:
+    issue = ValidationIssue(None, IssueSeverity.ERROR, message, code)
+    return DocumentOutcome(
+        source_path=path,
+        status=DocumentOutcomeStatus.FAILED,
+        drafts=(),
+        metadata=ExtractionMetadata(
+            parser_name=None,
+            layout_version=None,
+            extraction_methods=(),
+            ocr_pages=(),
+            source_filename=path.name,
+            document_type=None,
+            recognized_supplier=None,
+            technical_detail=detail or None,
+        ),
+        issues=(issue,),
+        reason=message,
+    )

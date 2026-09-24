@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ema.core.config import Settings
+from ema.invoices.parsers.alive_parser import AliveInvoiceParser
 from ema.invoices.parsers.eds_parser import EdsInvoiceParser
 from ema.invoices.parsers.engie_parser import EngieInvoiceParser
 from ema.invoices.parsers.incompatible_parser import (
@@ -13,6 +14,7 @@ from ema.invoices.parsers.incompatible_parser import (
 from ema.invoices.parsers.met_energy_parser import (
     MetElectricityInvoiceParser,
 )
+from ema.invoices.parsers.omv_petrom_parser import OmvPetromInvoiceParser
 from ema.invoices.pipeline import ExtractInvoice, ProcessInvoiceFiles
 from ema.invoices.reader import InvoiceDocumentReader
 
@@ -24,6 +26,8 @@ def build_invoice_processor(settings: Settings) -> ProcessInvoiceFiles:
             [
                 EngieInvoiceParser(),
                 EngieEInvoiceCompanionParser(),
+                OmvPetromInvoiceParser(),
+                AliveInvoiceParser(),
                 EdsInvoiceParser(),
                 MetElectricityInvoiceParser(),
                 MetNaturalGasInvoiceParser(),

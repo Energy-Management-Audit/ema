@@ -13,9 +13,14 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
+from ema.core.errors import EmaError
 from ema.core.jobs import create_job, run_stage, status, subscribe
 from ema.core.workspace import Workspace
-from ema.invoices import export, extract_batch
+from ema.invoices import (
+    confirm_client,
+    export,
+    extract_batch,
+)
 
 _BASELINE = Path.home() / "Ema-dev/s9a-baseline"
 _TEXT_CASES = ("invoice-case-d", "CLIENT-I5", "invoice-case-a")
@@ -71,9 +76,12 @@ def _source_paths(case: str, expected: list[dict[str, object]]) -> list[Path]:
 
 
 def _run_case(
-    tmp_path: Path, case: str, expected: list[dict[str, object]]
+    tmp_path: Path,
+    case: str,
+    expected: list[dict[str, object]],
+    workspace: Workspace | None = None,
 ) -> tuple[Workspace, str, list[dict[str, object]]]:
-    ws = Workspace(tmp_path / case)
+    ws = workspace or Workspace(tmp_path / case)
     job = create_job(ws, "invoices", case, None)
     for index, source in enumerate(_source_paths(case, expected), 1):
         sha = ws.add_file(case, source)
@@ -258,6 +266,10 @@ def test_text_pdf_regression_and_delivered_rows(tmp_path: Path, case: str) -> No
     _compare_outcomes(case, actual, expected)
     with ws.connect() as db:
         destination = ws.job_path(db, job) / "outputs" / "Facturi.xlsx"
+    with pytest.raises(EmaError) as blocked:
+        export(ws, job, destination)
+    assert blocked.value.code == "invoices_unconfirmed_client"
+    confirm_client(ws, job)
     generated = export(ws, job, destination)
     _compare_workbooks(case, generated, baseline_workbook)
     if case in ("invoice-case-d", "CLIENT-I5"):
@@ -266,7 +278,7 @@ def test_text_pdf_regression_and_delivered_rows(tmp_path: Path, case: str) -> No
 
 @pytest.mark.golden
 @pytest.mark.parametrize("case", _OUTCOME_CASES)
-def test_unported_families_require_review_or_stop(tmp_path: Path, case: str) -> None:
+def test_supported_families_and_incompatible_documents(tmp_path: Path, case: str) -> None:
     expected, _ = _baseline(case)
     _, _, actual = _run_case(tmp_path, case, expected)
     by_name = {str(row["source_path"]): row for row in expected}
@@ -274,11 +286,16 @@ def test_unported_families_require_review_or_stop(tmp_path: Path, case: str) -> 
     for row in actual:
         original = by_name[str(row["source_path"])]
         parser = original["metadata"]["parser_name"]
+        if parser == "AliveInvoiceParser":
+            if row["status"] not in {"exportable", "requires_review"}:
+                mismatches.append(f"{row['source_path']}:status")
+            continue
         if parser in {
             "EngieInvoiceParser",
             "MetNaturalGasInvoiceParser",
             "SeeExclusiveRefactoringParser",
             "EngieEInvoiceCompanionParser",
+            "OmvPetromInvoiceParser",
         }:
             wanted = original["status"]
         else:

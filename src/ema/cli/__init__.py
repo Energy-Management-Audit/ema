@@ -25,7 +25,17 @@ from ema.core.jobs import (
 )
 from ema.core.logging import write_event
 from ema.core.workspace import Workspace
-from ema.invoices import run_batch
+from ema.invoices import (
+    batch_client,
+    confirm_client,
+    run_batch,
+)
+from ema.invoices import (
+    export as export_invoices,
+)
+from ema.invoices import (
+    readiness as invoice_readiness,
+)
 
 _app = typer.Typer(no_args_is_help=True, invoke_without_command=True)
 workspace_app = typer.Typer()
@@ -93,8 +103,47 @@ def invoices_extract(folder: Path, client: str = typer.Option(..., "--client")) 
     if result.omitted:
         typer.echo(f"Omise din Excel ({len(result.omitted)}): {', '.join(result.omitted)}")
     typer.echo(result.client_notice)
-    if result.workbook is not None:
-        typer.echo(str(result.workbook))
+    typer.echo(f"Lucrare: {result.job_id}")
+    if result.client_proposal:
+        typer.echo(json.dumps(result.client_proposal, ensure_ascii=False))
+
+
+@invoices_app.command("confirm")
+def invoices_confirm(job: str, confirm: bool = typer.Option(False, "--confirm")) -> None:
+    ws = _workspace()
+    _, proposed = batch_client(ws, job)
+    if proposed is None:
+        raise EmaError("client_missing", "Clientul lotului nu a fost identificat.", job)
+    typer.echo(
+        json.dumps(
+            {
+                "name": proposed.name,
+                "tax_id": proposed.tax_id,
+                "pods": proposed.pods,
+                "pod_fill": proposed.pod_fill,
+                "disagreements": proposed.disagreements,
+                "candidates": proposed.candidates,
+                "memory": proposed.memory,
+            },
+            ensure_ascii=False,
+        )
+    )
+    if not confirm:
+        raise EmaError("confirmation_required", "Confirmați clientul cu --confirm.", job)
+    decision = confirm_client(ws, job)
+    checks = invoice_readiness(ws, job)
+    typer.echo(f"Confirmare: {decision.id}; exportabile: {checks.exportable}")
+
+
+@invoices_app.command("export")
+def invoices_export(job: str) -> None:
+    ws = _workspace()
+    with ws.connect() as db:
+        dest = ws.job_path(db, job) / "outputs" / "Facturi.xlsx"
+    checks = invoice_readiness(ws, job)
+    if checks.omitted:
+        typer.echo(f"Omise din Excel ({len(checks.omitted)}): {', '.join(checks.omitted)}")
+    typer.echo(str(export_invoices(ws, job, dest)))
 
 
 @_app.command("intake")

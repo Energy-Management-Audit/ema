@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import subprocess
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -64,11 +65,27 @@ def text(pdf: Path) -> list[PageText]:
 
 
 def _run_tesseract(
-    executable: Path, image: bytes, lang: str, timeout_s: float, psm: int, format_: str
+    executable: Path,
+    image: bytes,
+    lang: str,
+    timeout_s: float,
+    psm: int,
+    format_: str,
 ) -> str:
     try:
         result = subprocess.run(
-            [str(executable), "stdin", "stdout", "-l", lang, "--psm", str(psm), format_],
+            [
+                str(executable),
+                "stdin",
+                "stdout",
+                "--dpi",
+                "200",
+                "-l",
+                lang,
+                "--psm",
+                str(psm),
+                format_,
+            ],
             input=image,
             capture_output=True,
             check=False,
@@ -112,6 +129,7 @@ def ocr(
     lang: str = "ron+eng",
     timeout_s: float = 120,
     pages: set[int] | None = None,
+    alternatives: bool = False,
 ) -> list[PageText]:
     executable = settings.tesseract_path
     if not executable.is_file():
@@ -132,9 +150,63 @@ def ocr(
                 png = image.getvalue()
                 raw_text = _run_tesseract(executable, png, lang, timeout_s, 6, "txt")
                 tsv = _run_tesseract(executable, png, lang, timeout_s, 6, "tsv")
+                if alternatives:
+                    oriented = _run_tesseract(executable, png, lang, timeout_s, 1, "txt")
+                    sparse = _run_tesseract(executable, png, lang, timeout_s, 11, "txt")
+                    raw_text = _merge_ocr(raw_text, oriented, "[OCR auto-orientation alternatives]")
+                    raw_text = _merge_ocr(raw_text, sparse, "[OCR sparse-layout alternatives]")
+                    if "factur" in raw_text.casefold():
+                        strips: list[str] = []
+                        for strip in range(3):
+                            height = page.get_height()
+                            crop = (0, (2 - strip) * height / 3, 0, strip * height / 3)
+                            strip_png = io.BytesIO()
+                            render_page.render(scale=dpi / 72, crop=crop).to_pil().save(
+                                strip_png, format="PNG"
+                            )
+                            strips.append(
+                                _run_tesseract(
+                                    executable, strip_png.getvalue(), lang, timeout_s, 6, "txt"
+                                )
+                            )
+                        raw_text = _merge_strips(raw_text, strips)
                 output.append(PageText(number, raw_text, _words(tsv, dpi), "ocr"))
     except EmaError:
         raise
     except Exception as exc:
         raise EmaError("pdf_render_failed", "Pagina PDF nu a putut fi randată.", str(exc)) from exc
     return output
+
+
+def _comparison_key(line: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", line)
+    return "".join(
+        char.casefold() for char in decomposed if char.isalnum() and not unicodedata.combining(char)
+    )
+
+
+def _merge_ocr(primary: str, alternative: str, marker: str) -> str:
+    lines = [line.strip() for line in primary.splitlines() if line.strip()]
+    known = {_comparison_key(line) for line in lines}
+    additions = [
+        line.strip()
+        for line in alternative.splitlines()
+        if line.strip() and _comparison_key(line) not in known
+    ]
+    return "\n".join([*lines, *([marker, *additions] if additions else [])])
+
+
+def _merge_strips(primary: str, strips: list[str]) -> str:
+    lines = [line.strip() for line in primary.splitlines() if line.strip()]
+    known = {" ".join(line.casefold().split()) for line in lines}
+    additions: list[str] = []
+    for strip in strips:
+        for line in strip.splitlines():
+            candidate = line.strip()
+            key = " ".join(candidate.casefold().split())
+            if key and key not in known:
+                known.add(key)
+                additions.append(candidate)
+    return "\n".join(
+        [*lines, *(["[OCR horizontal-strip alternatives]", *additions] if additions else [])]
+    )
