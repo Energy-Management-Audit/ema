@@ -227,6 +227,8 @@ def _measure_year(cell: CellValue) -> Located | None:
         return Located(int(raw), cell.ref)
     if isinstance(raw, str) and re.fullmatch(r"20\d\d", raw.strip()):
         return Located(int(raw.strip()), cell.ref)
+    if isinstance(raw, str) and (match := re.fullmatch(r"\d{2}\.\d{2}\.(20\d\d)", raw.strip())):
+        return Located(int(match.group(1)), cell.ref)
     return None
 
 

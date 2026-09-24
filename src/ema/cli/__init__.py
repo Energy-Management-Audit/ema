@@ -36,15 +36,39 @@ from ema.invoices import (
 from ema.invoices import (
     readiness as invoice_readiness,
 )
+from ema.reporting import collect_annexes, write_report
+from ema.reporting import generate as generate_report
 
 _app = typer.Typer(no_args_is_help=True, invoke_without_command=True)
 workspace_app = typer.Typer()
 job_app = typer.Typer()
 invoices_app = typer.Typer()
+reporting_app = typer.Typer()
 _app.add_typer(workspace_app, name="workspace")
 _app.add_typer(job_app, name="job")
 job_app.add_typer(job_review_app)
 _app.add_typer(invoices_app, name="invoices")
+_app.add_typer(reporting_app, name="reporting")
+
+
+@reporting_app.command("generate")
+def reporting_generate(
+    sources: list[Path],
+    years: str = typer.Option(..., "--years"),
+    out: Path = typer.Option(..., "--out"),  # noqa: B008
+) -> None:
+    """Build a report from annex files or folders."""
+    try:
+        first, last = (int(part) for part in years.split("-", maxsplit=1))
+        if first > last or last - first > 20:
+            raise ValueError
+    except ValueError as exc:
+        raise typer.BadParameter("Use an ascending year range, e.g. 2023-2025") from exc
+    paths = collect_annexes(sources)
+    if not paths:
+        raise typer.BadParameter("No annex workbooks found")
+    write_report(generate_report(paths, tuple(range(first, last + 1))), out)
+    typer.echo(str(out))
 
 
 def _workspace() -> Workspace:

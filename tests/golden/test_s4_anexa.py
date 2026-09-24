@@ -38,8 +38,10 @@ def test_all_38_annexes_read_with_traceable_core_values(reference_library: Path)
         parsed = parse_anexa(path)
         assert parsed.year is not None, path.name
         assert parsed.year.value == 2025, path.name
-        assert {"name", "address", "cui", "phone", "fax", "caen_code", "caen_description"} <= set(
-            parsed.identity
+        required = {"address", "cui", "phone", "fax", "caen_code", "caen_description"}
+        assert required <= set(parsed.identity), path.name
+        assert "name" in parsed.identity or any(
+            issue.code == "name_is_address" for issue in parsed.issues
         ), path.name
         assert "total_tep" in parsed.annual, path.name
         assert parsed.annual["total_tep"].ref.sheet == "Date anuale", path.name

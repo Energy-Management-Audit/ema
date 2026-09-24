@@ -39,6 +39,7 @@ def read_identity(book: Book, result: AnexaData) -> None:
         return
     sheet = book.sheet(name)
     _primary(sheet, result)
+    _validate_name(book, result)
     _contact_fields(sheet, result)
     _ownership(sheet, result)
     _contact_person(sheet, result)
@@ -53,6 +54,28 @@ def _primary(sheet: Sheet, result: AnexaData) -> None:
         value = right_of_label(sheet, labels, result.issues)
         if value is not None:
             result.identity[key] = value
+
+
+def _validate_name(book: Book, result: AnexaData) -> None:
+    name = result.identity.get("name")
+    address = result.identity.get("address")
+    if name is None or address is None:
+        return
+    normalized_name = normal(str(name.value))
+    normalized_address = normal(str(address.value))
+    if not normalized_address or normalized_address not in normalized_name:
+        return
+    result.issues.append(ReaderIssue("name_is_address", str(name.value), name.ref))
+    del result.identity["name"]
+    for sheet_name in book.sheet_names:
+        sheet = book.sheet(sheet_name)
+        alternative = right_of_label(
+            sheet, ("Denumirea operatorului economic", "Denumirea unităţii", "Denumire"), []
+        )
+        if alternative is not None and normal(str(alternative.value)) != normalized_name:
+            result.identity["name"] = alternative
+            result.name_origin = alternative.ref.a1
+            return
 
 
 def _contact_fields(sheet: Sheet, result: AnexaData) -> None:

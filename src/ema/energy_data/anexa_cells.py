@@ -22,7 +22,9 @@ class AnexaData:
 
     year: Located | None = None
     identity: dict[str, Located] = field(default_factory=dict[str, Located])
+    name_origin: str | None = None
     annual: dict[str, Located] = field(default_factory=dict[str, Located])
+    monthly_total_tep: Located | None = None
     monthly: dict[str, dict[int, Located]] = field(default_factory=dict[str, dict[int, Located]])
     monthly_unresolved: dict[str, dict[int, Located]] = field(
         default_factory=dict[str, dict[int, Located]]

@@ -5,7 +5,7 @@ from __future__ import annotations
 from ema.core.office.sheets import Book, CellRef, Sheet
 from ema.energy_data.anexa_cells import AnexaData
 from ema.energy_data.carriers import Carrier, carrier_for
-from ema.energy_data.source import Located, ReaderIssue, cell_at, normal, number
+from ema.energy_data.source import Located, ReaderIssue, cell_at, normal, number, row_with
 
 _MONTH_NAMES = {
     name: index
@@ -33,6 +33,7 @@ _KNOWN_UNITS = {"mwh", "gcal", "tone", "m3 an", "mc", "mii mc"}
 
 def read_monthly(book: Book, result: AnexaData) -> None:
     sheet = book.sheet("Date lunare")
+    _read_total(sheet, result)
     ambiguous: set[str] = set()
     for row in range(1, sheet.max_row + 1):
         labels = [(col, cell_at(sheet, row, col, result.issues).value) for col in range(1, 4)]
@@ -70,6 +71,34 @@ def read_monthly(book: Book, result: AnexaData) -> None:
             else:
                 target = result.monthly if has_unit else result.monthly_unresolved
                 target[carrier.value] = months
+
+
+def _read_total(sheet: Sheet, result: AnexaData) -> None:
+    total_row = row_with(sheet, ("CONSUM DE ENERGIE TOTAL ANUAL",), result.issues)
+    if total_row is not None:
+        candidates: list[Located] = []
+        for col in range(1, min(sheet.max_col, 20) + 1):
+            unit = cell_at(sheet, total_row, col, result.issues).value
+            if isinstance(unit, str) and normal(unit) == "tep an":
+                value_col = col + 3
+                if value_col <= sheet.max_col:
+                    value = number(
+                        cell_at(sheet, total_row + 1, value_col, result.issues),
+                        result.issues,
+                        unit="tep/an",
+                    )
+                    if value is not None:
+                        candidates.append(value)
+        if len(candidates) == 1:
+            result.monthly_total_tep = candidates[0]
+        elif len(candidates) > 1:
+            result.issues.append(
+                ReaderIssue(
+                    "monthly_total_ambiguous",
+                    "Date lunare total",
+                    CellRef(sheet.name, total_row, 1),
+                )
+            )
 
 
 def _monthly_block_carrier(sheet: Sheet, month_row: int, result: AnexaData) -> Carrier | None:
