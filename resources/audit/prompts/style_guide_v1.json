@@ -1,0 +1,17 @@
+{
+  "version": "audit-draft-v1",
+  "sources": ["AUDIT-01 2026", "AUDIT-02 2026", "AUDIT-03 2026", "AUDIT-04 2026", "AUDIT-05 Cap 2-3-4 V2"],
+  "content_only": "CLIENT-A3 2022",
+  "patterns": [
+    "Introduce a section's subject before a relevant figure or table; observe what the evidence shows and enumerate distinct parts only when the source supports them.",
+    "Describe a process stage by its purpose, input, operation and output when those facts exist.",
+    "Explain equipment by its role in the process in terms a non-technical reader can follow.",
+    "Give indicators their meaning and unit before interpreting a value."
+  ],
+  "examples": [
+    {"section": "ch2.date_generale", "paragraphs": ["Societatea {{f:audit.company_name}} are sediul în {{f:audit.address}}."]},
+    {"section": "ch2.localizare", "paragraphs": ["Amplasamentul este în {{f:audit.location}}."]},
+    {"section": "ch3.flux", "paragraphs": ["Fluxul descris în {{f:audit.process_sections}} cuprinde etapele documentate."]},
+    {"section": "ch3.equipment", "paragraphs": ["Dotările consemnate sunt {{f:audit.equipment}}."]}
+  ]
+}
