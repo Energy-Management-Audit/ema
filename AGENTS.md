@@ -59,6 +59,30 @@ traces back to the handoff.
 - Romanian number formatting in anything a user reads: `1.234,56` in documents, `1 234,56` in the
   UI, unit after a space.
 
+## Verify, don't recall
+
+Anything that feeds a decision, the code or a deliverable is read from its source in this session: the code, the
+contract, the spec, a reference document, a number, a path, an environment value. Memory from earlier sessions
+(yours or a tool's) is a pointer to where to look and a record of preferences and past mistakes, never the fact
+itself. When memory and the source disagree, the source wins; say so in your report.
+
+## Building from a slice plan
+
+- The plan's decisions are made. Implement them; if one is wrong or missing, ask. Never pick your
+  own name, status code, event type, layout or data shape where the plan names one.
+- Anything the plan quotes as a literal (paths, enums, event types, status codes, field names) is
+  copied exactly and asserted in a test.
+- Every item on the plan's checklist is built, or reported Blocked with the reason. Nothing is
+  dropped silently.
+- Follow the module next to yours: its structure, naming and error style. The core logic of a
+  function is visible on its first screen; no wrapper, factory or helper layer the slice does not
+  need.
+- Validate input at the boundary with a typed model: malformed input is a 4xx, never a 500.
+- State read in two steps can change in between: read it once, in one transaction.
+- Wait for a long command with one blocking call; never sleep and re-read its log.
+- Before the PR, review your own diff against the checklist and fix what you find. The PR carries a
+  table: each checklist item, Done or Blocked, and where (file:line or test name).
+
 ## Packaging constraints (they shape the code)
 
 The Windows build is a frozen one-folder PyInstaller bundle. Therefore:
