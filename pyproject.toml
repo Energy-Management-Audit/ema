@@ -49,6 +49,7 @@ dev = [
     "lxml-stubs>=0.5.1",
     "xlwt>=1.3.0",
     "openapi-spec-validator>=0.9.0",
+    "pytest-cov>=6.0",
 ]
 
 [build-system]
@@ -113,3 +114,8 @@ markers = [
     "network: live public network acceptance; CI excludes it because the source may be unavailable",
     "live_research: pending CLIENT-A1 equipment acceptance; requires a controlled live search API",
 ]
+
+[tool.coverage.run]
+source = ["src/ema"]
+branch = true
+omit = ["src/ema/api/mock.py", "*/__main__.py"]

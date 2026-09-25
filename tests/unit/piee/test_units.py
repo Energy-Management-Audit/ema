@@ -7,8 +7,16 @@ from pathlib import Path
 import pytest
 from docx import Document
 
+from ema.core.office.package import encoded, read_parts, write_parts
+from ema.core.office.pie_xml import pie_root
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
-from ema.piee.units import convert, delivered_production_unit, presentation_dataset
+from ema.piee.units import (
+    convert,
+    delivered_pie_representation,
+    delivered_production_unit,
+    delivered_separate_pv_figures,
+    presentation_dataset,
+)
 
 
 @pytest.mark.parametrize(
@@ -67,3 +75,24 @@ def test_ambiguous_delivered_unit_is_rejected(tmp_path: Path) -> None:
     _programme(previous, "Producție tone/an", "Producție mii tone/an")
     with pytest.raises(ValueError, match="unambiguous"):
         delivered_production_unit(previous)
+
+
+@pytest.mark.parametrize("values,expected", [((0.2, 0.8), "normalized"), ((20, 80), "raw")])
+def test_prior_native_pie_determines_value_scale_and_pv_visibility(
+    tmp_path: Path, values: tuple[float, float], expected: str
+) -> None:
+    path = tmp_path / "previous.docx"
+    Document().save(path)
+    parts = read_parts(path)
+    parts["word/charts/chart1.xml"] = encoded(pie_root("pv", ("Grid", "Solar"), values))
+    write_parts(parts, path)
+    assert delivered_pie_representation(path) == expected
+    assert delivered_separate_pv_figures(path)
+
+
+def test_prior_document_without_native_pie_has_no_pie_representation(tmp_path: Path) -> None:
+    path = tmp_path / "previous.docx"
+    Document().save(path)
+    with pytest.raises(ValueError, match="no native pie"):
+        delivered_pie_representation(path)
+    assert not delivered_separate_pv_figures(path)

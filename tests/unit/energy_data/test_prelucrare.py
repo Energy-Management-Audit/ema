@@ -1,8 +1,9 @@
 """Synthetic precedence, unit conversion, and factor coverage checks."""
 
 from ema.energy_data.carriers import Carrier
-from ema.energy_data.factors import FACTORS_2026, FactorTable
+from ema.energy_data.factors import FACTORS_2026, Factor, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
+from ema.energy_data.prelucrare_factors import factors_for_output
 from ema.energy_data.prelucrare_merge import merge_prelucrare
 from ema.energy_data.prelucrare_types import PrelucrareData
 
@@ -35,3 +36,16 @@ def test_prelucrare_wins_with_conflict_and_production_unit_conversion() -> None:
     assert conflicts[0].field == "carrier.natural_gas.2025.01"
     assert conflicts[0].other.value == 20
     assert merged.production["main"][2025].months[1] == Reading(1, "mii MWh gaz vehiculat")
+
+
+def test_output_factors_use_filed_years_and_documented_defaults_elsewhere() -> None:
+    imported = PrelucrareData(
+        EnergyDataset((2025,), {}),
+        FactorTable("case", 2025, (Factor(Carrier.natural_gas, "MWh", 0.1, "source"),), ()),
+    )
+    output = factors_for_output(imported, (2024, 2025))
+    assert output.tep_factor(Carrier.natural_gas, "MWh", 2024).per_unit == 0.086
+    assert output.tep_factor(Carrier.natural_gas, "MWh", 2025).per_unit == 0.1
+    assert output.tep_factor(Carrier.electricity_pv, "MWh", 2025).per_unit == 0.086
+    assert output.co2_factor(Carrier.electricity_grid, "MWh", 2024).per_unit == 0.226
+    assert output.co2_factor(Carrier.electricity_grid, "MWh", 2025) is None

@@ -210,7 +210,13 @@ def test_system_exit_and_failed_log_write_finish_run(
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "invoices", "client", 2025)
     failures: list[BaseException] = []
-    monkeypatch.setattr(threading, "excepthook", lambda args: failures.append(args.exc_value))
+    reported = threading.Event()
+
+    def capture_failure(args: threading.ExceptHookArgs) -> None:
+        failures.append(args.exc_value)
+        reported.set()
+
+    monkeypatch.setattr(threading, "excepthook", capture_failure)
 
     class BrokenLog:
         def write(self, value: str) -> int:
@@ -225,6 +231,7 @@ def test_system_exit_and_failed_log_write_finish_run(
     result = wait_run(ws, job)
     assert result["state"] == "failed"
     assert result["error"] == "stage exited"
+    assert reported.wait(timeout=2)
     assert len(failures) == 1 and isinstance(failures[0], SystemExit)
 
 
