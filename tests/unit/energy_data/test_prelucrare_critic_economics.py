@@ -4,7 +4,10 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
+from ema.energy_data.carriers import Carrier
+from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
 from ema.energy_data.prelucrare import import_prelucrare
+from ema.energy_data.prelucrare_writer import write_prelucrare
 
 
 def _book(path: Path, *, label_column: int = 3, turnover: int | None = 100) -> Path:
@@ -66,3 +69,18 @@ def test_energy_costs_imported_from_labeled_row(tmp_path: Path) -> None:
 def test_economic_labels_can_move_column(tmp_path: Path) -> None:
     imported = import_prelucrare(_book(tmp_path / "economic.xlsx", label_column=4))
     assert imported.dataset.turnover_lei[2025].value == 100
+
+
+def test_writer_round_trip_preserves_energy_costs(tmp_path: Path) -> None:
+    dataset = EnergyDataset(
+        (2025,),
+        {Carrier.electricity_grid: {2025: CarrierSeries({1: Reading(1, "MWh")})}},
+        turnover_lei={2025: Reading(100, "lei")},
+        energy_costs_lei={2025: Reading(30, "lei")},
+    )
+    path = tmp_path / "economic.xlsx"
+    write_prelucrare(dataset, (2025,), path)
+
+    imported = import_prelucrare(path)
+    assert imported.dataset.energy_costs_lei == dataset.energy_costs_lei
+    assert imported.located["energy_costs.2025"].label == "Cheltuieli cu energia [lei]"

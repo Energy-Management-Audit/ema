@@ -66,7 +66,8 @@ _CASES = {
         (16, 25),
     ),
     "CLIENT-X3": (
-        _COMMON_IDENTITY | {"contact_person", "ownership_state", "website_target"},
+        _COMMON_IDENTITY
+        | {"contact_person", "consumer_contact_person", "ownership_state", "website_target"},
         _COMMON_ANNUAL | {"purchased_heat_gcal", "clu_raw", "clu_tep"},
         _COMMON_MONTHLY | {"clu", "water_industrial"},
         (7, 7),

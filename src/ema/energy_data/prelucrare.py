@@ -45,6 +45,7 @@ PHYSICAL = (
     ("Consum Carburanti", "CTL [t]", Carrier.ctl, "t"),
     ("consum apa potabila", "[m3]", Carrier.water_potable, "m3"),
     ("consum apa industriala", "[m3]", Carrier.water_industrial, "m3"),
+    ("consum apa pluviala", "[m3]", Carrier.water_storm, "m3"),
 )
 
 
@@ -188,6 +189,7 @@ def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dic
                     "cifra de afaceri" in normal(value)
                     or "veniturilor din exploatare" in normal(value)
                     or "cheltuieli energetice totale" in normal(value)
+                    or "cheltuieli cu energia" in normal(value)
                 )
             ),
             None,
@@ -200,7 +202,7 @@ def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dic
                 turnover_rows["turnover"] = row
             elif "veniturilor din exploatare" in label:
                 turnover_rows.setdefault("revenue", row)
-            elif "cheltuieli energetice totale" in label:
+            elif "cheltuieli energetice totale" in label or "cheltuieli cu energia" in label:
                 costs_row = row
         if any("intensitate energetica tep 1000 lei" in label for label in labels):
             for year, col in columns.items():

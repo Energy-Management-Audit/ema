@@ -9,7 +9,7 @@ from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-from ema.energy_data.carriers import Carrier
+from ema.energy_data.carriers import WATER_CARRIERS, Carrier
 from ema.energy_data.factors import FACTORS_2026, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset
 from ema.energy_data.prelucrare import MONTHS
@@ -27,6 +27,7 @@ NAMES = {
     Carrier.purchased_heat: ("Consum Energie termica terti", "[Gcal]"),
     Carrier.water_potable: ("consum apa potabila", "[m3]"),
     Carrier.water_industrial: ("consum apa industriala", "[m3]"),
+    Carrier.water_storm: ("consum apa pluviala", "[m3]"),
 }
 SPECIFIC_LABELS = {
     Carrier.electricity_grid: "energie electrica",
@@ -142,12 +143,13 @@ def _tep(
 ) -> dict[tuple[Carrier | None, int], str]:
     sheet = _sheet(book, "TEP")
     annual: dict[tuple[Carrier | None, int], str] = {}
+    energy_carriers = [carrier for carrier in ds.carriers if carrier not in WATER_CARRIERS]
     for index, year in enumerate(years):
-        start = 2 + index * (len(ds.carriers) + 4)
+        start = 2 + index * (len(energy_carriers) + 4)
         sheet.cell(start, 3, year)
         _header(sheet, year, start + 1)
         rows: list[int] = []
-        for offset, carrier in enumerate(ds.carriers, 2):
+        for offset, carrier in enumerate(energy_carriers, 2):
             row = start + offset
             sheet.cell(row, 3, f"{carrier.value} [tep]")
             factor = factors.get((carrier, year))
@@ -160,7 +162,7 @@ def _tep(
                 sheet.cell(row, 16, f"={source}*{factor}").number_format = NUMBER
                 annual[carrier, year] = f"'TEP'!P{row}"
             rows.append(row)
-        total_row = start + len(ds.carriers) + 2
+        total_row = start + len(energy_carriers) + 2
         sheet.cell(total_row, 3, "TOTAL [tep]")
         for col in range(4, 17):
             letter = get_column_letter(col)
@@ -275,11 +277,12 @@ def _impact(
     factors: FactorTable,
 ) -> None:
     sheet = _sheet(book, "impact de mediu")
+    energy_carriers = [carrier for carrier in ds.carriers if carrier not in WATER_CARRIERS]
     for index, year in enumerate(years):
-        start = 2 + index * (len(ds.carriers) + 3)
+        start = 2 + index * (len(energy_carriers) + 3)
         sheet.cell(start, 2, year)
         rows: list[int] = []
-        for offset, carrier in enumerate(ds.carriers, 1):
+        for offset, carrier in enumerate(energy_carriers, 1):
             row = start + offset
             sheet.cell(row, 2, carrier.value)
             series = ds.carriers[carrier].get(year)
@@ -294,7 +297,7 @@ def _impact(
                 factor_ref = f"{get_column_letter(factor_col)}{row}"
                 sheet.cell(row, 9, f"={source}*{factor_ref}").number_format = NUMBER
                 rows.append(row)
-        total = start + len(ds.carriers) + 1
+        total = start + len(energy_carriers) + 1
         sheet.cell(total, 2, "Indicator global prin suprapunerea efectelor")
         if rows:
             sheet.cell(
