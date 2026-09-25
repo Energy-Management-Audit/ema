@@ -42,5 +42,9 @@ def test_stale_na_confirmation_cannot_override_newer_section_state(tmp_path):
         headers=headers,
     )
     assert replay.status_code == 409
-    assert replay.json()["detail"]["current_revision"] == 2
+    assert replay.json() == {
+        "type": "urn:ema:error:stale_revision",
+        "title": "Secțiunea s-a modificat între timp.",
+        "status": 409,
+    }
     assert client.get(f"/jobs/{job}/sections").json()[0]["reason"] == "newer decision"

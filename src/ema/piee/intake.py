@@ -306,7 +306,7 @@ def import_piee(  # noqa: PLR0913
     previous_piee: Path | None = None,
 ) -> PieeJob:
     """Validate sources before creating a job, then retain slot versions and review evidence."""
-    data = load(year, anexa, necesar, prelucrare, previous_piee)
+    load(year, anexa, necesar, prelucrare, previous_piee)
     job = create_job(ws, "piee", client_slug, year + 1)
     paths = {
         "anexa": anexa,
@@ -314,10 +314,33 @@ def import_piee(  # noqa: PLR0913
         "prelucrare": prelucrare,
         "previous_piee": previous_piee,
     }
-    shas = {name: _sha(path) for name, path in paths.items()}
     for name, path in paths.items():
         if path is not None:
             ws.set_slot(job, name, ws.add_file(client_slug, path))
+    return import_piee_into_job(
+        ws, job, year, anexa, necesar, prelucrare, previous_piee=previous_piee
+    )
+
+
+def import_piee_into_job(  # noqa: PLR0913
+    ws: Workspace,
+    job: str,
+    year: int,
+    anexa: Path,
+    necesar: Path | None,
+    prelucrare: Path | None = None,
+    *,
+    previous_piee: Path | None = None,
+) -> PieeJob:
+    """Reconcile immutable slot sources into an existing PIEE job."""
+    data = load(year, anexa, necesar, prelucrare, previous_piee)
+    paths = {
+        "anexa": anexa,
+        "questionnaire": necesar,
+        "prelucrare": prelucrare,
+        "previous_piee": previous_piee,
+    }
+    shas = {name: _sha(path) for name, path in paths.items()}
     if shas["anexa"] is None:
         raise ValueError("Anexa checksum missing")
     _record_identity(ws, job, data, shas["anexa"])

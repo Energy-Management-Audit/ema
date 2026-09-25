@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ema.clients import remember
+from ema.clients.registry import validate_id
 from ema.core.errors import EmaError
 from ema.core.jobs import JobId, latest_ready_run
 from ema.core.review import fields, undo
@@ -44,8 +46,14 @@ def batch_client(ws: Workspace, job: JobId) -> tuple[Field, BatchClient | None]:
     return field, BatchClient.from_field(field) if field.value is not None else None
 
 
-def confirm_client(ws: Workspace, job: JobId) -> Decision:
+def confirm_client(
+    ws: Workspace, job: JobId, *, client_id: str | None = None, on_revision: int | None = None
+) -> Decision:
     field, client = batch_client(ws, job)
+    if on_revision is not None and field.revision != on_revision:
+        raise EmaError("stale_revision", "Propunerea clientului s-a modificat.", "")
+    if client_id is not None:
+        validate_id(client_id)
     if client is None:
         raise EmaError("client_missing", "Clientul lotului nu a fost identificat.", job)
     if field.review in {"accepted", "corrected"}:
@@ -54,6 +62,17 @@ def confirm_client(ws: Workspace, job: JobId) -> Decision:
     admissible_pods = _admissible_pods(rows, client)
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
+        if client_id is not None:
+            row = db.execute("SELECT client_slug FROM jobs WHERE id=?", (job,)).fetchone()
+            if row is None or row["client_slug"] != client_id:
+                raise EmaError("client_memory_conflict", "Clientul propus nu corespunde.", "")
+            known = db.execute("SELECT cui FROM clients WHERE id=?", (client_id,)).fetchone()
+            if known is None:
+                raise EmaError("client_missing", "Clientul nu există.", "")
+            if known["cui"] and normalize_client_tax_id(str(known["cui"])) != (
+                normalize_client_tax_id(client.tax_id)
+            ):
+                raise EmaError("client_memory_conflict", "Codul fiscal nu corespunde.", "")
         decision = decide_in_connection(db, job, field.id, field.revision, "user")
         remember(
             db,
@@ -227,3 +246,54 @@ def readiness(ws: Workspace, job: JobId) -> InvoiceReadiness:
         exportable,
         omitted,
     )
+
+
+def identity_view(ws: Workspace, job: JobId) -> dict[str, Any]:
+    field, client = batch_client(ws, job)
+    with ws.connect() as db:
+        row = db.execute("SELECT client_slug FROM jobs WHERE id=?", (job,)).fetchone()
+    candidate = (
+        {
+            "client_id": str(row["client_slug"]),
+            "cui": client.tax_id,
+            "pod": client.pods[0] if client.pods else None,
+        }
+        if client is not None and row is not None
+        else None
+    )
+    return {
+        "batch_id": client.run_id if client else job,
+        "candidate": candidate,
+        "confirmed": field.review in {"accepted", "corrected"},
+        "evidence_ids": field.evidence,
+    }
+
+
+def batch_view(ws: Workspace, job: JobId) -> dict[str, Any]:
+    identity = identity_view(ws, job)
+    rows: list[dict[str, Any]] = []
+    for row in resolved_outcomes(ws, job):
+        for draft in row["drafts"]:
+            energy = cast("dict[str, Any]", draft["fields"].get("active_energy") or {})
+            raw = energy.get("value")
+            try:
+                consumption = float(raw) if raw is not None else None
+            except (TypeError, ValueError):
+                consumption = None
+            rows.append(
+                {
+                    "id": hashlib.sha256(
+                        f"{row['source_path']}:{draft.get('source_filename', '')}".encode()
+                    ).hexdigest()[:16],
+                    "month": None,
+                    "consumption_kwh": consumption,
+                    "source_evidence_ids": [],
+                    "anomalies": [str(issue["code"]) for issue in draft["issues"]],
+                }
+            )
+    return {
+        "batch_id": identity["batch_id"],
+        "identity": identity,
+        "rows": rows,
+        "missing_months": [],
+    }

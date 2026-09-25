@@ -18,6 +18,7 @@ from ema.core.logging import log_exception
 from ema.core.workspace.backup_install import install_backup
 from ema.core.workspace.cleanup import delete_job_rows
 from ema.core.workspace.lock import workspace_lock
+from ema.core.workspace.mutations import delete_job as delete_job_impl
 from ema.core.workspace.references import evidence_uses_file, referenced_files
 from ema.core.workspace.schema import migrate
 from ema.core.workspace.settings import write_settings
@@ -162,6 +163,14 @@ class Workspace:
         origin: str = "upload",
         converted_from: str | None = None,
     ) -> SlotVersion:
+        parts = slot.split("/")
+        if (
+            not 1 <= len(parts) <= 16
+            or (len(parts) > 2 and parts[0] != "dossier")
+            or any(part in ("", ".", "..") for part in parts)
+            or any("\\" in part or any(ord(char) < 32 for char in part) for part in parts)
+        ):
+            raise EmaError("invalid_slot", "Numele fișierului este invalid.", "")
         with self.connect() as db:
             job_row = db.execute(
                 "SELECT client_slug FROM jobs WHERE id=? AND deleted=0", (job,)
@@ -231,12 +240,16 @@ class Workspace:
             raise EmaError("file_missing", "Fișierul nu există.", file_sha)
         return self.path(str(row["relative_path"]))
 
-    def remove_version(self, job: str, slot: str, version: int) -> None:
+    def remove_version(
+        self, job: str, slot: str, version: int, *, on_revision: int | None = None
+    ) -> None:
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             current = db.execute(
-                "SELECT active_version FROM slots WHERE job_id=? AND name=?", (job, slot)
+                "SELECT active_version,revision FROM slots WHERE job_id=? AND name=?", (job, slot)
             ).fetchone()
+            if on_revision is not None and (current is None or current["revision"] != on_revision):
+                raise EmaError("stale_revision", "Fișierul a fost modificat.", "")
             cursor = db.execute(
                 "DELETE FROM slot_versions WHERE job_id=? AND slot=? AND version=?",
                 (job, slot, version),
@@ -254,17 +267,8 @@ class Workspace:
                     (row["active"], job, slot),
                 )
 
-    def delete_job(self, job: str) -> None:
-        with self.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            cursor = db.execute(
-                "UPDATE jobs SET deleted=1,revision=revision+1 "
-                "WHERE id=? AND deleted=0 AND state!='running'",
-                (job,),
-            )
-            if cursor.rowcount == 0:
-                raise EmaError("job_unavailable", "Lucrarea lipsește sau rulează.", job)
-        self.finish_deletes()
+    def delete_job(self, job: str, *, on_revision: int | None = None) -> None:
+        delete_job_impl(self, job, on_revision=on_revision)
 
     def finish_deletes(self) -> None:
         with workspace_lock(self.root):

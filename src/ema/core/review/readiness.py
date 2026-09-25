@@ -57,6 +57,18 @@ def readiness_hash(ws: Workspace, job: str, readiness: Readiness, workflow: Work
     return _hash(readiness, snapshot, workflow.readiness_snapshot(ws, job))
 
 
+def readiness_hash_in_tx(
+    ws: Workspace,
+    db: sqlite3.Connection,
+    job: str,
+    readiness: Readiness,
+    workflow: Workflow,
+) -> str:
+    snapshot_reader = getattr(workflow, "readiness_snapshot_in_tx", None)
+    snapshot = snapshot_reader(db, job) if snapshot_reader else workflow.readiness_snapshot(ws, job)
+    return _hash(readiness, _field_revisions(db, job), snapshot)
+
+
 def _field_revisions(db: sqlite3.Connection, job: str) -> list[tuple[str, int]]:
     return [
         (str(row["id"]), int(row["revision"]))
@@ -101,39 +113,47 @@ def output_path(ws: Workspace, job: str, output_id: str) -> Path:
 
 
 def approve_final(
-    ws: Workspace, job: str, output_id: str, readiness_hash: str, actor: Actor
+    ws: Workspace,
+    job: str,
+    output_id: str,
+    readiness_hash: str,
+    actor: Actor,
+    *,
+    db: sqlite3.Connection | None = None,
 ) -> Approval:
     if actor != "user":
         raise EmaError("approval_requires_user", "Aprobarea aparține utilizatorului.", job)
-    with ws.connect() as db:
-        db.execute("BEGIN IMMEDIATE")
-        if _latest_output(db, job) != output_id:
-            raise EmaError("output_stale", "Documentul nu este versiunea curentă.", output_id)
-        row = db.execute("SELECT kind FROM outputs WHERE id=?", (output_id,)).fetchone()
-        if row is None or row["kind"] != "final":
-            raise EmaError("output_not_final", "Documentul nu este final.", output_id)
-        approval = Approval(
-            id=uuid.uuid4().hex,
-            job_id=job,
-            output_id=output_id,
-            readiness_hash=readiness_hash,
-            on_decision=_latest_decision(db, job),
-            at=datetime.now(UTC),
-            actor=actor,
-        )
-        db.execute(
-            "INSERT INTO approvals VALUES (?,?,?,?,?,?,?)",
-            (
-                approval.id,
-                job,
-                output_id,
-                readiness_hash,
-                approval.on_decision,
-                approval.at.isoformat(),
-                actor,
-            ),
-        )
-        return approval
+    if db is None:
+        with ws.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            return approve_final(ws, job, output_id, readiness_hash, actor, db=connection)
+    if _latest_output(db, job) != output_id:
+        raise EmaError("output_stale", "Documentul nu este versiunea curentă.", output_id)
+    row = db.execute("SELECT kind FROM outputs WHERE id=?", (output_id,)).fetchone()
+    if row is None or row["kind"] != "final":
+        raise EmaError("output_not_final", "Documentul nu este final.", output_id)
+    approval = Approval(
+        id=uuid.uuid4().hex,
+        job_id=job,
+        output_id=output_id,
+        readiness_hash=readiness_hash,
+        on_decision=_latest_decision(db, job),
+        at=datetime.now(UTC),
+        actor=actor,
+    )
+    db.execute(
+        "INSERT INTO approvals VALUES (?,?,?,?,?,?,?)",
+        (
+            approval.id,
+            job,
+            output_id,
+            readiness_hash,
+            approval.on_decision,
+            approval.at.isoformat(),
+            actor,
+        ),
+    )
+    return approval
 
 
 def _require_ready(readiness: Readiness, final: bool, job: str) -> None:
@@ -143,7 +163,7 @@ def _require_ready(readiness: Readiness, final: bool, job: str) -> None:
         raise EmaError("not_ready", "Ciorna nu poate fi exportată.", job)
 
 
-def export(
+def export(  # noqa: PLR0913
     ws: Workspace,
     job: str,
     workflow: Workflow,
@@ -151,6 +171,7 @@ def export(
     final: bool,
     dest: Path,
     actor: Actor,
+    expected_output_id: str | None = None,
 ) -> Path:
     draft_output_id: str | None = None
     if not final:
@@ -162,6 +183,8 @@ def export(
         output_id = _latest_output(db, job) if final else draft_output_id
         if output_id is None:
             raise EmaError("output_missing", "Documentul lipsește.", job)
+        if expected_output_id is not None and output_id != expected_output_id:
+            raise EmaError("output_stale", "Documentul nu este versiunea curentă.", job)
         row = db.execute(
             "SELECT relative_path,sha,run_id,kind FROM outputs WHERE id=?", (output_id,)
         ).fetchone()

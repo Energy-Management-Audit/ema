@@ -3,21 +3,18 @@
 from __future__ import annotations
 
 import hashlib
-import http.client
-import ipaddress
 import json
 import re
-import socket
-import ssl
-import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from urllib.parse import unquote, urljoin, urlsplit
+from urllib.parse import unquote
 
 from ema.core.errors import EmaError
 from ema.core.logging import write_event
 from ema.core.review.fields import fields
+from ema.core.web import fetch_bytes
+from ema.core.web import request as _request
 from ema.core.workspace import Workspace
 
 MAX_QUERY = 180
@@ -157,115 +154,6 @@ class OutboundGuard:
             raise EmaError("outbound_refused", "Cererea online a fost refuzată.", reason)
 
 
-def _public_ip(host: str, port: int) -> str:
-    try:
-        addresses = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
-    except OSError as exc:
-        raise EmaError("web_dns", "Adresa sursei nu poate fi rezolvată.", host) from exc
-    ips = {item[4][0] for item in addresses}
-    if not ips or any(not ipaddress.ip_address(ip).is_global for ip in ips):
-        raise EmaError("web_private", "Sursa online nu este publică.", host)
-    return str(sorted(ips)[0])
-
-
-class _PinnedHTTP(http.client.HTTPConnection):
-    def __init__(self, host: str, port: int, ip: str, timeout: float) -> None:
-        super().__init__(host, port, timeout=timeout)
-        self.ip = ip
-
-    def connect(self) -> None:
-        self.sock = socket.create_connection((self.ip, self.port), self.timeout)
-
-
-class _PinnedHTTPS(http.client.HTTPSConnection):
-    def __init__(self, host: str, port: int, ip: str, timeout: float) -> None:
-        super().__init__(host, port, timeout=timeout, context=ssl.create_default_context())
-        self.ip = ip
-        self.tls_context = ssl.create_default_context()
-
-    def connect(self) -> None:
-        raw = socket.create_connection((self.ip, self.port), self.timeout)
-        self.sock = self.tls_context.wrap_socket(raw, server_hostname=self.host)
-
-
-def _read_body(
-    response: http.client.HTTPResponse,
-    connection: http.client.HTTPConnection,
-    deadline: float,
-    url: str,
-) -> bytes:
-    chunks: list[bytes] = []
-    size = 0
-    while True:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise EmaError("web_timeout", "Sursa online a depășit timpul permis.", url)
-        if connection.sock is not None:
-            connection.sock.settimeout(remaining)
-        chunk = response.read(min(65536, MAX_BODY + 1 - size))
-        if not chunk:
-            return b"".join(chunks)
-        chunks.append(chunk)
-        size += len(chunk)
-        if size > MAX_BODY:
-            raise EmaError("web_size", "Sursa online este prea mare.", url)
-
-
-def _request(url: str, method: str, payload: bytes | None) -> tuple[int, str, bytes, str | None]:
-    parsed = urlsplit(url)
-    if (
-        parsed.scheme not in {"http", "https"}
-        or not parsed.hostname
-        or parsed.username is not None
-        or parsed.password is not None
-    ):
-        raise EmaError("web_url", "Adresa sursei este invalidă.", url)
-    try:
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    except ValueError as exc:
-        raise EmaError("web_url", "Adresa sursei este invalidă.", url) from exc
-    if port not in {80, 443}:
-        raise EmaError("web_port", "Portul sursei nu este permis.", url)
-    ip = _public_ip(parsed.hostname, port)
-    connection = (
-        _PinnedHTTPS(parsed.hostname, port, ip, 8)
-        if parsed.scheme == "https"
-        else _PinnedHTTP(parsed.hostname, port, ip, 8)
-    )
-    target = parsed.path or "/"
-    if parsed.query:
-        target += "?" + parsed.query
-    try:
-        deadline = time.monotonic() + 10
-        connection.request(
-            method,
-            target,
-            body=payload,
-            headers={
-                "Host": parsed.netloc,
-                "User-Agent": "EmaResearch/1",
-                "Content-Type": "application/json",
-                "Accept-Encoding": "identity",
-            },
-        )
-        response = connection.getresponse()
-        if response.getheader("Content-Encoding", "identity").lower() != "identity":
-            raise EmaError("web_encoding", "Codarea sursei nu este acceptată.", url)
-        content_type = response.getheader("Content-Type", "").split(";", 1)[0].lower()
-        if response.status not in {301, 302, 303, 307, 308} and content_type not in _ALLOWED_TYPES:
-            raise EmaError("web_type", "Tipul sursei nu este acceptat.", content_type)
-        if response.length is not None and response.length > MAX_BODY:
-            raise EmaError("web_size", "Sursa online este prea mare.", url)
-        body = _read_body(response, connection, deadline, url)
-        return response.status, content_type, body, response.getheader("Location")
-    except (OSError, TimeoutError) as exc:
-        raise EmaError(
-            "web_unavailable", "Sursa online nu este disponibilă.", type(exc).__name__
-        ) from exc
-    finally:
-        connection.close()
-
-
 def fetch(
     ws: Workspace,
     job: str,
@@ -275,20 +163,13 @@ def fetch(
     method: str = "GET",
     payload: bytes | None = None,
 ) -> Snapshot:
-    current = url
-    for _ in range(6):
-        guard.check("url", current)
-        status, content_type, body, redirect = _request(current, method, payload)
-        if status in {301, 302, 303, 307, 308}:
-            if not redirect:
-                raise EmaError("web_redirect", "Redirecționarea nu are destinație.", current)
-            current = urljoin(current, redirect)
-            if status == 303:
-                method, payload = "GET", None
-            continue
-        if status >= 400:
-            raise EmaError("web_status", "Sursa online a răspuns cu eroare.", str(status))
-        sha = hashlib.sha256(body).hexdigest()
-        retrieved = datetime.now(UTC)
-        return store_snapshot(ws, job, Snapshot(current, sha, retrieved, content_type, body))
-    raise EmaError("web_redirect", "Prea multe redirecționări.", url)
+    current, content_type, body = fetch_bytes(
+        url,
+        method=method,
+        payload=payload,
+        check_url=lambda value: guard.check("url", value),
+        request=_request,
+    )
+    sha = hashlib.sha256(body).hexdigest()
+    retrieved = datetime.now(UTC)
+    return store_snapshot(ws, job, Snapshot(current, sha, retrieved, content_type, body))

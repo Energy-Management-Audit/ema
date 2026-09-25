@@ -13,8 +13,8 @@ from openapi_spec_validator import validate as validate_openapi
 from pypdfium2 import PdfDocument
 
 from ema.api import create_app
-from ema.api.mock import seed
-from ema.api.routes import PROVISIONAL
+from ema.api.mock import preview_pdf, seed
+from ema.api.provisional import PROVISIONAL, REASONS
 from ema.audit.catalogue import CATALOGUE, AuditFact
 from ema.core.jobs import StageOutcome, create_job, run_stage, status
 from ema.core.review import propose
@@ -63,9 +63,10 @@ def test_openapi_snapshot_and_provisional_mock(tmp_path: Path) -> None:
     mock = TestClient(create_app(ws, PORT, launch_code="mock-code", mock=True), base_url=BASE)
     mock_session = mock.post("/session", json={"code": "mock-code"})
     assert mock_session.status_code == 200
+    audit_id = next(item["id"] for item in mock.get("/jobs").json() if item["type"] == "audit")
     for method, path in PROVISIONAL:
         operation = observed["paths"][path][method.lower()]
-        assert operation["x-provisional"] is True
+        assert operation["x-provisional"] == REASONS[path]
         if method != "GET" and "requestBody" in operation:
             content = operation["requestBody"]["content"]
             if "application/json" in content:
@@ -88,6 +89,8 @@ def test_openapi_snapshot_and_provisional_mock(tmp_path: Path) -> None:
             "evidence_id",
         ):
             url = url.replace("{" + key + "}", "synthetic")
+        if path.endswith("preview.pdf"):
+            url = url.replace("synthetic", audit_id)
         reply = mock.request(method, url, headers={"x-ema-csrf": mock_session.json()["csrf"]})
         assert reply.status_code == 200, (method, path, reply.text)
         if path.endswith(".pdf"):
@@ -149,7 +152,7 @@ def test_session_checks_cover_json_sse_and_download(tmp_path: Path) -> None:
     )
 
 
-def test_frozen_job_slot_review_and_section_routes(tmp_path: Path) -> None:
+def test_frozen_job_slot_review_and_section_routes(tmp_path: Path) -> None:  # noqa: PLR0915
     ws = Workspace(tmp_path / "workspace")
     client, headers = session(ws)
     assert (
@@ -158,26 +161,42 @@ def test_frozen_job_slot_review_and_section_routes(tmp_path: Path) -> None:
         ).status_code
         == 403
     )
+    client_id = client.post("/clients", json={"name": "Synthetic Client"}, headers=headers).json()[
+        "id"
+    ]
     created = client.post(
-        "/jobs", json={"type": "audit", "client": "synthetic", "year": 2026}, headers=headers
+        "/jobs", json={"type": "audit", "client": client_id, "year": 2026}, headers=headers
     )
     assert created.status_code == 200
     job = created.json()["id"]
     assert len(client.get("/jobs").json()) == 1
     assert client.get(f"/jobs/{job}").json()["type"] == "audit"
+    assert client.get(f"/jobs/{job}").json()["revision"] == 1
     assert client.get(f"/jobs/{job}/status").json()["state"] == "created"
-    assert client.get(f"/jobs/{job}/events").status_code == 200
+    assert client.get(f"/jobs/{job}/status").json()["revision"] == 1
     assert client.post(f"/jobs/{job}/cancel", headers=headers).json() == {"cancelled": True}
 
     source = tmp_path / "source.txt"
     source.write_text("Synthetic document", encoding="utf-8")
-    sha = ws.add_file("synthetic", source)
-    slot = f"/jobs/{job}/slots/invoices/001"
+    sha = ws.add_file(client_id, source)
+    slot = f"/jobs/{job}/slots/dossier/001"
     first = client.put(slot, json={"file_sha": sha}, headers=headers)
     assert first.status_code == 200
-    assert client.get(f"/jobs/{job}/slots").json() == ["invoices/001"]
+    assert client.get(f"/jobs/{job}/slots").json() == ["dossier/001"]
     assert client.get(f"{slot}/versions").json()[0]["file_sha"] == sha
-    assert client.delete(f"{slot}/versions/1", headers=headers).status_code == 200
+    with ws.connect() as db:
+        slot_revision = db.execute(
+            "SELECT revision FROM slots WHERE job_id=? AND name=?", (job, "dossier/001")
+        ).fetchone()[0]
+    assert (
+        client.request(
+            "DELETE",
+            f"{slot}/versions/1",
+            json={"confirm": True, "on_revision": slot_revision},
+            headers=headers,
+        ).status_code
+        == 200
+    )
 
     field = propose(
         ws, job, AuditFact.COMPANY_NAME.value, "Before", [evidence("source-1")], state="extracted"
@@ -235,19 +254,34 @@ def test_frozen_job_slot_review_and_section_routes(tmp_path: Path) -> None:
     assert client.get(f"/jobs/{job}/export/checks").json()["readiness"]["final_ok"] is False
     assert (
         client.post(
-            f"/jobs/{job}/export", json={"final": True, "confirm": True}, headers=headers
+            f"/jobs/{job}/export",
+            json={
+                "final": True,
+                "confirm": True,
+                "output_id": "synthetic",
+                "readiness_hash": "synthetic",
+            },
+            headers=headers,
         ).status_code
         == 409
     )
+    with ws.connect() as db:
+        job_revision = db.execute("SELECT revision FROM jobs WHERE id=?", (job,)).fetchone()[0]
     assert (
         client.request(
-            "DELETE", f"/jobs/{job}", json={"confirm": False}, headers=headers
+            "DELETE",
+            f"/jobs/{job}",
+            json={"confirm": False, "on_revision": job_revision},
+            headers=headers,
         ).status_code
         == 403
     )
     assert (
         client.request(
-            "DELETE", f"/jobs/{job}", json={"confirm": True}, headers=headers
+            "DELETE",
+            f"/jobs/{job}",
+            json={"confirm": True, "on_revision": job_revision},
+            headers=headers,
         ).status_code
         == 200
     )
@@ -273,7 +307,17 @@ def test_http_rerun_undo_and_synthetic_final_export(tmp_path: Path) -> None:
         == 400
     )
     assert (
-        client.post(f"/jobs/{job}/export", json={"final": True}, headers=headers).status_code == 409
+        client.post(
+            f"/jobs/{job}/export",
+            json={
+                "final": True,
+                "output_id": "synthetic",
+                "readiness_hash": "synthetic",
+                "confirm": True,
+            },
+            headers=headers,
+        ).status_code
+        == 409
     )
     for section in CATALOGUE:
         current_revision = next(
@@ -314,9 +358,9 @@ def test_http_rerun_undo_and_synthetic_final_export(tmp_path: Path) -> None:
     assert checks["readiness"]["final_ok"] is True
 
     def save(ctx):  # type: ignore[no-untyped-def]
-        path = ctx.artifact_dir() / "synthetic.txt"
-        path.write_text("synthetic output", encoding="utf-8")
-        ctx.save_output(path, "synthetic.txt", kind="final")
+        path = ctx.artifact_dir() / "synthetic.pdf"
+        path.write_bytes(preview_pdf())
+        ctx.save_output(path, "synthetic.pdf", kind="final")
         return StageOutcome()
 
     run_stage(ws, job, "render", save)
@@ -326,7 +370,7 @@ def test_http_rerun_undo_and_synthetic_final_export(tmp_path: Path) -> None:
     assert status(ws, job).runs[-1]["state"] == "ready"
     with ws.connect() as db:
         output_id = str(db.execute("SELECT id FROM outputs WHERE job_id=?", (job,)).fetchone()[0])
-    assert client.get(f"/jobs/{job}/outputs/{output_id}").content == b"synthetic output"
+    assert client.get(f"/jobs/{job}/outputs/{output_id}").content == preview_pdf()
     checks = client.get(f"/jobs/{job}/export/checks").json()
     assert (
         client.post(
@@ -352,4 +396,4 @@ def test_http_rerun_undo_and_synthetic_final_export(tmp_path: Path) -> None:
     )
     assert result.status_code == 200, result.text
     assert result.json() == {"output_id": output_id}
-    assert (ws.root / "exports" / f"{job}-{output_id}.txt").read_text() == "synthetic output"
+    assert (ws.root / "exports" / f"{job}-{output_id}.pdf").read_bytes() == preview_pdf()

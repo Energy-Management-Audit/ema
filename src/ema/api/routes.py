@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
-from collections.abc import Callable
+from collections.abc import AsyncIterator
 from dataclasses import asdict
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from fastapi import FastAPI, Header, Query, Request, Response
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel, ConfigDict
 
-from ema.api.mock import preview_pdf, snippet_png
+from ema.api.job_routes import validate_slot
 from ema.api.models import (
     CancelResult,
     DeleteResult,
@@ -24,11 +25,15 @@ from ema.api.models import (
     SectionState,
     SlotVersion,
 )
-from ema.api.provisional import PROVISIONAL, example_schema, mock_example, request_body
-from ema.audit.sections import Status, get_status, set_status, statuses
+from ema.api.provisional import install_provisional_routes
+from ema.audit.sections import Status, set_status, statuses
 from ema.audit.workflow import AuditWorkflow
+from ema.clients.registry import get_client
 from ema.core.errors import EmaError
-from ema.core.jobs import cancel, create_job, get_job, list_jobs, status, subscribe
+from ema.core.jobs import cancel, create_job, get_job, list_jobs, status
+from ema.core.jobs.events import replay
+from ema.core.jobs.outputs import MEDIA
+from ema.core.jobs.outputs import get_output as stored_output
 from ema.core.review import (
     accept_batch,
     approve_final,
@@ -43,20 +48,26 @@ from ema.core.review import (
 )
 from ema.core.review.evidence import get_evidence
 from ema.core.review.models import Decision, Evidence, Field
+from ema.core.review.readiness import readiness_hash_in_tx
 from ema.core.workspace import Workspace
+from ema.invoices import InvoiceWorkflow
+from ema.piee.review_workflow import PieeWorkflow
 
 
 class NewJob(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["invoices", "piee", "audit", "reporting"]
     client: str
     year: int | None = None
 
 
 class SlotInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     file_sha: str
 
 
 class DecisionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     action: Literal["accept", "correct", "reject", "choose"]
     on_revision: int
     value: Any = None
@@ -64,31 +75,50 @@ class DecisionInput(BaseModel):
 
 
 class BatchInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     fields: list[tuple[str, int]]
 
 
 class SectionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     status: Literal["done", "n/a", "later", "ready", "missing"]
     on_revision: int
     reason: str | None = None
     confirm: bool = False
 
 
-class ConfirmInput(BaseModel):
+class DeleteInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     confirm: bool
+    on_revision: int
 
 
 class ExportInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     final: Literal[True]
-    output_id: str | None = None
-    readiness_hash: str | None = None
+    output_id: str
+    readiness_hash: str
     confirm: bool = False
+
+
+async def _poll_events() -> None:
+    await asyncio.sleep(1)
 
 
 def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None:  # noqa: C901, PLR0915
     def audit_only(job_id: str) -> None:
         if get_job(ws, job_id)["type"] != "audit":
-            raise HTTPException(501, "Workflow contract is provisional")
+            raise EmaError("wrong_job_type", "Lucrarea nu este un audit.", "")
+
+    def export_workflow(job_id: str) -> AuditWorkflow | PieeWorkflow | InvoiceWorkflow:
+        job_type = get_job(ws, job_id)["type"]
+        if job_type == "audit":
+            return AuditWorkflow()
+        if job_type == "piee":
+            return PieeWorkflow()
+        if job_type == "invoices":
+            return InvoiceWorkflow()
+        raise EmaError("wrong_job_type", "Exportul nu este disponibil.", "")
 
     @app.get("/jobs", tags=["jobs"], response_model=list[Job])
     def jobs() -> list[dict[str, Any]]:
@@ -96,6 +126,8 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
 
     @app.post("/jobs", tags=["jobs"], response_model=NewJobResult)
     def new_job(body: NewJob) -> dict[str, str]:
+        if body.type != "reporting":
+            get_client(ws, body.client)
         return {"id": create_job(ws, body.type, body.client, body.year)}
 
     @app.get("/jobs/{job_id}", tags=["jobs"], response_model=Job)
@@ -104,32 +136,70 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
 
     @app.get("/jobs/{job_id}/status", tags=["jobs"], response_model=JobStatus)
     def job_status(job_id: str) -> dict[str, object]:
-        return asdict(status(ws, job_id))
+        result = asdict(status(ws, job_id))
+        for run in result["runs"]:
+            if run.get("error"):
+                run["error"] = "Etapa a eșuat."
+        return result
 
     @app.get(
         "/jobs/{job_id}/events",
         tags=["jobs"],
+        response_class=StreamingResponse,
         responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}},
     )
-    def events(job_id: str) -> StreamingResponse:
+    def events(
+        job_id: str,
+        request: Request,
+        last_event_id: str | None = Header(None, alias="Last-Event-ID"),
+    ) -> StreamingResponse:
         get_job(ws, job_id)
+        raw = last_event_id
+        if raw is not None and not re.fullmatch(r"[0-9]+", raw):
+            raise EmaError("invalid_cursor", "Poziția evenimentului este invalidă.", raw)
+        try:
+            cursor = int(raw) if raw is not None else 0
+        except ValueError as exc:
+            raise EmaError("invalid_cursor", "Poziția evenimentului este invalidă.", "") from exc
 
-        def stream() -> Any:
-            for event in subscribe(ws, job_id):
-                yield f"data: {json.dumps(asdict(event), ensure_ascii=False)}\n\n"
+        async def stream() -> AsyncIterator[str]:
+            nonlocal cursor
+            idle = 0
+            while not await request.is_disconnected():
+                batch, terminal = replay(ws, job_id, cursor)
+                for event in batch:
+                    cursor = event.seq
+                    payload = asdict(event)
+                    data = json.dumps(payload, ensure_ascii=False)
+                    yield f"id: {event.seq}\nevent: {event.type}\ndata: {data}\n\n"
+                if not batch and terminal:
+                    return
+                if batch:
+                    idle = 0
+                    continue
+                await _poll_events()
+                idle += 1
+                if idle == 15:
+                    yield ": keepalive\n\n"
+                    idle = 0
 
-        return StreamingResponse(stream(), media_type="text/event-stream")
+        return StreamingResponse(
+            stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.post("/jobs/{job_id}/cancel", tags=["jobs"], response_model=CancelResult)
     def cancel_job(job_id: str) -> dict[str, bool]:
+        get_job(ws, job_id)
         cancel(ws, job_id)
         return {"cancelled": True}
 
     @app.delete("/jobs/{job_id}", tags=["jobs"], response_model=DeleteResult)
-    def delete_job(job_id: str, body: ConfirmInput) -> dict[str, bool]:
-        if not body.confirm:
-            raise HTTPException(403, "Human confirmation required")
-        ws.delete_job(job_id)
+    def delete_job(job_id: str, body: DeleteInput, request: Request) -> dict[str, bool]:
+        if not body.confirm or not getattr(request.state, "human_session", False):
+            raise EmaError("human_required", "Confirmarea umană este necesară.", "")
+        ws.delete_job(job_id, on_revision=body.on_revision)
         return {"deleted": True}
 
     @app.get("/jobs/{job_id}/slots", tags=["documents"])
@@ -148,6 +218,7 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
 
     @app.put("/jobs/{job_id}/slots/{slot:path}", tags=["documents"], response_model=SlotVersion)
     def put_slot(job_id: str, slot: str, body: SlotInput) -> dict[str, object]:
+        validate_slot(str(get_job(ws, job_id)["type"]), slot)
         return asdict(ws.set_slot(job_id, slot, body.file_sha))
 
     @app.delete(
@@ -155,8 +226,12 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
         tags=["documents"],
         response_model=DeleteResult,
     )
-    def delete_version(job_id: str, slot: str, version: int) -> dict[str, bool]:
-        ws.remove_version(job_id, slot, version)
+    def delete_version(
+        job_id: str, slot: str, version: int, body: DeleteInput, request: Request
+    ) -> dict[str, bool]:
+        if not body.confirm or not getattr(request.state, "human_session", False):
+            raise EmaError("human_required", "Confirmarea umană este necesară.", "")
+        ws.remove_version(job_id, slot, version, on_revision=body.on_revision)
         return {"deleted": True}
 
     @app.get("/jobs/{job_id}/fields", tags=["review"], response_model=list[Field])
@@ -210,42 +285,27 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
         return [item.payload() for item in statuses(ws, job_id)]
 
     @app.patch("/jobs/{job_id}/sections/{section_id}", tags=["audit"], response_model=SectionState)
-    def change_section(job_id: str, section_id: str, body: SectionInput) -> dict[str, object]:
+    def change_section(
+        job_id: str, section_id: str, body: SectionInput, request: Request
+    ) -> dict[str, object]:
         audit_only(job_id)
-        if body.status in ("done", "n/a") and not body.confirm:
-            raise HTTPException(403, "Human confirmation required")
-        try:
-            return set_status(
-                ws,
-                job_id,
-                section_id,
-                Status(body.status),
-                "user",
-                body.reason,
-                on_revision=body.on_revision,
-            ).payload()
-        except EmaError as exc:
-            if exc.code != "stale_revision":
-                raise
-            raise HTTPException(
-                409, {"current_revision": get_status(ws, job_id, section_id).revision}
-            ) from exc
+        if body.status in ("done", "n/a") and (
+            not body.confirm or not getattr(request.state, "human_session", False)
+        ):
+            raise EmaError("human_required", "Confirmarea umană este necesară.", "")
+        return set_status(
+            ws,
+            job_id,
+            section_id,
+            Status(body.status),
+            "user",
+            body.reason,
+            on_revision=body.on_revision,
+        ).payload()
 
     @app.get("/jobs/{job_id}/export/checks", tags=["export"], response_model=ExportChecks)
     def checks(job_id: str) -> dict[str, Any]:
-        if mock and get_job(ws, job_id)["type"] != "audit":
-            return {
-                "readiness": {
-                    "draft_ok": True,
-                    "final_ok": False,
-                    "blocking": [],
-                    "warnings": [],
-                    "next": [],
-                },
-                "readiness_hash": "synthetic",
-            }
-        audit_only(job_id)
-        workflow = AuditWorkflow()
+        workflow = export_workflow(job_id)
         readiness = workflow.readiness(ws, job_id)
         return {
             "readiness": readiness.model_dump(mode="json"),
@@ -255,85 +315,71 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
     @app.get(
         "/jobs/{job_id}/outputs/{output_id}",
         tags=["export"],
+        response_class=Response,
         responses={
             200: {
                 "content": {
-                    "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
-                }
+                    media: {"schema": {"type": "string", "format": "binary"}}
+                    for media in MEDIA.values()
+                },
             }
         },
     )
     def get_output(job_id: str, output_id: str) -> Response:
         if mock:
             get_job(ws, job_id)
-            return Response(b"Synthetic output", media_type="application/octet-stream")
-        path = output_path(ws, job_id, output_id)
-        return FileResponse(path, filename=path.name)
+            return Response(
+                b"Synthetic output",
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                headers={"X-Content-Type-Options": "nosniff"},
+            )
+        metadata, relative = stored_output(ws, job_id, output_id)
+        path = ws.path(relative)
+        return FileResponse(
+            path,
+            filename=str(metadata["download_name"]),
+            media_type=str(metadata["media_type"]),
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
 
     @app.post("/jobs/{job_id}/export", tags=["export"], response_model=ExportResult)
     def do_export(job_id: str, body: ExportInput, request: Request) -> dict[str, str]:
-        if mock and get_job(ws, job_id)["type"] != "audit":
-            return {"output_id": "output-exemplu"}
-        audit_only(job_id)
-        workflow = AuditWorkflow()
-        readiness = workflow.readiness(ws, job_id)
-        if not readiness.final_ok:
-            raise HTTPException(409, "Final export is not ready")
-        current_hash = readiness_hash(ws, job_id, readiness, workflow)
-        if not body.confirm or body.readiness_hash != current_hash or body.output_id is None:
-            raise HTTPException(403, "Revision-bound human approval required")
-        if not request.cookies.get("ema_session"):
-            raise HTTPException(403, "Human session required")
-        approve_final(ws, job_id, body.output_id, current_hash, "user")
+        if not body.confirm or not getattr(request.state, "human_session", False):
+            raise EmaError("human_required", "Confirmarea umană este necesară.", "")
+        workflow = export_workflow(job_id)
+        with ws.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            job_row = db.execute(
+                "SELECT state FROM jobs WHERE id=? AND deleted=0", (job_id,)
+            ).fetchone()
+            if job_row is None:
+                raise EmaError("job_missing", "Lucrarea nu există.", "")
+            if job_row["state"] == "running":
+                raise EmaError("job_running", "Lucrarea rulează deja.", "")
+            readiness_reader = getattr(workflow, "readiness_in_tx", None)
+            readiness = (
+                readiness_reader(ws, job_id, db)
+                if readiness_reader is not None
+                else workflow.readiness(ws, job_id)
+            )
+            if not readiness.final_ok:
+                raise EmaError("not_ready", "Lucrarea nu este pregătită.", "")
+            current_hash = readiness_hash_in_tx(ws, db, job_id, readiness, workflow)
+            if body.readiness_hash != current_hash:
+                raise EmaError("hash_mismatch", "Datele de pregătire nu corespund.", "")
+            approve_final(ws, job_id, body.output_id, current_hash, "user", db=db)
         source = output_path(ws, job_id, body.output_id)
         destination = ws.root / "exports" / f"{job_id}-{body.output_id}{source.suffix}"
         destination.parent.mkdir(exist_ok=True)
-        export(ws, job_id, workflow, final=True, dest=destination, actor="user")
+        export(
+            ws,
+            job_id,
+            workflow,
+            final=True,
+            dest=destination,
+            actor="user",
+            expected_output_id=body.output_id,
+        )
         return {"output_id": body.output_id}
 
-    def provisional_handler(method: str, route: str) -> Callable[[], Response]:
-        def handler() -> Response:
-            if mock:
-                if route.endswith("preview.pdf"):
-                    return Response(preview_pdf(), media_type="application/pdf")
-                if route.endswith(".png"):
-                    return Response(snippet_png(), media_type="image/png")
-                return JSONResponse(mock_example(method, route))
-            return JSONResponse({"detail": "Provisional contract"}, status_code=501)
-
-        return handler
-
-    for method, path in PROVISIONAL:
-        example = mock_example(method, path)
-        body = request_body(method, path)
-        content_type = (
-            "application/pdf"
-            if path.endswith(".pdf")
-            else "image/png"
-            if path.endswith(".png")
-            else "application/json"
-        )
-        content = (
-            {"schema": {"type": "string", "format": "binary"}}
-            if content_type != "application/json"
-            else {"schema": example_schema(example), "example": example}
-        )
-        parameters = [
-            {"name": name, "in": "path", "required": True, "schema": {"type": "string"}}
-            for name in re.findall(r"\{(\w+)\}", path)
-        ]
-        app.add_api_route(
-            path,
-            provisional_handler(method, path),
-            methods=[method],
-            tags=["provisional"],
-            openapi_extra={
-                "x-provisional": True,
-                "parameters": parameters,
-                **({"requestBody": body} if body is not None else {}),
-            },
-            responses={
-                200: {"content": {content_type: content}},
-                501: {"description": "Contract only; use case pending"},
-            },
-        )
+    install_provisional_routes(app, ws, mock=mock)

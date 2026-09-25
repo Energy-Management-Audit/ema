@@ -7,7 +7,7 @@ import tempfile
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
@@ -24,6 +24,7 @@ from ema.core.jobs import (
 )
 from ema.core.jobs.reads import run_current
 from ema.core.logging import write_event
+from ema.core.review.models import Issue, Readiness
 from ema.core.workspace import Workspace
 from ema.invoices.artifact import encode, exportable_drafts
 from ema.invoices.batch_identity import KEY as BATCH_CLIENT_KEY
@@ -49,8 +50,10 @@ __all__ = (
     "extract_batch",
     "raw_outcomes",
     "readiness",
+    "render",
     "resolved_outcomes",
     "run_batch",
+    "start_workbook",
     "undo_client",
 )
 
@@ -143,7 +146,14 @@ def extract_batch(
     return StageOutcome(item_failures=failures, warnings=warnings)
 
 
-def export(ws: Workspace, job: JobId, dest: Path) -> Path:
+def render(
+    ws: Workspace,
+    job: JobId,
+    kind: Literal["draft", "final"],
+    *,
+    ctx: StageContext | None = None,
+    name: str = "Facturi.xlsx",
+) -> str | None:
     run = latest_ready_run(ws, job, "invoices")
     if run is None:
         raise EmaError("invoices_missing", "Extracția facturilor lipsește.", job)
@@ -151,19 +161,23 @@ def export(ws: Workspace, job: JobId, dest: Path) -> Path:
         if not run_current(db, run):
             raise EmaError("invoices_stale", "Extracția facturilor nu mai este actuală.", job)
         artifact = ws.artifact_dir(db, job, "invoices", run) / "outcomes.json"
-        output_dir = ws.job_path(db, job) / "outputs"
-    if dest.parent.resolve() != output_dir.resolve():
-        raise EmaError("output_path", "Exportul trebuie salvat în lucrare.", str(dest))
+        ws.job_path(db, job)
     checks = readiness(ws, job)
     if not checks.final_ok:
         raise EmaError("invoices_unconfirmed_client", checks.blocking[0], job)
     client_field, _ = batch_client(ws, job)
+    if ctx is not None:
+        ctx.read_slots("invoices")
+        ctx.record_read("fields", client_field.id, client_field.revision)
     drafts = exportable_drafts(json.dumps(resolved_outcomes(ws, job), ensure_ascii=False))
     if not drafts:
         raise EmaError("invoices_no_export", "Nicio factură nu poate fi exportată.", job)
     with tempfile.TemporaryDirectory(dir=artifact.parent) as temporary_dir:
         temporary = Path(temporary_dir) / "workbook.xlsx"
         OpenpyxlWorkbookExporter().export(drafts, temporary)
+        if ctx is not None:
+            ctx.save_output(temporary, name, kind=kind)
+            return None
         with ws.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             if not run_current(db, run):
@@ -180,6 +194,74 @@ def export(ws: Workspace, job: JobId, dest: Path) -> Path:
                 raise EmaError(
                     "invoices_unconfirmed_client", "Clientul lotului nu este confirmat.", job
                 )
-            output = ws.save_output(db, job, run, temporary, dest.name)
-            ws.record_outputs(db, job, run, [(output, "draft")])
-    return output
+            previous = db.execute(
+                "SELECT COUNT(*) FROM outputs WHERE job_id=? AND run_id=? AND kind='draft'",
+                (job, run),
+            ).fetchone()[0]
+            output_name = (
+                name if previous == 0 else f"{Path(name).stem}-{previous + 1}{Path(name).suffix}"
+            )
+            output = ws.save_output(db, job, run, temporary, output_name)
+            ws.record_outputs(db, job, run, [(output, kind)])
+            row = db.execute(
+                "SELECT id FROM outputs WHERE job_id=? AND run_id=? ORDER BY seq DESC LIMIT 1",
+                (job, run),
+            ).fetchone()
+    assert row is not None
+    return str(row["id"])
+
+
+def start_workbook(ws: Workspace, job: JobId, *, on_revision: int | None = None) -> str:
+    if not readiness(ws, job).final_ok:
+        raise EmaError("not_ready", "Lotul nu este pregătit pentru export.", "")
+
+    def stage(ctx: StageContext) -> StageOutcome:
+        render(ws, job, "final", ctx=ctx)
+        return StageOutcome()
+
+    return run_stage(ws, job, "invoices_workbook", stage, on_revision=on_revision)
+
+
+def export(ws: Workspace, job: JobId, dest: Path) -> Path:
+    with ws.connect() as db:
+        output_dir = ws.job_path(db, job) / "outputs"
+    if dest.parent.resolve() != output_dir.resolve():
+        raise EmaError("output_path", "Exportul trebuie salvat în lucrare.", str(dest))
+    output_id = render(ws, job, "draft", name=dest.name)
+    assert output_id is not None
+    with ws.connect() as db:
+        row = db.execute("SELECT relative_path FROM outputs WHERE id=?", (output_id,)).fetchone()
+    assert row is not None
+    return ws.path(str(row["relative_path"]))
+
+
+class InvoiceWorkflow:
+    def readiness(self, ws: Workspace, job: JobId) -> Readiness:
+        checks = readiness(ws, job)
+        issues = [Issue(code="not_ready", message=message) for message in checks.blocking]
+        return Readiness(
+            draft_ok=True,
+            final_ok=checks.final_ok,
+            blocking=issues,
+            next=[issue.message for issue in issues],
+        )
+
+    def readiness_snapshot(self, ws: Workspace, job: JobId) -> dict[str, object]:
+        return {
+            "invoices_run": latest_ready_run(ws, job, "invoices"),
+            "workbook_run": latest_ready_run(ws, job, "invoices_workbook"),
+        }
+
+    def render(self, ws: Workspace, job: JobId, kind: str) -> str:
+        if kind == "draft":
+            output_id = render(ws, job, "draft")
+            assert output_id is not None
+            return output_id
+        with ws.connect() as db:
+            row = db.execute(
+                "SELECT id FROM outputs WHERE job_id=? AND kind='final' ORDER BY seq DESC LIMIT 1",
+                (job,),
+            ).fetchone()
+        if row is None:
+            raise EmaError("output_missing", "Documentul final lipsește.", "")
+        return str(row["id"])

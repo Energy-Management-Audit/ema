@@ -15,8 +15,16 @@ from ema.core.jobs import StageContext, StageOutcome
 from ema.core.llm import Limits, ReplayProvider
 from ema.core.office.convert import stored_file
 from ema.core.office.sniff import FileKind
+from ema.core.workspace import SlotVersion
 
 _PREFIX = re.compile(r"^(0|1[0-3]|[1-9])(?:\.\d+)?\.")
+
+
+def select_checklist(slots: list[SlotVersion]) -> SlotVersion:
+    matches = [version for version in slots if Path(version.slot).name.startswith("0.")]
+    if len(matches) != 1:
+        raise EmaError("checklist_file", "Fișierul Necesar info lipsește sau este ambiguu.", "")
+    return matches[0]
 
 
 @dataclass(frozen=True)
@@ -93,10 +101,8 @@ def audit_intake(
     limits: Limits | None = None,
 ) -> StageOutcome:
     slots = ctx.read_slots(collection)
-    checklist_slots = [version for version in slots if Path(version.slot).name.startswith("0.")]
-    if len(checklist_slots) != 1:
-        raise EmaError("checklist_file", "Fișierul Necesar info lipsește sau este ambiguu.", "")
-    _, checklist_path = stored_file(ctx.ws, ctx.job, checklist_slots[0].file_sha)
+    checklist = select_checklist(slots)
+    _, checklist_path = stored_file(ctx.ws, ctx.job, checklist.file_sha)
     checklist = read_checklist(checklist_path)
     records: list[IntakeRecord] = []
     failures: list[str] = []

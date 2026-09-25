@@ -7,13 +7,14 @@ import json
 from pathlib import Path
 from typing import cast
 
+from ema.core.config import load_settings
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, run_stage, status, subscribe
 from ema.core.jobs.reads import run_current
 from ema.core.office.anchors import leftover_issues
 from ema.core.office.package import check_standalone
 from ema.core.office.word import WordMac
-from ema.core.review import base_readiness, fields
+from ema.core.review import base_readiness
 from ema.core.review.models import FieldSpec, Issue, Readiness
 from ema.core.workspace import Workspace
 from ema.piee.compose import load_approved_base
@@ -88,19 +89,6 @@ class PieeWorkflow:
             ],
         )
         issues = list(base.blocking)
-        for field in fields(ws, job):
-            if field.review == "corrected" or (
-                field.chosen is not None
-                and field.alternatives
-                and field.chosen != field.alternatives[-1].id
-            ):
-                issues.append(
-                    Issue(
-                        code="review_override",
-                        field_id=field.id,
-                        message=f"Valoarea revizuită necesită regenerare: {field.label}",
-                    )
-                )
         try:
             checks = _checks(ws, job)
             _, draft_run, _ = _latest_draft(ws, job)
@@ -138,35 +126,44 @@ class PieeWorkflow:
         }
 
     def render(self, ws: Workspace, job: str, kind: str) -> str:
-        draft_id, draft_run, draft_path = _latest_draft(ws, job)
+        draft_id, _, _ = _latest_draft(ws, job)
         if kind == "draft":
             return draft_id
         if kind != "final":
             raise EmaError("output_kind", "Tipul documentului este invalid.", kind)
-        if not self.readiness(ws, job).final_ok:
-            raise EmaError("not_ready", "Lucrarea nu este pregătită pentru export.", job)
-        base_dir = base_directory(ws)
-        mapping = load_approved_base(base_dir)
-        workbook_path = _draft_workbook(ws, job, draft_run)
+        return _wait_for_output(ws, job, start_word_render(ws, job))
 
-        def stage(ctx: StageContext) -> StageOutcome:
-            ctx.read_slots("")
-            original = ctx.artifact_dir() / "PIEE-final.docx"
-            original.write_bytes(draft_path.read_bytes())
-            office = WordMac()
-            office.update_toc_pages(original)
-            pdf = ctx.artifact_dir() / "PIEE-final.pdf"
-            office.render_pdf(original, pdf)
-            office.open_check(original)
-            issues = check_standalone(original)
-            denylist = tuple(json.loads((base_dir / "base-identity.json").read_text()))
-            leftovers = leftover_issues(original, denylist)
-            if issues or leftovers or not pdf.is_file() or not pdf.stat().st_size:
-                raise EmaError("piee_package", "Pachetul PIEE final este invalid.", job)
-            ctx.record_input(template=mapping.base_sha)
-            ctx.save_output(workbook_path, "Prelucrare-date.xlsx")
-            ctx.save_output(pdf, "PIEE-final.pdf")
-            ctx.save_output(original, "PIEE-final.docx", kind="final")
-            return StageOutcome()
 
-        return _wait_for_output(ws, job, run_stage(ws, job, "piee_word", stage))
+def start_word_render(ws: Workspace, job: str, *, on_revision: int | None = None) -> str:
+    """Start the final Word stage without waiting for WordMac."""
+    _, draft_run, draft_path = _latest_draft(ws, job)
+    if not PieeWorkflow().readiness(ws, job).final_ok:
+        raise EmaError("not_ready", "Lucrarea nu este pregătită pentru export.", job)
+    settings = load_settings(ws)
+    if not settings.word_path.is_dir():
+        raise EmaError("word_unavailable", "Microsoft Word nu este disponibil.", "")
+    base_dir = base_directory(ws)
+    mapping = load_approved_base(base_dir)
+    workbook_path = _draft_workbook(ws, job, draft_run)
+
+    def stage(ctx: StageContext) -> StageOutcome:
+        ctx.read_slots("")
+        original = ctx.artifact_dir() / "PIEE-final.docx"
+        original.write_bytes(draft_path.read_bytes())
+        office = WordMac(app=settings.word_path, timeout_s=settings.word_timeout_s)
+        office.update_toc_pages(original)
+        pdf = ctx.artifact_dir() / "PIEE-final.pdf"
+        office.render_pdf(original, pdf)
+        office.open_check(original)
+        issues = check_standalone(original)
+        denylist = tuple(json.loads((base_dir / "base-identity.json").read_text()))
+        leftovers = leftover_issues(original, denylist)
+        if issues or leftovers or not pdf.is_file() or not pdf.stat().st_size:
+            raise EmaError("piee_package", "Pachetul PIEE final este invalid.", job)
+        ctx.record_input(template=mapping.base_sha)
+        ctx.save_output(workbook_path, "Prelucrare-date.xlsx")
+        ctx.save_output(pdf, "PIEE-final.pdf")
+        ctx.save_output(original, "PIEE-final.docx", kind="final")
+        return StageOutcome()
+
+    return run_stage(ws, job, "piee_word", stage, on_revision=on_revision)

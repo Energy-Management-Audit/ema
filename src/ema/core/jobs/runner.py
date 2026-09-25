@@ -12,6 +12,7 @@ from pathlib import Path
 
 import psutil
 
+from ema.core.jobs.events import append
 from ema.core.logging import log_exception
 from ema.core.workspace import Workspace
 
@@ -65,7 +66,7 @@ def recover(ws: Workspace) -> None:
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
         rows = db.execute(
-            "SELECT runs.id,runs.job_id,runners.host,runners.pid, "
+            "SELECT runs.id,runs.job_id,runs.stage,runners.host,runners.pid, "
             "runners.process_start,runners.heartbeat "
             "FROM runs LEFT JOIN runners ON runs.owner=runners.id WHERE runs.state='running'"
         ).fetchall()
@@ -83,6 +84,14 @@ def recover(ws: Workspace) -> None:
                 "UPDATE jobs SET state=CASE WHEN type='audit' THEN 'open' "
                 "ELSE 'failed' END,revision=revision+1 WHERE id=? AND state='running'",
                 (row["job_id"],),
+            )
+            append(
+                db,
+                str(row["job_id"]),
+                str(row["id"]),
+                str(row["stage"]),
+                "stage_failed",
+                {"code": "interrupted"},
             )
     ws.finish_deletes()
 

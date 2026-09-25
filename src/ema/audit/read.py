@@ -9,8 +9,11 @@ from decimal import Decimal
 from pathlib import Path
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.intake import select_checklist
 from ema.audit.sections import recompute_ready, record_applicability
 from ema.consumption_analysis.analysis import Metric, resolve_value
+from ema.core.errors import EmaError
+from ema.core.jobs import StageContext, StageOutcome, get_job
 from ema.core.review.fields import propose
 from ema.core.review.models import Cell, Derivation, Evidence, Field, FieldSpec, Manual
 from ema.core.workspace import Workspace
@@ -28,6 +31,21 @@ class ReadResult:
     dataset: EnergyDataset
     fields: tuple[Field, ...]
     issues: tuple[str, ...]
+
+
+def read_job(ctx: StageContext) -> StageOutcome:
+    """Run deterministic audit reading from the job's explicit active slots."""
+    client = str(get_job(ctx.ws, ctx.job)["client_slug"])
+    checklist = select_checklist(ctx.read_slots("dossier"))
+    necesar = ctx.ws.file_path(client, checklist.file_sha)
+    anexa = None
+    if "anexa" in ctx.ws.list_slots(ctx.job, ""):
+        anexa = ctx.ws.file_path(client, ctx.read_slot("anexa").file_sha)
+        if anexa.suffix.lower() not in {".xls", ".xlsx"}:
+            raise EmaError("file_type", "Tipul anexei este invalid.", "")
+    result = read_dossier(ctx.ws, ctx.job, necesar, anexa)
+    ctx.progress(1, 1, "Citire finalizată")
+    return StageOutcome(warnings=list(result.issues))
 
 
 def _sha(path: Path) -> str:

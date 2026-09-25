@@ -15,7 +15,7 @@ from ema.core.jobs import status, subscribe
 from ema.core.review import decide, fields
 from ema.core.workspace import Workspace
 from ema.piee.review_workflow import PieeWorkflow
-from ema.piee.workflow import GenerateRequest, start_generate
+from ema.piee.workflow import GenerateRequest, start_generate, start_generate_for_job
 
 pytestmark = pytest.mark.golden
 
@@ -62,9 +62,19 @@ def test_review_decision_and_final_gate(
             candidate for candidate in item.alternatives if candidate.value == item.value
         )
         decide(ws, job, item.id, "choose", item.revision, "user", alternative=selected.id)
+    assert any(issue.code == "stale" for issue in workflow.readiness(ws, job).blocking)
+    regenerated = start_generate_for_job(ws, job)
+    for _ in subscribe(ws, job):
+        pass
+    assert (
+        next(item for item in status(ws, job).runs if item["id"] == regenerated)["state"] == "ready"
+    )
     assert workflow.readiness(ws, job).final_ok
 
     class StubWord:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
         def update_toc_pages(self, _docx: Path) -> None:
             pass
 
@@ -87,7 +97,7 @@ def test_review_decision_and_final_gate(
     reviewed = next(item for item in fields(ws, job) if item.id == conflict.id)
     alternative = next(item for item in reviewed.alternatives if item.value != reviewed.value)
     decide(ws, job, reviewed.id, "choose", reviewed.revision, "user", alternative=alternative.id)
-    assert any(issue.code == "review_override" for issue in workflow.readiness(ws, job).blocking)
+    assert any(issue.code == "stale" for issue in workflow.readiness(ws, job).blocking)
 
 
 def test_cli_generate_review_and_refuse_unresolved_final(

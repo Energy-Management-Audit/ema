@@ -11,9 +11,53 @@ from typing import Any
 
 import pdfplumber
 import pypdfium2
+from PIL import Image, ImageDraw
 
 from ema.core.config import Settings
 from ema.core.errors import EmaError
+from ema.core.review.evidence import get_evidence
+from ema.core.review.models import PdfRegion, PdfText
+from ema.core.workspace import Workspace
+
+
+def render_evidence_png(
+    ws: Workspace, evidence_id: str, *, mode: str = "snippet", highlight: bool = False
+) -> bytes:
+    evidence = get_evidence(ws, evidence_id)
+    locator = evidence.locator
+    if evidence.provenance != "document" or not isinstance(locator, PdfRegion | PdfText):
+        raise EmaError("evidence_not_pdf", "Dovada nu provine dintr-un PDF.", "")
+    with ws.connect() as db:
+        row = db.execute(
+            "SELECT f.relative_path FROM evidence e JOIN jobs j ON j.id=e.job_id "
+            "JOIN files f ON f.client_slug=j.client_slug AND f.sha=? "
+            "WHERE e.id=?",
+            (evidence.file_sha, evidence_id),
+        ).fetchone()
+    if row is None:
+        raise EmaError("file_missing", "Fișierul dovezii lipsește.", "")
+    path = ws.path(str(row["relative_path"]))
+    if path.suffix.lower() != ".pdf":
+        raise EmaError("evidence_not_pdf", "Dovada nu provine dintr-un PDF.", "")
+    try:
+        with pypdfium2.PdfDocument(path) as document:
+            if locator.page < 1 or locator.page > len(document):
+                raise EmaError("evidence_missing", "Pagina dovezii lipsește.", "")
+            render_page: Any = document[locator.page - 1]
+            image: Image.Image = render_page.render(scale=2).to_pil()
+            if mode == "snippet" and isinstance(locator, PdfRegion):
+                x0, y0, x1, y1 = locator.bbox
+                box = (int(x0 * 2), int(y0 * 2), int(x1 * 2), int(y1 * 2))
+                image = image.crop(box)
+                if highlight:
+                    ImageDraw.Draw(image).rectangle(
+                        (0, 0, image.width - 1, image.height - 1), outline="#d93636", width=3
+                    )
+            output = io.BytesIO()
+            image.save(output, format="PNG")
+            return output.getvalue()
+    except (pypdfium2.PdfiumError, OSError) as exc:
+        raise EmaError("file_type", "Fișierul PDF este invalid.", "") from exc
 
 
 @dataclass(frozen=True)

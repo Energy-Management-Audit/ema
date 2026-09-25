@@ -156,6 +156,10 @@ def test_recovery_and_interrupted_delete(ws: Workspace) -> None:
     recover(ws)
     assert status(ws, job).runs[0]["error"] == "interrupted"
     with ws.connect() as db:
+        event = db.execute("SELECT type,payload FROM job_events WHERE job_id=?", (job,)).fetchone()
+    assert event["type"] == "stage_failed"
+    assert json.loads(event["payload"])["code"] == "interrupted"
+    with ws.connect() as db:
         path = ws.job_path(db, job)
         db.execute("UPDATE jobs SET deleted=1 WHERE id=?", (job,))
     ws.finish_deletes()

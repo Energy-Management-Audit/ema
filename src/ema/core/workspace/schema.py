@@ -3,10 +3,10 @@
 import sqlite3
 import time
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
-def migrate(db: sqlite3.Connection) -> None:
+def migrate(db: sqlite3.Connection) -> None:  # noqa: C901
     version = db.execute("PRAGMA user_version").fetchone()[0]
     if version > SCHEMA_VERSION:
         raise RuntimeError(f"Workspace schema {version} is newer than Ema")
@@ -118,6 +118,58 @@ def migrate(db: sqlite3.Connection) -> None:
             PRAGMA user_version = 8;
             COMMIT;
         """)
+        version = 8
+    if version == 8:
+        # Historical migration tests model only the tables under test; real v8
+        # workspaces always have jobs, while those minimal fixtures do not.
+        has_jobs = (
+            db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone()
+            is not None
+        )
+        backfill = (
+            "INSERT OR IGNORE INTO clients(id) "
+            "SELECT DISTINCT client_slug FROM jobs WHERE type != 'reporting';"
+            if has_jobs
+            else ""
+        )
+        db.executescript(
+            """
+            BEGIN IMMEDIATE;
+            CREATE TABLE job_events (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
+                run_id TEXT, stage TEXT, type TEXT NOT NULL, at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            );
+            CREATE INDEX job_events_job_seq ON job_events(job_id, seq);
+            CREATE TABLE clients (
+                id TEXT PRIMARY KEY, name TEXT, cui TEXT, caen TEXT,
+                sites_json TEXT NOT NULL DEFAULT '[]',
+                contacts_json TEXT NOT NULL DEFAULT '[]',
+                revision INTEGER NOT NULL DEFAULT 1, anaf_refreshed_at TEXT
+            );
+            CREATE TABLE client_uploads (
+                client_id TEXT NOT NULL, sha TEXT NOT NULL,
+                original_name TEXT NOT NULL, kind TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL, created_at TEXT NOT NULL,
+                PRIMARY KEY(client_id, sha)
+            );
+            CREATE TABLE anaf_snapshots (
+                client_id TEXT PRIMARY KEY, status TEXT NOT NULL,
+                retrieved_at TEXT, source_url TEXT, payload_json TEXT, sha TEXT
+            );
+            CREATE TABLE reporting_runs (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL,
+                years_json TEXT NOT NULL, client_ids_json TEXT NOT NULL,
+                state TEXT NOT NULL, exceptions_json TEXT NOT NULL DEFAULT '[]',
+                output_id TEXT
+            );
+        """
+            + backfill
+            + """
+            PRAGMA user_version = 9;
+            COMMIT;
+        """
+        )
         return
     db.executescript("""
             BEGIN IMMEDIATE;

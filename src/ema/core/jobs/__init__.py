@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sys
+import sqlite3
 import threading
-import traceback
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,17 +15,22 @@ from typing import Any, Literal
 
 from ema import __version__
 from ema.core.errors import EmaError
+from ema.core.jobs.events import ProgressEvent, append, subscribe
+from ema.core.jobs.failure import record_failure
 from ema.core.jobs.fingerprint import collection_revision
 from ema.core.jobs.reads import (
+    JobStatus,
     get_job,
     latest_ready_run,
     revision,
+    status,
 )
 from ema.core.jobs.runner import owner, recover
-from ema.core.logging import log_exception, write_event
+from ema.core.logging import write_event
 from ema.core.workspace import SlotVersion, Workspace
 
 __all__ = [
+    "JobStatus",
     "cancel",
     "create_job",
     "get_job",
@@ -45,29 +49,9 @@ RunId = str
 
 
 @dataclass(frozen=True)
-class ProgressEvent:
-    run_id: str
-    done: int
-    total: int
-    message: str
-
-
-@dataclass(frozen=True)
 class StageOutcome:
     item_failures: list[str] = field(default_factory=list[str])
     warnings: list[str] = field(default_factory=list[str])
-
-
-@dataclass(frozen=True)
-class JobStatus:
-    id: str
-    type: str
-    state: str
-    runs: list[dict[str, Any]]
-
-
-_events: dict[str, list[ProgressEvent]] = {}
-_events_condition = threading.Condition()
 
 
 def _now() -> str:
@@ -86,6 +70,8 @@ def create_job(ws: Workspace, type: JobType, client_slug: str, year: int | None)
     relative = f"clients/{client_slug}/jobs/{year or 'none'}-{type}-{job[:8]}"
     ws.make_job_folders(relative)
     with ws.connect() as db:
+        if type != "reporting":
+            db.execute("INSERT OR IGNORE INTO clients(id) VALUES (?)", (client_slug,))
         db.execute(
             "INSERT INTO jobs (id,type,client_slug,year,relative_path,state,created_at) "
             "VALUES (?,?,?,?,?,?,?)",
@@ -97,24 +83,10 @@ def create_job(ws: Workspace, type: JobType, client_slug: str, year: int | None)
 def list_jobs(ws: Workspace) -> list[dict[str, Any]]:
     with ws.connect() as db:
         rows = db.execute(
-            "SELECT id,type,client_slug,year,state FROM jobs WHERE deleted=0 ORDER BY created_at"
+            "SELECT id,type,client_slug,year,state,revision "
+            "FROM jobs WHERE deleted=0 ORDER BY created_at"
         ).fetchall()
     return [dict(row) for row in rows]
-
-
-def status(ws: Workspace, job: JobId) -> JobStatus:
-    with ws.connect() as db:
-        row = db.execute(
-            "SELECT id,type,state FROM jobs WHERE id=? AND deleted=0", (job,)
-        ).fetchone()
-        if row is None:
-            raise EmaError("job_missing", "Lucrarea nu există.", job)
-        runs = db.execute(
-            "SELECT id,stage,state,publication,fingerprint,outcome,error "
-            "FROM runs WHERE job_id=? ORDER BY started_at",
-            (job,),
-        ).fetchall()
-    return JobStatus(str(row["id"]), str(row["type"]), str(row["state"]), [dict(r) for r in runs])
 
 
 class StageContext:
@@ -218,9 +190,15 @@ class StageContext:
 
     def progress(self, done: int, total: int, message: str) -> None:
         event = ProgressEvent(self.run_id, done, total, message)
-        with _events_condition:
-            _events.setdefault(self.job, []).append(event)
-            _events_condition.notify_all()
+        with self.ws.connect() as db:
+            append(
+                db,
+                self.job,
+                self.run_id,
+                self.stage,
+                "stage_progress",
+                {"done": done, "total": total, "message": message},
+            )
         with self.ws.connect() as db, self.ws.job_log(db, self.job) as handle:
             write_event(handle, "progress", **asdict(event))
 
@@ -232,8 +210,12 @@ class StageContext:
         return bool(row and row["cancel_requested"])
 
 
-def _finish(
-    ws: Workspace, context: StageContext, outcome: StageOutcome | None, error: str | None
+def _finish(  # noqa: C901
+    ws: Workspace,
+    context: StageContext,
+    outcome: StageOutcome | None,
+    error: str | None,
+    on_finish: Callable[[sqlite3.Connection, str], None] | None = None,
 ) -> None:
     fingerprint_data = {
         "reads": sorted(
@@ -291,18 +273,54 @@ def _finish(
         db.execute(
             "UPDATE jobs SET state=?,revision=revision+1 WHERE id=?", (job_state, context.job)
         )
+        if on_finish is not None:
+            on_finish(db, state)
+        if outcome:
+            for item_id in outcome.item_failures:
+                opaque_id = hashlib.sha256(item_id.encode()).hexdigest()[:16]
+                append(
+                    db,
+                    context.job,
+                    context.run_id,
+                    context.stage,
+                    "item_failed",
+                    {"item_id": opaque_id, "code": "item_failed"},
+                )
+        if state == "ready":
+            event_type = "stage_finished"
+            payload = {
+                "state": "ready",
+                "publication": publication,
+                "item_failures": len(outcome.item_failures) if outcome else 0,
+                "warnings": len(outcome.warnings) if outcome else 0,
+            }
+        elif state == "cancelled":
+            event_type, payload = "stage_cancelled", {"state": "cancelled"}
+        else:
+            event_type, payload = "stage_failed", {"code": "stage_failed"}
+        append(db, context.job, context.run_id, context.stage, event_type, payload)
 
 
 def run_stage(
-    ws: Workspace, job: JobId, stage: str, fn: Callable[[StageContext], StageOutcome]
+    ws: Workspace,
+    job: JobId,
+    stage: str,
+    fn: Callable[[StageContext], StageOutcome],
+    *,
+    on_finish: Callable[[sqlite3.Connection, str], None] | None = None,
+    on_revision: int | None = None,
 ) -> RunId:
     runner_owner = owner(ws)
     run = uuid.uuid4().hex
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
-        row = db.execute("SELECT state FROM jobs WHERE id=? AND deleted=0", (job,)).fetchone()
+        row = db.execute(
+            "SELECT state,revision FROM jobs WHERE id=? AND deleted=0", (job,)
+        ).fetchone()
         if row is None:
             raise EmaError("job_missing", "Lucrarea nu există.", job)
+        if on_revision is not None and row["revision"] != on_revision:
+            raise EmaError("stale_revision", "Lucrarea s-a modificat.", "")
         if row["state"] == "running":
             raise EmaError("job_running", "Lucrarea rulează deja.", job)
         ws.artifact_dir(db, job, stage, run)
@@ -311,32 +329,22 @@ def run_stage(
             (run, job, stage, runner_owner, "running", _now()),
         )
         db.execute("UPDATE jobs SET state='running',revision=revision+1 WHERE id=?", (job,))
+        append(db, job, run, stage, "stage_started", {"state": "running"})
     context = StageContext(ws, job, run, stage)
     threading.Thread(
-        target=_execute_stage, args=(context, fn), daemon=True, name=f"ema-{stage}-{run[:8]}"
+        target=_execute_stage,
+        args=(context, fn, on_finish),
+        daemon=True,
+        name=f"ema-{stage}-{run[:8]}",
     ).start()
     return run
 
 
-def _record_failure(ws: Workspace, job: JobId, exc: BaseException) -> None:
-    try:
-        with ws.connect() as db, ws.job_log(db, job) as handle:
-            log_exception(handle, exc)
-    except BaseException as log_error:
-        try:
-            with ws.app_log() as handle:
-                log_exception(handle, exc)
-                log_exception(handle, log_error)
-        except BaseException as app_log_error:
-            try:
-                traceback.print_exception(exc, file=sys.stderr)
-                traceback.print_exception(log_error, file=sys.stderr)
-                traceback.print_exception(app_log_error, file=sys.stderr)
-            except BaseException:
-                return  # Diagnostics cannot interrupt the run state transition.
-
-
-def _execute_stage(context: StageContext, fn: Callable[[StageContext], StageOutcome]) -> None:
+def _execute_stage(
+    context: StageContext,
+    fn: Callable[[StageContext], StageOutcome],
+    on_finish: Callable[[sqlite3.Connection, str], None] | None = None,
+) -> None:
     ws, job, run = context.ws, context.job, context.run_id
     outcome: StageOutcome | None = None
     error: str | None = None
@@ -347,23 +355,26 @@ def _execute_stage(context: StageContext, fn: Callable[[StageContext], StageOutc
         error = str(exc) or type(exc).__name__
         if not isinstance(exc, Exception):
             fatal = exc
-        _record_failure(ws, job, exc)
+        record_failure(ws, job, exc)
     finally:
         try:
-            _finish(ws, context, outcome, error)
+            _finish(ws, context, outcome, error, on_finish)
         except Exception as exc:
-            _record_failure(ws, job, exc)
+            record_failure(ws, job, exc)
             with ws.connect() as db:
-                db.execute(
-                    "UPDATE runs SET state='failed',error=?,ended_at=? "
-                    "WHERE id=? AND state='running'",
-                    (str(exc), _now(), run),
-                )
-                db.execute(
-                    "UPDATE jobs SET state=CASE WHEN type='audit' THEN 'open' "
-                    "ELSE 'failed' END,revision=revision+1 WHERE id=?",
-                    (job,),
-                )
+                db.execute("BEGIN IMMEDIATE")
+                current = db.execute("SELECT state FROM runs WHERE id=?", (run,)).fetchone()
+                if current is not None and current["state"] == "running":
+                    db.execute(
+                        "UPDATE runs SET state='failed',error=?,ended_at=? WHERE id=?",
+                        (str(exc), _now(), run),
+                    )
+                    db.execute(
+                        "UPDATE jobs SET state=CASE WHEN type='audit' THEN 'open' "
+                        "ELSE 'failed' END,revision=revision+1 WHERE id=?",
+                        (job,),
+                    )
+                    append(db, job, run, context.stage, "stage_failed", {"code": "stage_failed"})
         finally:
             with ws.connect() as db:
                 row = db.execute("SELECT state FROM runs WHERE id=?", (run,)).fetchone()
@@ -377,19 +388,3 @@ def _execute_stage(context: StageContext, fn: Callable[[StageContext], StageOutc
 def cancel(ws: Workspace, job: JobId) -> None:
     with ws.connect() as db:
         db.execute("UPDATE runs SET cancel_requested=1 WHERE job_id=? AND state='running'", (job,))
-
-
-def subscribe(ws: Workspace, job: JobId) -> Iterator[ProgressEvent]:
-    index = 0
-    while True:
-        with _events_condition:
-            events = _events.get(job, [])
-            if index < len(events):
-                event = events[index]
-                index += 1
-            else:
-                if status(ws, job).state != "running":
-                    return
-                _events_condition.wait(timeout=1)
-                continue
-        yield event
