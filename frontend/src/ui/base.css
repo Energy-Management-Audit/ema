@@ -1,0 +1,85 @@
+@import './fonts.css';
+@import './tokens.css';
+@import './typography.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 14px/1.5 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-block: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Never remove an outline without the replacement ring (handoff README, "Focus"). */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.ema-mono {
+  font-family: var(--font-mono);
+}
+
+.ema-paper {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+@keyframes ema-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ema-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes ema-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+/* A static specimen of the focus ring, for the component sheet's FOCUS row. */
+.ema-focus-ring {
+  box-shadow: var(--focus-ring);
+}

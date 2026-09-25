@@ -1,0 +1,157 @@
+.ema-dialog-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(20 18 13 / 0.42);
+}
+.ema-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 520px;
+  padding: 26px 28px 22px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-dialog);
+  color: var(--ink);
+}
+@media (max-width: 600px) {
+  .ema-dialog {
+    width: min(520px, 100%);
+  }
+}
+.ema-dialog__head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ema-dialog__head h3 {
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+.ema-dialog__head p {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+.ema-dialog__content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ema-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 2px;
+}
+
+.ema-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--surface-sunken);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.ema-check-row__box {
+  display: grid;
+  place-items: center;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1.5px solid rgb(var(--ink-rgb) / 0.3);
+  border-radius: 5px;
+}
+.ema-check-row__box:checked {
+  border-color: var(--olive);
+  background: var(--olive);
+}
+
+.ema-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--border);
+  cursor: pointer;
+}
+.ema-choice[data-checked] {
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1.5px var(--olive);
+}
+.ema-choice:has(:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.ema-choice__radio {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 2px;
+  border: 1.5px solid rgb(var(--ink-rgb) / 0.3);
+  border-radius: 50%;
+  color: var(--surface);
+}
+.ema-choice[data-checked] .ema-choice__radio {
+  border: 0;
+  background: var(--olive);
+}
+.ema-choice__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ema-choice__text strong {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.ema-choice__text span {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.ema-file-notice {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: rgb(var(--amber-rgb) / 0.13);
+}
+.ema-file-notice__name {
+  flex: 1;
+  font-size: 12.5px;
+}
+.ema-file-notice__detail {
+  color: var(--amber-ink);
+  font: 11px var(--font-mono);
+}
+
+.ema-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ema-check-row__box:checked::before {
+  content: '';
+  width: 7px;
+  height: 3.5px;
+  margin-top: -2px;
+  border-bottom: 1.8px solid var(--surface);
+  border-left: 1.8px solid var(--surface);
+  transform: rotate(-45deg);
+}

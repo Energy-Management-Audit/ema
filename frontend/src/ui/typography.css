@@ -1,0 +1,38 @@
+/* Type roles, handoff README "Typography" (as drawn in 7d). */
+
+.ema-type-screen-title {
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+.ema-type-screen-title--dense {
+  font-size: 30px;
+}
+.ema-type-job-title {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.ema-type-section {
+  font-size: 15px;
+  font-weight: 500;
+}
+.ema-type-row {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.ema-type-body {
+  font-size: 13px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+.ema-type-secondary {
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.ema-type-mono {
+  color: var(--section-key);
+  font: 11px var(--font-mono);
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import './ui/base.css'
 
 const code = new URLSearchParams(location.hash.slice(1)).get('code')
 history.replaceState(null, '', location.pathname)
@@ -20,7 +21,7 @@ function App() {
       if (!jobs.ok) throw new Error('Lucrările nu au putut fi încărcate.')
       const list: unknown = await jobs.json()
       if (!Array.isArray(list)) throw new Error('Răspunsul pentru lucrări este invalid.')
-      setMessage(`Conectat · ${list.length} lucrări`)
+      setMessage(`Conectat · ${String(list.length)} lucrări`)
     }
 
     start().catch((error: unknown) => {
@@ -31,4 +32,6 @@ function App() {
   return <main>{message}</main>
 }
 
-createRoot(document.getElementById('app')!).render(<App />)
+const root = document.getElementById('root')
+if (!root) throw new Error('Elementul #root lipseşte.')
+createRoot(root).render(<App />)

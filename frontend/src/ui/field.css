@@ -1,0 +1,109 @@
+.ema-field {
+  height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  background: var(--field-fill);
+  color: var(--field-ink);
+  font: 13px var(--font-sans);
+}
+.ema-field--figures {
+  font-family: var(--font-mono);
+}
+.ema-field::placeholder {
+  color: rgba(37, 34, 25, 0.45);
+}
+.ema-field:focus,
+.ema-field:focus-visible,
+.ema-field[data-state='focus'] {
+  outline: none;
+  padding: 0 12.5px;
+  border: 1.5px solid var(--olive);
+  box-shadow: var(--focus-ring-input);
+}
+/* The value Ema is confident about (7d CÂMPURI, second field): olive border, no ring. */
+.ema-field[data-state='confirmed'] {
+  padding: 0 12.5px;
+  border: 1.5px solid var(--olive);
+}
+
+.ema-field-missing {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 13px;
+  border: 1px dashed rgb(var(--amber-rgb) / 0.6);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--amber-ink);
+  font-size: 13px;
+  text-align: left;
+}
+
+.ema-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.ema-select select {
+  appearance: none;
+  height: 36px;
+  padding: 0 36px 0 13px;
+  border: 1px solid var(--control-border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ema-select option {
+  background: var(--surface);
+  color: var(--ink);
+}
+.ema-select__chevron {
+  position: absolute;
+  right: 13px;
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.ema-toggle {
+  display: flex;
+  align-items: center;
+  width: 40px;
+  height: 23px;
+  flex: none;
+  padding: 2px;
+  border: 0;
+  border-radius: 14px;
+  background: rgb(var(--ink-rgb) / 0.16);
+}
+.ema-toggle[aria-checked='true'] {
+  background: var(--olive);
+}
+.ema-toggle__knob {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  /* 3i draws the knob in the light surface colour; kept in dark so it reads on both fills. */
+  background: #f6f2e8;
+}
+.ema-toggle[aria-checked='true'] .ema-toggle__knob {
+  margin-left: auto;
+}
+
+.ema-key-input {
+  width: 190px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: rgb(var(--ink-rgb) / 0.06);
+  color: var(--ink);
+  font: 12px var(--font-mono);
+}
+.ema-key-input::placeholder {
+  color: var(--ink-muted);
+}
+.ema-key-input:focus-visible {
+  box-shadow: var(--focus-ring-input);
+}

@@ -1,0 +1,132 @@
+.ema-tabs__list {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  padding-bottom: 4px;
+}
+.ema-tabs__tab {
+  display: inline-flex;
+  white-space: nowrap;
+  gap: 4px;
+  padding: 0 0 9px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 13.5px;
+}
+.ema-tabs__tab[aria-selected='true'] {
+  box-shadow: 0 1.5px 0 var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
+.ema-tabs__count {
+  color: var(--ink-muted);
+}
+.ema-tabs__count--pending {
+  color: var(--amber-ink);
+}
+.ema-tabs__aside {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  padding-bottom: 9px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ema-tabs__rule {
+  height: 1px;
+  background: rgb(var(--ink-rgb) / 0.1);
+}
+
+.ema-stepper__track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 22px;
+}
+.ema-stepper__rail,
+.ema-stepper__fill {
+  position: absolute;
+  top: 10px;
+  left: 8px;
+  height: 1.5px;
+  border-radius: 2px;
+}
+.ema-stepper__rail {
+  right: 8px;
+  background: rgb(var(--ink-rgb) / 0.12);
+}
+.ema-stepper__fill {
+  background: var(--olive-mark);
+}
+.ema-stepper__slot {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+}
+.ema-stepper__slot--last {
+  flex: 0 0 150px;
+}
+.ema-stepper__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.ema-stepper__dot--done {
+  background: var(--olive-mark);
+}
+.ema-stepper__dot--warn {
+  background: var(--amber);
+}
+.ema-stepper__dot--todo {
+  background: var(--surface);
+  box-shadow: 0 0 0 1.5px rgb(var(--ink-rgb) / 0.2);
+}
+.ema-stepper__dot--current {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1.5px var(--olive-mark);
+}
+.ema-stepper__pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--olive-mark);
+  animation: ema-pulse 1.6s ease-in-out infinite;
+}
+.ema-stepper__labels {
+  display: flex;
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ema-stepper__labels .ema-stepper__slot {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.ema-stepper__label {
+  font-size: 12px;
+}
+[aria-current='step'] > .ema-stepper__label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.ema-stepper__detail {
+  font: 11px var(--font-mono);
+}
+.ema-stepper__detail--muted {
+  color: var(--ink-muted);
+}
+.ema-stepper__detail--warn {
+  color: var(--amber-ink);
+}
+.ema-stepper__detail--ok {
+  color: var(--olive-ink);
+}

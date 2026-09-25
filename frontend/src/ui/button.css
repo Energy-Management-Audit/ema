@@ -1,0 +1,178 @@
+.ema-btn {
+  --btn-radius: 21px;
+  --btn-pad: 19px;
+  --btn-pad-bordered: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--btn-height);
+  padding: 0 var(--btn-pad);
+  border: 0;
+  border-radius: var(--btn-radius);
+  background: transparent;
+  font-size: var(--btn-font);
+  white-space: nowrap;
+}
+
+.ema-btn--h38 {
+  --btn-height: 38px;
+  --btn-radius: 21px;
+  --btn-pad: 19px;
+  --btn-pad-bordered: 17px;
+  --btn-pad-quiet: 15px;
+  --btn-font: 13px;
+}
+.ema-btn--h36 {
+  --btn-height: 36px;
+  --btn-radius: 20px;
+  --btn-pad: 18px;
+  --btn-pad-bordered: 16px;
+  --btn-pad-quiet: 14px;
+  --btn-font: 12.5px;
+}
+.ema-btn--h34 {
+  --btn-height: 34px;
+  --btn-radius: 20px;
+  --btn-pad: 17px;
+  --btn-pad-bordered: 15px;
+  --btn-pad-quiet: 13px;
+  --btn-font: 12.5px;
+}
+.ema-btn--h32 {
+  --btn-height: 32px;
+  --btn-radius: 18px;
+  --btn-pad: 15px;
+  --btn-pad-bordered: 15px;
+  --btn-pad-quiet: 14px;
+  --btn-font: 12.5px;
+}
+.ema-btn--h30 {
+  --btn-height: 30px;
+  --btn-radius: 16px;
+  --btn-pad: 13px;
+  --btn-pad-bordered: 13px;
+  --btn-pad-quiet: 12px;
+  --btn-font: 12px;
+}
+.ema-btn--h28 {
+  --btn-height: 28px;
+  --btn-radius: 16px;
+  --btn-pad: 12px;
+  --btn-pad-bordered: 12px;
+  --btn-pad-quiet: 11px;
+  --btn-font: 12px;
+}
+.ema-btn--h26 {
+  --btn-height: 26px;
+  --btn-radius: 14px;
+  --btn-pad: 11px;
+  --btn-pad-bordered: 11px;
+  --btn-pad-quiet: 10px;
+  --btn-font: 11.5px;
+}
+
+.ema-btn--primary {
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 500;
+}
+.ema-btn--primary:hover,
+.ema-btn--primary[data-state='hover'] {
+  background: var(--primary-hover);
+}
+.ema-btn--primary:active,
+.ema-btn--primary[data-state='active'] {
+  background: var(--primary-active);
+}
+.ema-btn--primary[data-loading] {
+  color: var(--primary-loading-label);
+}
+
+.ema-btn--destructive,
+.ema-btn--olive {
+  color: var(--surface);
+  font-weight: 500;
+}
+.ema-btn--destructive {
+  background: var(--error);
+}
+.ema-btn--olive {
+  background: var(--olive);
+}
+.ema-btn--destructive:hover,
+.ema-btn--olive:hover {
+  filter: brightness(1.08);
+}
+.ema-btn--destructive:active,
+.ema-btn--olive:active {
+  filter: brightness(0.94);
+}
+
+.ema-btn--secondary {
+  padding: 0 var(--btn-pad-bordered);
+  border: 1px solid var(--control-border);
+}
+.ema-btn--secondary:hover {
+  background: var(--row-hover);
+}
+
+.ema-btn--tertiary,
+.ema-btn--quiet {
+  padding: 0 var(--btn-pad-quiet);
+  color: var(--ink-muted);
+}
+.ema-btn--tertiary:hover,
+.ema-btn--quiet:hover {
+  background: var(--row-hover);
+}
+
+.ema-btn--soft {
+  padding: 0 var(--btn-pad-quiet);
+  background: rgb(var(--ink-rgb) / 0.07);
+}
+.ema-btn--soft:hover {
+  background: rgb(var(--ink-rgb) / 0.11);
+}
+
+.ema-btn[data-loading] {
+  cursor: progress;
+}
+
+.ema-btn:disabled {
+  border-color: transparent;
+  background: rgb(var(--ink-rgb) / 0.1);
+  color: rgb(var(--ink-rgb) / 0.4);
+  box-shadow: none;
+  filter: none;
+  cursor: default;
+}
+
+/* 3c: the olive action waiting on a gate (Exportă Word before review ends). */
+.ema-btn--olive:disabled {
+  background: rgb(var(--olive-rgb) / 0.35);
+  color: rgba(246, 242, 232, 0.9);
+}
+
+.ema-btn--secondary:disabled {
+  padding: 0 var(--btn-pad);
+  border: 0;
+}
+
+.ema-icon-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--section-key);
+}
+.ema-icon-btn--bordered {
+  border: 1px solid var(--control-border);
+  color: inherit;
+}
+.ema-icon-btn:hover {
+  background: var(--row-hover);
+}

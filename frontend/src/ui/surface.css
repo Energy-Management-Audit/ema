@@ -1,0 +1,116 @@
+.ema-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--olive);
+  color: var(--surface);
+  font-family: var(--font-sans);
+  font-weight: 600;
+}
+.ema-mark--24 {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px 12px 12px 3px;
+  font-size: 12px;
+}
+.ema-mark--30 {
+  width: 30px;
+  height: 30px;
+  border-radius: 12px 12px 12px 4px;
+  font-size: 12px;
+}
+.ema-mark--38 {
+  width: 38px;
+  height: 38px;
+  border-radius: 15px 15px 15px 5px;
+  font-size: 15px;
+}
+
+.ema-group {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-raised);
+}
+.ema-group__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+}
+.ema-group__row + .ema-group__row {
+  border-top: 1px solid var(--hairline);
+}
+.ema-group__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.ema-group__title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.ema-group__description {
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+.ema-group__state {
+  margin-top: 2px;
+}
+.ema-group__control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.ema-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgb(var(--ink-rgb) / 0.12);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.ema-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.ema-card__title {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.ema-card__count {
+  color: var(--section-key);
+  font: 11px var(--font-mono);
+}
+.ema-card__aside {
+  margin-left: auto;
+  color: var(--amber-ink);
+  font: 11px var(--font-mono);
+}
+
+.ema-paper-sheet {
+  border: 1px solid rgba(37, 34, 25, 0.2);
+  border-radius: 12px;
+  box-shadow: var(--shadow-paper);
+}
+
+.ema-section-key {
+  color: var(--section-key);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}

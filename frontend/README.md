@@ -1,7 +1,38 @@
-# S16a API probe
+# Ema frontend
 
-The Vite page is a small session and proxy check for S17. Its only display is the job count.
-The versioned API contract is [`../openapi/ema.v1.json`](../openapi/ema.v1.json).
+React + TypeScript (strict) + Vite. `src/main.tsx` is still the S16a session probe; its only
+display is the job count. The versioned API contract is
+[`../openapi/ema.v1.json`](../openapi/ema.v1.json).
+
+## Design system (S17a)
+
+`src/ui/` is the component layer from the design handoff (docs/PLAN.md §5.18). `tokens.css` holds
+the README token table for both themes; the theme is the `data-theme` attribute (`light` default,
+`dark`) on any ancestor, and `.ema-paper` resets the light palette because paper never inverts.
+Geist and Geist Mono are bundled from `src/fonts/` (SIL OFL, `OFL.txt`); nothing is loaded from the
+network. Component names and comments carry the design id they implement (7d, 3c, 3i, 7b, 7c, M5).
+
+The component sheet is a dev-only entry, not part of the build:
+
+```sh
+npm run dev --prefix frontend
+# http://127.0.0.1:5173/dev/sheet.html?theme=light   (7d)
+# http://127.0.0.1:5173/dev/sheet.html?theme=dark    (7e)
+```
+
+Its top frame rebuilds 7d/7e row for row from the real components; the frame below holds the
+components the screens use beyond the sheet, each labelled with its design id.
+
+Visual acceptance renders the sheet and the handoff at 1400×900 in both themes, writes paired
+screenshots outside git, and asserts tokens per theme, the focus ring, paper in dark, toggle, row
+and button states, and the bundled fonts:
+
+```sh
+EMA_REFERENCE=… EMA_ARTIFACTS=… npm run capture --prefix frontend   # → $EMA_ARTIFACTS/s17a/
+```
+
+`npm run check --prefix frontend` (format, ESLint, tsc, token tests, build) is part of
+`scripts/check`.
 
 ## Mock server
 

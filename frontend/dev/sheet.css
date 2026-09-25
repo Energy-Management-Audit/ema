@@ -1,0 +1,209 @@
+/* The component sheet's own chrome: the handoff's canvas, captions and specimen helpers. */
+
+body {
+  background: #dcd8cd;
+}
+.sheet-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px 44px 60px;
+}
+.sheet-page__themes {
+  display: flex;
+  gap: 14px;
+  font: 12px var(--font-mono);
+}
+.sheet-page__themes a {
+  color: #3f5a11;
+}
+.sheet-page__themes a[aria-current] {
+  color: #23231f;
+  font-weight: 600;
+}
+.sheet-page__caption {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 16px;
+  color: rgba(35, 35, 31, 0.72);
+  font-size: 11px;
+}
+.sheet-page__caption b {
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: rgba(35, 35, 31, 0.1);
+  color: #23231f;
+  font: 600 11px var(--font-mono);
+}
+
+.sheet-frame {
+  display: flex;
+  flex-direction: column;
+  width: 1400px;
+  padding: 34px 38px;
+  border: 1px solid rgb(var(--ink-rgb) / 0.1);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-window);
+  color: var(--ink);
+}
+.sheet-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.sheet-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.sheet-row--wide {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.sheet-row--wide .sheet-row__label {
+  flex-direction: row;
+  gap: 10px;
+}
+.sheet-row__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--section-key);
+  font: 500 11px var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.sheet-row__ref {
+  color: var(--olive-ink);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.sheet-row__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sheet-legend {
+  color: var(--section-key);
+  font: 11px var(--font-mono);
+}
+.sheet-legend--small {
+  font-size: 10.5px;
+}
+.sheet-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.sheet-fill {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sheet-swatch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px 5px 5px;
+  border-radius: 16px;
+  background: rgb(var(--ink-rgb) / 0.05);
+}
+.sheet-swatch__dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+.sheet-swatch__text {
+  display: flex;
+  flex-direction: column;
+  font-size: 10.5px;
+}
+.sheet-swatch__text span:first-child {
+  font-family: var(--font-mono);
+}
+.sheet-swatch__text span:last-child {
+  color: var(--section-key);
+}
+
+.sheet-radius {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 52px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--section-key);
+  font: 10.5px var(--font-mono);
+}
+.sheet-radius--wide {
+  width: 130px;
+  border-radius: 14px;
+}
+
+.sheet-icon-box {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--surface-sunken);
+}
+.sheet-caption-small {
+  color: var(--section-key);
+  font-size: 10.5px;
+}
+
+.sheet-tokens {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+}
+.sheet-tokens__row {
+  display: grid;
+  grid-template-columns: 200px 1fr 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgb(var(--ink-rgb) / 0.07);
+  font: 11.5px var(--font-mono);
+}
+.sheet-tokens__row--head {
+  padding: 8px 0;
+  border-bottom-color: rgb(var(--ink-rgb) / 0.14);
+  color: var(--section-key);
+  font: 500 10.5px var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.sheet-tokens__value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+.sheet-tokens__dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+.sheet-tokens__note {
+  padding-top: 9px;
+  color: var(--section-key);
+  font-size: 11.5px;
+}
+
+/* M-screens convention: new Romanian copy awaiting the auditor's copy pass. */
+.sheet-provisional {
+  text-decoration: underline dotted rgba(122, 94, 168, 0.8);
+  text-underline-offset: 3px;
+}

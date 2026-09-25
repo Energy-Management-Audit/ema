@@ -21,3 +21,10 @@ coverage_file="$(mktemp "${TMPDIR:-/tmp}/ema-coverage.XXXXXX")"
 trap 'rm -f "$coverage_file"' EXIT
 COVERAGE_FILE="$coverage_file" "$python" -m pytest -m 'not golden and not network' \
   --cov --cov-config=pyproject.toml --cov-fail-under=80 --cov-report=term
+
+# Frontend gates (docs/PLAN.md §5.18): format, lint, strict types, token tests, build.
+if [[ ! -f frontend/node_modules/.package-lock.json || frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]]; then
+  printf '%s\n' 'frontend dependencies missing or stale: run npm ci --prefix frontend' >&2
+  exit 1
+fi
+npm --prefix frontend run --silent check

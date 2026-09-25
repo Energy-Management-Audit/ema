@@ -1,0 +1,138 @@
+/* Design tokens, handoff README "Design Tokens" and 7d/7e. The dark values not in the README
+   table (ink-coloured text on tints, button states) are read from 7e. */
+
+:root,
+[data-theme='light'],
+.ema-paper {
+  --surface: #f6f2e8;
+  --surface-sunken: #f0ebde;
+  --surface-raised: #f1ecdf;
+  --surface-accent: #f3ead6;
+  --paper: #fffdf6;
+  --ink: #252219;
+  --ink-muted: rgba(37, 34, 25, 0.72);
+  --border: rgba(37, 34, 25, 0.11);
+  --olive: #4f7015;
+  --amber: #b8751a;
+  --error: #9e3f1f;
+  --violet: #7a5ea8;
+
+  --ink-rgb: 37 34 25;
+  --olive-rgb: 79 112 21;
+  --olive-tint-rgb: 90 122 30;
+  --amber-rgb: 184 117 26;
+  --error-tint-rgb: 199 90 58;
+
+  --olive-ink: #3f5a11;
+  --olive-mark: #5a7a1e;
+  --amber-ink: #8a5a12;
+  --error-ink: #8c3524;
+  --error-mark: #c75a3a;
+  --avatar: #e3dccb;
+  --swatch-ring: rgba(37, 34, 25, 0.12);
+
+  --primary-hover: #35301f;
+  --primary-active: #151309;
+  --primary-loading-label: rgba(246, 242, 232, 0.6);
+
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --surface: #1e1b16;
+  --surface-sunken: #181510;
+  --surface-raised: #242019;
+  --surface-accent: #2a2419;
+  --paper: #fffdf6;
+  --ink: #ece5d5;
+  --ink-muted: rgba(236, 229, 213, 0.72);
+  --border: rgba(236, 229, 213, 0.11);
+  --olive: #9bbb52;
+  --amber: #d8a24e;
+  --error: #e8836a;
+  --violet: #a58cd4;
+
+  --ink-rgb: 236 229 213;
+  --olive-rgb: 155 187 82;
+  --olive-tint-rgb: 155 187 82;
+  --amber-rgb: 216 162 78;
+  --error-tint-rgb: 232 131 106;
+
+  --olive-ink: #9bbb52;
+  --olive-mark: #9bbb52;
+  --amber-ink: #d8a24e;
+  --error-ink: #e8836a;
+  --error-mark: #e8836a;
+  --avatar: #2e2920;
+  --swatch-ring: rgba(236, 229, 213, 0.3);
+
+  --primary-hover: #d8dcc8;
+  --primary-active: #b9c4a4;
+  --primary-loading-label: rgba(30, 27, 22, 0.5);
+
+  color-scheme: dark;
+}
+
+/* Shadows fall on the surface around an element, so paper does not reset them: a paper sheet
+   in the dark theme casts the dark shadow. */
+:root,
+[data-theme='light'] {
+  --shadow-paper: 0 6px 18px rgba(37, 34, 25, 0.07);
+  --shadow-window: 0 20px 50px rgba(37, 34, 25, 0.14);
+  --shadow-dialog: 0 24px 60px rgba(37, 34, 25, 0.28), 0 0 0 1px rgba(37, 34, 25, 0.1);
+  --shadow-card: 0 10px 26px rgba(37, 34, 25, 0.09);
+}
+
+[data-theme='dark'] {
+  --shadow-paper: 0 6px 18px rgba(0, 0, 0, 0.28);
+  --shadow-window: 0 20px 50px rgba(20, 18, 14, 0.4);
+  --shadow-dialog: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(236, 229, 213, 0.1);
+  --shadow-card: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+/* Declared on every theme root (and on paper) so var(--surface) resolves against that root's
+   palette; a custom property referencing another is resolved where it is declared. */
+:root,
+[data-theme],
+.ema-paper {
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--olive);
+  --focus-ring-input: 0 0 0 3px rgb(var(--olive-rgb) / 0.22);
+
+  /* Inputs are paper in both themes (7e): the fill and the text never invert. */
+  --field-fill: var(--paper);
+  --field-ink: #252219;
+  --field-border: rgba(37, 34, 25, 0.16);
+
+  --control-border: rgb(var(--ink-rgb) / 0.16);
+  --hairline: rgb(var(--ink-rgb) / 0.09);
+  --section-key: rgb(var(--ink-rgb) / 0.7);
+  --row-hover: rgb(var(--ink-rgb) / 0.05);
+  --row-selected: rgb(var(--olive-rgb) / 0.12);
+}
+
+:root {
+  --traffic-red: #ec6a5e;
+  --traffic-yellow: #f4bf4f;
+  --traffic-green: #61c554;
+
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  --space-6: 6px;
+  --space-10: 10px;
+  --space-14: 14px;
+  --space-18: 18px;
+  --space-26: 26px;
+  --space-34: 34px;
+  --space-44: 44px;
+
+  --radius-10: 10px;
+  --radius-12: 12px;
+  --radius-14: 14px;
+  --radius-16: 16px;
+  --radius-18: 18px;
+  --radius-21: 21px;
+
+  --sidebar-width: 230px;
+  --activity-width: 290px;
+}

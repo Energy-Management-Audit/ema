@@ -11,15 +11,22 @@ import sys
 from pathlib import Path
 
 LIMIT = 400
+SUFFIXES = {".py", ".ts", ".tsx", ".css"}
 
 
 def main(argv: list[str]) -> int:
     if not argv:
-        argv = subprocess.check_output(["git", "ls-files", "-z", "--", "*.py"]).decode().split("\0")
+        argv = (
+            subprocess.check_output(
+                ["git", "ls-files", "-z", "--", "*.py", "*.ts", "*.tsx", "*.css"]
+            )
+            .decode()
+            .split("\0")
+        )
     too_long = []
     for name in argv:
         path = Path(name)
-        if path.suffix != ".py" or not path.is_file():
+        if path.suffix not in SUFFIXES or not path.is_file():
             continue
         lines = len(path.read_text(encoding="utf-8").splitlines())
         if lines > LIMIT:

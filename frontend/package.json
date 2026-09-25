@@ -1,19 +1,38 @@
 {
-  "name": "ema-api-probe",
+  "name": "ema-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
-    "build": "tsc --noEmit && vite build --outDir ../resources/frontend --emptyOutDir"
+    "build": "tsc --noEmit && vite build --outDir ../resources/frontend --emptyOutDir",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0 .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --test tests/*.test.mjs",
+    "build:check": "vite build --outDir node_modules/.ema-check-build --emptyOutDir --logLevel warn",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build:check",
+    "capture": "node scripts/capture-s17a.mjs"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "typescript": "^5.6.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
+    "playwright": "^1.63.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.1",
     "vite": "^6.0.0"
   },
   "dependencies": {
+    "lucide-react": "^1.48.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   }

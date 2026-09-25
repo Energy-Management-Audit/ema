@@ -1,0 +1,59 @@
+.ema-table-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+.ema-table-row:hover,
+.ema-table-row[data-state='hover'] {
+  border-bottom-color: transparent;
+  border-radius: 10px;
+  background: var(--row-hover);
+}
+.ema-cell {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+}
+.ema-cell--name {
+  font-weight: 500;
+}
+.ema-cell--figures {
+  justify-content: flex-end;
+  font: 12px var(--font-mono);
+}
+.ema-cell--end {
+  justify-content: flex-end;
+}
+
+.ema-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.ema-list-row:hover,
+.ema-list-row[data-state='hover'] {
+  background: var(--row-hover);
+}
+.ema-list-row[aria-selected='true'] {
+  background: var(--row-selected);
+  box-shadow: inset 2px 0 0 var(--olive);
+}
+.ema-list-row--boxed {
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--surface-sunken);
+  font-size: 12.5px;
+}
+.ema-list-row--boxed:hover {
+  background: var(--surface-sunken);
+}
+.ema-list-row:focus-visible,
+.ema-list-row.ema-focus-ring {
+  box-shadow: var(--focus-ring);
+}

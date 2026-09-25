@@ -1,0 +1,124 @@
+.ema-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+}
+.ema-dot--ok {
+  background: var(--olive-mark);
+}
+.ema-dot--warn {
+  background: var(--amber);
+}
+.ema-dot--err {
+  background: var(--error-mark);
+}
+.ema-dot--muted {
+  background: rgb(var(--ink-rgb) / 0.3);
+}
+
+.ema-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 17px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ema-status-chip--ok {
+  background: rgb(var(--olive-tint-rgb) / 0.12);
+  color: var(--olive-ink);
+}
+.ema-status-chip--warn {
+  background: rgb(var(--amber-rgb) / 0.16);
+  color: var(--amber-ink);
+}
+.ema-status-chip--err {
+  background: rgb(var(--error-tint-rgb) / 0.13);
+  color: var(--error);
+}
+.ema-status-chip--missing {
+  border: 1px dashed rgb(var(--amber-rgb) / 0.55);
+  background: transparent;
+  color: var(--amber-ink);
+}
+
+.ema-page-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 17px;
+  background: rgb(var(--ink-rgb) / 0.08);
+  font: 11.5px var(--font-mono);
+  white-space: nowrap;
+}
+
+.ema-source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  font: 400 12px var(--font-sans);
+  white-space: nowrap;
+}
+.ema-source-chip:hover {
+  border-color: rgb(var(--ink-rgb) / 0.2);
+}
+.ema-source-chip--online {
+  border-color: rgb(var(--olive-rgb) / 0.35);
+}
+.ema-source-chip--calculated {
+  border-style: dashed;
+}
+
+.ema-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 11px var(--font-mono);
+  white-space: nowrap;
+}
+.ema-status--ok {
+  color: var(--olive-ink);
+}
+.ema-status--warn {
+  color: var(--amber-ink);
+}
+.ema-status--err {
+  color: var(--error-ink);
+}
+.ema-status--muted {
+  color: var(--section-key);
+}
+
+.ema-tag {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgb(var(--olive-rgb) / 0.16);
+  color: var(--olive-ink);
+  font: 10.5px var(--font-mono);
+}
+
+.ema-spinner {
+  flex: none;
+  border: 1.5px solid rgb(var(--ink-rgb) / 0.18);
+  border-top-color: var(--olive-mark);
+  border-radius: 50%;
+  animation: ema-spin 1s linear infinite;
+}
+.ema-spinner--10 {
+  width: 10px;
+  height: 10px;
+}
+.ema-spinner--11 {
+  width: 11px;
+  height: 11px;
+}
