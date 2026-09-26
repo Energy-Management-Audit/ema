@@ -54,6 +54,7 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
     }
     # S17b adds the PIEE import, its summary and the approvals read (openapi/s17b-diff.md).
     assert new.keys() - old.keys() == {
+        ("GET", "/audit/forms/masuri-propuse.xlsx"),
         ("POST", "/jobs/{job_id}/piee/import"),
         ("GET", "/jobs/{job_id}/piee/summary"),
         ("GET", "/jobs/{job_id}/approvals"),

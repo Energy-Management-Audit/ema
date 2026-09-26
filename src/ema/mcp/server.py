@@ -1,4 +1,4 @@
-"""The stdio MCP server: ten agent tools over the same use cases as the CLI (R14 applies)."""
+"""The stdio MCP server: agent tools over the same use cases as the CLI (R14 applies)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from pydantic import Field as Describe
 from ema import __version__
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_stage import draft_section
+from ema.audit.measures import run_measures
 from ema.audit.sections import statuses
 from ema.audit.workflow import AuditWorkflow
 from ema.core.config import workspace_path
@@ -224,6 +225,21 @@ def build_server(ws: Workspace, import_roots: tuple[Path, ...]) -> FastMCP:  # n
                 "review_path": str(result.review_path),
             }
         )
+
+    @server.tool(
+        description="Read the audit measures form and prepare chapter 6.", annotations=WRITE
+    )
+    async def audit_measures(job: str) -> dict[str, str | int]:
+        result = await call(ws, "audit_measures", lambda: run_measures(ws, job))
+        return {
+            "job": result.job,
+            "run": result.run,
+            "measures": result.measures,
+            "payback_missing": result.payback_missing,
+            "factor_version": result.factor_version,
+            "missing_narratives": result.missing_narratives,
+            "plan_path": str(result.plan_path),
+        }
 
     @server.tool(
         description=(

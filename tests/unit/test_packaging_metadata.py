@@ -90,7 +90,7 @@ def test_listed_metadata_is_enough() -> None:
     probed = _probe(_listed())
 
     assert probed.returncode == 0, probed.stderr[-2000:]
-    assert probed.stdout.strip() == "10"
+    assert probed.stdout.strip() == "11"
 
 
 @pytest.mark.parametrize("missing", ["httpx2", "mcp"])

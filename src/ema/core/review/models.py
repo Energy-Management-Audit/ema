@@ -85,7 +85,9 @@ class Evidence(BaseModel):
     provenance: Literal["document", "online", "calculated", "manual"]
     file_sha: str | None = None
     locator: Locator | None = None
-    method: Literal["questionnaire", "anexa", "prelucrare", "invoice", "online", "manual", "calc"]
+    method: Literal[
+        "questionnaire", "anexa", "prelucrare", "invoice", "online", "manual", "calc", "form"
+    ]
     retrieved_at: datetime
     quote: str | None = None
     trust_reason: str | None = None

@@ -1,4 +1,4 @@
-"""The MCP surface is the S19 contract: ten tools, their schemas, no human action (R14)."""
+"""The MCP surface is the S19 contract: tools, schemas, no human action (R14)."""
 
 import ast
 import tomllib
@@ -55,6 +55,12 @@ TOOLS: dict[str, tuple[str, dict[str, Any], list[str], list[str]]] = {
         WRITE,
         ["job", "section", "draft_recording", "support_recording"],
         ["job", "section"],
+    ),
+    "audit_measures": (
+        "Read the audit measures form and prepare chapter 6.",
+        WRITE,
+        ["job"],
+        ["job"],
     ),
     "piee_generate": (
         "Create a PIEE job from an Anexa 2-3 (and optional Necesar info, Prelucrare date, "

@@ -33,6 +33,8 @@ STATUS = {
     "piee_base_missing": 409,
     "piee_base_review_required": 409,
     "piee_base_changed": 409,
+    "measures_form_missing": 409,
+    "measures_form_invalid": 409,
     "word_unavailable": 424,
     "anaf_unavailable": 424,
     "audit_render_unavailable": 501,
@@ -88,6 +90,8 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "piee_base_missing",
         "piee_base_review_required",
         "piee_base_changed",
+        "measures_form_missing",
+        "measures_form_invalid",
     ),
     ("POST", "/jobs/{job_id}/conflicts/{conflict_id}"): (
         "job_missing",

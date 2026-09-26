@@ -10,6 +10,7 @@ from ema.audit.catalogue_types import (
     Condition,
     FactRef,
     MaterialKind,
+    PrefixPattern,
     PrototypeRef,
     Section,
     SectionKind,
@@ -83,9 +84,9 @@ _FACTS: dict[str, tuple[FactRef, ...]] = {
     "ch4.specific_carburant": (carrier_fact(*_FUELS),),
     "ch4.specific_total": (carrier_fact(),),
     "ch4.specific_apa": (carrier_fact(*_WATER),),
-    "ch6.specifice": (AuditFact.AUDITOR_MEASURES,),
-    "ch6.measure": (AuditFact.AUDITOR_MEASURES,),
-    "ch6.sinteza": (AuditFact.AUDITOR_MEASURES,),
+    "ch6.specifice": (PrefixPattern("audit_measure."), PrefixPattern("narrative.ch6.")),
+    "ch6.measure": (PrefixPattern("audit_measure."), PrefixPattern("narrative.ch6.")),
+    "ch6.sinteza": (PrefixPattern("audit_measure."), PrefixPattern("narrative.ch6.")),
 }
 _CONDITIONS: dict[str, Condition] = {
     "ch2.manager": fact(AuditFact.ENERGY_MANAGER),
@@ -117,9 +118,9 @@ _CONDITIONS: dict[str, Condition] = {
     "ch4.specific_gaz": carrier_condition(Carrier.natural_gas),
     "ch4.specific_carburant": carrier_condition(*_FUELS),
     "ch4.specific_apa": carrier_condition(*_WATER),
-    "ch6.specifice": fact(AuditFact.AUDITOR_MEASURES),
-    "ch6.measure": fact(AuditFact.AUDITOR_MEASURES),
-    "ch6.sinteza": fact(AuditFact.AUDITOR_MEASURES),
+    "ch6.specifice": material(MaterialKind.MEASURES),
+    "ch6.measure": material(MaterialKind.MEASURES),
+    "ch6.sinteza": material(MaterialKind.MEASURES),
 }
 _AWAITS: dict[str, tuple[MaterialKind, ...]] = {
     "ch2.localizare": (MaterialKind.MAP,),
@@ -132,6 +133,9 @@ _AWAITS: dict[str, tuple[MaterialKind, ...]] = {
     "ch5.termic": (MaterialKind.THERMAL,),
     "ch5.termic_fisa": (MaterialKind.THERMAL,),
     "ch5.termic_rezultate": (MaterialKind.THERMAL,),
+    "ch6.specifice": (MaterialKind.MEASURES,),
+    "ch6.measure": (MaterialKind.MEASURES,),
+    "ch6.sinteza": (MaterialKind.MEASURES,),
 }
 
 _ENTRIES: tuple[Section, ...] = (*GENERAL, *ANALYSIS)

@@ -18,6 +18,7 @@ from ema.api.models import (
     SectionState as SectionStateModel,
 )
 from ema.audit.intake import audit_intake, select_checklist
+from ema.audit.measures import compose_measures, validate_measures_form
 from ema.audit.read import read_job
 from ema.audit.sections import Status, set_status
 from ema.audit.sections_bulk import patch_sections
@@ -33,7 +34,7 @@ from ema.piee.review_workflow import start_word_render
 from ema.piee.workflow import start_generate_for_job, start_import_for_job
 
 _STAGES: dict[str, set[str]] = {
-    "audit": {"intake", "read", "fill", "draft"},
+    "audit": {"intake", "read", "fill", "draft", "measures"},
     "piee": {"piee_import", "piee_generate", "piee_word"},
     "invoices": {"invoices", "invoices_workbook"},
     "reporting": set(),
@@ -49,7 +50,7 @@ def validate_slot(job_type: str, slot: str) -> None:
     elif job_type == "invoices":
         allowed = re.fullmatch(r"invoices/[0-9]{4}", slot) is not None
     elif job_type == "audit":
-        if slot == "anexa":
+        if slot in {"anexa", "measures"}:
             allowed = True
         else:
             prefix, separator, tail = slot.partition("/")
@@ -87,7 +88,7 @@ def _check_revision(ws: Workspace, job: str, expected: int) -> None:
         raise EmaError("job_running", "Lucrarea rulează deja.", "")
 
 
-def start_named_stage(  # noqa: C901, PLR0911
+def start_named_stage(  # noqa: C901, PLR0911, PLR0912
     ws: Workspace, job: str, stage: str, on_revision: int, *, human_session: bool = False
 ) -> str:
     record = get_job(ws, job)
@@ -110,6 +111,9 @@ def start_named_stage(  # noqa: C901, PLR0911
         return run_stage(ws, job, stage, audit_intake, on_revision=on_revision)
     if stage == "read":
         return run_stage(ws, job, stage, read_job, on_revision=on_revision)
+    if stage == "measures":
+        validate_measures_form(ws, job)
+        return run_stage(ws, job, stage, compose_measures, on_revision=on_revision)
     if stage == "piee_import":
         return start_import_for_job(ws, job, on_revision=on_revision)
     if stage == "piee_generate":

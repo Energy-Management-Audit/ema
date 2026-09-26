@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ema.audit.catalogue import AuditFact, CarrierPattern, Condition
+from ema.audit.catalogue_types import PrefixPattern
 from ema.core.review.models import Field
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.model import field_key
@@ -25,10 +26,14 @@ def carrier_fields(pattern: CarrierPattern, facts: dict[str, Field]) -> list[Fie
     return result
 
 
-def fact_fields(ref: AuditFact | CarrierPattern, facts: dict[str, Field]) -> list[Field]:
+def fact_fields(
+    ref: AuditFact | CarrierPattern | PrefixPattern, facts: dict[str, Field]
+) -> list[Field]:
     if isinstance(ref, AuditFact):
         field = facts.get(ref.value)
         return [field] if field is not None else []
+    if isinstance(ref, PrefixPattern):
+        return [field for key, field in sorted(facts.items()) if key.startswith(ref.prefix)]
     return carrier_fields(ref, facts)
 
 

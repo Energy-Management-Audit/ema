@@ -508,7 +508,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
     `url {url, snapshot_sha}` · `manual {who, note?}`
   - `highlight ∈ exact | page | none` — what the snippet can honestly show (R18). OCR keeps its
     word boxes (Tesseract TSV), so a scan gets `exact` when the word is found.
-  - `method ∈ questionnaire | anexa | prelucrare | invoice | online | manual | calc`
+  - `method ∈ questionnaire | anexa | prelucrare | invoice | form | online | manual | calc`
   - Readers capture evidence as they read: it is part of every reader's acceptance (S4, S5, S9,
     S12), with a crop/quote test on a scanned PDF and a spreadsheet.
 - **`Value[T]`:** `{value?, unit?, evidence[], derivation?, state, presence, review, revision}`
@@ -884,7 +884,7 @@ The catalogue (each section's kind and sources):
 | 4.x Analiza consumurilor | data blocks | `consumption_analysis` |
 | 5 Bilanțuri energetice (electro + termic) | method text + results + narrative | visit material: **photos of meter/analyser displays grouped by panel** (e.g. Siemens PAC3220: THD, voltages, currents, cos φ) and FLIR images → a vision model reads the values into `MeasurementFacts` (the photo is the source; the auditor confirms) → her measurement-sheet pattern (figure + values + interpretation vs. norms). `later` until received |
 | 6.1 Indicatori financiari · 6.2 Măsuri generale | fixed/parameterised text | template + calc |
-| 6.3 Măsuri specifice · 6.4 Sinteza | narrative + table + calc (NPV, payback) | auditor input + enrichment + calc |
+| 6.3 Măsuri specifice · 6.4 Sinteza | auditor measures form + table + deterministic tep, CO₂ and TRB | labelled „Măsuri propuse” form with cell evidence; per-measure narrative remains a marked gap that blocks final export until a later draft-agent slice |
 | 7 Surse de finanțare | fixed text | template |
 
 **Draft rules for AI narrative:**
@@ -1144,6 +1144,8 @@ POST       /jobs                         {type: invoices|piee|audit|reporting, c
 GET        /jobs/{id}                    GET /jobs/{id}/events   (server-sent progress)
 PUT        /jobs/{id}/slots/{slot}       DELETE /jobs/{id}/slots/{slot}/versions/{v}
 POST       /jobs/{id}/stages/{stage}     POST /jobs/{id}/cancel
+POST       /jobs/{id}/stages/measures    (audit: deterministic form read and ch. 6 plan)
+GET        /audit/forms/masuri-propuse.xlsx  (blank „Măsuri propuse” workbook)
 GET/PATCH  /jobs/{id}/facts              GET /jobs/{id}/conflicts  POST /jobs/{id}/conflicts/{c}
 GET/PATCH  /jobs/{id}/sections           POST /jobs/{id}/sections/{s}/draft
 GET        /jobs/{id}/preview.pdf        GET /jobs/{id}/outputs/{name}
@@ -1174,12 +1176,13 @@ ema reporting generate --years 2023-2025
 ema audit new --client <cui> --year 2026 ; ema audit add <job> <files…> ; ema audit run <job> <stage>
 ema audit status <job>
 ema audit draft <job> <section> [--draft-recording <file> --support-recording <file>]   (replay only)
+ema audit measures <job> ; ema audit measures-form <dest>
 ema mcp [--import-root <dir>]…                                                             (stdio MCP server)
 ```
 
 **MCP** (S19; `ema mcp`, stdio, server `ema`, SDK `mcp==1.30.0`):
-- ten tools over the CLI's use cases: `workspace_info`, `job_list`, `job_status`, `job_fields`, `job_decide`,
-  `job_log`, `job_checks`, `audit_sections`, `audit_draft_section`, `piee_generate`
+- eleven tools over the CLI's use cases: `workspace_info`, `job_list`, `job_status`, `job_fields`, `job_decide`,
+  `job_log`, `job_checks`, `audit_sections`, `audit_draft_section`, `audit_measures`, `piee_generate`
 - one workspace per server, chosen as the CLI chooses it; input files only from `<workspace>/imports/` or an
   `--import-root`; nothing is written outside the workspace
 - every call acts as `agent`: no final export, approval, `done`/`n/a`, undo or delete (R14)

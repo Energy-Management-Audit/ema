@@ -14,6 +14,7 @@ class MaterialKind(StrEnum):
     THERMAL = "thermal_images"
     VISIT = "visit_photos"
     MAP = "map"
+    MEASURES = "measures_form"
 
 
 class AuditFact(StrEnum):
@@ -46,7 +47,6 @@ class AuditFact(StrEnum):
     METERING = "audit.metering"
     AUTOMATION = "audit.automation"
     PRODUCTION = "audit.production"
-    AUDITOR_MEASURES = "audit.auditor_measures"
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,12 @@ class CarrierPattern:
     carriers: tuple[Carrier, ...] = ()
 
 
-FactRef = AuditFact | CarrierPattern
+@dataclass(frozen=True)
+class PrefixPattern:
+    prefix: str
+
+
+FactRef = AuditFact | CarrierPattern | PrefixPattern
 
 
 def carrier_fact(*carriers: Carrier) -> CarrierPattern:

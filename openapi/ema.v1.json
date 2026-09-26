@@ -909,7 +909,8 @@
               "invoice",
               "online",
               "manual",
-              "calc"
+              "calc",
+              "form"
             ],
             "title": "Method",
             "type": "string"
@@ -2800,6 +2801,109 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/audit/forms/masuri-propuse.xlsx": {
+      "get": {
+        "operationId": "measures_form_audit_forms_masuri_propuse_xlsx_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_origin, session_required"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "Measures Form",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/clients": {
       "get": {
         "operationId": "clients_clients_get",
@@ -11422,7 +11526,7 @@
                 }
               }
             },
-            "description": "import_required, job_running, not_ready, piee_base_changed, piee_base_missing, piee_base_review_required, stale_revision"
+            "description": "import_required, job_running, measures_form_invalid, measures_form_missing, not_ready, piee_base_changed, piee_base_missing, piee_base_review_required, stale_revision"
           },
           "415": {
             "content": {

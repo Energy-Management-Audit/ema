@@ -9,6 +9,8 @@ from pathlib import Path
 import typer
 
 from ema.audit.draft_stage import draft_section
+from ema.audit.measures import run_measures
+from ema.audit.measures_form import write_measures_form
 from ema.core.config import workspace_path
 from ema.core.jobs import recover
 from ema.core.workspace import Workspace
@@ -30,3 +32,17 @@ def draft(
         ws, job, section, draft_recording=draft_recording, support_recording=support_recording
     )
     typer.echo(json.dumps(asdict(result), ensure_ascii=False, default=str))
+
+
+@audit_app.command("measures")
+def measures(job: str) -> None:
+    """Read the uploaded measures form and prepare chapter 6."""
+    ws = Workspace(workspace_path())
+    recover(ws)
+    typer.echo(json.dumps(asdict(run_measures(ws, job)), ensure_ascii=False, default=str))
+
+
+@audit_app.command("measures-form")
+def measures_form(dest: Path) -> None:
+    """Write a blank Măsuri propuse workbook."""
+    typer.echo(str(write_measures_form(dest)))
