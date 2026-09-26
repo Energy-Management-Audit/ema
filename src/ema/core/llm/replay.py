@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ema.core.errors import EmaError
 from ema.core.llm.types import Exchange, ToolCall, ToolSpec
@@ -39,7 +39,10 @@ class ReplayProvider:
     name = "replay"
 
     def __init__(self, recording: Path) -> None:
-        data = json.loads(recording.read_text(encoding="utf-8"))
+        loaded: object = json.loads(recording.read_text(encoding="utf-8"))
+        data = cast(dict[str, Any], loaded) if isinstance(loaded, dict) else {}
+        if not isinstance(data.get("responses"), list):
+            raise EmaError("replay_invalid", "Înregistrarea AI este invalidă.", "shape")
         if data.get("source") not in {"recorded", "hand-authored"}:
             raise EmaError("replay_invalid", "Înregistrarea AI este invalidă.", "source")
         if data.get("format") not in {"openai-chat-completions", "gemini-generate-content"}:

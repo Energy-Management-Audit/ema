@@ -115,6 +115,27 @@ def unrendered_items(draft: SectionDraft) -> tuple[str, ...]:
     )
 
 
+def review_payload(
+    draft: SectionDraft, check: DraftCheck, flags: tuple[DraftReview, ...]
+) -> dict[str, object]:
+    return {
+        "section": draft.section,
+        "coverage": check.coverage,
+        "cited_sentences": check.cited_sentences,
+        "total_sentences": check.total_sentences,
+        "review": [item.__dict__ for item in (*check.review, *flags)],
+    }
+
+
+def mark_section_drafted(ws: Workspace, job: str, draft: SectionDraft) -> None:
+    """Capture the exact fact dependency of a drafted section for staleness."""
+    if draft.status == "drafted":
+        recompute_ready(ws, job)
+        keys = {key for paragraph in draft.paragraphs for key in paragraph.fact_ids}
+        keys.update(figure.fact_id for figure in draft.figures)
+        mark_drafted(ws, job, draft.section, "agent", tuple(f"fact:{key}" for key in sorted(keys)))
+
+
 def render_draft_section(  # noqa: PLR0913
     ws: Workspace,
     job: str,
@@ -130,22 +151,8 @@ def render_draft_section(  # noqa: PLR0913
     check = render_section(base, anchors, output, draft, facts, flags, job=job)
     review_path = output.with_suffix(".draft-review.json")
     review_path.write_text(
-        json.dumps(
-            {
-                "section": draft.section,
-                "coverage": check.coverage,
-                "cited_sentences": check.cited_sentences,
-                "total_sentences": check.total_sentences,
-                "review": [item.__dict__ for item in (*check.review, *flags)],
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
+        json.dumps(review_payload(draft, check, flags), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    if draft.status == "drafted":
-        recompute_ready(ws, job)
-        keys = {key for paragraph in draft.paragraphs for key in paragraph.fact_ids}
-        keys.update(figure.fact_id for figure in draft.figures)
-        mark_drafted(ws, job, draft.section, "agent", tuple(f"fact:{key}" for key in sorted(keys)))
+    mark_section_drafted(ws, job, draft)
     return check

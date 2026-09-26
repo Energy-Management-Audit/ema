@@ -12,6 +12,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "uvicorn[standard]>=0.30",
     "typer>=0.12",
+    "mcp==1.30.0",        # MCP server (S19); 2.x pulls opentelemetry-api, whose entry-point loading breaks ADR 0001 rule 2
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
     # office documents

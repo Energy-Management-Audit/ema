@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from ema.audit.draft_checks import DraftCheck, DraftReview, check_draft, support_pass
 from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
@@ -17,6 +17,7 @@ from ema.core.review.models import Field
 from ema.core.workspace import Workspace
 
 PROMPT_VERSION = "audit-draft-v1"
+REPLAY_MODEL = "gemini-3.6-flash"
 INSTRUCTIONS = (
     "Draft only the requested section from recorded facts. Read facts and the style guide first. "
     "Use {{f:fact_id}} for every number and client-specific name; list supporting fact ids on "
@@ -98,7 +99,7 @@ def draft_section_replay(  # noqa: PLR0913
     support_recording: Path,
     limits: Limits,
     *,
-    model_id: str = "gemini-3.6-flash",
+    model_id: str = REPLAY_MODEL,
 ) -> tuple[AgentState, SectionDraft, DraftCheck, tuple[DraftReview, ...]]:
     """Run request-bound Draft and support replay; real client use is disabled."""
     tools = DraftTools(ws, job, section)
@@ -142,5 +143,5 @@ def draft_section_replay(  # noqa: PLR0913
     return state, tools.draft, tools.check, flags
 
 
-def draft_section_live(*_args: object, **_kwargs: object) -> None:
+def draft_section_live(*_args: object, **_kwargs: object) -> NoReturn:
     raise EmaError("ai_client_disabled", "Redactarea pe documente reale așteaptă aprobarea.", "")

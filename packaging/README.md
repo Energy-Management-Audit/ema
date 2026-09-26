@@ -8,3 +8,5 @@ through configuration) apply to every slice before this one.
 
 Nothing in this directory runs on macOS: PyInstaller does not cross-compile, so the build happens
 on a Windows runner from a tag on `prod`.
+
+The spec copies the package metadata listed in `metadata.txt` (`copy_metadata`); a unit test keeps that list exact.

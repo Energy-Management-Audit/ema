@@ -13,6 +13,7 @@ import uvicorn
 from ema import __version__
 from ema.api import create_app
 from ema.api.mock import seed as seed_mock
+from ema.cli.audit import audit_app
 from ema.cli.piee import piee_app
 from ema.cli.review import job_review_app
 from ema.core.backup import backup, restore
@@ -41,6 +42,7 @@ from ema.invoices import (
 from ema.invoices import (
     readiness as invoice_readiness,
 )
+from ema.mcp.server import serve as serve_mcp
 from ema.reporting import collect_annexes, write_report
 from ema.reporting import generate as generate_report
 
@@ -55,6 +57,7 @@ job_app.add_typer(job_review_app)
 _app.add_typer(invoices_app, name="invoices")
 _app.add_typer(piee_app, name="piee")
 _app.add_typer(reporting_app, name="reporting")
+_app.add_typer(audit_app, name="audit")
 
 
 @reporting_app.command("generate")
@@ -236,6 +239,14 @@ def serve(
             host="127.0.0.1",
             port=port,
         )
+
+
+@_app.command("mcp")
+def mcp(
+    import_root: list[Path] = typer.Option([], "--import-root"),  # noqa: B008
+) -> None:
+    """Serve the agent tools over stdio (MCP)."""
+    serve_mcp(import_root)
 
 
 def app() -> None:

@@ -1173,12 +1173,17 @@ ema job checks <job> ; ema job export <job> [--final]    (--final: one y/N human
 ema reporting generate --years 2023-2025
 ema audit new --client <cui> --year 2026 ; ema audit add <job> <files…> ; ema audit run <job> <stage>
 ema audit status <job>
+ema audit draft <job> <section> [--draft-recording <file> --support-recording <file>]   (replay only)
+ema mcp [--import-root <dir>]…                                                             (stdio MCP server)
 ```
 
-**MCP** (slice S19):
-- tools mirror the CLI
-- confined to the workspace
-- no delete, no final export (R14)
+**MCP** (S19; `ema mcp`, stdio, server `ema`, SDK `mcp==1.30.0`):
+- ten tools over the CLI's use cases: `workspace_info`, `job_list`, `job_status`, `job_fields`, `job_decide`,
+  `job_log`, `job_checks`, `audit_sections`, `audit_draft_section`, `piee_generate`
+- one workspace per server, chosen as the CLI chooses it; input files only from `<workspace>/imports/` or an
+  `--import-root`; nothing is written outside the workspace
+- every call acts as `agent`: no final export, approval, `done`/`n/a`, undo or delete (R14)
+- audit drafting replays recorded responses; without recordings it answers `ai_client_disabled` (live AI not approved)
 
 ### 5.14 Errors, logging, observability
 

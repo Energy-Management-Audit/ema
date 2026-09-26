@@ -41,3 +41,12 @@ forbidden_modules =
     ema.api
     ema.cli
     ema.mcp
+
+[importlinter:contract:mcp-standalone]
+name = MCP never imports the other interfaces
+type = forbidden
+source_modules =
+    ema.mcp
+forbidden_modules =
+    ema.api
+    ema.cli

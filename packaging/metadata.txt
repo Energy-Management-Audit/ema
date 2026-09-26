@@ -1,0 +1,3 @@
+# Distributions whose metadata the frozen build must copy (PyInstaller copy_metadata); tested by tests/unit/test_packaging_metadata.py
+httpx2  # reads its own version at import (httpx2/__version__.py)
+mcp     # mcp.server.fastmcp reads version("mcp") at import

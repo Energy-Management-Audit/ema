@@ -31,6 +31,12 @@ export EMA_ARTIFACTS=~/Code/projects/ema/artifacts
 uv run pytest -m golden
 ```
 
+## Agents (MCP)
+
+`ema mcp` serves Ema's agent tools over stdio (`docs/PLAN.md` §5.13). Register it in the agent's MCP configuration
+as a stdio server with command `uv` and arguments `run --directory <repo> ema mcp`. It uses the CLI's workspace
+(`EMA_WORKSPACE`); put input files in `<workspace>/imports/` or pass `--import-root <dir>`.
+
 ## Layout
 
 | Path | Holds |

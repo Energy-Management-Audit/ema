@@ -17,6 +17,8 @@ from ema.core.jobs import (
     get_job,
     latest_ready_run,
     run_stage,
+    status,
+    subscribe,
 )
 from ema.core.workspace import Workspace
 from ema.energy_data.prelucrare import import_prelucrare
@@ -80,6 +82,35 @@ def start_generate(
         if path is not None:
             ws.set_slot(job, slot, ws.add_file(request.client, path))
     return job, start_generate_for_job(ws, job, generated_on=generated_on)
+
+
+@dataclass(frozen=True)
+class GeneratedDraft:
+    job: str
+    run: str
+    draft: Path
+    workbook: Path
+
+
+def generate_draft(ws: Workspace, request: GenerateRequest) -> GeneratedDraft:
+    """Create the job, wait for its draft run, and return both published drafts."""
+    job, run = start_generate(ws, request)
+    for _ in subscribe(ws, job):
+        pass
+    record = next(item for item in status(ws, job).runs if item["id"] == run)
+    if record["state"] != "ready":
+        raise EmaError("piee_generation_failed", "Generarea PIEE a eșuat.", str(record["error"]))
+    with ws.connect() as db:
+        rows = db.execute(
+            "SELECT relative_path FROM outputs WHERE job_id=? AND run_id=? AND kind='draft'",
+            (job, run),
+        ).fetchall()
+    paths = {ws.path(str(row["relative_path"])) for row in rows}
+    draft = next((path for path in paths if path.suffix == ".docx"), None)
+    workbook = next((path for path in paths if path.suffix == ".xlsx"), None)
+    if draft is None or workbook is None:
+        raise EmaError("piee_output_missing", "Ciorna PIEE lipsește.", run)
+    return GeneratedDraft(job, run, draft, workbook)
 
 
 def start_generate_for_job(

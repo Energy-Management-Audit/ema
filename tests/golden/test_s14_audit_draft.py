@@ -4,146 +4,32 @@ import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import pytest
 from docx import Document
 from docx.oxml.ns import qn
+from tests.audit_replay import draft_recording, support_recording
 from tests.golden.s14_structure import auditor_structure
 from tests.golden.test_s10b_audit_base import _identity, _references
 
 from ema.audit.base import build_base
 from ema.audit.base_units import UnitPlan
 from ema.audit.draft_agent import (
-    INSTRUCTIONS,
-    PROMPT_VERSION,
     DraftTools,
     draft_section_replay,
     recorded_facts,
 )
-from ema.audit.draft_checks import SUPPORT_PROMPT, SupportResult
 from ema.audit.draft_render import render_draft_section, render_section
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.sections import get_status, refresh_staleness
 from ema.core.jobs import create_job
 from ema.core.llm import Limits
-from ema.core.llm.replay import request_hashes
 from ema.core.office.anchors import find, stamp
 from ema.core.review.fields import propose
 from ema.core.review.models import Evidence, Field, Manual
 from ema.core.workspace import Workspace
 
 pytestmark = pytest.mark.golden
-MODEL = "gemini-3.6-flash"
-
-
-def _recording(path: Path, rows: list[dict[str, Any]]) -> Path:
-    path.write_text(
-        json.dumps(
-            {"source": "hand-authored", "format": "openai-chat-completions", "responses": rows},
-            ensure_ascii=False,
-        )
-    )
-    return path
-
-
-def _draft_replay(ws: Workspace, job: str, draft: SectionDraft, path: Path) -> Path:
-    tools = DraftTools(ws, job, draft.section)
-    specs = tuple(tool.spec for tool in tools.tools().values())
-    messages: list[dict[str, Any]] = [{"role": "system", "content": INSTRUCTIONS}]
-    rows: list[dict[str, Any]] = []
-    calls = [
-        ("read_facts", {}),
-        ("read_style_guide", {}),
-        ("write_section_draft", draft.model_dump()),
-    ]
-    for index, (name, args) in enumerate(calls):
-        rows.append(
-            {
-                "request_hashes": request_hashes(
-                    MODEL, messages, specs, None, 4096, PROMPT_VERSION
-                ),
-                "choices": [
-                    {
-                        "message": {
-                            "tool_calls": [
-                                {
-                                    "id": str(index),
-                                    "type": "function",
-                                    "function": {
-                                        "name": name,
-                                        "arguments": json.dumps(args, ensure_ascii=False),
-                                    },
-                                }
-                            ]
-                        }
-                    }
-                ],
-                "usage": {"prompt_tokens": 1, "completion_tokens": 1},
-            }
-        )
-        result = tools.tools()[name].execute(args)
-        messages.append(
-            {
-                "role": "assistant",
-                "tool_calls": [{"id": str(index), "name": name, "arguments": args}],
-            }
-        )
-        messages.append(
-            {"role": "tool", "name": name, "tool_call_id": str(index), "content": result}
-        )
-    assert tools.draft is not None
-    rows.append(
-        {
-            "request_hashes": request_hashes(MODEL, messages, specs, None, 4096, PROMPT_VERSION),
-            "choices": [{"message": {"content": "Draft complete"}}],
-            "usage": {"prompt_tokens": 1, "completion_tokens": 1},
-        }
-    )
-    return _recording(path, rows)
-
-
-def _support_replay(
-    ws: Workspace, job: str, draft: SectionDraft, path: Path, flagged: int | None
-) -> Path:
-    facts = recorded_facts(ws, job, draft.section)
-    request = [
-        {
-            "location": f"paragraph:{index}",
-            "text": paragraph.text,
-            "facts": {key: str(facts[key].value) for key in paragraph.fact_ids},
-        }
-        for index, paragraph in enumerate(draft.paragraphs)
-    ]
-    content = json.dumps(request, ensure_ascii=False)
-    messages = [
-        {"role": "system", "content": SUPPORT_PROMPT},
-        {"role": "user", "content": content},
-    ]
-    flags = (
-        []
-        if flagged is None
-        else [
-            {
-                "location": f"paragraph:{flagged}",
-                "sentence": draft.paragraphs[flagged].text,
-                "reason": "The cited fact does not support a claim about efficiency.",
-            }
-        ]
-    )
-    row = {
-        "request_hashes": request_hashes(
-            MODEL,
-            messages,
-            (),
-            SupportResult.model_json_schema(),
-            4096,
-            PROMPT_VERSION + "-support",
-        ),
-        "choices": [{"message": {"content": json.dumps({"flags": flags})}}],
-        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
-    }
-    return _recording(path, [row])
 
 
 def _base(tmp_path: Path) -> tuple[Path, Path]:
@@ -243,8 +129,8 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
             ws,
             job,
             draft.section,
-            _draft_replay(ws, job, draft, tmp_path / f"draft-{index}.json"),
-            _support_replay(
+            draft_recording(ws, job, draft, tmp_path / f"draft-{index}.json"),
+            support_recording(
                 ws, job, draft, tmp_path / f"support-{index}.json", 1 if index == 0 else None
             ),
             Limits(8),
