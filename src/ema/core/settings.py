@@ -12,11 +12,12 @@ from typing import Any, cast
 
 import httpx
 
+from ema.core.config import load_settings
 from ema.core.errors import EmaError
 from ema.core.workspace import Workspace
 from ema.core.workspace.lock import workspace_lock
 
-_ENV_KEYS = {"gemini": "EMA_GEMINI_API_KEY", "openai": "EMA_OPENAI_API_KEY"}
+_PROVIDERS = ("gemini", "openai")
 _MODEL_URLS = {
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/models",
     "openai": "https://api.openai.com/v1/models",
@@ -69,16 +70,17 @@ def _write(ws: Workspace, values: dict[str, Any]) -> None:
 
 def read(ws: Workspace) -> dict[str, Any]:
     values = _values(ws)
+    configured = load_settings(ws, workspace_values=values)
     verified = cast("dict[str, Any]", values.get("provider_verified", {}))
     return {
         "theme": values.get("theme", "light"),
         "default_provider": values.get("provider"),
         "providers": {
             name: {
-                "present": bool(os.environ.get(env)),
+                "present": bool(configured.provider_key(name)),
                 "verified_at": verified.get(name),
             }
-            for name, env in _ENV_KEYS.items()
+            for name in _PROVIDERS
         },
         "extraction": _EXTRACTION | values.get("extraction", {}),
     }
@@ -106,14 +108,17 @@ def update(ws: Workspace, patch: dict[str, Any]) -> dict[str, Any]:
 
 
 def test_provider(ws: Workspace, provider: str) -> dict[str, Any]:
-    if provider not in _ENV_KEYS:
+    if provider not in _PROVIDERS:
         raise EmaError("provider_invalid", "Furnizorul este invalid.", "")
-    key = os.environ.get(_ENV_KEYS[provider])
-    if not key:
+    key = load_settings(ws).provider_key(provider)
+    if key is None or not key.get_secret_value():
         return {"provider": provider, "status": "no_key"}
     try:
         with httpx.Client(timeout=5, follow_redirects=False, trust_env=False) as client:
-            response = client.get(_MODEL_URLS[provider], headers={"Authorization": f"Bearer {key}"})
+            response = client.get(
+                _MODEL_URLS[provider],
+                headers={"Authorization": f"Bearer {key.get_secret_value()}"},
+            )
         success = response.status_code == 200
     except httpx.HTTPError:
         success = False

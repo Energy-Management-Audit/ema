@@ -3,25 +3,24 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, cast
 
 from google import genai
 from google.genai import types
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
+from pydantic import SecretStr
 
 from ema.core.errors import EmaError
 from ema.core.llm.types import Exchange, ToolCall, ToolSpec
 
 
-def _live_key(environment: str) -> str:
-    if os.environ.get("EMA_LLM_LIVE") != "1":
+def _live_key(key: SecretStr | None, llm_live: bool, environment: str) -> str:
+    if not llm_live:
         raise EmaError("ai_offline", "AI aşteaptă activarea explicită.", "EMA_LLM_LIVE")
-    key = os.environ.get(environment)
-    if not key:
+    if key is None or not key.get_secret_value():
         raise EmaError("ai_key_missing", "Cheia furnizorului AI lipseşte.", environment)
-    return key
+    return key.get_secret_value()
 
 
 def _openai_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -60,8 +59,8 @@ def _openai_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
 class OpenAIProvider:
     name = "openai"
 
-    def __init__(self) -> None:
-        self._client = OpenAI(api_key=_live_key("OPENAI_API_KEY"))
+    def __init__(self, key: SecretStr | None, llm_live: bool) -> None:
+        self._client = OpenAI(api_key=_live_key(key, llm_live, "EMA_OPENAI_API_KEY"))
 
     def respond(  # noqa: PLR0913
         self,
@@ -125,8 +124,8 @@ class OpenAIProvider:
 class GeminiProvider:
     name = "gemini"
 
-    def __init__(self) -> None:
-        self._client = genai.Client(api_key=_live_key("GEMINI_API_KEY"))
+    def __init__(self, key: SecretStr | None, llm_live: bool) -> None:
+        self._client = genai.Client(api_key=_live_key(key, llm_live, "EMA_GEMINI_API_KEY"))
 
     def respond(  # noqa: PLR0913
         self,

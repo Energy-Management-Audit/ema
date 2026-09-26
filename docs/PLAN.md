@@ -1253,6 +1253,9 @@ reached, never just „passed":
 ### 5.17 Configuration
 
 - One settings file in the workspace + the keyring.
+- Non-secret settings use `EMA_*` environment variables before the workspace file; defaults come
+  last. Provider keys use `EMA_GEMINI_API_KEY` and `EMA_OPENAI_API_KEY` before the OS keyring
+  (service `Ema`, usernames `gemini_api_key` and `openai_api_key`); `EMA_LLM_LIVE` is environment-only.
 - Settings: workspace path, the active AI provider (Gemini / OpenAI) + one model from the curated
   list (§5.12), OCR language, the Word path, enrichment on/off.
 

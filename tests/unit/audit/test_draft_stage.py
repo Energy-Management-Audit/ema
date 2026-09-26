@@ -81,8 +81,8 @@ def test_no_recordings_refuses_before_any_write_even_when_live(
 ) -> None:
     constructed: list[str] = []
     monkeypatch.setenv("EMA_LLM_LIVE", "1")
-    monkeypatch.setenv("GEMINI_API_KEY", "synthetic-key")
-    monkeypatch.setenv("OPENAI_API_KEY", "synthetic-key")
+    monkeypatch.setenv("EMA_GEMINI_API_KEY", "synthetic-key")
+    monkeypatch.setenv("EMA_OPENAI_API_KEY", "synthetic-key")
     monkeypatch.setattr(
         "ema.core.llm.providers.genai.Client", lambda **_: constructed.append("gemini")
     )

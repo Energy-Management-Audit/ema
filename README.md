@@ -21,6 +21,12 @@ uv run pre-commit install --install-hooks -t pre-commit -t pre-push
 scripts/check              # non-mutating gate, same command as CI and pre-push
 ```
 
+Configuration uses `EMA_*` environment variables before `settings.toml` in the workspace, then
+defaults. Set provider keys with `EMA_GEMINI_API_KEY` / `EMA_OPENAI_API_KEY` for development and CI;
+they override OS keyring entries under service `Ema` and usernames `gemini_api_key` /
+`openai_api_key`. Keys are never read from workspace settings. `EMA_LLM_LIVE=true` enables live
+provider construction and is environment-only.
+
 Golden tests read the real reference library, which lives outside this repository and never enters
 git. To run them:
 

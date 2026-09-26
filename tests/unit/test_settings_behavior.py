@@ -33,6 +33,8 @@ def test_settings_update_merges_extraction_and_clears_provider(tmp_path: Path) -
     ("patch", "code"),
     [
         ({"gemini_key": "secret"}, "key_not_allowed"),
+        ({"gemini_api_key": "secret"}, "key_not_allowed"),
+        ({"openai_api_key": "secret"}, "key_not_allowed"),
         ({"unsupported": True}, "settings_invalid"),
     ],
 )
