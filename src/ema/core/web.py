@@ -58,7 +58,7 @@ def _read_body(
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise EmaError("web_timeout", "Sursa online a depășit timpul permis.", url)
+            raise EmaError("web_timeout", "Sursa online a depăşit timpul permis.", url)
         if connection.sock is not None:
             connection.sock.settimeout(remaining)
         chunk = response.read(min(65536, MAX_BODY + 1 - size))
@@ -145,7 +145,7 @@ def fetch_bytes(
         status, content_type, body, redirect = request(current, method, payload)
         if status in {301, 302, 303, 307, 308}:
             if not redirect:
-                raise EmaError("web_redirect", "Redirecționarea nu are destinație.", "")
+                raise EmaError("web_redirect", "Redirecţionarea nu are destinaţie.", "")
             current = urljoin(current, redirect)
             if status == 303:
                 method, payload = "GET", None
@@ -153,4 +153,4 @@ def fetch_bytes(
         if status >= 400:
             raise EmaError("web_status", "Sursa online a răspuns cu eroare.", str(status))
         return current, content_type, body
-    raise EmaError("web_redirect", "Prea multe redirecționări.", "")
+    raise EmaError("web_redirect", "Prea multe redirecţionări.", "")

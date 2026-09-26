@@ -81,7 +81,7 @@ class SectionState:
 def _forbidden(current: SectionState, to: Status, actor: Actor) -> EmaError:
     return EmaError(
         "transition_forbidden",
-        "Tranziția secțiunii este interzisă.",
+        "Tranziţia secţiunii este interzisă.",
         f"{current.status.value} -> {to.value} by {actor}",
     )
 

@@ -93,7 +93,7 @@ def render_section(  # noqa: PLR0913
         paragraphs.append(MARKER)
     if len(paragraphs) > len(writable):
         raise EmaError(
-            "draft_slots", "Secțiunea nu are suficiente ancore de paragraf.", draft.section
+            "draft_slots", "Secţiunea nu are suficiente ancore de paragraf.", draft.section
         )
     for element, text in zip(writable, paragraphs, strict=False):
         set_text(element, text, missing=text == MARKER)

@@ -29,7 +29,7 @@ def undo(ws: Workspace, job: str, decision_id: str, actor: Actor) -> Decision:  
                 (job, original.field_id),
             ).fetchone()
             if section_row is None:
-                raise EmaError("section_missing", "Secțiunea lipsește.", original.field_id)
+                raise EmaError("section_missing", "Secţiunea lipseşte.", original.field_id)
             current = json.loads(section_row["data"])
         row = db.execute(
             "SELECT seq FROM decisions WHERE id=? AND job_id=?", (decision_id, job)
@@ -115,7 +115,7 @@ def _validate_section_undo(
     if actor != "user" and decided_section.status in (Status.DONE, Status.NA):
         raise EmaError(
             "transition_forbidden",
-            "Tranziția secțiunii este interzisă.",
+            "Tranziţia secţiunii este interzisă.",
             f"undo {decided_section.status.value} by {actor}",
         )
     changed_input = _changed_section_input(db, job, previous_section)

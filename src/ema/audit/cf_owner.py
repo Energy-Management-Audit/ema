@@ -39,7 +39,7 @@ class LocatedCui:
 def read_owner_cui(extracts: list[Path], company: str) -> LocatedCui:
     wanted = _tokens(company)
     if not wanted:
-        raise EmaError("company_missing", "Numele clientului lipsește.", "")
+        raise EmaError("company_missing", "Numele clientului lipseşte.", "")
     matches: dict[str, tuple[Evidence, Path]] = {}
     for source in extracts:
         document = pdfium.PdfDocument(source)

@@ -10,16 +10,18 @@ export function ActivityPanel({
   title,
   children,
   footer,
+  onAll,
 }: {
   title: ReactNode
   children: ReactNode
   footer?: ReactNode
+  onAll?: () => void
 }) {
   return (
     <aside className="ema-activity">
       <div className="ema-activity__head">
         <span className="ema-activity__title">{title}</span>
-        <Button variant="quiet" height={26} className="ema-activity__all">
+        <Button variant="quiet" height={26} className="ema-activity__all" onClick={onAll}>
           Tot jurnalul
         </Button>
         <IconButton
@@ -43,15 +45,19 @@ export function ActivityEntry({
   time,
   detail,
   undo,
+  onUndo,
+  testId,
 }: {
   outcome: 'accepted' | 'rejected' | 'info'
   title: ReactNode
   time: ReactNode
   detail?: ReactNode
   undo?: string
+  onUndo?: () => void
+  testId?: string
 }) {
   return (
-    <div className={`ema-activity-entry ema-activity-entry--${outcome}`}>
+    <div className={`ema-activity-entry ema-activity-entry--${outcome}`} data-testid={testId}>
       <div className="ema-activity-entry__line">
         {outcome === 'accepted' && (
           <Icon icon={Check} size={12} stroke={2.6} color="var(--olive-mark)" />
@@ -65,7 +71,12 @@ export function ActivityEntry({
       </div>
       {detail && <span className="ema-activity-entry__detail">{detail}</span>}
       {undo && (
-        <Button variant="secondary" height={26} className="ema-activity-entry__undo">
+        <Button
+          variant="secondary"
+          height={26}
+          className="ema-activity-entry__undo"
+          onClick={onUndo}
+        >
           {undo}
         </Button>
       )}

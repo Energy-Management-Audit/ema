@@ -1,4 +1,4 @@
-"""PIEE job generation shared by the command line and future HTTP adapter."""
+"""PIEE import and generation shared by the command line and the HTTP API."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import cast
 
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
@@ -20,13 +21,16 @@ from ema.core.jobs import (
     status,
     subscribe,
 )
+from ema.core.jobs.reads import run_current
+from ema.core.review.models import Cell, Field
 from ema.core.workspace import Workspace
 from ema.energy_data.prelucrare import import_prelucrare
 from ema.energy_data.prelucrare_writer import write_prelucrare
 from ema.piee.base import build_local_base
 from ema.piee.compose import compose_draft, load_approved_base
-from ema.piee.dataset import load
+from ema.piee.dataset import PieeData, load
 from ema.piee.intake import import_piee_into_job
+from ema.piee.review_overlay import apply_review
 from ema.piee.views import prelucrare_state
 
 
@@ -34,7 +38,7 @@ def base_directory(ws: Workspace) -> Path:
     settings = load_settings(ws)
     base = settings.piee_base_document
     if base is None or not base.is_file():
-        raise EmaError("piee_base_missing", "Documentul de bază PIEE lipsește.", str(base))
+        raise EmaError("piee_base_missing", "Documentul de bază PIEE lipseşte.", str(base))
     base_sha = hashlib.sha256(base.read_bytes()).hexdigest()
     directory = settings.piee_base_directory or ws.root / "bases" / "piee" / base_sha[:16]
     if not (directory / "base-map.json").is_file():
@@ -64,7 +68,7 @@ class GenerateRequest:
 def start_generate(
     ws: Workspace, request: GenerateRequest, *, generated_on: date | None = None
 ) -> tuple[str, str]:
-    """Import review evidence, then render one draft from immutable slot copies."""
+    """Read the documents, wait for the import, then render one draft (the CLI one-call path)."""
     load(
         request.year,
         request.anexa,
@@ -81,6 +85,14 @@ def start_generate(
     ):
         if path is not None:
             ws.set_slot(job, slot, ws.add_file(request.client, path))
+    run = start_import_for_job(ws, job)
+    for _ in subscribe(ws, job):
+        pass
+    record = next(item for item in status(ws, job).runs if item["id"] == run)
+    if record["state"] != "ready":
+        raise EmaError(
+            "piee_import_failed", "Documentele nu s-au putut citi.", str(record["error"])
+        )
     return job, start_generate_for_job(ws, job, generated_on=generated_on)
 
 
@@ -113,14 +125,23 @@ def generate_draft(ws: Workspace, request: GenerateRequest) -> GeneratedDraft:
     return GeneratedDraft(job, run, draft, workbook)
 
 
-def start_generate_for_job(
-    ws: Workspace,
-    job: str,
-    *,
-    generated_on: date | None = None,
-    on_revision: int | None = None,
-) -> str:
-    """Generate from the active slots of a pre-existing year-N+1 PIEE job."""
+@dataclass(frozen=True)
+class _Sources:
+    data_year: int
+    shas: dict[str, str]
+    paths: dict[str, Path]
+
+    def load(self) -> PieeData:
+        return load(
+            self.data_year,
+            self.paths["anexa"],
+            self.paths.get("questionnaire"),
+            self.paths.get("prelucrare"),
+            self.paths.get("previous_piee"),
+        )
+
+
+def _sources(ws: Workspace, job: str) -> _Sources:
     record = get_job(ws, job)
     if record["type"] != "piee":
         raise EmaError("wrong_job_type", "Lucrarea nu este PIEE.", "")
@@ -135,60 +156,99 @@ def start_generate_for_job(
             "WHERE s.job_id=?",
             (job,),
         ).fetchall()
-    source_shas = {str(row["name"]): str(row["file_sha"]) for row in slots}
-    sources = {name: ws.file_path(client, sha) for name, sha in source_shas.items()}
-    if "anexa" not in sources:
-        raise EmaError("not_ready", "Anexa lipsește.", "")
-    data_year = job_year - 1
-    previous = latest_ready_run(ws, job, "piee_generate")
-    with ws.connect() as db:
-        current_slots = {
-            (str(row["name"]), int(row["revision"]))
-            for row in db.execute(
-                "SELECT name,revision FROM slots WHERE job_id=? AND active_version IS NOT NULL",
-                (job,),
-            )
-        }
-        previous_slots: set[tuple[str, int]] = (
-            {
-                (str(row["row_id"]).split(":", 1)[1], int(row["revision"]))
-                for row in db.execute(
-                    "SELECT row_id,revision FROM run_reads WHERE run_id=? AND table_name='slots'",
-                    (previous,),
-                )
-            }
-            if previous is not None
-            else set()
+    shas = {str(row["name"]): str(row["file_sha"]) for row in slots}
+    if "anexa" not in shas:
+        raise EmaError("not_ready", "Anexa lipseşte.", "")
+    paths = {name: ws.file_path(client, sha) for name, sha in shas.items()}
+    return _Sources(job_year - 1, shas, paths)
+
+
+def _check_reads(ctx: StageContext, expected: dict[str, str]) -> None:
+    read = {slot.slot: slot.file_sha for slot in ctx.read_slots("")}
+    if read != expected:
+        raise EmaError("stale_revision", "Fişierele lucrării s-au schimbat.", "")
+
+
+def start_import_for_job(ws: Workspace, job: str, *, on_revision: int | None = None) -> str:
+    """Read every source slot into review fields; generation composes from these fields."""
+    sources = _sources(ws, job)
+    sources.load()
+
+    def stage(ctx: StageContext) -> StageOutcome:
+        ctx.progress(0, 1, "Citire documente PIEE")
+        _check_reads(ctx, sources.shas)
+        import_piee_into_job(
+            ws,
+            job,
+            sources.data_year,
+            sources.paths["anexa"],
+            sources.paths.get("questionnaire"),
+            sources.paths.get("prelucrare"),
+            previous_piee=sources.paths.get("previous_piee"),
         )
-    needs_import = previous is None or current_slots != previous_slots
-    data = load(
-        data_year,
-        sources["anexa"],
-        sources.get("questionnaire"),
-        sources.get("prelucrare"),
-        sources.get("previous_piee"),
-    )
+        ctx.progress(1, 1, "Date citite")
+        return StageOutcome()
+
+    return run_stage(ws, job, "piee_import", stage, on_revision=on_revision)
+
+
+def current_import(ws: Workspace, job: str) -> str | None:
+    """The latest import whose documents are still the job's active slots."""
+    run = latest_ready_run(ws, job, "piee_import")
+    if run is None:
+        return None
+    with ws.connect() as db:
+        return run if run_current(db, run) else None
+
+
+def _reviewed(ws: Workspace, ctx: StageContext, data: PieeData) -> PieeData:
+    with ws.connect() as db:
+        db.execute("BEGIN")
+        rows = db.execute(
+            "SELECT id,revision,data FROM fields WHERE job_id=? ORDER BY key", (ctx.job,)
+        ).fetchall()
+        evidence = db.execute("SELECT id,data FROM evidence WHERE job_id=?", (ctx.job,)).fetchall()
+    fields: list[Field] = []
+    for row in rows:
+        ctx.record_read("fields", str(row["id"]), int(row["revision"]))
+        fields.append(Field.model_validate_json(row["data"]))
+    cells: dict[str, Cell] = {}
+    for row in evidence:
+        # Older evidence rows predate `provenance`, so only the locator is validated.
+        locator = cast("dict[str, object]", json.loads(row["data"])).get("locator")
+        if isinstance(locator, dict) and cast("dict[str, object]", locator).get("kind") == "cell":
+            cells[str(row["id"])] = Cell.model_validate(locator)
+    return apply_review(data, fields, cells)
+
+
+def start_generate_for_job(
+    ws: Workspace,
+    job: str,
+    *,
+    generated_on: date | None = None,
+    on_revision: int | None = None,
+) -> str:
+    """Compose a draft from the current import's fields; it never reads the documents anew."""
+    sources = _sources(ws, job)
+    source_shas = sources.shas
+    imported = current_import(ws, job)
+    if imported is None:
+        raise EmaError("import_required", "Documentele trebuie citite din nou.", "")
+    with ws.connect() as db:
+        import_shas = {
+            str(row["file_sha"])
+            for row in db.execute("SELECT file_sha FROM run_inputs WHERE run_id=?", (imported,))
+        }
+    if import_shas != set(source_shas.values()):
+        raise EmaError("import_required", "Documentele trebuie citite din nou.", "")
+    base_data = sources.load()
     base = base_directory(ws)
     today = generated_on or date.today()
 
     def stage(ctx: StageContext) -> StageOutcome:
         ctx.progress(0, 2, "Pregătire date PIEE")
-        for slot_name, expected_sha in source_shas.items():
-            if ctx.read_slot(slot_name).file_sha != expected_sha:
-                raise EmaError("stale_revision", "Fișierele lucrării s-au schimbat.", "")
-        if needs_import:
-            import_piee_into_job(
-                ws,
-                job,
-                data_year,
-                sources["anexa"],
-                sources.get("questionnaire"),
-                sources.get("prelucrare"),
-                previous_piee=sources.get("previous_piee"),
-            )
-        with ws.connect() as db:
-            for row in db.execute("SELECT id,revision FROM fields WHERE job_id=?", (job,)):
-                ctx.record_read("fields", str(row["id"]), int(row["revision"]))
+        _check_reads(ctx, source_shas)
+        data = _reviewed(ws, ctx, base_data)
         ctx.record_input(template=load_approved_base(base).base_sha, factors=data.factors.version)
         temporary = ctx.artifact_dir() / "PIEE-draft.docx"
         result = compose_draft(data, base, temporary, today)
@@ -217,7 +277,7 @@ def start_generate_for_job(
                     },
                     "separate_pv_figures": {
                         "value": data.separate_pv_figures,
-                        "source": "previous_piee" if "previous_piee" in sources else "base",
+                        "source": "previous_piee" if "previous_piee" in source_shas else "base",
                     },
                 }
             ),
@@ -235,7 +295,7 @@ def start_generate_for_job(
 
 def set_prelucrare(ws: Workspace, job: str, file_id: str, role: str = "input") -> dict[str, object]:
     if role != "input":
-        raise EmaError("file_type", "Tipul fișierului este invalid.", "")
+        raise EmaError("file_type", "Tipul fişierului este invalid.", "")
     record = get_job(ws, job)
     if record["type"] != "piee":
         raise EmaError("wrong_job_type", "Lucrarea nu este PIEE.", "")
@@ -243,7 +303,7 @@ def set_prelucrare(ws: Workspace, job: str, file_id: str, role: str = "input") -
         raise EmaError("job_running", "Lucrarea rulează deja.", "")
     path = ws.file_path(str(record["client_slug"]), file_id)
     if path.suffix.lower() not in {".xls", ".xlsx"}:
-        raise EmaError("file_type", "Tipul fișierului este invalid.", "")
+        raise EmaError("file_type", "Tipul fişierului este invalid.", "")
     import_prelucrare(path)
     ws.set_slot(job, "prelucrare", file_id)
     return prelucrare_state(ws, job)

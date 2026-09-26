@@ -32,7 +32,7 @@ class ItemOutcome:
 def intake_file(ctx: StageContext, slot: str) -> ItemOutcome:
     version = active_version(ctx.ws, ctx.job, slot)
     if version is None:
-        raise EmaError("slot_missing", "Fișierul cerut lipsește.", slot)
+        raise EmaError("slot_missing", "Fişierul cerut lipseşte.", slot)
     _, path = stored_file(ctx.ws, ctx.job, version.file_sha)
     # This stage updates the slot; recording its old revision would mark its own run stale.
     ctx.inputs[f"slot:{slot}"] = version.file_sha

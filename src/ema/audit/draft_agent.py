@@ -40,7 +40,7 @@ def recorded_facts(ws: Workspace, job: str, section: str) -> dict[str, Field]:
 class DraftTools:
     def __init__(self, ws: Workspace, job: str, section: str) -> None:
         if section not in SECTION_FACTS:
-            raise EmaError("section_missing", "Secțiunea de redactare lipsește.", section)
+            raise EmaError("section_missing", "Secţiunea de redactare lipseşte.", section)
         self.ws, self.job, self.section = ws, job, section
         self.draft: SectionDraft | None = None
         self.check: DraftCheck | None = None
@@ -63,7 +63,7 @@ class DraftTools:
     def write_section_draft(self, args: dict[str, Any]) -> object:
         draft = SectionDraft.model_validate(args)
         if draft.section != self.section:
-            raise EmaError("draft_section", "Secțiunea redactată nu corespunde.", self.section)
+            raise EmaError("draft_section", "Secţiunea redactată nu corespunde.", self.section)
         check = check_draft(draft, recorded_facts(self.ws, self.job, self.section), self.job)
         if check.fatal:
             return {"accepted": False, "errors": [issue.code for issue in check.fatal]}
@@ -128,7 +128,7 @@ def draft_section_replay(  # noqa: PLR0913
                 if call["id"] in accepted and call["name"] == "write_section_draft":
                     tools.write_section_draft(call["arguments"])
     if state.status != "done" or tools.draft is None or tools.check is None:
-        raise EmaError("draft_incomplete", "Redactarea secțiunii nu s-a încheiat.", section)
+        raise EmaError("draft_incomplete", "Redactarea secţiunii nu s-a încheiat.", section)
     facts = recorded_facts(ws, job, section)
     support_context = AgentContext(
         ws,

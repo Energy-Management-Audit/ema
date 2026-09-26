@@ -20,7 +20,7 @@ def start_run(ws: Workspace, years: list[int], client_ids: list[str]) -> dict[st
     if not years or any(year < 1 for year in years) or years != sorted(set(years)):
         raise EmaError("invalid_year", "Anii raportării sunt invalizi.", "")
     if not client_ids or len(client_ids) != len(set(client_ids)):
-        raise EmaError("invalid_id", "Lista clienților este invalidă.", "")
+        raise EmaError("invalid_id", "Lista clienţilor este invalidă.", "")
     sources: list[tuple[str, str, Path]] = []
     absent: list[dict[str, Any]] = []
     for client_id in client_ids:

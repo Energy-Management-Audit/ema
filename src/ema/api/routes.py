@@ -47,8 +47,8 @@ from ema.core.review import (
     undo,
 )
 from ema.core.review.evidence import get_evidence
-from ema.core.review.models import Decision, Evidence, Field
-from ema.core.review.readiness import readiness_hash_in_tx
+from ema.core.review.models import Approval, Decision, Evidence, Field
+from ema.core.review.readiness import approvals, readiness_hash_in_tx
 from ema.core.workspace import Workspace
 from ema.invoices import InvoiceWorkflow
 from ema.piee.review_workflow import PieeWorkflow
@@ -139,7 +139,7 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
         result = asdict(status(ws, job_id))
         for run in result["runs"]:
             if run.get("error"):
-                run["error"] = "Etapa a eșuat."
+                run["error"] = "Etapa a eşuat."
         return result
 
     @app.get(
@@ -156,11 +156,11 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
         get_job(ws, job_id)
         raw = last_event_id
         if raw is not None and not re.fullmatch(r"[0-9]+", raw):
-            raise EmaError("invalid_cursor", "Poziția evenimentului este invalidă.", raw)
+            raise EmaError("invalid_cursor", "Poziţia evenimentului este invalidă.", raw)
         try:
             cursor = int(raw) if raw is not None else 0
         except ValueError as exc:
-            raise EmaError("invalid_cursor", "Poziția evenimentului este invalidă.", "") from exc
+            raise EmaError("invalid_cursor", "Poziţia evenimentului este invalidă.", "") from exc
 
         async def stream() -> AsyncIterator[str]:
             nonlocal cursor
@@ -341,6 +341,10 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
             media_type=str(metadata["media_type"]),
             headers={"X-Content-Type-Options": "nosniff"},
         )
+
+    @app.get("/jobs/{job_id}/approvals", tags=["export"], response_model=list[Approval])
+    def job_approvals(job_id: str) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in approvals(ws, job_id)]
 
     @app.post("/jobs/{job_id}/export", tags=["export"], response_model=ExportResult)
     def do_export(job_id: str, body: ExportInput, request: Request) -> dict[str, str]:

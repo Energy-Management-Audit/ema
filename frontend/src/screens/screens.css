@@ -1,0 +1,168 @@
+/* S2–S5 assembled from the S17a parts; measures from M4/M6/3g of the handoff. */
+.ema-content {
+  position: relative;
+}
+.ema-content > .ema-tabs {
+  margin-top: 16px;
+}
+.job-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 0 34px;
+}
+.job-draft {
+  color: var(--section-key);
+  font-size: 12px;
+}
+.job-draft--stale {
+  color: var(--amber-ink);
+}
+.job-header-problem {
+  position: absolute;
+  top: 70px;
+  right: 34px;
+  z-index: 2;
+  width: 440px;
+  white-space: normal;
+}
+
+a.ema-btn {
+  text-decoration: none;
+}
+
+/* S2 Documente (M6) */
+.documents,
+.data,
+.measures {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.documents .ema-section-key {
+  margin-top: 6px;
+}
+.slot-row,
+.output-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 190px 64px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.output-row {
+  grid-template-columns: 28px minmax(0, 1fr) auto 64px;
+}
+.slot-row:last-child,
+.output-row:last-child {
+  border-bottom: 0;
+}
+.slot-row--empty {
+  color: var(--ink-muted);
+}
+.slot-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.slot-row__name {
+  overflow: hidden;
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slot-row__name--file {
+  font-weight: 500;
+}
+.slot-row__detail {
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+.slot-row__size {
+  color: var(--ink-muted);
+  font: 12px var(--font-mono);
+  text-align: right;
+}
+.documents__none {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+/* The activity column */
+.blocking-panel {
+  display: flex;
+  flex-direction: column;
+}
+.blocking-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.blocking-item__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.blocking-item small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.activity-section {
+  padding: 16px 0 2px;
+}
+.activity-footnote {
+  color: var(--ink-muted);
+  font-size: 11.5px;
+}
+.ema-count-bar__count.is-complete {
+  color: var(--olive-ink);
+}
+.run-panel {
+  padding-bottom: 10px;
+}
+.run-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 16px 14px;
+}
+.run-panel__body .ema-btn,
+.run-panel--lines .ema-btn {
+  align-self: flex-start;
+}
+.run-panel--lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+}
+.run-panel__title {
+  font-size: 13px;
+  font-weight: 500;
+}
+.run-panel__time {
+  color: var(--section-key);
+  font: 11px var(--font-mono);
+}
+.run-panel__exits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.run-panel__stopped {
+  margin: 0 0 8px;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+.journal {
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+}

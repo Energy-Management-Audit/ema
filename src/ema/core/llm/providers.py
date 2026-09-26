@@ -17,10 +17,10 @@ from ema.core.llm.types import Exchange, ToolCall, ToolSpec
 
 def _live_key(environment: str) -> str:
     if os.environ.get("EMA_LLM_LIVE") != "1":
-        raise EmaError("ai_offline", "AI așteaptă activarea explicită.", "EMA_LLM_LIVE")
+        raise EmaError("ai_offline", "AI aşteaptă activarea explicită.", "EMA_LLM_LIVE")
     key = os.environ.get(environment)
     if not key:
-        raise EmaError("ai_key_missing", "Cheia furnizorului AI lipsește.", environment)
+        raise EmaError("ai_key_missing", "Cheia furnizorului AI lipseşte.", environment)
     return key
 
 

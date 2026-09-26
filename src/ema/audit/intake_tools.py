@@ -34,7 +34,7 @@ class IntakeTools:
         name = str(args["name"])
         document = self.documents.get(name)
         if document is None:
-            raise EmaError("file_missing", "Fișierul cerut lipsește.", name)
+            raise EmaError("file_missing", "Fişierul cerut lipseşte.", name)
         return {
             "text": document.text,
             "ocr_text": document.ocr_text,
@@ -47,7 +47,7 @@ class IntakeTools:
         if document is None or number not in self.checklist:
             raise EmaError("classification_invalid", "Clasificarea nu este validă.", name)
         if not quote or (quote not in document.text and quote not in document.ocr_text):
-            raise EmaError("evidence_quote", "Fragmentul citat nu apare în fișier.", name)
+            raise EmaError("evidence_quote", "Fragmentul citat nu apare în fişier.", name)
         self.classifications[name] = number
         self.evidence[name] = quote
         self.missing.discard(number)
@@ -56,7 +56,7 @@ class IntakeTools:
     def mark_missing(self, args: dict[str, Any]) -> object:
         number = int(args["item"])
         if number not in self.checklist:
-            raise EmaError("checklist_item", "Poziția din listă nu există.", str(number))
+            raise EmaError("checklist_item", "Poziţia din listă nu există.", str(number))
         if number not in self.classifications.values():
             self.missing.add(number)
         return {"missing": number}

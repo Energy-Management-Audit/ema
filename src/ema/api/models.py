@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -155,6 +156,32 @@ class Output(BaseModel):
     media_type: str
     size_bytes: int
     edited_externally: bool
+    name: str
+    created_at: str | None
+    run_id: str
+    stage: str
+
+
+class PieeImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    on_revision: int
+
+
+class SummaryFigure(BaseModel):
+    value: Decimal | None
+    unit: str
+    field_ids: list[str]
+    missing: list[str]
+
+
+class PieeSummary(BaseModel):
+    total_tep: SummaryFigure
+    annual_check: Literal["match", "decided", "mismatch", "missing"]
+    savings_mwh: SummaryFigure
+    investment_thousand_lei: SummaryFigure
+    measures_total: int
+    measures_complete: int
+    measures_without_term: int
 
 
 class PieeGenerate(BaseModel):

@@ -25,7 +25,7 @@ def read_checklist(path: Path) -> tuple[ChecklistItem, ...]:
     try:
         matches = [name for name in book.sheet_names if "diverse" in name.casefold()]
         if len(matches) != 1:
-            raise EmaError("checklist_sheet", "Foaia diverse lipsește sau este ambiguă.", "")
+            raise EmaError("checklist_sheet", "Foaia diverse lipseşte sau este ambiguă.", "")
         sheet = book.sheet(matches[0])
         found: dict[int, ChecklistItem] = {}
         for row in range(1, sheet.max_row + 1):
@@ -48,13 +48,13 @@ def read_checklist(path: Path) -> tuple[ChecklistItem, ...]:
                 text = sheet.value(row, col + 1).value
                 if not isinstance(text, str) or not text.strip():
                     raise EmaError(
-                        "checklist_text", "Descrierea documentului lipsește.", str(number)
+                        "checklist_text", "Descrierea documentului lipseşte.", str(number)
                     )
                 found[number] = ChecklistItem(number, text.strip(), sheet.name, row)
         if set(found) != set(range(1, 14)):
             raise EmaError(
                 "checklist_count",
-                "Lista de documente nu are 13 poziții.",
+                "Lista de documente nu are 13 poziţii.",
                 ",".join(str(n) for n in sorted(found)),
             )
         return tuple(found[number] for number in range(1, 14))

@@ -44,7 +44,7 @@ def stored_file(ws: Workspace, job: str, sha: str) -> tuple[str, Path]:
             (sha, job),
         ).fetchone()
     if row is None:
-        raise EmaError("file_missing", "Fișierul nu există.", sha)
+        raise EmaError("file_missing", "Fişierul nu există.", sha)
     return str(row["client_slug"]), ws.path(str(row["relative_path"]))
 
 
@@ -55,7 +55,7 @@ def convert_doc(
         raise EmaError("version_missing", "Versiunea nu există.", f"{job}/{slot}/{version.version}")
     _, source = stored_file(ws, job, version.file_sha)
     if sniff(source).kind != FileKind.DOC:
-        raise EmaError("file_type", "Fișierul nu este un document DOC.", source.name)
+        raise EmaError("file_type", "Fişierul nu este un document DOC.", source.name)
     if sys.platform != "darwin" or not settings.word_path.is_dir():
         raise ConversionFailed(
             "needs_conversion", "Open it in Word and save it as .docx, then add it again."

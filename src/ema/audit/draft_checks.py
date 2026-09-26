@@ -194,6 +194,6 @@ def support_pass(
         for flag in result.flags
     ):
         raise EmaError(
-            "support_invalid", "Verificarea afirmațiilor a returnat o poziție invalidă.", ""
+            "support_invalid", "Verificarea afirmaţiilor a returnat o poziţie invalidă.", ""
         )
     return tuple(DraftReview("unsupported", flag.location, flag.reason) for flag in result.flags)

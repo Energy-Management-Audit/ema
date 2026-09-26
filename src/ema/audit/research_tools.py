@@ -54,7 +54,7 @@ class ResearchTools:
         search_backend: SearchBackend,
     ) -> None:
         if section not in {item.id for item in CATALOGUE}:
-            raise EmaError("section_missing", "Secțiunea lipsește.", section)
+            raise EmaError("section_missing", "Secţiunea lipseşte.", section)
         self.ws, self.job, self.section = ws, job, section
         self.guard, self.search_backend = guard, search_backend
         self.snapshots: dict[str, Snapshot] = {}
@@ -130,7 +130,7 @@ class ResearchTools:
         ):
             with self.ws.connect() as db, self.ws.job_log(db, self.job) as handle:
                 write_event(handle, "registry_refused", reason="registry_mismatch")
-            raise EmaError("registry_mismatch", "Codul fiscal nu aparține lucrării.", "")
+            raise EmaError("registry_mismatch", "Codul fiscal nu aparţine lucrării.", "")
         payload = json.dumps(
             [{"cui": int(cui), "data": datetime.now(UTC).date().isoformat()}]
         ).encode()
@@ -167,14 +167,14 @@ class ResearchTools:
 
     def mark_registry_missing(self, args: dict[str, Any]) -> object:
         if self.section != "ch2.date_generale":
-            raise EmaError("fact_section", "Faptul nu aparține secțiunii active.", self.section)
+            raise EmaError("fact_section", "Faptul nu aparţine secţiunii active.", self.section)
         snapshot = self._snapshot(str(args["snapshot_sha"]))
         if snapshot.url != ANAF_URL:
-            raise EmaError("snapshot_missing", "Răspunsul registrului lipsește.", "")
+            raise EmaError("snapshot_missing", "Răspunsul registrului lipseşte.", "")
         response = json.loads(snapshot.text)
         general = response["found"][0]["date_generale"]
         if general.get("nrRegCom"):
-            raise EmaError("registry_present", "Registrul conține numărul.", "")
+            raise EmaError("registry_present", "Registrul conţine numărul.", "")
         evidence = Evidence(
             id=hashlib.sha256(f"{self.job}:{snapshot.sha}:nrRegCom:missing".encode()).hexdigest(),
             provenance="online",
@@ -200,7 +200,7 @@ class ResearchTools:
     def record_equipment(self, args: dict[str, Any]) -> object:
         if self.section not in {"ch3.equipment", "ch3.consumatori", "ch3.flux", "ch3.process"}:
             raise EmaError(
-                "fact_section", "Echipamentul nu aparține secțiunii active.", self.section
+                "fact_section", "Echipamentul nu aparţine secţiunii active.", self.section
             )
         model = str(args["model"])
         cached = cached_equipment(self.ws, self.job, model)
@@ -232,7 +232,7 @@ class ResearchTools:
         if key not in {item.value for item in AuditFact} or not any(
             isinstance(ref, AuditFact) and ref.value == key for ref in section.facts
         ):
-            raise EmaError("fact_section", "Faptul nu aparține secțiunii active.", key)
+            raise EmaError("fact_section", "Faptul nu aparţine secţiunii active.", key)
         value, sha, quote = str(args["value"]), str(args["snapshot_sha"]), str(args["quote"])
         reason = str(args["trust_reason"]).strip()
         if not reason or "\n" in reason or len(reason) > 240:

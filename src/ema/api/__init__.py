@@ -66,7 +66,8 @@ def create_app(  # noqa: C901
             "/openapi.json",
             "/docs",
             "/docs/oauth2-redirect",
-        ) and not request.url.path.startswith("/assets/"):
+            "/app",
+        ) and not request.url.path.startswith(("/assets/", "/app/")):
             session = request.cookies.get("ema_session", "")
             if session not in sessions:
                 return problem("session_required", 403)
@@ -125,7 +126,10 @@ def create_app(  # noqa: C901
     if (frontend / "index.html").exists():
 
         @app.get("/", include_in_schema=False)
+        @app.get("/app", include_in_schema=False)
+        @app.get("/app/{path:path}", include_in_schema=False)
         def index() -> FileResponse:
+            # A static shell holding no data, so deep links reload without a session.
             return FileResponse(frontend / "index.html")
 
         app.mount("/assets", StaticFiles(directory=frontend / "assets"), name="assets")

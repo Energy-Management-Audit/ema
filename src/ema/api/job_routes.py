@@ -30,11 +30,11 @@ from ema.core.workspace import Workspace
 from ema.core.workspace.conversion import active_version
 from ema.invoices import extract_batch, start_workbook
 from ema.piee.review_workflow import start_word_render
-from ema.piee.workflow import start_generate_for_job
+from ema.piee.workflow import start_generate_for_job, start_import_for_job
 
 _STAGES: dict[str, set[str]] = {
     "audit": {"intake", "read", "fill", "draft"},
-    "piee": {"piee_generate", "piee_word"},
+    "piee": {"piee_import", "piee_generate", "piee_word"},
     "invoices": {"invoices", "invoices_workbook"},
     "reporting": set(),
 }
@@ -66,7 +66,7 @@ def validate_slot(job_type: str, slot: str) -> None:
                 )
             )
     if not allowed:
-        raise EmaError("invalid_slot", "Numele fișierului este invalid.", "")
+        raise EmaError("invalid_slot", "Numele fişierului este invalid.", "")
 
 
 class StageInput(BaseModel):
@@ -87,7 +87,7 @@ def _check_revision(ws: Workspace, job: str, expected: int) -> None:
         raise EmaError("job_running", "Lucrarea rulează deja.", "")
 
 
-def start_named_stage(  # noqa: C901
+def start_named_stage(  # noqa: C901, PLR0911
     ws: Workspace, job: str, stage: str, on_revision: int, *, human_session: bool = False
 ) -> str:
     record = get_job(ws, job)
@@ -110,6 +110,8 @@ def start_named_stage(  # noqa: C901
         return run_stage(ws, job, stage, audit_intake, on_revision=on_revision)
     if stage == "read":
         return run_stage(ws, job, stage, read_job, on_revision=on_revision)
+    if stage == "piee_import":
+        return start_import_for_job(ws, job, on_revision=on_revision)
     if stage == "piee_generate":
         return start_generate_for_job(ws, job, on_revision=on_revision)
     if stage == "piee_word":

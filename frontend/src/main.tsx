@@ -1,37 +1,30 @@
-import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { App } from './app/App.tsx'
+import { ApiProblem, storeCsrf } from './api/client.ts'
+import { api } from './api/endpoints.ts'
 import './ui/base.css'
+import './app/app.css'
 
+// D2: the launch code arrives in the fragment (never sent to a server); it is spent on /session,
+// the csrf is kept for mutations, and the URL loses the fragment. Everything lives under /app/.
 const code = new URLSearchParams(location.hash.slice(1)).get('code')
-history.replaceState(null, '', location.pathname)
+const path = location.pathname.startsWith('/app') ? location.pathname + location.search : '/app/'
+history.replaceState(null, '', path)
 
-function App() {
-  const [message, setMessage] = useState('Conectare…')
-
-  useEffect(() => {
-    async function start() {
-      if (!code) throw new Error('Codul de lansare lipseşte.')
-      const session = await fetch('/session', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ code }),
-      })
-      if (!session.ok) throw new Error('Sesiunea nu a putut fi deschisă.')
-      const jobs = await fetch('/jobs')
-      if (!jobs.ok) throw new Error('Lucrările nu au putut fi încărcate.')
-      const list: unknown = await jobs.json()
-      if (!Array.isArray(list)) throw new Error('Răspunsul pentru lucrări este invalid.')
-      setMessage(`Conectat · ${String(list.length)} lucrări`)
-    }
-
-    start().catch((error: unknown) => {
-      setMessage(error instanceof Error ? error.message : 'Eroare de conectare.')
-    })
-  }, [])
-
-  return <main>{message}</main>
+async function boot(): Promise<ApiProblem | null> {
+  try {
+    if (code) storeCsrf((await api.session(code)).csrf)
+    document.documentElement.dataset.theme = (await api.settings()).theme
+    return null
+  } catch (error) {
+    return error instanceof ApiProblem
+      ? error
+      : new ApiProblem('request_error', 0, 'Cererea nu poate fi procesată.')
+  }
 }
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Elementul #root lipseşte.')
-createRoot(root).render(<App />)
+void boot().then((problem) => {
+  createRoot(root).render(<App bootProblem={problem} />)
+})

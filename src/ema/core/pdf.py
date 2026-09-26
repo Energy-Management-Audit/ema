@@ -35,14 +35,14 @@ def render_evidence_png(
             (evidence.file_sha, evidence_id),
         ).fetchone()
     if row is None:
-        raise EmaError("file_missing", "Fișierul dovezii lipsește.", "")
+        raise EmaError("file_missing", "Fişierul dovezii lipseşte.", "")
     path = ws.path(str(row["relative_path"]))
     if path.suffix.lower() != ".pdf":
         raise EmaError("evidence_not_pdf", "Dovada nu provine dintr-un PDF.", "")
     try:
         with pypdfium2.PdfDocument(path) as document:
             if locator.page < 1 or locator.page > len(document):
-                raise EmaError("evidence_missing", "Pagina dovezii lipsește.", "")
+                raise EmaError("evidence_missing", "Pagina dovezii lipseşte.", "")
             render_page: Any = document[locator.page - 1]
             image: Image.Image = render_page.render(scale=2).to_pil()
             if mode == "snippet" and isinstance(locator, PdfRegion):
@@ -57,7 +57,7 @@ def render_evidence_png(
             image.save(output, format="PNG")
             return output.getvalue()
     except (pypdfium2.PdfiumError, OSError) as exc:
-        raise EmaError("file_type", "Fișierul PDF este invalid.", "") from exc
+        raise EmaError("file_type", "Fişierul PDF este invalid.", "") from exc
 
 
 @dataclass(frozen=True)
@@ -136,12 +136,12 @@ def _run_tesseract(
             timeout=timeout_s,
         )
     except subprocess.TimeoutExpired as exc:
-        raise EmaError("ocr_timeout", "OCR-ul a depășit timpul permis.", str(exc)) from exc
+        raise EmaError("ocr_timeout", "OCR-ul a depăşit timpul permis.", str(exc)) from exc
     except OSError as exc:
         raise EmaError("ocr_start_failed", "OCR-ul nu a putut porni.", str(exc)) from exc
     if result.returncode:
         stderr = result.stderr.decode("utf-8", errors="replace")[:1000]
-        raise EmaError("ocr_failed", "OCR-ul a eșuat.", stderr)
+        raise EmaError("ocr_failed", "OCR-ul a eşuat.", stderr)
     return result.stdout.decode("utf-8", errors="replace")
 
 
@@ -177,7 +177,7 @@ def ocr(
 ) -> list[PageText]:
     executable = settings.tesseract_path
     if not executable.is_file():
-        raise EmaError("ocr_unavailable", "Tesseract lipsește din configurație.", str(executable))
+        raise EmaError("ocr_unavailable", "Tesseract lipseşte din configuraţie.", str(executable))
     dpi = 200
     output: list[PageText] = []
     try:

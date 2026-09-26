@@ -28,5 +28,5 @@ def delete_job(ws: Workspace, job: str, *, on_revision: int | None = None) -> No
             (job,),
         )
         if cursor.rowcount == 0:
-            raise EmaError("job_unavailable", "Lucrarea lipsește sau rulează.", job)
+            raise EmaError("job_unavailable", "Lucrarea lipseşte sau rulează.", job)
     ws.finish_deletes()

@@ -66,7 +66,7 @@ def propose(  # noqa: PLR0913
         else FieldSpec(key=key, label=key, value_type=_type(value))
     )
     if value is None:
-        raise EmaError("value_missing", "Valoarea propusă lipsește.", spec.key)
+        raise EmaError("value_missing", "Valoarea propusă lipseşte.", spec.key)
     if state == "manual" and not evidence:
         raise EmaError("evidence_missing", "Valoarea introdusă necesită dovadă.", spec.key)
     with ws.connect() as db:
@@ -144,7 +144,7 @@ def mark_absent(
 ) -> Field:
     spec = key if isinstance(key, FieldSpec) else FieldSpec(key=key, label=key, value_type="text")
     if presence == "failed" and not failure:
-        raise EmaError("failure_missing", "Cauza erorii lipsește.", spec.key)
+        raise EmaError("failure_missing", "Cauza erorii lipseşte.", spec.key)
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
         save_evidence(db, job, evidence or [])
@@ -216,7 +216,7 @@ def _apply(
         return _changed(field, review="rejected"), []
     if action == "correct":
         if value is None:
-            raise EmaError("value_missing", "Valoarea corectată lipsește.", field.id)
+            raise EmaError("value_missing", "Valoarea corectată lipseşte.", field.id)
         value = _correction_value(field, value)
         evidence = Evidence(
             id=uuid.uuid4().hex,

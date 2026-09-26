@@ -43,7 +43,7 @@ def base_readiness(ws: Workspace, job: str, catalogue: list[FieldSpec]) -> Readi
                 Issue(
                     code="missing",
                     field_id=field.id if field else None,
-                    message=f"Lipsește: {spec.label}",
+                    message=f"Lipseşte: {spec.label}",
                 )
             )
     return Readiness(
@@ -108,7 +108,7 @@ def output_path(ws: Workspace, job: str, output_id: str) -> Path:
             "SELECT relative_path FROM outputs WHERE id=? AND job_id=?", (output_id, job)
         ).fetchone()
     if row is None:
-        raise EmaError("output_missing", "Documentul lipsește.", output_id)
+        raise EmaError("output_missing", "Documentul lipseşte.", output_id)
     return ws.path(str(row["relative_path"]))
 
 
@@ -122,7 +122,7 @@ def approve_final(
     db: sqlite3.Connection | None = None,
 ) -> Approval:
     if actor != "user":
-        raise EmaError("approval_requires_user", "Aprobarea aparține utilizatorului.", job)
+        raise EmaError("approval_requires_user", "Aprobarea aparţine utilizatorului.", job)
     if db is None:
         with ws.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -156,6 +156,19 @@ def approve_final(
     return approval
 
 
+def approvals(ws: Workspace, job: str) -> list[Approval]:
+    """Every final approval of the job, newest first."""
+    with ws.connect() as db:
+        if db.execute("SELECT 1 FROM jobs WHERE id=? AND deleted=0", (job,)).fetchone() is None:
+            raise EmaError("job_missing", "Lucrarea nu există.", job)
+        rows = db.execute(
+            "SELECT id,job_id,output_id,readiness_hash,on_decision,at,actor FROM approvals "
+            "WHERE job_id=? ORDER BY at DESC",
+            (job,),
+        ).fetchall()
+    return [Approval.model_validate(dict(row)) for row in rows]
+
+
 def _require_ready(readiness: Readiness, final: bool, job: str) -> None:
     if final and not readiness.final_ok:
         raise EmaError("not_ready", "Lucrarea nu este pregătită pentru export.", job)
@@ -182,14 +195,14 @@ def export(  # noqa: PLR0913
         db.execute("BEGIN IMMEDIATE")
         output_id = _latest_output(db, job) if final else draft_output_id
         if output_id is None:
-            raise EmaError("output_missing", "Documentul lipsește.", job)
+            raise EmaError("output_missing", "Documentul lipseşte.", job)
         if expected_output_id is not None and output_id != expected_output_id:
             raise EmaError("output_stale", "Documentul nu este versiunea curentă.", job)
         row = db.execute(
             "SELECT relative_path,sha,run_id,kind FROM outputs WHERE id=?", (output_id,)
         ).fetchone()
         if row is None:
-            raise EmaError("output_missing", "Documentul lipsește.", output_id)
+            raise EmaError("output_missing", "Documentul lipseşte.", output_id)
         if row["kind"] != ("final" if final else "draft"):
             code, message = (
                 ("output_not_final", "Documentul nu este final.")
@@ -216,7 +229,7 @@ def export(  # noqa: PLR0913
                 (job, output_id, digest, _latest_decision(db, job)),
             ).fetchone()
             if approval_row is None:
-                raise EmaError("approval_required", "Aprobarea finală lipsește.", output_id)
+                raise EmaError("approval_required", "Aprobarea finală lipseşte.", output_id)
         if not run_current(db, str(row["run_id"])):
             raise EmaError("output_stale", "Documentul nu mai este actual.", output_id)
         return copy_output(ws, str(row["relative_path"]), str(row["sha"]), dest)

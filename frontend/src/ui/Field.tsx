@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Icon } from './Icon'
 import './field.css'
@@ -10,7 +10,11 @@ export function TextField({
   width,
   className,
   ...rest
-}: InputHTMLAttributes<HTMLInputElement> & { figures?: boolean; width?: number }) {
+}: InputHTMLAttributes<HTMLInputElement> & {
+  figures?: boolean
+  width?: number
+  ref?: Ref<HTMLInputElement>
+}) {
   return (
     <input
       className={`ema-field ${figures ? 'ema-field--figures' : ''} ${className ?? ''}`}

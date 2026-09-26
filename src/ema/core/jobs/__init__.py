@@ -106,7 +106,7 @@ class StageContext:
                 (self.job, slot),
             ).fetchone()
             if row is None:
-                raise EmaError("slot_missing", "Fișierul cerut lipsește.", slot)
+                raise EmaError("slot_missing", "Fişierul cerut lipseşte.", slot)
             client = db.execute("SELECT client_slug FROM jobs WHERE id=?", (self.job,)).fetchone()[
                 0
             ]

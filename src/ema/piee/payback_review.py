@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from ema.core.review import propose
+from ema.core.review import mark_absent, propose
 from ema.core.review.models import Cell, Derivation, Evidence, FieldSpec
 from ema.core.workspace import Workspace
 from ema.energy_data.anexa_cells import Measure
@@ -33,7 +33,10 @@ def record_payback_check(
     key = f"measure.{kind}.{index}.payback_years"
     filed = row.values.get("payback_years")
     if calculated is None:
-        if filed is not None:
+        if filed is None:
+            spec = FieldSpec(key=key, label=key, value_type="number", unit="ani")
+            mark_absent(ws, job, spec, "not_found")
+        else:
             propose(
                 ws,
                 job,

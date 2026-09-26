@@ -71,7 +71,7 @@ class Workspace:
     def path(self, relative: str) -> Path:
         path = (self.root / relative).resolve()
         if not path.is_relative_to(self.root):
-            raise EmaError("invalid_path", "Calea fișierului este invalidă.", relative)
+            raise EmaError("invalid_path", "Calea fişierului este invalidă.", relative)
         return path
 
     def job_path(self, db: sqlite3.Connection, job: str) -> Path:
@@ -170,7 +170,7 @@ class Workspace:
             or any(part in ("", ".", "..") for part in parts)
             or any("\\" in part or any(ord(char) < 32 for char in part) for part in parts)
         ):
-            raise EmaError("invalid_slot", "Numele fișierului este invalid.", "")
+            raise EmaError("invalid_slot", "Numele fişierului este invalid.", "")
         with self.connect() as db:
             job_row = db.execute(
                 "SELECT client_slug FROM jobs WHERE id=? AND deleted=0", (job,)
@@ -184,7 +184,7 @@ class Workspace:
                 ).fetchone()
                 is None
             ):
-                raise EmaError("file_missing", "Fișierul nu există.", file_sha)
+                raise EmaError("file_missing", "Fişierul nu există.", file_sha)
             db.execute("INSERT OR IGNORE INTO slots (job_id,name) VALUES (?,?)", (job, slot))
             row = db.execute(
                 "SELECT next_version FROM slots WHERE job_id=? AND name=?", (job, slot)
@@ -237,7 +237,7 @@ class Workspace:
                 (client_slug, file_sha),
             ).fetchone()
         if row is None:
-            raise EmaError("file_missing", "Fișierul nu există.", file_sha)
+            raise EmaError("file_missing", "Fişierul nu există.", file_sha)
         return self.path(str(row["relative_path"]))
 
     def remove_version(
@@ -249,7 +249,7 @@ class Workspace:
                 "SELECT active_version,revision FROM slots WHERE job_id=? AND name=?", (job, slot)
             ).fetchone()
             if on_revision is not None and (current is None or current["revision"] != on_revision):
-                raise EmaError("stale_revision", "Fișierul a fost modificat.", "")
+                raise EmaError("stale_revision", "Fişierul a fost modificat.", "")
             cursor = db.execute(
                 "DELETE FROM slot_versions WHERE job_id=? AND slot=? AND version=?",
                 (job, slot, version),

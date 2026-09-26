@@ -1,0 +1,32 @@
+/* The app window fills the viewport (D6); the fixed columns come from the S17a shell. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  overflow: hidden;
+  background: var(--surface);
+}
+#root > .ema-window {
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.app-loading {
+  padding: 18px 0;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+.app-center {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 0 34px;
+}
+.app-center .ema-empty,
+.app-center .ema-failure {
+  max-width: 560px;
+}

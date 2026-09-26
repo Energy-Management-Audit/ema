@@ -100,7 +100,7 @@ def install_provisional_routes(app: FastAPI, ws: Workspace, *, mock: bool = Fals
                             (job_id,),
                         ).fetchone()
                     if row is None:
-                        raise EmaError("output_missing", "Previzualizarea lipsește.", "")
+                        raise EmaError("output_missing", "Previzualizarea lipseşte.", "")
                     metadata, relative = stored_output(ws, job_id, str(row["id"]))
                     return FileResponse(
                         ws.path(relative),

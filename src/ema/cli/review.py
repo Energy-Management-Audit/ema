@@ -79,7 +79,7 @@ def section_command(
     reason: str | None = typer.Option(None, "--reason"),
 ) -> None:
     if to not in ("done", "n/a", "later"):
-        raise EmaError("status_invalid", "Starea secțiunii este invalidă.", to)
+        raise EmaError("status_invalid", "Starea secţiunii este invalidă.", to)
     if to in ("done", "n/a"):
         if not _terminal():
             raise EmaError(

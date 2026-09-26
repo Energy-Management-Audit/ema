@@ -1,0 +1,213 @@
+/* S3 Date (M4 + 3c + M5) */
+.data-empty {
+  display: grid;
+  place-items: center;
+  padding: 40px 0;
+}
+.data__review {
+  display: flex;
+  flex-direction: column;
+}
+.conflict-open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  width: 100%;
+}
+.conflict-open__alternatives,
+.conflict-open__why {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.conflict-open__why p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.conflict-open__why .ema-btn {
+  align-self: flex-start;
+}
+.conflict-alternative {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.conflict-alternative__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.conflict-alternative__value {
+  font: 500 13px var(--font-mono);
+}
+.missing-row__text {
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+.value-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.value-editor__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.value-editor__unit {
+  color: var(--ink-muted);
+  font: 12px var(--font-mono);
+}
+.value-editor__invalid {
+  color: var(--error-ink);
+  font-size: 12px;
+}
+.carrier-table__heading {
+  padding: 12px 14px 4px;
+  color: var(--section-key);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.carrier-table__scroll {
+  overflow-x: auto;
+  padding: 0 4px 6px;
+}
+.carrier-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.carrier-table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--section-key);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.carrier-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.carrier-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.carrier-table .carrier-table__n {
+  text-align: right;
+}
+.carrier-table td.carrier-table__n {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+.carrier-table__year {
+  font-family: var(--font-mono);
+}
+.carrier-table__total {
+  font-weight: 500;
+}
+.carrier-table__figure {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.carrier-table__figure:hover,
+.carrier-table__figure:focus-visible {
+  border-bottom-color: var(--accent);
+}
+.carrier-table__more {
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.carrier-table__more[aria-expanded='true'] {
+  background: var(--row-hover);
+}
+.carrier-table .ema-field-missing {
+  height: 26px;
+  font-size: 11px;
+}
+.carrier-table .ema-source-chip {
+  display: inline-block;
+  max-width: 200px;
+  overflow: hidden;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.carrier-table .ema-source-chip svg {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+.carrier-table__annual-only {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px dashed rgb(var(--amber-rgb) / 0.6);
+  border-radius: 10px;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+.carrier-table__missing {
+  color: var(--amber-ink);
+  font: 11.5px var(--font-mono);
+}
+.carrier-table__detail td {
+  background: var(--surface-raised);
+}
+.evidence-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 2px;
+  font-size: 12.5px;
+  white-space: normal;
+}
+.evidence-detail__line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.evidence-detail__mono {
+  font: 12px var(--font-mono);
+}
+.evidence-detail__muted {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.evidence-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.evidence-inputs__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 4px 0;
+}
+.evidence-inputs__row > :first-child {
+  flex-basis: 100%;
+  color: var(--ink-muted);
+}
+.evidence-inputs__raw {
+  font: 12px var(--font-mono);
+}

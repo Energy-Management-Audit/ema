@@ -78,14 +78,14 @@ class FillTools:
         self, ws: Workspace, job: str, section: str, documents: dict[str, FillDocument]
     ) -> None:
         if section not in {item.id for item in CATALOGUE}:
-            raise EmaError("section_missing", "Secțiunea lipsește.", section)
+            raise EmaError("section_missing", "Secţiunea lipseşte.", section)
         self.ws, self.job, self.section, self.documents = ws, job, section, documents
 
     def read_file(self, args: dict[str, Any]) -> object:
         name = str(args["name"])
         document = self.documents.get(name)
         if document is None:
-            raise EmaError("file_missing", "Fișierul cerut lipsește.", name)
+            raise EmaError("file_missing", "Fişierul cerut lipseşte.", name)
         return {
             "text": document.text,
             "ocr_text": document.ocr_text,
@@ -110,7 +110,7 @@ class FillTools:
     def _dataset_evidence(self, source_key: str, value: object) -> list[Evidence]:
         field = next((item for item in fields(self.ws, self.job) if item.key == source_key), None)
         if field is None or field.presence != "found" or not field.evidence:
-            raise EmaError("evidence_missing", "Valoarea din setul de date lipsește.", source_key)
+            raise EmaError("evidence_missing", "Valoarea din setul de date lipseşte.", source_key)
         if isinstance(value, int | float):
             if Decimal(str(field.value)) != Decimal(str(value)):
                 raise EmaError("value_unverified", "Valoarea nu corespunde sursei.", source_key)
@@ -124,23 +124,23 @@ class FillTools:
             ).fetchall()
         if len(rows) != len(field.evidence) or {row["id"] for row in rows} != set(field.evidence):
             raise EmaError(
-                "evidence_missing", "Dovada valorii din setul de date lipsește.", source_key
+                "evidence_missing", "Dovada valorii din setul de date lipseşte.", source_key
             )
         return [Evidence.model_validate_json(row["data"]) for row in rows]
 
     def _validate_section_fact(self, key: str) -> None:
         section = next(item for item in CATALOGUE if item.id == self.section)
         if not any(isinstance(ref, AuditFact) and ref.value == key for ref in section.facts):
-            raise EmaError("fact_section", "Faptul nu aparține secțiunii active.", key)
+            raise EmaError("fact_section", "Faptul nu aparţine secţiunii active.", key)
 
     def _document_evidence(self, name: str, quote: str, value: object) -> Evidence:
         document = self.documents.get(name)
         if document is None:
-            raise EmaError("file_missing", "Fișierul cerut lipsește.", name)
+            raise EmaError("file_missing", "Fişierul cerut lipseşte.", name)
         if not quote or not any(
             quote in text for text in (document.text, document.ocr_text, *document.page_texts)
         ):
-            raise EmaError("evidence_quote", "Fragmentul citat nu apare în fișier.", name)
+            raise EmaError("evidence_quote", "Fragmentul citat nu apare în fişier.", name)
         if isinstance(value, int | float) and not _number_in_quote(value, quote):
             raise EmaError("value_unverified", "Numărul nu apare în fragment.", name)
         if isinstance(value, str) and value not in quote:
@@ -209,14 +209,14 @@ class FillTools:
     def mark_later(self, args: dict[str, Any]) -> object:
         reason = str(args["reason"]).strip()
         if not reason:
-            raise EmaError("reason_missing", "Motivul lipsește.", self.section)
+            raise EmaError("reason_missing", "Motivul lipseşte.", self.section)
         state = set_status(self.ws, self.job, self.section, Status.LATER, "agent", reason)
         return {"section": self.section, "status": state.status.value}
 
     def propose_na(self, args: dict[str, Any]) -> object:
         reason = str(args["reason"]).strip()
         if not reason:
-            raise EmaError("reason_missing", "Motivul lipsește.", self.section)
+            raise EmaError("reason_missing", "Motivul lipseşte.", self.section)
         state = set_status(self.ws, self.job, self.section, Status.NA_PROPOSED, "agent", reason)
         return {"section": self.section, "status": state.status.value, "reason": reason}
 

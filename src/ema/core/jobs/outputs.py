@@ -21,7 +21,8 @@ def list_outputs(ws: Workspace, job: str) -> list[dict[str, Any]]:
     get_job(ws, job)
     with ws.connect() as db:
         rows = db.execute(
-            "SELECT id,seq,kind,relative_path,size,sha FROM outputs WHERE job_id=? ORDER BY seq",
+            "SELECT o.id,o.seq,o.kind,o.relative_path,o.size,o.sha,o.run_id,r.stage,r.ended_at "
+            "FROM outputs o JOIN runs r ON r.id=o.run_id WHERE o.job_id=? ORDER BY o.seq",
             (job,),
         ).fetchall()
     return [_view(row, edited=_edited(ws, row)) for row in rows]
@@ -31,7 +32,8 @@ def get_output(ws: Workspace, job: str, output_id: str) -> tuple[dict[str, Any],
     get_job(ws, job)
     with ws.connect() as db:
         row = db.execute(
-            "SELECT id,seq,kind,relative_path,size,sha,run_id FROM outputs WHERE job_id=? AND id=?",
+            "SELECT o.id,o.seq,o.kind,o.relative_path,o.size,o.sha,o.run_id,r.stage,r.ended_at "
+            "FROM outputs o JOIN runs r ON r.id=o.run_id WHERE o.job_id=? AND o.id=?",
             (job, output_id),
         ).fetchone()
     if row is None:
@@ -42,13 +44,15 @@ def get_output(ws: Workspace, job: str, output_id: str) -> tuple[dict[str, Any],
     if _edited(ws, row):
         raise EmaError("output_stale", "Documentul a fost modificat extern.", "")
     view = _view(row, edited=False)
-    stored_name = Path(str(row["relative_path"])).name
-    prefix = f"{row['run_id']}-"
-    original = stored_name.removeprefix(prefix)
-    view["download_name"] = "".join(
+    view["download_name"] = view["name"]
+    return view, str(row["relative_path"])
+
+
+def _name(row: Any) -> str:
+    original = Path(str(row["relative_path"])).name.removeprefix(f"{row['run_id']}-")
+    return "".join(
         char if ord(char) >= 32 and char not in {"/", "\\"} else "_" for char in original
     )
-    return view, str(row["relative_path"])
 
 
 def _edited(ws: Workspace, row: Any) -> bool:
@@ -72,4 +76,8 @@ def _view(row: Any, *, edited: bool) -> dict[str, Any]:
         "media_type": media,
         "size_bytes": int(row["size"]),
         "edited_externally": edited,
+        "name": _name(row),
+        "created_at": row["ended_at"],
+        "run_id": str(row["run_id"]),
+        "stage": str(row["stage"]),
     }

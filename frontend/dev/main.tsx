@@ -4,6 +4,7 @@ import '../src/ui/base.css'
 import './sheet.css'
 import { ComponentSheet } from './ComponentSheet'
 import { Extensions } from './Extensions'
+import { PieeSpecimens } from './PieeSpecimens'
 
 // Dev-only entry (not in the build): /dev/sheet.html?theme=light|dark
 const theme = new URLSearchParams(location.search).get('theme') === 'dark' ? 'dark' : 'light'
@@ -32,6 +33,10 @@ function Page() {
         design de unde vine
       </p>
       <Extensions theme={theme} />
+      <p className="sheet-page__caption">
+        <b>S17b</b>Componentele ecranelor PIEE (3g, 7a)
+      </p>
+      <PieeSpecimens theme={theme} />
     </main>
   )
 }

@@ -43,7 +43,7 @@ def store_upload(
     basename = re.sub(r"[^\w.() -]", "_", basename).strip(". ")
     extension = Path(basename).suffix.lower()
     if not basename or extension not in _EXTENSIONS:
-        raise EmaError("file_type", "Tipul fișierului nu este acceptat.", "")
+        raise EmaError("file_type", "Tipul fişierului nu este acceptat.", "")
     temporary_dir = ws.path("temp")
     temporary_dir.mkdir(exist_ok=True)
     with tempfile.NamedTemporaryFile(dir=temporary_dir, suffix=extension, delete=False) as handle:
@@ -53,7 +53,7 @@ def store_upload(
             while chunk := stream.read(65536):
                 size += len(chunk)
                 if size > limit:
-                    raise EmaError("file_too_large", "Fișierul este prea mare.", "")
+                    raise EmaError("file_too_large", "Fişierul este prea mare.", "")
                 handle.write(chunk)
         except BaseException:
             temporary.unlink(missing_ok=True)
@@ -61,7 +61,7 @@ def store_upload(
     try:
         identified = sniff(temporary)
         if size == 0 or identified.kind == FileKind.UNKNOWN or identified.mismatch:
-            raise EmaError("file_type", "Tipul fișierului nu este acceptat.", "")
+            raise EmaError("file_type", "Tipul fişierului nu este acceptat.", "")
         sha = ws.add_file(client_id, temporary)
         with ws.connect() as db:
             db.execute(
@@ -103,7 +103,7 @@ def file_versions(ws: Workspace, client_id: str, sha: str) -> list[dict[str, Any
             (client_id, sha),
         ).fetchone()
     if row is None:
-        raise EmaError("file_missing", "Fișierul nu există.", "")
+        raise EmaError("file_missing", "Fişierul nu există.", "")
     return [
         {"version": 1, "sha": sha, "name": row["original_name"], "size_bytes": row["size_bytes"]}
     ]

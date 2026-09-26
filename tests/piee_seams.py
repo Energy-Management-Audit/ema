@@ -51,13 +51,14 @@ def _import(ws: Workspace, job: str, *_args: object, **_kwargs: object) -> None:
 
 
 def stub_piee_seams(monkeypatch: pytest.MonkeyPatch, base: Path) -> None:
-    """Replace the six document seams of ema.piee.workflow; base is any existing folder."""
+    """Replace the seven document seams of ema.piee.workflow; base is any existing folder."""
     monkeypatch.setattr("ema.piee.workflow.load", _data)
     monkeypatch.setattr("ema.piee.workflow.base_directory", lambda _ws: base)
     monkeypatch.setattr(
         "ema.piee.workflow.load_approved_base", lambda _base: SimpleNamespace(base_sha="0" * 64)
     )
     monkeypatch.setattr("ema.piee.workflow.import_piee_into_job", _import)
+    monkeypatch.setattr("ema.piee.workflow.apply_review", lambda data, *_args: data)
     monkeypatch.setattr("ema.piee.workflow.compose_draft", _compose)
     monkeypatch.setattr("ema.piee.workflow.write_prelucrare", _workbook)
 

@@ -11,14 +11,14 @@ import sys
 from pathlib import Path
 
 LIMIT = 400
-SUFFIXES = {".py", ".ts", ".tsx", ".css"}
+SUFFIXES = {".py", ".ts", ".tsx", ".css", ".mjs"}
 
 
 def main(argv: list[str]) -> int:
     if not argv:
         argv = (
             subprocess.check_output(
-                ["git", "ls-files", "-z", "--", "*.py", "*.ts", "*.tsx", "*.css"]
+                ["git", "ls-files", "-z", "--", "*.py", "*.ts", "*.tsx", "*.css", "*.mjs"]
             )
             .decode()
             .split("\0")

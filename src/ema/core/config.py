@@ -26,7 +26,7 @@ def workspace_path() -> Path:
             return Path(location).expanduser().resolve()
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise EmaError(
-                "config_invalid", "Configurația spațiului de lucru este invalidă.", str(exc)
+                "config_invalid", "Configuraţia spaţiului de lucru este invalidă.", str(exc)
             ) from exc
     if sys.platform == "darwin":
         return (Path.home() / "Ema").resolve()
@@ -70,5 +70,5 @@ def load_settings(workspace: Workspace) -> Settings:
         return Settings.model_validate(values)
     except (OSError, ValueError) as exc:
         raise EmaError(
-            "settings_invalid", "Setările spațiului de lucru sunt invalide.", str(exc)
+            "settings_invalid", "Setările spaţiului de lucru sunt invalide.", str(exc)
         ) from exc

@@ -23,7 +23,7 @@ _PREFIX = re.compile(r"^(0|1[0-3]|[1-9])(?:\.\d+)?\.")
 def select_checklist(slots: list[SlotVersion]) -> SlotVersion:
     matches = [version for version in slots if Path(version.slot).name.startswith("0.")]
     if len(matches) != 1:
-        raise EmaError("checklist_file", "Fișierul Necesar info lipsește sau este ambiguu.", "")
+        raise EmaError("checklist_file", "Fişierul Necesar info lipseşte sau este ambiguu.", "")
     return matches[0]
 
 

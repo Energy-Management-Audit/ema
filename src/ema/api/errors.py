@@ -19,6 +19,7 @@ STATUS = {
     "stale_revision": 409,
     "job_running": 409,
     "not_ready": 409,
+    "import_required": 409,
     "output_stale": 409,
     "output_not_final": 409,
     "conflict_open": 409,
@@ -80,6 +81,10 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "word_unavailable",
         "provisional_contract",
         "human_required",
+        "import_required",
+        "wrong_job_type",
+        "invalid_year",
+        "file_type",
         "piee_base_missing",
         "piee_base_review_required",
         "piee_base_changed",
@@ -109,6 +114,17 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
     ),
     ("GET", "/jobs/{job_id}/measures"): ("job_missing", "wrong_job_type"),
     ("GET", "/jobs/{job_id}/piee/data"): ("job_missing", "wrong_job_type"),
+    ("GET", "/jobs/{job_id}/piee/summary"): ("job_missing", "wrong_job_type"),
+    ("GET", "/jobs/{job_id}/approvals"): ("job_missing",),
+    ("POST", "/jobs/{job_id}/piee/import"): (
+        "job_missing",
+        "wrong_job_type",
+        "invalid_year",
+        "stale_revision",
+        "job_running",
+        "not_ready",
+        "file_type",
+    ),
     ("POST", "/jobs/{job_id}/piee/generate"): (
         "job_missing",
         "stale_revision",
@@ -116,6 +132,7 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "wrong_job_type",
         "invalid_year",
         "not_ready",
+        "import_required",
         "piee_base_missing",
         "piee_base_review_required",
         "piee_base_changed",
@@ -229,7 +246,7 @@ TITLES = {
     "csrf_required": "Confirmarea sesiunii este necesară.",
     "human_required": "Confirmarea umană este necesară.",
     "hash_mismatch": "Versiunea de pregătire nu corespunde.",
-    "provisional_contract": "Această funcție nu este încă disponibilă.",
+    "provisional_contract": "Această funcţie nu este încă disponibilă.",
 }
 
 

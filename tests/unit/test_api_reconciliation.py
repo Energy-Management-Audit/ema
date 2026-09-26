@@ -52,7 +52,12 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
         ("GET", "/jobs/{job_id}/facts"),
         ("PATCH", "/jobs/{job_id}/facts"),
     }
-    assert not new.keys() - old.keys()
+    # S17b adds the PIEE import, its summary and the approvals read (openapi/s17b-diff.md).
+    assert new.keys() - old.keys() == {
+        ("POST", "/jobs/{job_id}/piee/import"),
+        ("GET", "/jobs/{job_id}/piee/summary"),
+        ("GET", "/jobs/{job_id}/approvals"),
+    }
     diff = Path("openapi/s16-diff.md").read_text(encoding="utf-8")
     added_text = diff.split("### Added\n", 1)[1].split("### Removed\n", 1)[0]
     removed_text = diff.split("### Removed\n", 1)[1].split("## Changed operations", 1)[0]

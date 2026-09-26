@@ -1,0 +1,91 @@
+.ema-figures {
+  font-family: var(--font-mono);
+}
+.ema-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ema-kpi__label {
+  color: var(--section-key);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+}
+.ema-kpi__value {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+.ema-kpi__unit {
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.ema-kpi__note {
+  color: var(--amber-ink);
+  font: 11px var(--font-mono);
+}
+.ema-kpi .ema-source-chip {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.ema-count-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 420px;
+  flex: 1;
+}
+.ema-count-bar__line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.ema-count-bar__label {
+  color: var(--ink-muted);
+  font-size: 11.5px;
+}
+.ema-count-bar__count {
+  margin-left: auto;
+  color: var(--amber-ink);
+  font: 500 11px var(--font-mono);
+}
+.ema-count-bar__track {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(var(--ink-rgb) / 0.12);
+}
+.ema-count-bar__fill {
+  display: block;
+  height: 100%;
+  background: var(--amber);
+}
+.ema-count-bar--complete .ema-count-bar__count {
+  color: var(--olive-ink);
+}
+.ema-count-bar--complete .ema-count-bar__fill {
+  background: var(--olive-mark);
+}
+.ema-annual-check {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+.ema-annual-check--ok {
+  color: var(--olive-ink);
+}
+.ema-annual-check--warn {
+  color: var(--amber-ink);
+}
+.ema-annual-check__text {
+  flex: 1;
+  min-width: 0;
+}

@@ -40,7 +40,7 @@ def patch_sections(ws: Workspace, job: str, items: list[dict[str, Any]]) -> list
                 SectionState.parse(state_row["data"]) if state_row else SectionState(section_id)
             )
             if before.revision != item["on_revision"]:
-                raise EmaError("stale_revision", "Secțiunea s-a modificat între timp.", "")
+                raise EmaError("stale_revision", "Secţiunea s-a modificat între timp.", "")
             to = Status(item["status"])
             if to in {Status.DONE, Status.NA} and not item.get("confirm"):
                 raise EmaError("human_required", "Confirmarea umană este necesară.", "")

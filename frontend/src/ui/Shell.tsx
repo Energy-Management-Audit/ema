@@ -98,16 +98,23 @@ export function NavJob({
   count,
   working = false,
   finished = false,
+  onClick,
   children,
 }: {
   active?: boolean
   count?: number
   working?: boolean
   finished?: boolean
+  onClick?: () => void
   children: ReactNode
 }) {
   return (
-    <button type="button" className="ema-nav-job" aria-current={active ? 'page' : undefined}>
+    <button
+      type="button"
+      className="ema-nav-job"
+      aria-current={active ? 'page' : undefined}
+      onClick={onClick}
+    >
       {finished && <Icon icon={Check} size={12} stroke={2.4} color="var(--olive-mark)" />}
       <span className="ema-nav-job__label">{children}</span>
       {count !== undefined && <span className="ema-nav-job__count">{count}</span>}

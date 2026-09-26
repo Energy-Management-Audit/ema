@@ -1,8 +1,10 @@
-"""Reconcile PIEE annual totals with the filed Anexa value."""
+"""Reconcile PIEE annual totals with the filed Anexa value, and months with annual readings."""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 
 from ema.energy_data.anexa_cells import AnexaData
 from ema.energy_data.calc import tep_total
@@ -61,3 +63,43 @@ def annual_check(
         [locations[key].displayed_decimals or 0 for key in derived.inputs],
     )
     return AnnualCheck(checked.status, filed, checked)
+
+
+@dataclass(frozen=True)
+class MonthsMismatch:
+    annual_key: str
+    months_sum: Decimal
+    annual: Decimal
+    margin: Decimal
+
+
+def _half_unit(value: Decimal) -> Decimal:
+    exponent = value.as_tuple().exponent
+    return Decimal("0.5").scaleb(min(int(exponent), 0) if isinstance(exponent, int) else 0)
+
+
+def months_check(readings: Mapping[str, tuple[Decimal, str | None]]) -> list[MonthsMismatch]:
+    """Per carrier and year with all 12 months, the months' sum against the filed annual reading.
+
+    `readings` maps `carrier.<c>.<y>[.<MM>]` to the value in effect after review (a rejected
+    reading is absent). The margin is half a unit of every figure's written precision.
+    """
+    months: dict[str, dict[int, tuple[Decimal, str | None]]] = {}
+    for key, reading in readings.items():
+        parts = key.split(".")
+        if len(parts) == 4 and parts[0] == "carrier" and parts[3].isdigit():
+            months.setdefault(".".join(parts[:3]), {})[int(parts[3])] = reading
+    found: list[MonthsMismatch] = []
+    for annual_key, by_month in sorted(months.items()):
+        annual = readings.get(annual_key)
+        if annual is None or set(by_month) != set(range(1, 13)):
+            continue
+        if any(unit != annual[1] for _, unit in by_month.values()):
+            continue
+        total = sum((value for value, _ in by_month.values()), Decimal(0))
+        margin = _half_unit(annual[0]) + sum(
+            (_half_unit(value) for value, _ in by_month.values()), Decimal(0)
+        )
+        if abs(total - annual[0]) > margin:
+            found.append(MonthsMismatch(annual_key, total, annual[0], margin))
+    return found

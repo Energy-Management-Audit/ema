@@ -39,5 +39,8 @@ jobs:
       - name: Install the frontend
         run: npm ci --prefix frontend
 
+      - name: Install the e2e browser
+        run: npx --prefix frontend playwright install --with-deps chromium
+
       - name: Complete check
         run: scripts/check

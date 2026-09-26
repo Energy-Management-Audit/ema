@@ -1,0 +1,84 @@
+/* S6 Predare (7a): the 840 column, the thumbnail beside the checks and the package. */
+.export {
+  align-items: center;
+  padding: 0 40px;
+}
+.export__column {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 840px;
+  padding: 48px 0 60px;
+}
+.export__crumb {
+  align-self: flex-start;
+  color: var(--section-key);
+  font-size: 11.5px;
+  text-decoration: none;
+}
+.export__crumb:hover {
+  text-decoration: underline;
+}
+.export__title {
+  margin: 6px 0 0;
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.export__intro {
+  max-width: 62ch;
+  margin: 10px 0 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.export__body {
+  display: flex;
+  gap: 26px;
+  margin-top: 34px;
+}
+.export__side {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 26px;
+  min-width: 0;
+}
+.export__checks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.export__checks .ema-section-key,
+.export__package .ema-section-key {
+  padding-bottom: 8px;
+}
+.export__package {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.export__files {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.export__files:empty {
+  display: none;
+}
+.export__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.export__blocked,
+.export__done {
+  margin: -14px 0 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.export__blocked {
+  color: var(--error-ink);
+}

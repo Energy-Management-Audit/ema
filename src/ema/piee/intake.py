@@ -145,6 +145,14 @@ def _record_identity(ws: Workspace, job: str, data: PieeData, anexa_sha: str) ->
         )
 
 
+# A measure lacking one of these can still be completed by hand; each becomes a fillable field.
+_MEASURE_COLUMNS: tuple[tuple[str, Literal["number", "year"], str | None], ...] = (
+    ("investment_thousand_lei", "number", "mii lei"),
+    ("saving_mwh", "number", "MWh"),
+    ("commissioning_year", "year", None),
+)
+
+
 def _record_measures(ws: Workspace, job: str, data: PieeData, anexa_sha: str) -> None:
     groups = (
         ("audit", data.anexa.audit_measures),
@@ -176,6 +184,11 @@ def _record_measures(ws: Workspace, job: str, data: PieeData, anexa_sha: str) ->
                     [_evidence(found, anexa_sha, "anexa", key)],
                     state="extracted",
                 )
+            for name, value_type, unit in _MEASURE_COLUMNS:
+                if name not in values:
+                    key = f"measure.{kind}.{index}.{name}"
+                    spec = FieldSpec(key=key, label=key, value_type=value_type, unit=unit)
+                    mark_absent(ws, job, spec, "not_found")
             record_payback_check(ws, job, kind, index, row, anexa_sha)
 
 

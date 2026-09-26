@@ -32,7 +32,7 @@ class InvoiceReadiness:
 def _artifact(ws: Workspace, job: JobId) -> Path:
     run = latest_ready_run(ws, job, "invoices")
     if run is None:
-        raise EmaError("invoices_missing", "Extracția facturilor lipsește.", job)
+        raise EmaError("invoices_missing", "Extracţia facturilor lipseşte.", job)
     with ws.connect() as db:
         return ws.artifact_dir(db, job, "invoices", run) / "outcomes.json"
 
@@ -121,7 +121,7 @@ def undo_client(ws: Workspace, job: JobId, decision_id: str) -> Decision:
         ).fetchone()
     if row is None:
         raise EmaError(
-            "client_decision_missing", "Decizia clientului lotului lipsește.", decision_id
+            "client_decision_missing", "Decizia clientului lotului lipseşte.", decision_id
         )
     return undo(ws, job, decision_id, "user")
 

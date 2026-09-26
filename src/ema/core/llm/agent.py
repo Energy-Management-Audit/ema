@@ -171,7 +171,7 @@ def run_agent(  # noqa: C901
         context.provider.name,
         context.prompt_version,
     ):
-        raise EmaError("ai_context_changed", "Configurația AI a etapei s-a schimbat.", "")
+        raise EmaError("ai_context_changed", "Configuraţia AI a etapei s-a schimbat.", "")
     state.step_limit, state.spend_cap_usd = limits.steps, limits.spend_cap_usd
     if state.status == "done":
         return state
@@ -199,13 +199,13 @@ def run_agent(  # noqa: C901
             state.status = "waiting_for_ai"
             _save(context.ws, context.job, context.section, state)
             raise EmaError(
-                "ai_provider", "AI nu este disponibil; reluați etapa.", exc.code
+                "ai_provider", "AI nu este disponibil; reluaţi etapa.", exc.code
             ) from exc
         except Exception as exc:
             state.status = "waiting_for_ai"
             _save(context.ws, context.job, context.section, state)
             raise EmaError(
-                "ai_provider", "AI nu este disponibil; reluați etapa.", type(exc).__name__
+                "ai_provider", "AI nu este disponibil; reluaţi etapa.", type(exc).__name__
             ) from exc
         duration_ms = int((time.monotonic() - started) * 1000)
         cost = model.cost(

@@ -162,7 +162,7 @@ def invoices_confirm(job: str, confirm: bool = typer.Option(False, "--confirm"))
         )
     )
     if not confirm:
-        raise EmaError("confirmation_required", "Confirmați clientul cu --confirm.", job)
+        raise EmaError("confirmation_required", "Confirmaţi clientul cu --confirm.", job)
     decision = confirm_client(ws, job)
     checks = invoice_readiness(ws, job)
     typer.echo(f"Confirmare: {decision.id}; exportabile: {checks.exportable}")
@@ -193,9 +193,9 @@ def intake_command(job: str, collection: str) -> None:
     current = status(ws, job)
     recorded = next(entry for entry in current.runs if entry["id"] == run)
     if recorded["state"] == "failed":
-        raise EmaError("intake_failed", "Prelucrarea fișierului a eșuat.", str(recorded["error"]))
+        raise EmaError("intake_failed", "Prelucrarea fişierului a eşuat.", str(recorded["error"]))
     if recorded["state"] == "cancelled":
-        raise EmaError("intake_cancelled", "Prelucrarea fișierului a fost anulată.", collection)
+        raise EmaError("intake_cancelled", "Prelucrarea fişierului a fost anulată.", collection)
     for item in results:
         typer.echo(
             json.dumps(
@@ -233,7 +233,7 @@ def serve(
             seed_mock(ws)
         code = secrets.token_urlsafe(32)
         origin = dev_origin or f"http://127.0.0.1:{port}"
-        typer.echo(f"Open {origin}/#code={code}")
+        typer.echo(f"Open {origin}/app/#code={code}")
         uvicorn.run(
             create_app(ws, port, launch_code=code, dev_origin=dev_origin, mock=mock),
             host="127.0.0.1",

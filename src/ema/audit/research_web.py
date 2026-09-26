@@ -60,7 +60,7 @@ def store_snapshot(ws: Workspace, job: str, snapshot: Snapshot) -> Snapshot:
     if metadata.exists():
         previous = load_snapshot(ws, job, snapshot.sha)
         if previous.url != snapshot.url:
-            raise EmaError("snapshot_source", "Aceeași sursă are altă adresă.", snapshot.url)
+            raise EmaError("snapshot_source", "Aceeaşi sursă are altă adresă.", snapshot.url)
         return previous
     target.write_bytes(snapshot.body)
     ws.add_file(client_slug, target)
@@ -79,12 +79,12 @@ def store_snapshot(ws: Workspace, job: str, snapshot: Snapshot) -> Snapshot:
 
 def load_snapshot(ws: Workspace, job: str, sha: str) -> Snapshot:
     if not re.fullmatch(r"[0-9a-f]{64}", sha):
-        raise EmaError("snapshot_missing", "Sursa online lipsește.", "")
+        raise EmaError("snapshot_missing", "Sursa online lipseşte.", "")
     with ws.connect() as db:
         root = ws.job_path(db, job) / "cache" / "online"
     body_file, metadata_file = root / sha, root / f"{sha}.json"
     if not body_file.is_file() or not metadata_file.is_file():
-        raise EmaError("snapshot_missing", "Sursa online lipsește.", "")
+        raise EmaError("snapshot_missing", "Sursa online lipseşte.", "")
     body = body_file.read_bytes()
     if hashlib.sha256(body).hexdigest() != sha:
         raise EmaError("snapshot_changed", "Sursa online s-a modificat.", "")

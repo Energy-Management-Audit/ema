@@ -88,6 +88,13 @@ def _journey(  # noqa: PLR0915
         )
         assert bound.status_code == 200
 
+    imported = client.post(
+        f"/jobs/{job}/piee/import",
+        json={"on_revision": _revision(client, job)},
+        headers=headers,
+    )
+    assert imported.status_code == 202, imported.json().get("type")
+    _wait(client, job, imported.json()["run_id"])
     started = client.post(
         f"/jobs/{job}/piee/generate",
         json={"kind": "draft", "on_revision": _revision(client, job)},

@@ -82,7 +82,7 @@ def cached_equipment(ws: Workspace, job: str, model: str) -> EquipmentEntry | No
             ).fetchone()
             current = db.execute("SELECT client_slug FROM jobs WHERE id=?", (job,)).fetchone()
         if source is None or current is None or source["client_slug"] != current["client_slug"]:
-            raise EmaError("snapshot_missing", "Sursa online lipsește.", "")
+            raise EmaError("snapshot_missing", "Sursa online lipseşte.", "")
         snapshot = load_snapshot(ws, entry.source_job, entry.snapshot_sha)
         if snapshot.url != entry.source_url or entry.quote not in snapshot.text:
             raise EmaError("snapshot_changed", "Sursa online s-a modificat.", "")
@@ -118,7 +118,7 @@ def record_equipment(  # noqa: PLR0913
         or quote not in snapshot.text
         or any(value not in quote for value in (model, purpose, energy_features))
     ):
-        raise EmaError("evidence_quote", "Fragmentul nu susține descrierea echipamentului.", model)
+        raise EmaError("evidence_quote", "Fragmentul nu susţine descrierea echipamentului.", model)
     if not trust_reason.strip() or "\n" in trust_reason or len(trust_reason) > 240:
         raise EmaError("trust_reason", "Motivul sursei este invalid.", model)
     image_status = "later: visit photo"

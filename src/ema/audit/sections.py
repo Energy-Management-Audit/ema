@@ -27,7 +27,7 @@ from ema.core.workspace import Workspace
 def _section(section_id: str) -> Section:
     section = next((item for item in CATALOGUE if item.id == section_id), None)
     if section is None:
-        raise EmaError("section_missing", "Secțiunea lipsește.", section_id)
+        raise EmaError("section_missing", "Secţiunea lipseşte.", section_id)
     return section
 
 
@@ -35,7 +35,7 @@ def _audit_job(ws: Workspace, job: str) -> None:
     with ws.connect() as db:
         row = db.execute("SELECT type FROM jobs WHERE id=? AND deleted=0", (job,)).fetchone()
     if row is None or row["type"] != "audit":
-        raise EmaError("audit_job_missing", "Lucrarea de audit lipsește.", job)
+        raise EmaError("audit_job_missing", "Lucrarea de audit lipseşte.", job)
 
 
 def get_status(ws: Workspace, job: str, section_id: str) -> SectionState:
@@ -80,7 +80,7 @@ def _save(  # noqa: PLR0913
         actual = int(row["revision"]) if row else 0
         if actual != before.revision:
             raise EmaError(
-                "stale_revision", "Secțiunea s-a modificat între timp.", before.section_id
+                "stale_revision", "Secţiunea s-a modificat între timp.", before.section_id
             )
         db.execute(
             "INSERT INTO section_states (job_id,section_id,revision,data) VALUES (?,?,?,?) "
@@ -120,7 +120,7 @@ def record_material(
 ) -> None:
     _audit_job(ws, job)
     if not source.strip():
-        raise EmaError("material_invalid", "Materialul necesită tip și sursă.", str(kind))
+        raise EmaError("material_invalid", "Materialul necesită tip şi sursă.", str(kind))
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
         prior = db.execute(
@@ -185,7 +185,7 @@ def set_status(  # noqa: PLR0913
         if on_revision is not None and before.revision != on_revision:
             raise EmaError(
                 "stale_revision",
-                "Secțiunea s-a modificat între timp.",
+                "Secţiunea s-a modificat între timp.",
                 f"current revision: {before.revision}",
             )
         materials, facts = _inputs(ws, job, db)
@@ -193,7 +193,7 @@ def set_status(  # noqa: PLR0913
             to == Status.NA_PROPOSED
             and applies(section.applies_when, materials, facts) is not False
         ):
-            raise EmaError("na_trigger", "Secțiunea nu poate fi propusă n/a.", section_id)
+            raise EmaError("na_trigger", "Secţiunea nu poate fi propusă n/a.", section_id)
         auto_later = (
             actor == "ema"
             and bool(section.awaits)
@@ -310,13 +310,13 @@ def audit_readiness(ws: Workspace, job: str, db: sqlite3.Connection | None = Non
     issues: list[Issue] = []
     for section, state in zip(CATALOGUE, states, strict=True):
         if state.stale:
-            issues.append(Issue(code="stale", message=f"Refaceți secțiunea: {section.title}"))
+            issues.append(Issue(code="stale", message=f"Refaceţi secţiunea: {section.title}"))
         if (
             state.status == Status.NA
             and state.na_applicable is not True
             and applies(section.applies_when, materials, facts) is True
         ):
-            issues.append(Issue(code="na_recheck", message=f"Reverificați n/a: {section.title}"))
+            issues.append(Issue(code="na_recheck", message=f"Reverificaţi n/a: {section.title}"))
         if state.status not in (Status.DONE, Status.NA):
             applicable = applies(section.applies_when, materials, facts)
             next_step = (
@@ -336,7 +336,7 @@ def audit_readiness(ws: Workspace, job: str, db: sqlite3.Connection | None = Non
                         Issue(
                             code="conflict",
                             field_id=field.id,
-                            message=f"Rezolvați conflictul: {section.title} / {field.label}",
+                            message=f"Rezolvaţi conflictul: {section.title} / {field.label}",
                         )
                     )
     return Readiness(

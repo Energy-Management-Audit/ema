@@ -71,7 +71,7 @@ class BatchResult:
 
 def run_batch(ws: Workspace, client: str, sources: list[Path]) -> BatchResult:
     if not sources:
-        raise EmaError("invoices_empty", "Dosarul nu conține facturi PDF.", "")
+        raise EmaError("invoices_empty", "Dosarul nu conţine facturi PDF.", "")
     job = create_job(ws, "invoices", client, None)
     preflight_failures: list[tuple[int, DocumentOutcome]] = []
     for index, source in enumerate(sources, 1):
@@ -96,7 +96,7 @@ def run_batch(ws: Workspace, client: str, sources: list[Path]) -> BatchResult:
     result = status(ws, job)
     matching = next(item for item in result.runs if item["id"] == run)
     if matching["state"] != "ready":
-        raise EmaError("invoices_failed", "Extracția facturilor a eșuat.", str(matching["error"]))
+        raise EmaError("invoices_failed", "Extracţia facturilor a eşuat.", str(matching["error"]))
     outcomes = raw_outcomes(ws, job)
     omitted = [item["source_path"] for item in outcomes if item["status"] != "exportable"]
     _, proposed = batch_client(ws, job)
@@ -156,10 +156,10 @@ def render(
 ) -> str | None:
     run = latest_ready_run(ws, job, "invoices")
     if run is None:
-        raise EmaError("invoices_missing", "Extracția facturilor lipsește.", job)
+        raise EmaError("invoices_missing", "Extracţia facturilor lipseşte.", job)
     with ws.connect() as db:
         if not run_current(db, run):
-            raise EmaError("invoices_stale", "Extracția facturilor nu mai este actuală.", job)
+            raise EmaError("invoices_stale", "Extracţia facturilor nu mai este actuală.", job)
         artifact = ws.artifact_dir(db, job, "invoices", run) / "outcomes.json"
         ws.job_path(db, job)
     checks = readiness(ws, job)
@@ -181,7 +181,7 @@ def render(
         with ws.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             if not run_current(db, run):
-                raise EmaError("invoices_stale", "Extracția facturilor nu mai este actuală.", job)
+                raise EmaError("invoices_stale", "Extracţia facturilor nu mai este actuală.", job)
             confirmed = db.execute(
                 "SELECT revision,data FROM fields WHERE job_id=? AND key=?",
                 (job, BATCH_CLIENT_KEY),
@@ -263,5 +263,5 @@ class InvoiceWorkflow:
                 (job,),
             ).fetchone()
         if row is None:
-            raise EmaError("output_missing", "Documentul final lipsește.", "")
+            raise EmaError("output_missing", "Documentul final lipseşte.", "")
         return str(row["id"])

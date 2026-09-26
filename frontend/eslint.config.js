@@ -16,6 +16,11 @@ export default tseslint.config(
     rules: reactHooks.configs.recommended.rules,
   },
   {
+    // D3: nothing about a client reaches a log, so the app has no console at all.
+    files: ['src/**/*.{ts,tsx}'],
+    rules: { 'no-console': 'error' },
+  },
+  {
     // Node scripts; the Playwright callbacks inside them run in the page.
     files: ['**/*.{js,mjs}'],
     extends: [js.configs.recommended],

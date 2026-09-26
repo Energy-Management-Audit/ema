@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import cast
 
@@ -14,11 +15,12 @@ from ema.core.jobs.reads import run_current
 from ema.core.office.anchors import leftover_issues
 from ema.core.office.package import check_standalone
 from ema.core.office.word import WordMac
-from ema.core.review import base_readiness
-from ema.core.review.models import FieldSpec, Issue, Readiness
+from ema.core.review import base_readiness, fields
+from ema.core.review.models import Field, FieldSpec, Issue, Readiness
 from ema.core.workspace import Workspace
+from ema.piee.annual_check import months_check
 from ema.piee.compose import load_approved_base
-from ema.piee.workflow import base_directory
+from ema.piee.workflow import base_directory, current_import
 
 
 def _latest_draft(ws: Workspace, job: str) -> tuple[str, str, Path]:
@@ -30,7 +32,7 @@ def _latest_draft(ws: Workspace, job: str) -> tuple[str, str, Path]:
             (job,),
         ).fetchone()
     if row is None:
-        raise EmaError("piee_output_missing", "Ciorna PIEE lipsește.", job)
+        raise EmaError("piee_output_missing", "Ciorna PIEE lipseşte.", job)
     return str(row["id"]), str(row["run_id"]), ws.path(str(row["relative_path"]))
 
 
@@ -49,8 +51,27 @@ def _draft_workbook(ws: Workspace, job: str, run: str) -> Path:
             (job, run),
         ).fetchone()
     if row is None:
-        raise EmaError("piee_workbook_missing", "Prelucrare date lipsește.", job)
+        raise EmaError("piee_workbook_missing", "Prelucrare date lipseşte.", job)
     return ws.path(str(row["relative_path"]))
+
+
+def _months_issues(job_fields: list[Field]) -> list[Issue]:
+    by_key = {field.key: field for field in job_fields}
+    readings = {
+        field.key: (field.value, field.unit)
+        for field in job_fields
+        if field.key.startswith("carrier.")
+        and isinstance(field.value, Decimal)
+        and field.review != "rejected"
+    }
+    return [
+        Issue(
+            code="months_annual_mismatch",
+            field_id=by_key[item.annual_key].id,
+            message="Suma lunilor nu se potriveşte cu totalul anual.",
+        )
+        for item in months_check(readings)
+    ]
 
 
 def _wait_for_output(ws: Workspace, job: str, run: str) -> str:
@@ -59,7 +80,7 @@ def _wait_for_output(ws: Workspace, job: str, run: str) -> str:
     record = next(item for item in status(ws, job).runs if item["id"] == run)
     if record["state"] != "ready":
         raise EmaError(
-            "piee_word_failed", "Finalizarea PIEE în Word a eșuat.", str(record["error"])
+            "piee_word_failed", "Finalizarea PIEE în Word a eşuat.", str(record["error"])
         )
     with ws.connect() as db:
         row = db.execute(
@@ -67,7 +88,7 @@ def _wait_for_output(ws: Workspace, job: str, run: str) -> str:
             (job, run),
         ).fetchone()
     if row is None:
-        raise EmaError("piee_output_missing", "Documentul PIEE final lipsește.", run)
+        raise EmaError("piee_output_missing", "Documentul PIEE final lipseşte.", run)
     return str(row["id"])
 
 
@@ -88,7 +109,11 @@ class PieeWorkflow:
                 ),
             ],
         )
-        issues = list(base.blocking)
+        issues = [*base.blocking, *_months_issues(fields(ws, job))]
+        if current_import(ws, job) is None:
+            issues.append(
+                Issue(code="import_required", message="Documentele trebuie citite din nou.")
+            )
         try:
             checks = _checks(ws, job)
             _, draft_run, _ = _latest_draft(ws, job)
@@ -107,7 +132,7 @@ class PieeWorkflow:
             if checks["package_issues"] or checks["leftover_parts"]:
                 issues.append(Issue(code="package", message="Pachetul Word PIEE este invalid."))
         except (EmaError, OSError, KeyError, ValueError) as exc:
-            issues.append(Issue(code="draft_missing", message=f"Ciorna PIEE lipsește: {exc}"))
+            issues.append(Issue(code="draft_missing", message=f"Ciorna PIEE lipseşte: {exc}"))
         return Readiness(
             draft_ok=True,
             final_ok=not issues,
@@ -116,7 +141,12 @@ class PieeWorkflow:
         )
 
     def readiness_snapshot(self, ws: Workspace, job: str) -> dict[str, object]:
-        _, run, output = _latest_draft(ws, job)
+        try:
+            _, run, output = _latest_draft(ws, job)
+        except EmaError as exc:
+            if exc.code != "piee_output_missing":
+                raise
+            return {"run": None}
         base_dir = base_directory(ws)
         return {
             "run": run,

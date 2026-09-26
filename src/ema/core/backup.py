@@ -49,7 +49,7 @@ def backup(workspace: Workspace, dest_dir: Path) -> Path:
                         sha, size = _checksum(stream)
                     if expected_sha and (sha != expected_sha or size != expected_size):
                         raise EmaError(
-                            "backup_changed", "Fișierul s-a modificat în timpul copiei.", relative
+                            "backup_changed", "Fişierul s-a modificat în timpul copiei.", relative
                         )
                     archive.write(path, relative)
                     manifest.append({"path": relative, "sha256": sha, "size": size})
@@ -64,7 +64,7 @@ def backup(workspace: Workspace, dest_dir: Path) -> Path:
 
 def restore(archive_path: Path, new_workspace: Path) -> Path:
     if new_workspace.exists():
-        raise EmaError("restore_exists", "Destinația există deja.", str(new_workspace))
+        raise EmaError("restore_exists", "Destinaţia există deja.", str(new_workspace))
     with zipfile.ZipFile(archive_path) as archive:
         expected = _verify_archive(archive, archive_path)
         Workspace.install_backup(archive, expected, new_workspace)
@@ -80,12 +80,12 @@ def _verify_archive(archive: zipfile.ZipFile, path: Path) -> set[str]:
     names = set(archive.namelist())
     expected = {str(entry["path"]) for entry in manifest}
     if names != expected | {"manifest.json"} or "ema.sqlite" not in expected:
-        raise EmaError("backup_manifest", "Lista fișierelor din copie este invalidă.", str(path))
+        raise EmaError("backup_manifest", "Lista fişierelor din copie este invalidă.", str(path))
     for entry in manifest:
         relative = str(entry["path"])
         entry_path = Path(relative)
         if entry_path.is_absolute() or ".." in entry_path.parts or relative.startswith("."):
-            raise EmaError("backup_path", "Copia conține o cale invalidă.", relative)
+            raise EmaError("backup_path", "Copia conţine o cale invalidă.", relative)
         with archive.open(relative) as stream:
             sha, size = _checksum(stream)
         if sha != entry["sha256"] or size != entry["size"]:
