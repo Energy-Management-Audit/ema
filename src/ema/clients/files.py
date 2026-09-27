@@ -46,18 +46,23 @@ def store_upload(
         raise EmaError("file_type", "Tipul fişierului nu este acceptat.", "")
     temporary_dir = ws.path("temp")
     temporary_dir.mkdir(exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=temporary_dir, suffix=extension, delete=False) as handle:
-        temporary = Path(handle.name)
-        size = 0
-        try:
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=temporary_dir, suffix=extension, delete=False
+        ) as handle:
+            temporary = Path(handle.name)
+            size = 0
             while chunk := stream.read(65536):
                 size += len(chunk)
                 if size > limit:
                     raise EmaError("file_too_large", "Fişierul este prea mare.", "")
                 handle.write(chunk)
-        except BaseException:
+    except BaseException:
+        if temporary is not None:
             temporary.unlink(missing_ok=True)
-            raise
+        raise
+    assert temporary is not None
     try:
         identified = sniff(temporary)
         if size == 0 or identified.kind == FileKind.UNKNOWN or identified.mismatch:

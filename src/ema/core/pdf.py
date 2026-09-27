@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw
 from ema.core.config import Settings
 from ema.core.errors import EmaError
 from ema.core.photo import render_photo_png
+from ema.core.resources import resource_path
 from ema.core.review.evidence import get_evidence
 from ema.core.review.models import PdfRegion, PdfText, Photo
 from ema.core.workspace import Workspace
@@ -119,24 +120,18 @@ def _run_tesseract(
     psm: int,
     format_: str,
 ) -> str:
+    command = [str(executable), "stdin", "stdout"]
+    if executable.parent == resource_path("tesseract"):
+        command.extend(["--tessdata-dir", str(resource_path("tesseract", "tessdata"))])
+    command.extend(["--dpi", "200", "-l", lang, "--psm", str(psm), format_])
     try:
         result = subprocess.run(
-            [
-                str(executable),
-                "stdin",
-                "stdout",
-                "--dpi",
-                "200",
-                "-l",
-                lang,
-                "--psm",
-                str(psm),
-                format_,
-            ],
+            command,
             input=image,
             capture_output=True,
             check=False,
             timeout=timeout_s,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except subprocess.TimeoutExpired as exc:
         raise EmaError("ocr_timeout", "OCR-ul a depăşit timpul permis.", str(exc)) from exc

@@ -13,6 +13,7 @@ build/
 node_modules/
 frontend/dist/
 resources/frontend/
+resources/tesseract/
 
 # Packaging output
 packaging/build/

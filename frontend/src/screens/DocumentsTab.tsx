@@ -10,7 +10,7 @@ import { Button } from '../ui/Button'
 import { EmaWidget } from '../ui/Feedback'
 import { Icon } from '../ui/Icon'
 import { Card, SectionKey } from '../ui/Surface'
-import { ProblemNotice, download, useAction } from './actions.tsx'
+import { ProblemNotice, STALE_CODES, download, useAction } from './actions.tsx'
 import { PIEE_SLOTS, useReadDocuments, useSlots } from './JobHeader.tsx'
 import { SlotRow, type ReadState } from './SlotRow.tsx'
 
@@ -24,7 +24,7 @@ export function useReadState(): ReadState {
 }
 
 function OutputRow({ output, detail }: { output: Output; detail: string }) {
-  const { jobId } = useJob()
+  const { jobId, refresh } = useJob()
   const action = useAction()
   return (
     <div className="output-row" data-testid={`output-row-${output.id}`}>
@@ -40,7 +40,12 @@ function OutputRow({ output, detail }: { output: Output; detail: string }) {
         icon={Download}
         loading={action.pending}
         onClick={() => {
-          void action.run(() => download(jobId, output))
+          void action.run(
+            () => download(jobId, output),
+            (problem) => {
+              if (STALE_CODES.has(problem.code)) refresh('job', 'checks', 'outputs')
+            },
+          )
         }}
       >
         Descarcă

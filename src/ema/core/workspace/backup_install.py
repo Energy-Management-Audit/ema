@@ -20,4 +20,4 @@ def install_backup(archive: zipfile.ZipFile, names: set[str], target: Path) -> N
                 path.parent.mkdir(parents=True, exist_ok=True)
                 with archive.open(relative) as source, path.open("wb") as dest:
                     shutil.copyfileobj(source, dest)
-            staging.rename(target)
+        staging.rename(target)

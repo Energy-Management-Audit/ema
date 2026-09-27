@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import shutil
 import subprocess
 import threading
@@ -13,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Protocol
+
+from filelock import FileLock
 
 from ema.core.office.errors import OfficeError
 
@@ -73,12 +74,8 @@ class WordMac:
     @contextmanager
     def _process_lock(self):
         self.work_root.mkdir(parents=True, exist_ok=True)
-        with (self.work_root / ".word.lock").open("a+b") as handle:
-            fcntl.flock(handle, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(handle, fcntl.LOCK_UN)
+        with FileLock(self.work_root / ".word.lock"):
+            yield
 
     def _force_quit(self) -> None:
         kill = subprocess.run(

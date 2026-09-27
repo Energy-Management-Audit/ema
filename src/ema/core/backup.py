@@ -6,6 +6,7 @@ import os
 import sqlite3
 import tempfile
 import zipfile
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO
@@ -32,9 +33,9 @@ def backup(workspace: Workspace, dest_dir: Path) -> Path:
     try:
         with workspace_lock(workspace.root), tempfile.TemporaryDirectory() as temp:
             snapshot = Path(temp) / "ema.sqlite"
-            with workspace.connect() as source, sqlite3.connect(snapshot) as dest:
+            with workspace.connect() as source, closing(sqlite3.connect(snapshot)) as dest:
                 source.backup(dest)
-            with sqlite3.connect(snapshot) as db:
+            with closing(sqlite3.connect(snapshot)) as db:
                 refs = workspace.referenced_files(db)
             manifest: list[dict[str, object]] = []
             settings = [("settings.toml", "", -1)] if workspace.settings_file().exists() else []

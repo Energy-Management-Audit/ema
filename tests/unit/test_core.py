@@ -262,9 +262,13 @@ def test_backup_while_deleting_job(ws: Workspace, tmp_path: Path) -> None:
 
 def test_cli_version_and_help() -> None:
     executable = Path(sys.executable).parent / "ema"
-    result = subprocess.run([executable, "--version"], capture_output=True, text=True, check=True)
+    result = subprocess.run(
+        [executable, "--version"], capture_output=True, text=True, encoding="utf-8", check=True
+    )
     assert result.stdout.strip() == __version__
-    result = subprocess.run([executable, "--help"], capture_output=True, text=True, check=True)
+    result = subprocess.run(
+        [executable, "--help"], capture_output=True, text=True, encoding="utf-8", check=True
+    )
     assert "workspace" in result.stdout and "backup" in result.stdout
 
 
@@ -334,7 +338,11 @@ def test_interface_errors_hide_detail(ws: Workspace, monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("EMA_WORKSPACE", str(ws.root))
     executable = Path(sys.executable).parent / "ema"
     result = subprocess.run(
-        [executable, "job", "status", "missing"], capture_output=True, text=True, check=False
+        [executable, "job", "status", "missing"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
     )
     assert result.returncode != 0
     assert "Lucrarea nu există." in result.stderr
@@ -375,8 +383,10 @@ def test_slot_versions_do_not_reuse_removed_number(ws: Workspace, tmp_path: Path
 def test_workspace_discovery_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_dir = tmp_path / "config"
     config_dir.mkdir()
-    (config_dir / "config.toml").write_text(f'workspace = "{tmp_path / "configured"}"\n')
-    monkeypatch.setattr(config, "user_config_dir", lambda _name: str(config_dir))
+    (config_dir / "config.toml").write_text(
+        f"workspace = {json.dumps(str(tmp_path / 'configured'))}\n"
+    )
+    monkeypatch.setattr(config, "user_config_dir", lambda _name, **_kwargs: str(config_dir))
     monkeypatch.delenv("EMA_WORKSPACE", raising=False)
     assert config.workspace_path() == tmp_path / "configured"
     monkeypatch.setenv("EMA_WORKSPACE", str(tmp_path / "env"))

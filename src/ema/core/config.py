@@ -26,7 +26,7 @@ from ema.core.workspace import Workspace
 def workspace_path() -> Path:
     if location := os.environ.get("EMA_WORKSPACE"):
         return Path(location).expanduser().resolve()
-    config = Path(user_config_dir("Ema")) / "config.toml"
+    config = Path(user_config_dir("Ema", appauthor=False)) / "config.toml"
     if config.exists():
         try:
             location = tomllib.loads(config.read_text(encoding="utf-8"))["workspace"]
@@ -39,7 +39,7 @@ def workspace_path() -> Path:
             ) from exc
     if sys.platform == "darwin":
         return (Path.home() / "Ema").resolve()
-    return Path(user_data_dir("Ema", roaming=True)).resolve()
+    return Path(user_data_dir("Ema", appauthor=False, roaming=True)).resolve()
 
 
 def _word_default() -> Path:

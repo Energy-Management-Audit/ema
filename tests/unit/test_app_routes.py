@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -36,7 +37,7 @@ def test_app_paths_serve_the_shell_without_a_session(
 
 def test_serve_prints_the_app_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("EMA_WORKSPACE", str(tmp_path))
-    monkeypatch.setattr(cli.uvicorn, "run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(cli.uvicorn, "Server", lambda _config: SimpleNamespace(run=lambda: None))
     result = CliRunner().invoke(cli._app, ["serve", "--port", "8766"])
     assert result.exit_code == 0, result.output
     assert "Open http://127.0.0.1:8766/app/#code=" in result.output

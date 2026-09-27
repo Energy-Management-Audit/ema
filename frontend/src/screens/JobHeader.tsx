@@ -118,7 +118,13 @@ export function JobActions({ tab }: { tab: Tab }) {
         disabled={!pdf || preview.pending}
         title={pdf ? undefined : 'Previzualizarea apare după generarea pachetului.'}
         onClick={() => {
-          if (pdf) void preview.run(() => openPreview(ctx.jobId, pdf))
+          if (pdf)
+            void preview.run(
+              () => openPreview(ctx.jobId, pdf),
+              (problem) => {
+                if (STALE_CODES.has(problem.code)) ctx.refresh('job', 'checks', 'outputs')
+              },
+            )
         }}
       >
         Previzualizare

@@ -47,6 +47,8 @@ import anyio
 from mcp.shared.memory import create_connected_server_and_client_session
 
 import ema.cli
+import ema.cli.desktop
+import ema.cli.install_check
 from ema.core.workspace import Workspace
 from ema.mcp.server import build_server
 
@@ -80,10 +82,7 @@ def _probe(names: list[str]) -> subprocess.CompletedProcess[str]:
 def test_metadata_list_and_readme_match_the_contract() -> None:
     assert _listed() == ["httpx2", "mcp"]
     readme = (ROOT / "packaging" / "README.md").read_text(encoding="utf-8")
-    assert (
-        "The spec copies the package metadata listed in `metadata.txt` (`copy_metadata`); "
-        "a unit test keeps that list exact." in readme
-    )
+    assert "metadata listed in `metadata.txt` with `copy_metadata`" in readme
 
 
 def test_listed_metadata_is_enough() -> None:

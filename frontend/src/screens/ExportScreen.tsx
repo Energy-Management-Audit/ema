@@ -11,7 +11,7 @@ import { Status } from '../ui/Chip'
 import { FailureNotice } from '../ui/Feedback'
 import { DocThumb, ExportCheck, PackageFile } from '../ui/Package'
 import { SectionKey } from '../ui/Surface'
-import { ProblemNotice, download, useAction } from './actions.tsx'
+import { ProblemNotice, STALE_CODES, download, useAction } from './actions.tsx'
 import { useGeneratePackage } from './JobHeader.tsx'
 import { clientName } from './JobScreen.tsx'
 import { RunPanel } from './RunPanel.tsx'
@@ -162,7 +162,12 @@ export function ExportScreen() {
                   height={38}
                   loading={word.pending}
                   onClick={() => {
-                    void word.run(() => download(ctx.jobId, wordFile))
+                    void word.run(
+                      () => download(ctx.jobId, wordFile),
+                      (problem) => {
+                        if (STALE_CODES.has(problem.code)) ctx.refresh('job', 'checks', 'outputs')
+                      },
+                    )
                   }}
                 >
                   Descarcă doar Word

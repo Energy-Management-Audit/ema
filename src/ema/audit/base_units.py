@@ -151,9 +151,8 @@ def _insert_measurements(document: Any, prototype: Path, needed: bool) -> None:
 
 def heading_spans_document(document: Any) -> list[tuple[MappedHeading, int, int]]:
     # A transient copy allows the existing mapper to supply catalogue identities.
-    with NamedTemporaryFile(suffix="-AUDIT-01.docx") as temporary:
-        document.save(temporary.name)
-        return _heading_spans(Path(temporary.name), "AUDIT-01", document)
+    with _Saved(document) as temporary:
+        return _heading_spans(temporary, "AUDIT-01", document)
 
 
 def _remove_carriers(document: Any, source_path: Path, present: frozenset[str]) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -37,7 +38,11 @@ def _pdf(path: Path) -> Path:
     return path
 
 
-def _executable(path: Path, body: str) -> Path:
+def _executable(path: Path, body: str, windows_body: str) -> Path:
+    if sys.platform == "win32":
+        path = path.with_suffix(".cmd")
+        path.write_text(f"@echo off\n{windows_body}\n", encoding="utf-8")
+        return path
     path.write_text(f"#!/bin/sh\n{body}\n")
     path.chmod(0o700)
     return path
@@ -57,6 +62,9 @@ def test_ocr_uses_configured_child_and_word_boxes(tmp_path: Path) -> None:
         'cat >/dev/null\ncase "$*" in *tsv*) '
         'printf "text\\tleft\\ttop\\twidth\\theight\\nToken\\t20\\t30\\t10\\t12\\n" ;; '
         '*) printf "Token\\n" ;; esac',
+        'more >nul\necho %* | findstr /C:"tsv" >nul\n'
+        "if %errorlevel%==0 (echo text\tleft\ttop\twidth\theight& echo Token\t20\t30\t10\t12) "
+        "else echo Token",
     )
     pages = pdf.ocr(_pdf(tmp_path / "invoice.pdf"), Settings(tesseract_path=binary))
     assert pages[0].text.strip() == "Token"
@@ -66,12 +74,20 @@ def test_ocr_uses_configured_child_and_word_boxes(tmp_path: Path) -> None:
 
 def test_ocr_timeout_kills_child_and_error_keeps_stderr(tmp_path: Path) -> None:
     source = _pdf(tmp_path / "invoice.pdf")
-    slow = _executable(tmp_path / "slow-tesseract", "cat >/dev/null\nsleep 2")
+    slow = _executable(
+        tmp_path / "slow-tesseract",
+        "cat >/dev/null\nsleep 2",
+        'more >nul\npowershell -NoProfile -Command "Start-Sleep -Seconds 2"',
+    )
     with pytest.raises(EmaError) as timeout:
         pdf.ocr(source, Settings(tesseract_path=slow), timeout_s=0.1)
     assert timeout.value.code == "ocr_timeout"
 
-    bad = _executable(tmp_path / "bad-tesseract", 'echo "synthetic stderr" >&2\nexit 3')
+    bad = _executable(
+        tmp_path / "bad-tesseract",
+        'echo "synthetic stderr" >&2\nexit 3',
+        "echo synthetic stderr 1>&2\nexit /b 3",
+    )
     with pytest.raises(EmaError) as failure:
         pdf.ocr(source, Settings(tesseract_path=bad))
     assert failure.value.code == "ocr_failed"

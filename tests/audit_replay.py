@@ -53,7 +53,8 @@ def write_recording(path: Path, rows: list[dict[str, Any]]) -> Path:
         json.dumps(
             {"source": "hand-authored", "format": "openai-chat-completions", "responses": rows},
             ensure_ascii=False,
-        )
+        ),
+        encoding="utf-8",
     )
     return path
 

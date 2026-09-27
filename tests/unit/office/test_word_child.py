@@ -41,7 +41,8 @@ def _bystander(executable: str | None = None) -> subprocess.Popen[bytes]:
         [
             executable or sys.executable,
             "-c",
-            "import time; print('ready', flush=True); time.sleep(60)",
+            "import sys,time; sys.stdout.buffer.write(b'ready\\n'); "
+            "sys.stdout.buffer.flush(); time.sleep(60)",
         ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,

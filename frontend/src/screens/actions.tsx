@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { ApiProblem } from '../api/client.ts'
 import { api } from '../api/endpoints.ts'
 import type { Output } from '../api/types.ts'
+import { desktopApi } from '../lib/desktop.ts'
 import { FailureNotice } from '../ui/Feedback'
 
 /** Problems that mean the page is out of date: refetch what it shows, never retry (D4). */
@@ -9,6 +10,7 @@ export const STALE_CODES = new Set([
   'stale_revision',
   'hash_mismatch',
   'output_stale',
+  'output_missing',
   'not_ready',
   'job_running',
   'import_required',
@@ -59,6 +61,17 @@ export function ProblemNotice({ problem, body }: { problem: ApiProblem | null; b
 
 /** D3: binary content only through blob URLs; a download revokes its URL at once. */
 export async function download(jobId: string, output: Output): Promise<void> {
+  const bridge = desktopApi()
+  if (bridge) {
+    try {
+      const result = await bridge.save_output(jobId, output.id)
+      if (!result.ok) throw new ApiProblem(result.code, 0, result.message)
+    } catch (error) {
+      if (error instanceof ApiProblem) throw error
+      throw new ApiProblem('desktop_save_failed', 0, 'Fişierul nu s-a putut salva.')
+    }
+    return
+  }
   const url = URL.createObjectURL(await api.output(jobId, output.id))
   const anchor = document.createElement('a')
   anchor.href = url
@@ -69,6 +82,17 @@ export async function download(jobId: string, output: Output): Promise<void> {
 
 /** The PDF preview opens in a new tab from a blob URL, revoked after a minute. */
 export async function openPreview(jobId: string, output: Output): Promise<void> {
+  const bridge = desktopApi()
+  if (bridge) {
+    try {
+      const result = await bridge.open_output(jobId, output.id)
+      if (!result.ok) throw new ApiProblem(result.code, 0, result.message)
+    } catch (error) {
+      if (error instanceof ApiProblem) throw error
+      throw new ApiProblem('desktop_open_failed', 0, 'Fişierul nu s-a putut deschide.')
+    }
+    return
+  }
   const url = URL.createObjectURL(await api.output(jobId, output.id))
   window.open(url, '_blank')
   window.setTimeout(() => {

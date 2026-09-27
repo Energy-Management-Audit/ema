@@ -3,6 +3,7 @@
 import json
 import secrets
 import socket
+import sys
 from contextlib import nullcontext
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -14,9 +15,12 @@ from ema import __version__
 from ema.api import create_app
 from ema.api.mock import seed as seed_mock
 from ema.cli.audit import audit_app
+from ema.cli.desktop import run_desktop
+from ema.cli.install_check import check_install as run_install_check
 from ema.cli.office_worker import office_worker
 from ema.cli.piee import piee_app
 from ema.cli.review import job_review_app
+from ema.cli.server import uvicorn_config
 from ema.core.backup import backup, restore
 from ema.core.config import workspace_path
 from ema.core.errors import EmaError
@@ -236,11 +240,24 @@ def serve(
         code = secrets.token_urlsafe(32)
         origin = dev_origin or f"http://127.0.0.1:{port}"
         typer.echo(f"Open {origin}/app/#code={code}")
-        uvicorn.run(
-            create_app(ws, port, launch_code=code, dev_origin=dev_origin, mock=mock),
-            host="127.0.0.1",
-            port=port,
-        )
+        uvicorn.Server(
+            uvicorn_config(
+                create_app(ws, port, launch_code=code, dev_origin=dev_origin, mock=mock), port
+            )
+        ).run()
+
+
+@_app.command("desktop")
+def desktop() -> None:
+    raise typer.Exit(run_desktop())
+
+
+@_app.command("check-install")
+def check_install() -> None:
+    result = run_install_check()
+    typer.echo(json.dumps(result, ensure_ascii=False))
+    required_ok = all(check["ok"] or not check["required"] for check in result["checks"])
+    raise typer.Exit(0 if required_ok else 1)
 
 
 @_app.command("mcp")
@@ -252,6 +269,11 @@ def mcp(
 
 
 def app() -> None:
+    if sys.platform == "win32":
+        for stream in (sys.stdout, sys.stderr):
+            reconfigure = getattr(stream, "reconfigure", None)
+            if callable(reconfigure):
+                reconfigure(encoding="utf-8")
     try:
         _app()
     except EmaError as exc:

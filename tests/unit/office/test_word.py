@@ -3,6 +3,7 @@
 import multiprocessing
 import re
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -219,6 +220,7 @@ def _word_child(app, source, work_root, active, maximum):
     word.open_check(source)
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="S18b", strict=True)
 def test_processes_are_serialized(tmp_path):
     context = multiprocessing.get_context("fork")
     app = tmp_path / "Word.app"
@@ -317,8 +319,8 @@ def test_doc_actions_copy_results_and_count_tables(tmp_path):
         scripts[1],
     )
     assert "set d to active document" not in scripts[0] + scripts[1]
-    assert re.search(r"/[0-9a-f]{32}\.docx", scripts[0])
-    assert re.search(r"/[0-9a-f]{32}\.txt", scripts[1])
+    assert re.search(r"[/\\][0-9a-f]{32}\.docx", scripts[0])
+    assert re.search(r"[/\\][0-9a-f]{32}\.txt", scripts[1])
     assert copies(word) == []
 
 
