@@ -12,6 +12,7 @@ export type RunState = {
   startedAt: string | null
   publication: string | null
   itemFailures: number
+  steps: { message: string; done: number | null; total: number | null; at: string }[]
 }
 
 export const TERMINAL = new Set(['stage_finished', 'stage_failed', 'stage_cancelled'])
@@ -27,6 +28,7 @@ export function startRun(runId: string, stage: string): RunState {
     startedAt: null,
     publication: null,
     itemFailures: 0,
+    steps: [],
   }
 }
 
@@ -42,6 +44,18 @@ export function runReducer(state: RunState, event: JobEvent): RunState {
         done: typeof payload.done === 'number' ? payload.done : state.done,
         total: typeof payload.total === 'number' ? payload.total : state.total,
         message: typeof payload.message === 'string' ? payload.message : state.message,
+        steps:
+          typeof payload.message === 'string' && payload.message.trim()
+            ? [
+                ...state.steps,
+                {
+                  message: payload.message,
+                  done: typeof payload.done === 'number' ? payload.done : null,
+                  total: typeof payload.total === 'number' ? payload.total : null,
+                  at: event.at,
+                },
+              ].slice(-20)
+            : state.steps,
       }
     case 'item_failed':
       return { ...state, itemFailures: state.itemFailures + 1 }

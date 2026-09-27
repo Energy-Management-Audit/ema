@@ -100,6 +100,24 @@
         "title": "AnnexRow",
         "type": "object"
       },
+      "Annotation": {
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "revision"
+        ],
+        "title": "Annotation",
+        "type": "object"
+      },
       "Approval": {
         "properties": {
           "actor": {
@@ -154,6 +172,251 @@
           "actor"
         ],
         "title": "Approval",
+        "type": "object"
+      },
+      "AuditDeadlineInput": {
+        "additionalProperties": false,
+        "properties": {
+          "deadline": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "on_revision": {
+            "minimum": 0.0,
+            "title": "On Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deadline",
+          "on_revision"
+        ],
+        "title": "AuditDeadlineInput",
+        "type": "object"
+      },
+      "AuditDeadlineResult": {
+        "properties": {
+          "deadline": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deadline",
+          "revision"
+        ],
+        "title": "AuditDeadlineResult",
+        "type": "object"
+      },
+      "AuditDocuments": {
+        "properties": {
+          "anexa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocFile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checklist": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChecklistRow"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checklist"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/DocFile"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "measures": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocFile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missing": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "runs": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StageView"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Runs",
+            "type": "object"
+          },
+          "unclassified": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unclassified",
+            "type": "array"
+          },
+          "visit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VisitView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "files",
+          "anexa",
+          "measures",
+          "checklist",
+          "missing",
+          "unclassified",
+          "visit",
+          "runs"
+        ],
+        "title": "AuditDocuments",
+        "type": "object"
+      },
+      "AuditNoteInput": {
+        "additionalProperties": false,
+        "properties": {
+          "on_revision": {
+            "minimum": 0.0,
+            "title": "On Revision",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 2000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "on_revision"
+        ],
+        "title": "AuditNoteInput",
+        "type": "object"
+      },
+      "AuditNoteResult": {
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "section_id": {
+            "title": "Section Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_id",
+          "text",
+          "revision"
+        ],
+        "title": "AuditNoteResult",
+        "type": "object"
+      },
+      "AuditOutline": {
+        "properties": {
+          "answered": {
+            "title": "Answered",
+            "type": "integer"
+          },
+          "chapters": {
+            "title": "Chapters",
+            "type": "integer"
+          },
+          "deadline": {
+            "$ref": "#/components/schemas/Deadline"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/OutlineNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "visit_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Date"
+          },
+          "written": {
+            "title": "Written",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "nodes",
+          "deadline",
+          "visit_date",
+          "answered",
+          "total",
+          "written",
+          "chapters"
+        ],
+        "title": "AuditOutline",
         "type": "object"
       },
       "BackupResult": {
@@ -416,6 +679,29 @@
           "ref"
         ],
         "title": "Cell",
+        "type": "object"
+      },
+      "ChecklistRow": {
+        "properties": {
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "received": {
+            "title": "Received",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "text",
+          "received"
+        ],
+        "title": "ChecklistRow",
         "type": "object"
       },
       "Client": {
@@ -934,6 +1220,31 @@
         "title": "CuiInput",
         "type": "object"
       },
+      "Deadline": {
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "revision"
+        ],
+        "title": "Deadline",
+        "type": "object"
+      },
       "Decision": {
         "properties": {
           "action": {
@@ -1149,6 +1460,107 @@
           "factor_version"
         ],
         "title": "Derivation",
+        "type": "object"
+      },
+      "DocFile": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "item": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item"
+          },
+          "item_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Text"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "sha": {
+            "title": "Sha",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "slot": {
+            "title": "Slot",
+            "type": "string"
+          },
+          "slot_revision": {
+            "title": "Slot Revision",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "read",
+              "reading",
+              "needs_conversion",
+              "scanned",
+              "protected",
+              "failed",
+              "unread"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slot",
+          "name",
+          "kind",
+          "size_bytes",
+          "version",
+          "slot_revision",
+          "sha",
+          "status"
+        ],
+        "title": "DocFile",
         "type": "object"
       },
       "DocxLoc": {
@@ -2670,6 +3082,94 @@
         "title": "JobOverview",
         "type": "object"
       },
+      "JobRun": {
+        "properties": {
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "publication": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publication"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "stage",
+          "state",
+          "publication",
+          "fingerprint",
+          "outcome",
+          "error",
+          "started_at",
+          "ended_at"
+        ],
+        "title": "JobRun",
+        "type": "object"
+      },
       "JobStatus": {
         "properties": {
           "id": {
@@ -2682,8 +3182,7 @@
           },
           "runs": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/JobRun"
             },
             "title": "Runs",
             "type": "array"
@@ -2885,6 +3384,139 @@
           "id"
         ],
         "title": "NewJobResult",
+        "type": "object"
+      },
+      "OutlineNode": {
+        "properties": {
+          "answered": {
+            "title": "Answered",
+            "type": "boolean"
+          },
+          "applicability_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicability Reason"
+          },
+          "awaits": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Awaits",
+            "type": "array"
+          },
+          "changed_input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Input"
+          },
+          "chapter": {
+            "title": "Chapter",
+            "type": "integer"
+          },
+          "computed_status": {
+            "title": "Computed Status",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "missing_facts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Facts",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Annotation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "parent",
+          "chapter",
+          "number",
+          "title",
+          "kind",
+          "status",
+          "computed_status",
+          "stale",
+          "reason",
+          "changed_input",
+          "applicability_reason",
+          "awaits",
+          "missing_facts",
+          "revision",
+          "note",
+          "answered"
+        ],
+        "title": "OutlineNode",
         "type": "object"
       },
       "Output": {
@@ -3736,7 +4368,8 @@
               "n/a",
               "later",
               "ready",
-              "missing"
+              "missing",
+              "drafted"
             ],
             "title": "Status",
             "type": "string"
@@ -4154,6 +4787,24 @@
           "on_revision"
         ],
         "title": "StageInput",
+        "type": "object"
+      },
+      "StageView": {
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "current"
+        ],
+        "title": "StageView",
         "type": "object"
       },
       "SummaryFigure": {
@@ -8000,6 +8651,757 @@
         "summary": "Job Approvals",
         "tags": [
           "export"
+        ]
+      }
+    },
+    "/jobs/{job_id}/audit/deadline": {
+      "put": {
+        "operationId": "update_deadline_jobs__job_id__audit_deadline_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditDeadlineInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditDeadlineResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "wrong_job_type"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "csrf_required, invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "job_missing"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "stale_revision"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "Update Deadline",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/jobs/{job_id}/audit/documents": {
+      "get": {
+        "operationId": "get_documents_jobs__job_id__audit_documents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditDocuments"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "wrong_job_type"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "job_missing"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "Get Documents",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/jobs/{job_id}/audit/notes/{section_id}": {
+      "put": {
+        "operationId": "update_note_jobs__job_id__audit_notes__section_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "title": "Section Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditNoteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditNoteResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "wrong_job_type"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "csrf_required, invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "job_missing, section_missing"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "stale_revision"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "Update Note",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/jobs/{job_id}/audit/outline": {
+      "get": {
+        "operationId": "get_outline_jobs__job_id__audit_outline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditOutline"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "wrong_job_type"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "job_missing"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "Get Outline",
+        "tags": [
+          "audit"
         ]
       }
     },

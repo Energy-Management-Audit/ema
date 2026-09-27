@@ -222,6 +222,8 @@ export type RunRecord = {
   state: 'running' | 'ready' | 'failed' | 'cancelled'
   publication?: string | null
   error?: string | null
+  started_at: string
+  ended_at: string | null
 }
 
 export type JobStatus = {

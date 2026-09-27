@@ -27,7 +27,7 @@ def status(ws: Workspace, job: str) -> JobStatus:
         if row is None:
             raise EmaError("job_missing", "Lucrarea nu există.", job)
         runs = db.execute(
-            "SELECT id,stage,state,publication,fingerprint,outcome,error "
+            "SELECT id,stage,state,publication,fingerprint,outcome,error,started_at,ended_at "
             "FROM runs WHERE job_id=? ORDER BY started_at",
             (job,),
         ).fetchall()

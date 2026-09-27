@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -24,6 +25,30 @@ class EmptyInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+# s17b-audit-work
+class AuditNoteInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = PydanticField(max_length=2000)
+    on_revision: int = PydanticField(ge=0)
+
+
+class AuditDeadlineInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    deadline: date | None
+    on_revision: int = PydanticField(ge=0)
+
+
+class AuditNoteResult(BaseModel):
+    section_id: str
+    text: str
+    revision: int
+
+
+class AuditDeadlineResult(BaseModel):
+    deadline: date | None
+    revision: int
+
+
 class Job(BaseModel):
     id: str
     type: Literal["invoices", "piee", "audit", "reporting"]
@@ -37,12 +62,24 @@ class NewJobResult(BaseModel):
     id: str
 
 
+class JobRun(BaseModel):
+    id: str
+    stage: str
+    state: str
+    publication: str | None
+    fingerprint: str | None
+    outcome: str | None
+    error: str | None
+    started_at: str
+    ended_at: str | None
+
+
 class JobStatus(BaseModel):
     id: str
     type: str
     state: str
     revision: int
-    runs: list[dict[str, Any]]
+    runs: list[JobRun]
 
 
 class CancelResult(BaseModel):

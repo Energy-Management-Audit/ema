@@ -65,7 +65,16 @@ def store_upload(
     assert temporary is not None
     try:
         identified = sniff(temporary)
-        if size == 0 or identified.kind == FileKind.UNKNOWN or identified.mismatch:
+        html_spreadsheet = (
+            extension in {".xls", ".xlsx"}
+            and identified.kind == FileKind.HTML
+            and identified.mismatch
+        )
+        if (
+            size == 0
+            or identified.kind == FileKind.UNKNOWN
+            or (identified.mismatch and not html_spreadsheet)
+        ):
             raise EmaError("file_type", "Tipul fişierului nu este acceptat.", "")
         sha = ws.add_file(client_id, temporary)
         with ws.connect() as db:

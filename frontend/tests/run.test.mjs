@@ -43,3 +43,16 @@ test('failed and cancelled runs, and the terminal rebuilt from a stored state', 
   assert.equal(terminalFor(startRun('run-1', 's'), 'failed')?.type, 'stage_failed')
   assert.equal(terminalFor(startRun('run-1', 's'), 'running'), null)
 })
+
+test('progress steps are recorded for this run, capped, and reset for a new run', () => {
+  let state = startRun('run-1', 'read')
+  for (let index = 0; index < 23; index += 1)
+    state = runReducer(
+      state,
+      event('stage_progress', { message: `Pas ${index}`, done: index, total: 23 }),
+    )
+  assert.equal(state.steps.length, 20)
+  assert.equal(state.steps[0]?.message, 'Pas 3')
+  assert.equal(state.steps[19]?.done, 22)
+  assert.equal(startRun('run-2', 'read').steps.length, 0)
+})

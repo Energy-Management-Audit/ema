@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from ema.audit.checklist import ChecklistItem, read_checklist
 from ema.audit.intake_agent import classify_unplaced
+from ema.audit.pdf_state import pdf_state
 from ema.core.errors import EmaError
 from ema.core.intake import ItemOutcome, intake_file
 from ema.core.jobs import StageContext, StageOutcome
@@ -16,6 +17,7 @@ from ema.core.llm import Limits, ReplayProvider
 from ema.core.office.convert import stored_file
 from ema.core.office.sniff import FileKind
 from ema.core.workspace import SlotVersion
+from ema.core.workspace.conversion import active_version
 
 _PREFIX = re.compile(r"^(0|1[0-3]|[1-9])(?:\.\d+)?\.")
 
@@ -36,6 +38,7 @@ class IntakeRecord:
     item: int | None
     evidence: str | None
     error_code: str | None
+    file_sha: str | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +73,7 @@ def _result(
         item,
         name if item is not None else None,
         outcome.error_code,
+        outcome.file_sha,
     )
 
 
@@ -93,7 +97,7 @@ def build_completeness(
     return Completeness(checklist, files, received, missing, visit, unclassified)
 
 
-def audit_intake(
+def audit_intake(  # noqa: C901, PLR0912
     ctx: StageContext,
     *,
     collection: str = "dossier",
@@ -114,6 +118,17 @@ def audit_intake(
         ctx.reads.pop(("slots", f"{ctx.job}:{version.slot}"), None)
         try:
             outcome = intake_file(ctx, version.slot)
+            if outcome.status == "converted":
+                current = active_version(ctx.ws, ctx.job, version.slot)
+                if current is not None and current.converted_from == version.file_sha:
+                    outcome = replace(outcome, version=current.version, file_sha=current.file_sha)
+            if outcome.kind == FileKind.PDF and outcome.status not in {"failed", "cancelled"}:
+                _, pdf_path = stored_file(ctx.ws, ctx.job, outcome.file_sha)
+                state = pdf_state(pdf_path)
+                if state == "protected":
+                    outcome = replace(outcome, status="protected", error_code="pdf_protected")
+                elif state == "scanned":
+                    outcome = replace(outcome, status="scanned")
         except (EmaError, OSError, ValueError) as exc:
             outcome = ItemOutcome(
                 version.slot,
@@ -125,7 +140,7 @@ def audit_intake(
             )
         record = _result(version.slot, name, outcome, checklist)
         records.append(record)
-        if record.status in {"failed", "needs_conversion"}:
+        if record.status in {"failed", "needs_conversion", "protected"}:
             failures.append(f"{record.slot}: {record.error_code or record.status}")
     warnings: list[str] = []
     unplaced = {
@@ -151,6 +166,7 @@ def audit_intake(
                     ),
                     tools.evidence.get(record.slot.removeprefix(f"{collection}/"), record.evidence),
                     record.error_code,
+                    record.file_sha,
                 )
                 for record in records
             ]

@@ -79,7 +79,7 @@ class BatchInput(BaseModel):
 
 class SectionInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    status: Literal["done", "n/a", "later", "ready", "missing"]
+    status: Literal["done", "n/a", "later", "ready", "missing", "drafted"]
     on_revision: int
     reason: str | None = None
     confirm: bool = False

@@ -218,6 +218,16 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "output_missing",
         "file_type",
     ),
+    # s17b-audit-work
+    ("GET", "/jobs/{job_id}/audit/documents"): ("job_missing", "wrong_job_type"),
+    ("GET", "/jobs/{job_id}/audit/outline"): ("job_missing", "wrong_job_type"),
+    ("PUT", "/jobs/{job_id}/audit/notes/{section_id}"): (
+        "job_missing",
+        "wrong_job_type",
+        "section_missing",
+        "stale_revision",
+    ),
+    ("PUT", "/jobs/{job_id}/audit/deadline"): ("job_missing", "wrong_job_type", "stale_revision"),
     # s17b-clients-reporting
     ("POST", "/clients"): ("client_exists", "invalid_id"),
     ("GET", "/clients/overview"): (),

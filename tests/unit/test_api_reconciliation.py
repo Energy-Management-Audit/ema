@@ -57,6 +57,10 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
         ("GET", "/jobs/{job_id}/piee/summary"),
         ("GET", "/jobs/{job_id}/approvals"),
         ("GET", "/jobs/{job_id}/visit"),
+        ("GET", "/jobs/{job_id}/audit/documents"),  # s17b-audit-work
+        ("GET", "/jobs/{job_id}/audit/outline"),  # s17b-audit-work
+        ("PUT", "/jobs/{job_id}/audit/notes/{section_id}"),  # s17b-audit-work
+        ("PUT", "/jobs/{job_id}/audit/deadline"),  # s17b-audit-work
         ("GET", "/clients/overview"),  # s17b-clients-reporting
         ("POST", "/clients/annexes"),  # s17b-clients-reporting
         ("POST", "/clients/from-anaf"),  # s17b-clients-reporting

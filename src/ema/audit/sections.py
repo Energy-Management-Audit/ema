@@ -199,17 +199,25 @@ def set_status(  # noqa: PLR0913
             and bool(section.awaits)
             and any(materials.get(kind.value) is False for kind in section.awaits)
         )
+        computed = _computed(section, before, materials, facts)
         after = transition(
             before,
             to,
             actor,
             reason,
             auto_later=auto_later,
-            computed=_computed(section, before, materials, facts),
+            computed=computed,
         )
         if to in (Status.NA, Status.NA_PROPOSED):
             after = replace(after, na_applicable=applies(section.applies_when, materials, facts))
-        return _save(ws, job, before, after, actor, reason if actor == "ema" else None, db=db)
+        detail = (
+            "se aplică"
+            if before.status == Status.NA_PROPOSED and actor == "user" and to == computed
+            else reason
+            if actor == "ema"
+            else None
+        )
+        return _save(ws, job, before, after, actor, detail, db=db)
 
 
 def recompute_ready(ws: Workspace, job: str) -> list[SectionState]:

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { problem } from './harness.mjs'
 import { withHarness } from './helpers.mjs'
+import { DOCUMENTS, OUTLINE } from '../fixtures/audit/default.mjs'
 
 const id = 'audit-synthetic'
 const J = `/jobs/${id}`
@@ -46,6 +47,14 @@ test('3c reading row confirms one value, shows its photo and undoes the decision
         'GET /jobs': { status: 200, body: [job] },
         'GET /clients': { status: 200, body: [] },
         [`GET ${J}`]: { status: 200, body: job },
+        'GET /clients/synthetic': {
+          status: 200,
+          body: { id: 'synthetic', name: 'Synthetic', sites: [], contacts: [], revision: 1 },
+        },
+        [`GET ${J}/status`]: { status: 200, body: { ...job, runs: [] } },
+        [`GET ${J}/outputs`]: { status: 200, body: [] },
+        [`GET ${J}/audit/documents`]: { status: 200, body: { ...DOCUMENTS, visit } },
+        [`GET ${J}/audit/outline`]: { status: 200, body: OUTLINE },
         [`GET ${J}/fields`]: () => ({ status: 200, body: [current] }),
         [`GET ${J}/visit`]: { status: 200, body: visit },
         [`GET ${J}/log`]: () => ({ status: 200, body: decisions }),

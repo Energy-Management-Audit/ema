@@ -4,7 +4,7 @@ export type InvoiceView = 'empty' | 'reading' | 'unread' | 'identity' | 'table'
 
 export function invoiceView(input: {
   slots: string[]
-  runs: RunRecord[]
+  runs: Pick<RunRecord, 'id' | 'stage' | 'state' | 'publication'>[]
   confirmed: boolean | null
 }): InvoiceView {
   if (!input.slots.some((slot) => /^invoices\/\d{4}$/.test(slot))) return 'empty'

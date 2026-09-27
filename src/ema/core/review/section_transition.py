@@ -118,6 +118,14 @@ def transition(  # noqa: C901, PLR0913, PLR0911, PLR0912
             na_applicable=None,
             stale=current.stale if to == Status.DRAFTED else False,
         )
+    if source == Status.NA_PROPOSED and actor == "user" and to == computed:
+        return replace(
+            current,
+            status=to,
+            reason=None,
+            na_applicable=None,
+            stale=current.stale if to == Status.DRAFTED else False,
+        )
     if (
         source == Status.LATER
         and to == computed
