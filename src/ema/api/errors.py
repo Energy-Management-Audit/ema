@@ -56,6 +56,8 @@ STATUS = {
     "confirmation_individual": 409,
     "visit_missing": 409,
     "hash_mismatch": 403,
+    # s17b-clients-reporting
+    "run_not_ready": 409,
     # s17b-home-settings
     "keyring_unavailable": 424,
     "backup_dir_invalid": 400,
@@ -67,7 +69,6 @@ STATUS = {
 }
 
 ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
-    ("POST", "/clients"): ("client_exists", "invalid_id"),
     ("GET", "/clients/{client_id}"): ("client_missing",),
     ("PATCH", "/clients/{client_id}"): ("client_missing", "stale_revision"),
     ("POST", "/clients/{client_id}/files"): (
@@ -176,31 +177,6 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "stale_revision",
         "client_memory_conflict",
     ),
-    # s17b-invoices
-    ("POST", "/jobs/{job_id}/invoices/files"): (
-        "job_missing",
-        "wrong_job_type",
-        "invalid_slot",
-        "job_running",
-        "validation_error",
-    ),
-    ("GET", "/jobs/{job_id}/invoices/page.png"): (
-        "job_missing",
-        "wrong_job_type",
-        "invalid_slot",
-        "file_missing",
-        "evidence_missing",
-        "file_type",
-    ),
-    ("GET", "/jobs/{job_id}/invoices/file"): (
-        "job_missing",
-        "wrong_job_type",
-        "invalid_slot",
-        "file_missing",
-        "file_type",
-    ),
-    ("POST", "/reporting/runs"): ("invalid_year", "client_missing", "job_running"),
-    ("GET", "/reporting/runs/{run_id}"): ("run_missing",),
     ("PUT", "/settings"): ("key_not_allowed", "backup_dir_invalid"),
     ("POST", "/settings/providers/{provider}/test"): ("provider_invalid",),
     # s17b-home-settings
@@ -240,6 +216,44 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
     ("GET", "/jobs/{job_id}/outputs/{output_id}"): (
         "job_missing",
         "output_missing",
+        "file_type",
+    ),
+    # s17b-clients-reporting
+    ("POST", "/clients"): ("client_exists", "invalid_id"),
+    ("GET", "/clients/overview"): (),
+    ("POST", "/clients/annexes"): ("file_too_large",),
+    ("POST", "/clients/from-anaf"): (
+        "invalid_id",
+        "client_exists",
+        "anaf_missing",
+        "anaf_unavailable",
+    ),
+    ("GET", "/clients/{client_id}/profile"): ("client_missing", "invalid_id"),
+    ("GET", "/reporting/runs"): (),
+    ("POST", "/reporting/runs"): ("invalid_year", "invalid_id", "client_missing"),
+    ("GET", "/reporting/runs/{run_id}"): ("run_missing",),
+    ("GET", "/reporting/runs/{run_id}/preview"): ("run_missing", "run_not_ready"),
+    # s17b-invoices
+    ("POST", "/jobs/{job_id}/invoices/files"): (
+        "job_missing",
+        "wrong_job_type",
+        "invalid_slot",
+        "job_running",
+        "validation_error",
+    ),
+    ("GET", "/jobs/{job_id}/invoices/page.png"): (
+        "job_missing",
+        "wrong_job_type",
+        "invalid_slot",
+        "file_missing",
+        "evidence_missing",
+        "file_type",
+    ),
+    ("GET", "/jobs/{job_id}/invoices/file"): (
+        "job_missing",
+        "wrong_job_type",
+        "invalid_slot",
+        "file_missing",
         "file_type",
     ),
 }

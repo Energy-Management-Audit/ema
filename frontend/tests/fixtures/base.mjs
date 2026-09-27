@@ -97,4 +97,20 @@ export const baseRoutes = {
   'GET /jobs': { status: 200, body: JOBS },
   'GET /jobs/overview': { status: 200, body: OVERVIEW },
   'GET /clients': { status: 200, body: CLIENTS },
+  'GET /clients/overview': {
+    status: 200,
+    body: CLIENTS.map((client) => ({
+      id: client.id,
+      name: client.name,
+      cui: client.cui,
+      county: null,
+      caen: client.caen,
+      caen_description: null,
+      anaf_refreshed_at: client.anaf_refreshed_at,
+      annex_years: [],
+      consumption: null,
+      pods: [],
+    })),
+  },
+  'GET /reporting/runs': { status: 200, body: [] },
 }

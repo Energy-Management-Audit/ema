@@ -47,6 +47,7 @@ class ReportException:
     beneficiary: str | None
     situation: str
     decision: str
+    ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -104,18 +105,21 @@ def _measure_structure(item: Measure) -> str:
     )
 
 
-def generate(annex_paths: list[Path], years: tuple[int, ...]) -> ReportResult:  # noqa: C901, PLR0912, PLR0915
+def generate(  # noqa: C901, PLR0912, PLR0915
+    annex_paths: list[Path], years: tuple[int, ...], source_names: dict[Path, Path] | None = None
+) -> ReportResult:
     """Parse each source independently; a failed annex is recorded, not fatal."""
     if not years or years != tuple(sorted(set(years))):
         raise ValueError("years must be unique and ascending")
     companies: list[ReportCompany] = []
     exceptions: list[ReportException] = []
     consumption_year: int | None = None
-    for path in annex_paths:
+    for input_path in annex_paths:
+        path = (source_names or {}).get(input_path, input_path)
         digest = ""
         try:
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            annex = parse_anexa(path)
+            digest = hashlib.sha256(input_path.read_bytes()).hexdigest()
+            annex = parse_anexa(input_path)
         except (OSError, ValueError, RuntimeError, OfficeError, BadZipFile) as exc:
             companies.append(
                 ReportCompany(
@@ -147,6 +151,7 @@ def generate(annex_paths: list[Path], years: tuple[int, ...]) -> ReportResult:  
                     name,
                     "Denumirea din celula principală este o adresă poștală.",
                     f"S-a folosit {annex.name_origin}.",
+                    annex.name_origin,
                 )
             )
         if name is None:
@@ -193,6 +198,7 @@ def generate(annex_paths: list[Path], years: tuple[int, ...]) -> ReportResult:  
                         name,
                         "Anul raportării diferă de celelalte anexe.",
                         "Sursa a fost exclusă din foile anuale.",
+                        annex.year.ref.a1 if annex.year else None,
                     )
                 )
         if monthly is None and annual is None:
@@ -203,6 +209,7 @@ def generate(annex_paths: list[Path], years: tuple[int, ...]) -> ReportResult:  
                     name,
                     "Consumul anual lipsește din anexă.",
                     "Se completează din sursă.",
+                    source.ref.a1 if source else None,
                 )
             )
         elif monthly is None:
@@ -213,6 +220,7 @@ def generate(annex_paths: list[Path], years: tuple[int, ...]) -> ReportResult:  
                     name,
                     "Date lunare: totalul în tep/an este indisponibil.",
                     f"S-a folosit {source.ref.a1}." if source else "",
+                    source.ref.a1 if source else None,
                 )
             )
         elif annual is not None and abs(monthly - annual) > 1e-9:
@@ -223,6 +231,7 @@ def generate(annex_paths: list[Path], years: tuple[int, ...]) -> ReportResult:  
                     name,
                     "Totalurile lunar și anual diferă.",
                     "S-a păstrat totalul lunar.",
+                    annex.monthly_total_tep.ref.a1 if annex.monthly_total_tep else None,
                 )
             )
         grouped: dict[int, list[ReportMeasure]] = {year: [] for year in years}
@@ -236,6 +245,7 @@ def generate(annex_paths: list[Path], years: tuple[int, ...]) -> ReportResult:  
                         name,
                         "Anul punerii în funcțiune lipsește.",
                         f"Verificați {measure.description.ref.a1}.",
+                        measure.description.ref.a1,
                     )
                 )
             elif int(year) in grouped:
@@ -248,6 +258,7 @@ def generate(annex_paths: list[Path], years: tuple[int, ...]) -> ReportResult:  
                             name,
                             "Costul investiției lipsește.",
                             f"Verificați {measure.description.ref.a1}.",
+                            measure.description.ref.a1,
                         )
                     )
         if not annex.existing_measures:

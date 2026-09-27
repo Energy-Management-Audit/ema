@@ -57,6 +57,12 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
         ("GET", "/jobs/{job_id}/piee/summary"),
         ("GET", "/jobs/{job_id}/approvals"),
         ("GET", "/jobs/{job_id}/visit"),
+        ("GET", "/clients/overview"),  # s17b-clients-reporting
+        ("POST", "/clients/annexes"),  # s17b-clients-reporting
+        ("POST", "/clients/from-anaf"),  # s17b-clients-reporting
+        ("GET", "/clients/{client_id}/profile"),  # s17b-clients-reporting
+        ("GET", "/reporting/runs"),  # s17b-clients-reporting
+        ("GET", "/reporting/runs/{run_id}/preview"),  # s17b-clients-reporting
         ("PUT", "/settings/providers/{provider}/key"),  # s17b-home-settings
         ("DELETE", "/settings/providers/{provider}/key"),  # s17b-home-settings
         ("POST", "/backups"),  # s17b-home-settings

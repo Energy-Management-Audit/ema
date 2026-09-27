@@ -41,7 +41,7 @@ def get_client(ws: Workspace, client_id: str) -> dict[str, Any]:
     return _view(row)
 
 
-def create_client(ws: Workspace, name: str, cui: str | None = None) -> dict[str, Any]:
+def create_client(ws: Workspace, name: str | None, cui: str | None = None) -> dict[str, Any]:
     client_id = uuid.uuid4().hex
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")

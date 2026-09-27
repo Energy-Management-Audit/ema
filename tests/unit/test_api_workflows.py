@@ -24,6 +24,23 @@ def _session(ws: Workspace) -> tuple[TestClient, dict[str, str]]:
     return client, {"X-Ema-CSRF": token}
 
 
+def _annex_bytes() -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    sheet.title = "Date generale"
+    sheet["A1"] = "Denumirea operatorului economic"
+    sheet["B1"] = "Synthetic"
+    sheet["A2"] = "CUI"
+    sheet["B2"] = "RO123456"
+    annual = workbook.create_sheet("Date anuale")
+    annual["B4"] = "anului anterior"
+    annual["D4"] = 2025
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
 def test_client_anaf_settings_and_reporting_persistence(
     tmp_path: Path,
     monkeypatch,
@@ -79,18 +96,25 @@ def test_client_anaf_settings_and_reporting_persistence(
     )
     assert denied.status_code == 400 and denied.json()["type"] == "urn:ema:error:key_not_allowed"
 
-    workbook = Workbook()
-    buffer = io.BytesIO()
-    workbook.save(buffer)
+    annex_bytes = _annex_bytes()
     uploaded = client.post(
         f"/clients/{client_id}/files",
-        files={"file": ("synthetic.xlsx", buffer.getvalue())},
+        files={"file": ("synthetic.xlsx", annex_bytes)},
         headers=headers,
     )
     assert uploaded.status_code == 201
+    indexed = client.post(
+        "/clients/annexes",
+        files={"files": ("synthetic-annex.xlsx", annex_bytes)},
+        headers=headers,
+    )
+    assert indexed.status_code == 200
+    assert len(indexed.json()["imported"]) == 1
     monkeypatch.setattr(
         "ema.reporting.runs.generate",
-        lambda _paths, _years: SimpleNamespace(exceptions=[]),
+        lambda _paths, _years, _names: SimpleNamespace(
+            exceptions=[], companies=[], consumption_year=2025
+        ),
     )
     monkeypatch.setattr(
         "ema.reporting.runs.write_report",

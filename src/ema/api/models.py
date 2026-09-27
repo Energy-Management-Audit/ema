@@ -299,10 +299,16 @@ class ReportException(BaseModel):
     year: int | None = None
     code: str
     detail: str
+    source_name: str | None = None
+    beneficiary: str | None = None
+    decision: str | None = None
+    ref: str | None = None
 
 
 class ReportingRun(BaseModel):
     id: str
+    job_id: str
+    created_at: str
     years: list[int]
     client_ids: list[str]
     state: Literal["running", "ready", "failed", "cancelled"]
