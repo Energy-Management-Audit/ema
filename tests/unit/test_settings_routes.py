@@ -4,7 +4,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from ema.api import create_app
+from ema.api import backup_routes, create_app
+from ema.core.errors import EmaError
 from ema.core.jobs import create_job
 from ema.core.settings import write_settings_values
 from ema.core.workspace import Workspace
@@ -65,3 +66,18 @@ def test_malformed_backup_timestamp_is_a_400(tmp_path: Path) -> None:
     response = client.get("/settings")
     assert response.status_code == 400
     assert response.json()["type"] == "urn:ema:error:settings_invalid"
+
+
+def test_backup_invalid_dir_is_documented_and_returns_400(tmp_path: Path, monkeypatch) -> None:
+    def invalid(_ws: Workspace) -> None:
+        raise EmaError("backup_dir_invalid", "synthetic", "")
+
+    monkeypatch.setattr(backup_routes.backup, "backup_now", invalid)
+    client, headers = _client(Workspace(tmp_path))
+    response = client.post("/backups", json={}, headers=headers)
+    assert (response.status_code, response.json()["type"]) == (
+        400,
+        "urn:ema:error:backup_dir_invalid",
+    )
+    documented = client.get("/openapi.json").json()["paths"]["/backups"]["post"]["responses"]
+    assert "backup_dir_invalid" in documented["400"]["description"]

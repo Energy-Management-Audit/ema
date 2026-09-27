@@ -34,6 +34,7 @@ from ema.core.jobs import (
     status,
     subscribe,
 )
+from ema.core.keyring_backend import install_keyring
 from ema.core.logging import write_event
 from ema.core.workspace import Workspace
 from ema.invoices import (
@@ -269,6 +270,7 @@ def mcp(
 
 
 def app() -> None:
+    install_keyring()
     if sys.platform == "win32":
         for stream in (sys.stdout, sys.stderr):
             reconfigure = getattr(stream, "reconfigure", None)

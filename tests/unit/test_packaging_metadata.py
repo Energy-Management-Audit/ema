@@ -49,8 +49,22 @@ from mcp.shared.memory import create_connected_server_and_client_session
 import ema.cli
 import ema.cli.desktop
 import ema.cli.install_check
+from ema.core.keyring_backend import install_keyring
+import keyring
+from keyring.backends import fail, macOS
+from keyring.backends.Windows import WinVaultKeyring
 from ema.core.workspace import Workspace
 from ema.mcp.server import build_server
+
+install_keyring()
+expected = (
+    WinVaultKeyring
+    if sys.platform == "win32"
+    else macOS.Keyring
+    if sys.platform == "darwin"
+    else fail.Keyring
+)
+assert isinstance(keyring.get_keyring(), expected)
 
 
 async def main():

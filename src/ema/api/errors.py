@@ -181,7 +181,12 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
     # s17b-home-settings
     ("PUT", "/settings/providers/{provider}/key"): ("provider_invalid", "keyring_unavailable"),
     ("DELETE", "/settings/providers/{provider}/key"): ("provider_invalid", "keyring_unavailable"),
-    ("POST", "/backups"): ("backup_dir_missing", "backup_changed", "backup_failed"),
+    ("POST", "/backups"): (
+        "backup_dir_missing",
+        "backup_dir_invalid",
+        "backup_changed",
+        "backup_failed",
+    ),
     ("GET", "/evidence/{evidence_id}/snippet.png"): (
         "evidence_missing",
         "file_missing",

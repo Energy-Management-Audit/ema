@@ -28,6 +28,7 @@ from ema.api.piee_routes import install_piee_routes
 from ema.api.reporting_routes import install_reporting_routes
 from ema.api.routes import install_routes
 from ema.api.settings_routes import install_settings_routes
+from ema.api.update_routes import install_update_routes
 from ema.core.errors import EmaError
 from ema.core.jobs import recover
 from ema.core.logging import write_event
@@ -39,7 +40,7 @@ class SessionInput(BaseModel):
     code: str
 
 
-def create_app(  # noqa: C901
+def create_app(  # noqa: C901, PLR0915
     workspace: Workspace,
     port: int,
     *,
@@ -148,6 +149,7 @@ def create_app(  # noqa: C901
     install_piee_routes(app, workspace)
     install_reporting_routes(app, workspace)
     install_settings_routes(app, workspace)
+    install_update_routes(app, mock=mock)
     install_backup_routes(app, workspace)
     install_audit_routes(app, workspace)
     install_audit_forms(app, workspace)

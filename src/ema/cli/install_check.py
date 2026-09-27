@@ -6,6 +6,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import keyring
+from keyring.backends import fail, macOS
+from keyring.backends.Windows import WinVaultKeyring
+
 from ema import __version__
 from ema.core import pdf
 from ema.core.config import load_settings, workspace_path
@@ -80,6 +84,15 @@ def check_install() -> dict[str, Any]:
         )
     else:
         add("webview2", True, False, "not required on this platform")
+
+    backend = keyring.get_keyring()
+    expected = {"win32": WinVaultKeyring, "darwin": macOS.Keyring}.get(sys.platform, fail.Keyring)
+    add(
+        "keyring",
+        isinstance(backend, expected),
+        sys.platform in {"win32", "darwin"},
+        backend.__class__.__name__,
+    )
 
     if settings is not None:
         add("word", settings.word_path.exists(), False, str(settings.word_path))

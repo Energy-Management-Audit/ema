@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { ApiProblem } from '../../api/client.ts'
 import { api } from '../../api/endpoints.ts'
 import { settingsApi } from '../../api/settings.ts'
+import { updateApi } from '../../api/update.ts'
 import { NewJobDialog } from '../../app/NewJobDialog.tsx'
 import { AppSidebar } from '../../app/AppSidebar.tsx'
 import { invalidate, useResource } from '../../state/resource.ts'
 import { Button } from '../../ui/Button.tsx'
-import { EmptyState, FailureNotice } from '../../ui/Feedback.tsx'
+import { EmaWidget, EmptyState, FailureNotice } from '../../ui/Feedback.tsx'
 import { Window } from '../../ui/Shell.tsx'
 import { SectionKey } from '../../ui/Surface.tsx'
 import { attentionLine } from '../../home/count-words.ts'
@@ -19,6 +20,12 @@ import './home.css'
 export function HomeScreen() {
   const overview = useResource('overview', api.overview)
   const settings = useResource('settings', settingsApi.settings)
+  const update = useResource('update', updateApi.status)
+  const refreshCachedUpdate = useRef(Boolean(update.data))
+  useEffect(() => {
+    if (refreshCachedUpdate.current) invalidate('update')
+  }, [])
+  const updateLink = update.data?.download_url ?? update.data?.page_url
   const [newJobType, setNewJobType] = useState<'audit' | null | undefined>(undefined)
   const [completedBackup, setCompletedBackup] = useState<string | null>(null)
   const jobs = (overview.data ?? [])
@@ -121,6 +128,25 @@ export function HomeScreen() {
               )}
             </>
           ) : null}
+          {update.data?.newer && update.data.latest && updateLink && (
+            <div className="home-screen__backup">
+              <EmaWidget
+                title={`Există o versiune nouă a Ema (${update.data.latest})`}
+                actions={
+                  <a
+                    className="ema-btn ema-btn--secondary ema-btn--h32 home-screen__update-link"
+                    href={updateLink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Descarcă
+                  </a>
+                }
+              >
+                {`Versiunea ${update.data.latest} este disponibilă.`}
+              </EmaWidget>
+            </div>
+          )}
         </div>
       </main>
       <NewJobDialog

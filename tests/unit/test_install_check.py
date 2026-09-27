@@ -44,11 +44,22 @@ def test_checks_mark_word_optional_and_webview2_required_on_windows(
         install_check.pdf, "ocr", lambda *_args: [SimpleNamespace(text="energie electrică")]
     )
     monkeypatch.setattr(install_check, "webview2_version", lambda: None, raising=False)
+
+    def backend() -> install_check.WinVaultKeyring:
+        return install_check.WinVaultKeyring()
+
+    monkeypatch.setattr(install_check.keyring, "get_keyring", backend)
     result = install_check.check_install()
     checks = {item["name"]: item for item in result["checks"]}
-    assert list(checks) == ["resources", "workspace", "ocr", "webview2", "word"]
+    assert list(checks) == ["resources", "workspace", "ocr", "webview2", "keyring", "word"]
     assert all(checks[name]["ok"] for name in ("resources", "workspace", "ocr"))
     assert checks["webview2"]["required"] and not checks["webview2"]["ok"]
+    assert checks["keyring"] == {
+        "name": "keyring",
+        "ok": True,
+        "required": True,
+        "detail": "WinVaultKeyring",
+    }
     assert not checks["word"]["required"] and not checks["word"]["ok"]
 
 
