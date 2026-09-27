@@ -1,0 +1,113 @@
+.settings-screen {
+  min-width: 0;
+  overflow: auto;
+}
+.settings-screen__inner {
+  width: min(720px, calc(100% - 80px));
+  margin: 0 auto;
+  padding: 56px 0 60px;
+}
+.settings-screen h1 {
+  margin: 0 0 34px;
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.settings-screen h2 {
+  margin: 34px 0 14px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.settings-screen__muted,
+.settings-screen__note {
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.settings-screen__note {
+  margin-top: 16px;
+}
+.settings-sidebar__back {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 2px 22px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+}
+.settings-sidebar__back:hover {
+  background: var(--surface-raised);
+}
+.settings-screen__mono {
+  font: 11px var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.settings-screen__error {
+  color: var(--error);
+  font-size: 11px;
+}
+.settings-screen__success {
+  color: var(--olive);
+}
+.settings-screen__success::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+}
+.settings-key-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.settings-key-controls .ema-key-input {
+  width: 120px;
+}
+.settings-key-controls__remove {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.settings-key-controls__remove:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+.ema-sidebar:has(.settings-sidebar__back) .ema-nav-group__key {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.settings-screen button:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--olive);
+}
+.settings-sidebar__back:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--olive);
+}
+.ema-sidebar:has(.settings-sidebar__back) .ema-sidebar__footer .ema-icon-btn {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .settings-screen__inner {
+    width: calc(100% - 48px);
+  }
+}

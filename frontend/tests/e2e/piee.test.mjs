@@ -23,15 +23,19 @@ test('B1 B2 boot: session, csrf, fragment dropped, theme, lands on S3', async ()
     },
   }
   await withHarness(
-    { theme: 'dark', routes: { [`POST ${J}/fields/f-registru/decide`]: decided } },
+    {
+      path: `/app/piee/${JOB}/date`,
+      theme: 'dark',
+      routes: { [`POST ${J}/fields/f-registru/decide`]: decided },
+    },
     async ({ page, requests }) => {
       await page.waitForURL(`**/app/piee/${JOB}/date`)
+      await page.getByTestId('carrier-table-electricity_grid').waitFor()
       const session = requests.find((item) => item.path === '/session')
       assert.deepEqual(session.body, { code: 'test-code' })
       assert.equal(await page.evaluate(() => localStorage.getItem('ema.csrf')), 'csrf-token')
       assert.equal(await page.evaluate(() => location.hash), '')
       assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark')
-      await page.getByTestId('carrier-table-electricity_grid').waitFor()
       await page.getByRole('button', { name: 'Scrie valoarea' }).click()
       await page.getByLabel('Nr. Registrul Comerţului').fill('J00/000/2000')
       await page.getByRole('button', { name: 'Salvează' }).click()
@@ -59,7 +63,7 @@ test('B3 a deep link reloads S4 without a new session', async () => {
 })
 
 test('B4 sidebar, tabs, and a tab switch refetches the job and its checks', async () => {
-  await withHarness({}, async ({ page, requests }) => {
+  await withHarness({ path: `/app/piee/${JOB}/date` }, async ({ page, requests }) => {
     await page.getByTestId('carrier-table-electricity_grid').waitFor()
     const nav = page.locator('.ema-sidebar')
     assert.match(await nav.innerText(), /ÎN LUCRU/)
@@ -82,7 +86,7 @@ test('B4 sidebar, tabs, and a tab switch refetches the job and its checks', asyn
 })
 
 test('B5 B6 the carrier tables', async () => {
-  await withHarness({}, async ({ page }) => {
+  await withHarness({ path: `/app/piee/${JOB}/date` }, async ({ page }) => {
     const grid = page.getByTestId('carrier-table-electricity_grid')
     await grid.waitFor()
     assert.match(await grid.innerText(), /Energie electrică din SEN · MWh/i)
@@ -106,7 +110,7 @@ test('B5 B6 the carrier tables', async () => {
 })
 
 test('B7 the banner leads to the conflict; choosing posts the candidate and refetches', async () => {
-  await withHarness({}, async ({ page, requests, setRoute }) => {
+  await withHarness({ path: `/app/piee/${JOB}/date` }, async ({ page, requests, setRoute }) => {
     await page.getByText('Totalul anual nu se potriveşte cu Anexa 2–3').waitFor()
     await page.getByRole('link', { name: 'Du-mă la conflict' }).click()
     await page.waitForURL('**?camp=f-annual')
@@ -247,6 +251,7 @@ test('B10 evidence: a cell chip and a calculated chip, each evidence fetched onc
 test('B11 E1 reads the documents; import_required shows the widget and disables generation', async () => {
   await withHarness(
     {
+      path: `/app/piee/${JOB}/date`,
       routes: {
         [`GET ${J}/fields`]: { status: 200, body: [] },
         [`GET ${J}/fields?status=missing`]: { status: 200, body: [] },
@@ -288,7 +293,10 @@ test('B11 E1 reads the documents; import_required shows the widget and disables 
     },
   }
   await withHarness(
-    { routes: { [`GET ${J}/export/checks`]: { status: 200, body: stale } } },
+    {
+      path: `/app/piee/${JOB}/date`,
+      routes: { [`GET ${J}/export/checks`]: { status: 200, body: stale } },
+    },
     async ({ page }) => {
       await page.getByText('Documentele s-au schimbat').waitFor()
       const generate = page.getByRole('button', { name: 'Generează programul' })

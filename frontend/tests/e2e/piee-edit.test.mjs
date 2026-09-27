@@ -25,7 +25,10 @@ const decided = (fieldId) => ({
 
 test('C2 a found month is click-to-correct with the decide API on its revision', async () => {
   await withHarness(
-    { routes: { [`POST ${J}/fields/${MONTH.id}/decide`]: decided(MONTH.id) } },
+    {
+      path: `/app/piee/${JOB}/date`,
+      routes: { [`POST ${J}/fields/${MONTH.id}/decide`]: decided(MONTH.id) },
+    },
     async ({ page, requests }) => {
       const table = page.getByTestId('carrier-table-natural_gas')
       await table.waitFor()
@@ -53,7 +56,7 @@ test('C2 a found month is click-to-correct with the decide API on its revision',
 })
 
 test('C2 Renunţă closes the month editor without a decision', async () => {
-  await withHarness({}, async ({ page, requests }) => {
+  await withHarness({ path: `/app/piee/${JOB}/date` }, async ({ page, requests }) => {
     const table = page.getByTestId('carrier-table-natural_gas')
     await table.getByRole('button', { name: 'Corectează Gaz natural · Mar 2025' }).click()
     await table.getByRole('button', { name: 'Renunţă' }).click()
@@ -79,6 +82,7 @@ test('C1 the months/annual mismatch shows the M4 banner and corrects the annual 
   }
   await withHarness(
     {
+      path: `/app/piee/${JOB}/date`,
       routes: {
         [`GET ${J}/export/checks`]: { status: 200, body: checks },
         [`POST ${J}/fields/${YEARLY.id}/decide`]: decided(YEARLY.id),

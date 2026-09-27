@@ -91,7 +91,7 @@ export async function ourShots(theme, viewport, report, pairs, out, extraChecks)
       const { page } = harness
       await page.locator('.ema-window').waitFor()
       await settle(page)
-      if (pair.act) await pair.act(page)
+      if (pair.act) await pair.act(page, theme)
       await settle(page)
       const file = `ours-${theme}-${pair.id}${suffix}.png`
       await (pair.ours ? page.locator(pair.ours) : page).screenshot({

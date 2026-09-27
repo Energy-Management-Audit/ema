@@ -9,11 +9,42 @@ import zipfile
 from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import IO
+from typing import IO, TypedDict
 
 from ema.core.errors import EmaError
+from ema.core.settings import backup_folder, settings_values, write_settings_values
 from ema.core.workspace import Workspace
 from ema.core.workspace.lock import workspace_lock
+
+
+class BackupResult(TypedDict):
+    name: str
+    path: str
+    created_at: str
+    size_bytes: int
+
+
+def backup_now(ws: Workspace) -> BackupResult:
+    folder = settings_values(ws).get("backup_dir")
+    if not folder:
+        raise EmaError("backup_dir_missing", "Alege întâi dosarul pentru copii.", "")
+    folder = backup_folder(ws, folder)
+    try:
+        path = backup(ws, Path(folder))
+        created_at = datetime.now(UTC).isoformat()
+        size = path.stat().st_size
+    except OSError as exc:
+        raise EmaError("backup_failed", "Copia nu s-a putut scrie în dosarul ales.", "") from exc
+    try:
+        with workspace_lock(ws.root):
+            values = settings_values(ws)
+            values.update(
+                last_backup_at=created_at, last_backup_size=size, last_backup_name=path.name
+            )
+            write_settings_values(ws, values)
+    except OSError as exc:
+        raise EmaError("backup_failed", "Copia nu s-a putut scrie în dosarul ales.", "") from exc
+    return {"name": path.name, "path": str(path), "created_at": created_at, "size_bytes": size}
 
 
 def _checksum(stream: IO[bytes]) -> tuple[str, int]:

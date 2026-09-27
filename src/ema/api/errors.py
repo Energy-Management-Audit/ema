@@ -56,6 +56,12 @@ STATUS = {
     "confirmation_individual": 409,
     "visit_missing": 409,
     "hash_mismatch": 403,
+    # s17b-home-settings
+    "keyring_unavailable": 424,
+    "backup_dir_invalid": 400,
+    "backup_dir_missing": 409,
+    "backup_changed": 409,
+    "backup_failed": 424,
 }
 
 ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
@@ -170,8 +176,12 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
     ),
     ("POST", "/reporting/runs"): ("invalid_year", "client_missing", "job_running"),
     ("GET", "/reporting/runs/{run_id}"): ("run_missing",),
-    ("PUT", "/settings"): ("key_not_allowed",),
+    ("PUT", "/settings"): ("key_not_allowed", "backup_dir_invalid"),
     ("POST", "/settings/providers/{provider}/test"): ("provider_invalid",),
+    # s17b-home-settings
+    ("PUT", "/settings/providers/{provider}/key"): ("provider_invalid", "keyring_unavailable"),
+    ("DELETE", "/settings/providers/{provider}/key"): ("provider_invalid", "keyring_unavailable"),
+    ("POST", "/backups"): ("backup_dir_missing", "backup_changed", "backup_failed"),
     ("GET", "/evidence/{evidence_id}/snippet.png"): (
         "evidence_missing",
         "file_missing",

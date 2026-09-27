@@ -16,6 +16,8 @@ import pytest
 @pytest.fixture(autouse=True)
 def no_real_keyring(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("keyring.get_password", lambda *_: None)
+    monkeypatch.setattr("keyring.set_password", lambda *_: None)
+    monkeypatch.setattr("keyring.delete_password", lambda *_: None)
 
 
 @pytest.fixture(scope="session")

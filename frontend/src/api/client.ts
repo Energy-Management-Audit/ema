@@ -61,6 +61,10 @@ export async function request<T>(method: string, path: string, body?: unknown): 
   return (await response.json()) as T
 }
 
+export async function requestVoid(method: string, path: string, body?: unknown): Promise<void> {
+  await send(method, path, body)
+}
+
 export async function blob(path: string): Promise<Blob> {
   return (await send('GET', path)).blob()
 }

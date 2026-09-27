@@ -163,6 +163,8 @@ try {
     if (!message.text().startsWith('Failed to load resource')) consoleLines.push(message.text())
   })
   await page.goto(server.url)
+  await page.getByRole('heading', { name: 'Bine ai revenit.' }).waitFor()
+  await page.goto(new URL(`/app/piee/${job}/date`, server.url).toString())
   await page.waitForURL(`**/app/piee/${job}/date`)
   await page.getByTestId('carrier-table-electricity_grid').waitFor()
   await shot(page, 'date')

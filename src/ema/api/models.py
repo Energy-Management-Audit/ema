@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic import Field as PydanticField
 
 from ema.core.review.models import Readiness
@@ -233,11 +233,44 @@ class SettingsPatch(BaseModel):
     theme: Literal["light", "dark"] | None = None
     default_provider: Literal["gemini", "openai"] | None = None
     extraction: ExtractionSettings | None = None
+    backup_dir: str | None = None
 
 
 class ProviderState(BaseModel):
     present: bool
     verified_at: str | None = None
+    hint: str | None = None
+    source: Literal["environment", "keyring"] | None = None
+
+
+class BackupState(BaseModel):
+    dir: str | None
+    last_at: str | None
+    last_size: int | None
+    last_name: str | None
+    due: bool
+
+
+class BackupResult(BaseModel):
+    name: str
+    path: str
+    created_at: str
+    size_bytes: int
+
+
+class ProviderKeyInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    key: str = PydanticField(min_length=1, max_length=512)
+
+    @field_validator("key", mode="before")
+    @classmethod
+    def valid_key(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        if not value or any(character.isspace() for character in value):
+            raise ValueError("invalid provider key")
+        return value
 
 
 class SettingsView(BaseModel):
@@ -245,6 +278,8 @@ class SettingsView(BaseModel):
     default_provider: Literal["gemini", "openai"] | None = None
     providers: dict[str, ProviderState]
     extraction: ExtractionSettings
+    workspace: str
+    backup: BackupState
 
 
 class ProviderTest(BaseModel):

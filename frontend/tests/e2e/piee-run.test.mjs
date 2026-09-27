@@ -31,6 +31,7 @@ test('B12 B13 generating: progress, terminal refetch, other runs ignored, stop, 
   ])
   await withHarness(
     {
+      path: `/app/piee/${JOB}/date`,
       routes: {
         [`POST ${J}/piee/generate`]: {
           status: 202,
@@ -97,7 +98,10 @@ test('B12 B13 generating: progress, terminal refetch, other runs ignored, stop, 
     runs: [{ id: 'run-gen-3', stage: 'piee_generate', state: 'failed', error: 'Etapa a eşuat.' }],
   }
   await withHarness(
-    { routes: { [`GET ${J}/status`]: { status: 200, body: failed } } },
+    {
+      path: `/app/piee/${JOB}/date`,
+      routes: { [`GET ${J}/status`]: { status: 200, body: failed } },
+    },
     async ({ page }) => {
       const panel = page.getByTestId('run-failed')
       await panel.waitFor()
@@ -113,6 +117,7 @@ test('B14 an edited draft asks before generating a new version', async () => {
   )
   await withHarness(
     {
+      path: `/app/piee/${JOB}/date`,
       routes: {
         [`GET ${J}/outputs`]: { status: 200, body: edited },
         [`POST ${J}/piee/generate`]: {

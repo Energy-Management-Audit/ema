@@ -6,11 +6,13 @@ import json
 import os
 import tempfile
 import tomllib
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
 import httpx
+import keyring
+from keyring.errors import KeyringError, PasswordDeleteError
 
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
@@ -25,7 +27,7 @@ _MODEL_URLS = {
 _EXTRACTION = {"ocr": True, "flag_uncertain": True, "auto_accept_exact": False}
 
 
-def _values(ws: Workspace) -> dict[str, Any]:
+def settings_values(ws: Workspace) -> dict[str, Any]:
     content = ws.settings_text()
     return tomllib.loads(content) if content else {}
 
@@ -40,7 +42,7 @@ def _literal(value: object) -> str:
     raise EmaError("settings_invalid", "Setările sunt invalide.", "")
 
 
-def _write(ws: Workspace, values: dict[str, Any]) -> None:
+def write_settings_values(ws: Workspace, values: dict[str, Any]) -> None:
     lines: list[str] = []
     for key, value in values.items():
         if not key.replace("_", "").isalnum():
@@ -69,31 +71,97 @@ def _write(ws: Workspace, values: dict[str, Any]) -> None:
 
 
 def read(ws: Workspace) -> dict[str, Any]:
-    values = _values(ws)
+    values = settings_values(ws)
     configured = load_settings(ws, workspace_values=values)
     verified = cast("dict[str, Any]", values.get("provider_verified", {}))
+    providers: dict[str, dict[str, Any]] = {}
+    for name in _PROVIDERS:
+        secret = configured.provider_key(name)
+        key = secret.get_secret_value() if secret else None
+        source = None
+        if key:
+            source = "environment" if os.environ.get(f"EMA_{name.upper()}_API_KEY") else "keyring"
+        providers[name] = {
+            "present": bool(key),
+            "verified_at": verified.get(name),
+            "hint": _key_hint(key),
+            "source": source,
+        }
+    last_at = values.get("last_backup_at")
+    try:
+        last_backup = datetime.fromisoformat(last_at) if isinstance(last_at, str) else None
+        if last_at is not None and (last_backup is None or last_backup.tzinfo is None):
+            raise ValueError("invalid backup timestamp")
+    except ValueError as exc:
+        raise EmaError("settings_invalid", "Setările sunt invalide.", "") from exc
+    with ws.connect() as db:
+        has_jobs = (
+            db.execute(
+                "SELECT 1 FROM jobs WHERE deleted=0 AND type!='reporting' LIMIT 1"
+            ).fetchone()
+            is not None
+        )
     return {
         "theme": values.get("theme", "light"),
         "default_provider": values.get("provider"),
-        "providers": {
-            name: {
-                "present": bool(configured.provider_key(name)),
-                "verified_at": verified.get(name),
-            }
-            for name in _PROVIDERS
-        },
+        "providers": providers,
         "extraction": _EXTRACTION | values.get("extraction", {}),
+        "workspace": str(ws.root),
+        "backup": {
+            "dir": values.get("backup_dir"),
+            "last_at": last_at,
+            "last_size": values.get("last_backup_size"),
+            "last_name": values.get("last_backup_name"),
+            "due": has_jobs
+            and (
+                last_at is None
+                or (
+                    last_backup is not None and datetime.now(UTC) - last_backup >= timedelta(days=7)
+                )
+            ),
+        },
     }
+
+
+def _key_hint(key: str | None) -> str | None:
+    if not key:
+        return None
+    return key[:4] + "••••••••" + key[-4:] if len(key) >= 12 else "••••••••"
+
+
+def backup_folder(ws: Workspace, value: str) -> str:
+    try:
+        folder = Path(value).expanduser()
+        if not folder.is_absolute():
+            raise ValueError("relative backup directory")
+        folder = folder.resolve()
+        workspace = ws.root.resolve()
+        folder_case = os.path.normcase(str(folder))
+        workspace_case = os.path.normcase(str(workspace))
+        inside = folder_case == workspace_case or folder_case.startswith(workspace_case + os.sep)
+        if not inside:
+            inside = any(
+                ancestor.exists() and os.path.samefile(ancestor, workspace)
+                for ancestor in (folder, *folder.parents)
+            )
+        if inside or folder.is_file():
+            raise ValueError("backup inside workspace or file")
+        folder.mkdir(parents=True, exist_ok=True)
+    except (OSError, ValueError) as exc:
+        raise EmaError(
+            "backup_dir_invalid", "Dosarul pentru copii nu poate fi folosit.", ""
+        ) from exc
+    return str(folder)
 
 
 def update(ws: Workspace, patch: dict[str, Any]) -> dict[str, Any]:
     if any("key" in key.lower() for key in patch):
         raise EmaError("key_not_allowed", "Cheile furnizorilor se setează în mediu.", "")
-    allowed = {"theme", "default_provider", "extraction"}
+    allowed = {"theme", "default_provider", "extraction", "backup_dir"}
     if patch.keys() - allowed:
         raise EmaError("settings_invalid", "Setările sunt invalide.", "")
     with workspace_lock(ws.root):
-        values = _values(ws)
+        values = settings_values(ws)
         if "theme" in patch:
             values["theme"] = patch["theme"]
         if "default_provider" in patch:
@@ -103,8 +171,62 @@ def update(ws: Workspace, patch: dict[str, Any]) -> dict[str, Any]:
                 values["provider"] = patch["default_provider"]
         if "extraction" in patch:
             values["extraction"] = _EXTRACTION | patch["extraction"]
-        _write(ws, values)
+        if "backup_dir" in patch:
+            if patch["backup_dir"] is None:
+                values.pop("backup_dir", None)
+            else:
+                values["backup_dir"] = backup_folder(ws, patch["backup_dir"])
+        write_settings_values(ws, values)
     return read(ws)
+
+
+def set_provider_key(ws: Workspace, provider: str, key: str) -> None:
+    if provider not in _PROVIDERS:
+        raise EmaError("provider_invalid", "Furnizorul este invalid.", "")
+    try:
+        keyring.set_password("Ema", f"{provider}_api_key", key)
+    except (KeyringError, OSError, RuntimeError) as exc:
+        raise EmaError(
+            "keyring_unavailable", "Depozitul de chei al sistemului nu este disponibil.", ""
+        ) from exc
+    with workspace_lock(ws.root):
+        values = settings_values(ws)
+        verified = cast("dict[str, Any]", values.get("provider_verified", {}))
+        verified.pop(provider, None)
+        values["provider_verified"] = verified
+        if not values.get("provider"):
+            values["provider"] = provider
+        write_settings_values(ws, values)
+
+
+def remove_provider_key(ws: Workspace, provider: str) -> None:
+    if provider not in _PROVIDERS:
+        raise EmaError("provider_invalid", "Furnizorul este invalid.", "")
+    with workspace_lock(ws.root):
+        values = settings_values(ws)
+        other = next(name for name in _PROVIDERS if name != provider)
+        other_present = (
+            bool(load_settings(ws, workspace_values=values).provider_key(other))
+            if values.get("provider") == provider
+            else False
+        )
+        try:
+            keyring.delete_password("Ema", f"{provider}_api_key")
+        except PasswordDeleteError:
+            pass
+        except (KeyringError, OSError, RuntimeError) as exc:
+            raise EmaError(
+                "keyring_unavailable", "Depozitul de chei al sistemului nu este disponibil.", ""
+            ) from exc
+        verified = cast("dict[str, Any]", values.get("provider_verified", {}))
+        verified.pop(provider, None)
+        values["provider_verified"] = verified
+        if values.get("provider") == provider:
+            if other_present:
+                values["provider"] = other
+            else:
+                values.pop("provider", None)
+        write_settings_values(ws, values)
 
 
 def test_provider(ws: Workspace, provider: str) -> dict[str, Any]:
@@ -126,7 +248,7 @@ def test_provider(ws: Workspace, provider: str) -> dict[str, Any]:
         return {"provider": provider, "status": "failed"}
     verified_at = datetime.now(UTC).isoformat()
     with workspace_lock(ws.root):
-        values = _values(ws)
+        values = settings_values(ws)
         values["provider_verified"] = values.get("provider_verified", {}) | {provider: verified_at}
-        _write(ws, values)
+        write_settings_values(ws, values)
     return {"provider": provider, "status": "ok", "verified_at": verified_at}

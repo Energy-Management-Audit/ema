@@ -72,8 +72,13 @@ export const baseRoutes = {
     body: {
       theme: 'light',
       default_provider: null,
-      providers: {},
+      providers: {
+        gemini: { present: false, verified_at: null, hint: null, source: null },
+        openai: { present: false, verified_at: null, hint: null, source: null },
+      },
       extraction: { ocr: true, flag_uncertain: true, auto_accept_exact: false },
+      workspace: '/synthetic/workspace',
+      backup: { dir: null, last_at: null, last_size: null, last_name: null, due: true },
     },
   },
   'GET /jobs': { status: 200, body: JOBS },

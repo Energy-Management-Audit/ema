@@ -45,8 +45,11 @@ test('shell destinations, job link, finalized expansion and settings work', asyn
       await page.waitForURL('**/app/raportare')
       await page.locator('.ema-sidebar').getByRole('button', { name: 'Setări' }).click()
       await page.waitForURL('**/app/setari')
-      await page.locator('.ema-sidebar').getByRole('button', { name: 'Clienţi 1' }).click()
-      await page.waitForURL('**/app/clienti')
+      await page
+        .locator('.ema-sidebar')
+        .getByRole('button', { name: 'Înapoi la aplicaţie' })
+        .click()
+      await page.waitForURL('**/app/raportare')
     },
   )
 })

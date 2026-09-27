@@ -107,13 +107,16 @@ test('B19 B20 B21 S6 X3/X4: approving binds the listed final and the readiness s
 })
 
 test('B23 the preview opens only the same-run PDF, as a blob', async () => {
-  await withHarness({}, async ({ page }) => {
+  await withHarness({ path: `/app/piee/${JOB}/date` }, async ({ page }) => {
     await page.getByTestId('carrier-table-electricity_grid').waitFor()
     assert.equal(await page.getByRole('button', { name: 'Previzualizare' }).isDisabled(), true)
   })
   const noPdf = FINAL_OUTPUTS.filter((item) => item.id !== 'out-pdf-1')
   await withHarness(
-    { routes: { [`GET ${J}/outputs`]: { status: 200, body: noPdf } } },
+    {
+      path: `/app/piee/${JOB}/date`,
+      routes: { [`GET ${J}/outputs`]: { status: 200, body: noPdf } },
+    },
     async ({ page }) => {
       await page.getByTestId('carrier-table-electricity_grid').waitFor()
       await settle(page)
@@ -121,7 +124,10 @@ test('B23 the preview opens only the same-run PDF, as a blob', async () => {
     },
   )
   await withHarness(
-    { routes: { [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS } } },
+    {
+      path: `/app/piee/${JOB}/date`,
+      routes: { [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS } },
+    },
     async ({ page, requests }) => {
       await page.getByTestId('carrier-table-electricity_grid').waitFor()
       await page.evaluate(() => {
@@ -146,6 +152,7 @@ test('B23 the preview opens only the same-run PDF, as a blob', async () => {
 test('B24 a closed session shows E3', async () => {
   await withHarness(
     {
+      path: `/app/piee/${JOB}/date`,
       routes: { [`GET ${J}/fields`]: problem('session_required', 403, 'Sesiunea este necesară.') },
     },
     async ({ page }) => {
@@ -158,6 +165,7 @@ test('B24 a closed session shows E3', async () => {
 test('B25 B26 no horizontal page scroll at 1280×800; no image evidence requests', async () => {
   await withHarness(
     {
+      path: `/app/piee/${JOB}/date`,
       viewport: { width: 1280, height: 800 },
       routes: { [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS } },
     },
