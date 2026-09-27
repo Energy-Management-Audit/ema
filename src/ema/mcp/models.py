@@ -90,6 +90,35 @@ class AuditDraft(_Output):
     review_path: str
 
 
+class AuditVisit(_Output):
+    job: str
+    run: str
+    panels: int
+    meter_photos: int
+    thermal_images: int
+    failures: list[str]
+
+
+class AuditReadings(_Output):
+    job: str
+    run: str
+    photos_read: int
+    photos_failed: int
+    readings: int
+    needs_confirmation: int
+
+
+class AuditMeasurements(_Output):
+    job: str
+    run: str
+    figures: int
+    confirmed: int
+    pending: int
+    missing_narratives: int
+    missing_sections: list[str]
+    plan_path: str
+
+
 class PieeDraft(_Output):
     job: str
     run: str

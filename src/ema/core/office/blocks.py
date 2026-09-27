@@ -7,6 +7,7 @@ from __future__ import annotations
 import copy
 import re
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal
@@ -20,6 +21,7 @@ from ema.core.office.chart_series import Series
 from ema.core.office.errors import OfficeError
 from ema.core.office.numbers_ro import format_number
 from ema.core.office.package import encoded, read_parts, write_parts
+from ema.core.office.pictures import replace_picture
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
@@ -28,7 +30,7 @@ Kind = Literal["fig", "tab"]
 
 @dataclass(frozen=True)
 class Num:
-    value: float | int | None
+    value: float | int | Decimal | None
     decimals: int
     unit: str | None = None
     fact: str | None = None
@@ -84,6 +86,7 @@ class NativeChart:
 class Figure:
     proto: str
     caption: Caption
+    image: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -102,6 +105,7 @@ class Retained:
     """Existing element kept in a region replacement without changing its OOXML ids."""
 
     proto: str
+    fresh: bool = False
 
 
 type Block = (
@@ -142,6 +146,7 @@ class RenderReport:
     numbers: list[NumberUse]
     values: list[ValueUse]
     chart_parts: list[str]
+    issues: list[str]
 
 
 def _visible(element: etree._Element) -> str:
@@ -355,7 +360,10 @@ def render(  # noqa: C901, PLR0912, PLR0915
                 block.caption.segments, lookup, values, index, prototypes.missing_text
             )
             set_text(caption, text, missing=missing, pieces=pieces)
-            nodes = [_prototype(prototypes, block.proto, "p"), caption]
+            picture = _prototype(prototypes, block.proto, "p")
+            if block.image is not None:
+                replace_picture(parts, picture, block.image)
+            nodes = [picture, caption]
         elif isinstance(block, PageBreak):
             nodes = [_prototype(prototypes, block.proto, "p")]
         else:
@@ -367,9 +375,9 @@ def render(  # noqa: C901, PLR0912, PLR0915
             nodes = [node]
         for node in nodes:
             body.insert(cursor, node)
-            if not isinstance(block, Retained):
+            if not isinstance(block, Retained) or block.fresh:
                 _fresh(node, root)
             cursor += 1
     parts["word/document.xml"] = encoded(root)
     write_parts(parts, out)
-    return RenderReport(numbers, values, chart_parts)
+    return RenderReport(numbers, values, chart_parts, [])

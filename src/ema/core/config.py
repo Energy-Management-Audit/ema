@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     tesseract_path: Path = Field(default_factory=_tesseract_default)
     audit_base_document: Path | None = None
     audit_measurement_prototype: Path | None = None
+    audit_measurement_sheet_model: Path | None = None
     piee_base_document: Path | None = None
     piee_base_directory: Path | None = None
     provider: str | None = None

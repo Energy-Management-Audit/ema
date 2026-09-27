@@ -1,7 +1,7 @@
 """Shared field review use cases."""
 
+from ema.core.review.confirmation import accept_batch
 from ema.core.review.fields import (
-    accept_batch,
     conflicts,
     decide,
     fields,

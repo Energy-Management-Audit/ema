@@ -30,6 +30,7 @@ class Sniffed:
     kind: FileKind
     mismatch: bool
     detail: str
+    media_type: str | None = None
 
 
 _EXTENSIONS = {
@@ -50,6 +51,16 @@ _EXTENSIONS = {
     ".zip": FileKind.ZIP,
     ".txt": FileKind.TEXT,
 }
+
+_IMAGE_MEDIA = (
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+    (b"GIF87a", "image/gif"),
+    (b"GIF89a", "image/gif"),
+    (b"BM", "image/bmp"),
+    (b"II*\x00", "image/tiff"),
+    (b"MM\x00*", "image/tiff"),
+)
 
 
 def _ole_kind(path: Path) -> FileKind:
@@ -155,4 +166,7 @@ def sniff(path: Path) -> Sniffed:
         detail = "PDF header without EOF marker near end"
     else:
         detail = f"{kind.value.upper()} saved as {path.suffix.lower()}" if mismatch else kind.value
-    return Sniffed(kind, mismatch, detail)
+    media_type = next(
+        (media for signature, media in _IMAGE_MEDIA if header.startswith(signature)), None
+    )
+    return Sniffed(kind, mismatch, detail, media_type if kind == FileKind.IMAGE else None)

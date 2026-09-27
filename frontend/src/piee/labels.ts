@@ -90,6 +90,7 @@ const METHODS: Record<string, string> = {
   questionnaire: 'Necesar info',
   prelucrare: 'Prelucrare',
   invoice: 'Factură',
+  vision: 'Fotografie',
 }
 
 export function docLabel(method: string): string {

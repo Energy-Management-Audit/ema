@@ -15,8 +15,9 @@ from PIL import Image, ImageDraw
 
 from ema.core.config import Settings
 from ema.core.errors import EmaError
+from ema.core.photo import render_photo_png
 from ema.core.review.evidence import get_evidence
-from ema.core.review.models import PdfRegion, PdfText
+from ema.core.review.models import PdfRegion, PdfText, Photo
 from ema.core.workspace import Workspace
 
 
@@ -25,7 +26,7 @@ def render_evidence_png(
 ) -> bytes:
     evidence = get_evidence(ws, evidence_id)
     locator = evidence.locator
-    if evidence.provenance != "document" or not isinstance(locator, PdfRegion | PdfText):
+    if evidence.provenance != "document" or not isinstance(locator, PdfRegion | PdfText | Photo):
         raise EmaError("evidence_not_pdf", "Dovada nu provine dintr-un PDF.", "")
     with ws.connect() as db:
         row = db.execute(
@@ -37,6 +38,8 @@ def render_evidence_png(
     if row is None:
         raise EmaError("file_missing", "Fişierul dovezii lipseşte.", "")
     path = ws.path(str(row["relative_path"]))
+    if isinstance(locator, Photo):
+        return render_photo_png(path, locator, mode=mode, highlight=highlight)
     if path.suffix.lower() != ".pdf":
         raise EmaError("evidence_not_pdf", "Dovada nu provine dintr-un PDF.", "")
     try:

@@ -238,7 +238,14 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
     def get_fields(
         job_id: str,
         status_filter: Literal[
-            "pending", "uncertain", "accepted", "corrected", "rejected", "conflict", "missing"
+            "pending",
+            "uncertain",
+            "accepted",
+            "corrected",
+            "rejected",
+            "conflict",
+            "missing",
+            "needs_confirmation",
         ]
         | None = Query(None, alias="status"),
     ) -> list[dict[str, Any]]:

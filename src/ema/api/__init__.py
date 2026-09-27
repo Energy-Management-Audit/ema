@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ema import __version__
 from ema.api.audit_forms import install_audit_forms
+from ema.api.audit_routes import install_audit_routes
 from ema.api.clients_routes import install_client_routes
 from ema.api.errors import from_ema, install_error_contract, problem
 from ema.api.evidence_routes import install_evidence_routes
@@ -136,6 +137,7 @@ def create_app(  # noqa: C901
         app.mount("/assets", StaticFiles(directory=frontend / "assets"), name="assets")
 
     install_routes(app, workspace, mock=mock)
+    install_audit_routes(app, workspace)
     install_audit_forms(app, workspace)
     install_client_routes(app, workspace)
     install_evidence_routes(app, workspace, mock=mock)

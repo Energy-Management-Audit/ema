@@ -14,6 +14,7 @@ class Model:
     provider: str
     id: str
     tier: str
+    vision: bool
     input_usd: float
     cached_input_usd: float
     output_usd: float

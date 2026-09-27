@@ -51,6 +51,10 @@ STATUS = {
     "wrong_job_type": 400,
     "provider_invalid": 400,
     "human_required": 403,
+    "ai_client_disabled": 403,
+    "model_no_vision": 409,
+    "confirmation_individual": 409,
+    "visit_missing": 409,
     "hash_mismatch": 403,
 }
 
@@ -90,6 +94,8 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "piee_base_missing",
         "piee_base_review_required",
         "piee_base_changed",
+        "ai_client_disabled",
+        "visit_missing",
         "measures_form_missing",
         "measures_form_invalid",
     ),
@@ -117,6 +123,12 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "invoices_unconfirmed_client",
     ),
     ("GET", "/jobs/{job_id}/measures"): ("job_missing", "wrong_job_type"),
+    ("GET", "/jobs/{job_id}/visit"): ("job_missing", "wrong_job_type"),
+    ("POST", "/jobs/{job_id}/fields/accept-batch"): (
+        "confirmation_individual",
+        "human_required",
+        "stale_revision",
+    ),
     ("GET", "/jobs/{job_id}/piee/data"): ("job_missing", "wrong_job_type"),
     ("GET", "/jobs/{job_id}/piee/summary"): ("job_missing", "wrong_job_type"),
     ("GET", "/jobs/{job_id}/approvals"): ("job_missing",),

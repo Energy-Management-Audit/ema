@@ -21,6 +21,7 @@ import type {
   SessionResult,
   SettingsView,
   SlotVersion,
+  VisitView,
 } from './types.ts'
 
 const job = (id: string) => `/jobs/${encodeURIComponent(id)}`
@@ -34,6 +35,14 @@ export const api = {
   job: (id: string) => request<Job>('GET', job(id)),
   status: (id: string) => request<JobStatus>('GET', `${job(id)}/status`),
   fields: (id: string) => request<Field[]>('GET', `${job(id)}/fields`),
+  visit: (id: string) => request<VisitView>('GET', `${job(id)}/visit`),
+  startReadings: (id: string, revision: number) =>
+    request<RunStart>('POST', `${job(id)}/stages/readings`, { on_revision: revision }),
+  accept: (id: string, fieldId: string, revision: number) =>
+    request<Decision>('POST', `${job(id)}/fields/${encodeURIComponent(fieldId)}/decide`, {
+      action: 'accept',
+      on_revision: revision,
+    }),
   missing: (id: string) => request<Field[]>('GET', `${job(id)}/fields?status=missing`),
   conflicts: (id: string) => request<Field[]>('GET', `${job(id)}/conflicts`),
   readDocuments: (id: string, revision: number) =>

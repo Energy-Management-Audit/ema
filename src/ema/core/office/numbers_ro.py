@@ -6,7 +6,7 @@ from decimal import ROUND_HALF_UP, Decimal, localcontext
 
 
 def format_number(
-    value: float | int,
+    value: float | int | Decimal,
     decimals: int,
     unit: str | None = None,
     grouping: bool = True,

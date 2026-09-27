@@ -17,11 +17,13 @@ from ema.api.models import (
 from ema.api.models import (
     SectionState as SectionStateModel,
 )
+from ema.audit.chapter_five import start_measurements
 from ema.audit.intake import audit_intake, select_checklist
 from ema.audit.measures import compose_measures, validate_measures_form
 from ema.audit.read import read_job
 from ema.audit.sections import Status, set_status
 from ema.audit.sections_bulk import patch_sections
+from ema.audit.visit import start_visit
 from ema.core.errors import EmaError
 from ema.core.jobs import get_job, run_stage
 from ema.core.jobs.outputs import list_outputs
@@ -34,7 +36,7 @@ from ema.piee.review_workflow import start_word_render
 from ema.piee.workflow import start_generate_for_job, start_import_for_job
 
 _STAGES: dict[str, set[str]] = {
-    "audit": {"intake", "read", "fill", "draft", "measures"},
+    "audit": {"intake", "read", "fill", "draft", "visit", "readings", "measurements", "measures"},
     "piee": {"piee_import", "piee_generate", "piee_word"},
     "invoices": {"invoices", "invoices_workbook"},
     "reporting": set(),
@@ -100,6 +102,12 @@ def start_named_stage(  # noqa: C901, PLR0911, PLR0912
     if stage == "invoices_workbook" and not human_session:
         raise EmaError("human_required", "Confirmarea umană este necesară.", "")
     _check_revision(ws, job, on_revision)
+    if stage == "readings":
+        raise EmaError("ai_client_disabled", "Citirea fotografiilor aşteaptă aprobarea.", "")
+    if stage == "visit":
+        return start_visit(ws, job, on_revision=on_revision)
+    if stage == "measurements":
+        return start_measurements(ws, job, on_revision=on_revision)
     if stage in {"intake", "read"}:
         slots = [
             version

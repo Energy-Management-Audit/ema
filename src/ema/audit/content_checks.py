@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from ema.audit.visit import slug
 from ema.core.review.models import Field, Issue
 
 
@@ -17,7 +18,43 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
         int(count_field.value) if count_field and count_field.value is not None else None
     )
     issues: list[Issue] = []
+    active_slots = [
+        (str(row["name"]), str(row["file_sha"]))
+        for row in db.execute(
+            "SELECT s.name, v.file_sha FROM slots s JOIN slot_versions v ON v.job_id=s.job_id "
+            "AND v.slot=s.name AND v.version=s.active_version "
+            "WHERE s.job_id=? AND (s.name LIKE 'visit/meter/%' OR s.name LIKE 'visit/thermal/%')",
+            (job,),
+        )
+    ]
+    active_photos = {sha[:8] for _, sha in active_slots}
+    active_panels = {
+        slug(parts[2])
+        for name, _ in active_slots
+        if (parts := name.split("/"))[:2] == ["visit", "meter"] and len(parts) == 4
+    }
     for key, field in sorted(fields.items()):
+        parts = key.split(".")
+        photo_id = (
+            parts[2]
+            if len(parts) >= 4 and parts[0] == "meter"
+            else parts[1]
+            if len(parts) >= 3 and parts[0] == "thermal"
+            else None
+        )
+        device_panel = (
+            parts[1] if len(parts) == 3 and parts[0] == "meter" and parts[2] == "device" else None
+        )
+        if field.needs_confirmation and (
+            photo_id in active_photos or device_panel in active_panels
+        ):
+            issues.append(
+                Issue(
+                    code="reading_unconfirmed",
+                    field_id=field.id,
+                    message=f"Confirmaţi valoarea de pe fotografie: {field.label}",
+                )
+            )
         if not key.startswith("narrative."):
             continue
         if key.startswith("narrative.ch6.measure.") and measure_count is not None:

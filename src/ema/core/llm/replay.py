@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -49,6 +50,7 @@ class ReplayProvider:
             raise EmaError("replay_invalid", "Formatul înregistrării AI este invalid.", "")
         self._responses: list[dict[str, Any]] = data["responses"]
         self._format: str = data["format"]
+        self.source: str = data["source"]
         self.calls = 0
 
     def respond(  # noqa: PLR0913
@@ -61,8 +63,9 @@ class ReplayProvider:
         synthetic: bool = False,
         *,
         prompt_version: str = "",
+        attachments: Mapping[str, bytes] | None = None,
     ) -> Exchange:
-        del synthetic
+        del synthetic, attachments
         if self.calls >= len(self._responses):
             raise EmaError("replay_exhausted", "Răspunsurile AI înregistrate s-au terminat.", "")
         row = self._responses[self.calls]

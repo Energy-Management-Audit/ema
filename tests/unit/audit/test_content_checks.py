@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PIL import Image
+
 from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.catalogue_types import PrefixPattern
@@ -76,3 +78,55 @@ def test_prefix_pattern_returns_fields_in_key_order(tmp_path: Path) -> None:
         PrefixPattern("narrative.ch5."),
         {later.key: later, earlier.key: earlier},
     ) == [earlier, later]
+
+
+def test_only_active_photo_readings_block_final(tmp_path: Path) -> None:
+    ws, job = _job(tmp_path)
+    image = tmp_path / "meter.png"
+    Image.new("RGB", (8, 8)).save(image)
+    sha = ws.add_file("synthetic", image)
+    slot = "visit/meter/panel/meter.png"
+    version = ws.set_slot(job, slot, sha)
+    reading = propose(
+        ws,
+        job,
+        f"meter.panel.{sha[:8]}.current.l1",
+        5,
+        [],
+        state="extracted",
+        needs_confirmation=True,
+    )
+    with ws.connect() as db:
+        assert [(issue.code, issue.field_id) for issue in content_issues(db, job)] == [
+            ("reading_unconfirmed", reading.id)
+        ]
+    ws.remove_version(job, slot, version.version)
+    with ws.connect() as db:
+        assert content_issues(db, job) == []
+
+
+def test_active_panel_device_needs_individual_confirmation(tmp_path: Path) -> None:
+    ws, job = _job(tmp_path)
+    image = tmp_path / "device.png"
+    Image.new("RGB", (8, 8)).save(image)
+    slot = "visit/meter/Panel 1/device.png"
+    version = ws.set_slot(job, slot, ws.add_file("synthetic", image))
+    device = propose(
+        ws,
+        job,
+        FieldSpec(key="meter.panel-1.device", label="Aparat", value_type="text"),
+        "Synthetic meter",
+        [],
+        state="extracted",
+        needs_confirmation=True,
+    )
+    readiness = AuditWorkflow().readiness(ws, job)
+    assert not readiness.final_ok
+    assert [(issue.code, issue.field_id) for issue in readiness.blocking] == [
+        ("reading_unconfirmed", device.id)
+    ]
+    decide(ws, job, device.id, "accept", device.revision, "user")
+    assert AuditWorkflow().readiness(ws, job).final_ok
+    ws.remove_version(job, slot, version.version)
+    with ws.connect() as db:
+        assert content_issues(db, job) == []

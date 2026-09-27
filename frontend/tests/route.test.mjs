@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { TABS, href, jobHref, parseRoute } from '../src/app/route.ts'
+import { TABS, auditHref, href, jobHref, parseRoute } from '../src/app/route.ts'
 
 test('every href lives under /app/', () => {
   assert.equal(href({ name: 'home' }), '/app/')
@@ -11,6 +11,7 @@ test('every href lives under /app/', () => {
     assert.equal(link, `/app/piee/job-piee-1/${tab}`)
   }
   assert.equal(jobHref('job-piee-1', 'date', 'f-annual'), '/app/piee/job-piee-1/date?camp=f-annual')
+  assert.equal(auditHref('audit 1', 'reading-1'), '/app/audit/audit%201/masuratori?camp=reading-1')
 })
 
 test('routes parse back, with the camp query', () => {
@@ -29,6 +30,12 @@ test('routes parse back, with the camp query', () => {
     field: 'f-1',
   })
   assert.deepEqual(parseRoute('/app/piee/j/other'), { name: 'unknown' })
+  assert.deepEqual(parseRoute('/app/audit/a/masuratori', '?camp=f-2'), {
+    name: 'audit',
+    jobId: 'a',
+    tab: 'masuratori',
+    field: 'f-2',
+  })
 })
 
 test('no Vite proxy key starts with /app', () => {

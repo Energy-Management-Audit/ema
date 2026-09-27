@@ -13,9 +13,12 @@ from pydantic import Field as Describe
 
 from ema import __version__
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.chapter_five import run_measurements
 from ema.audit.draft_stage import draft_section
 from ema.audit.measures import run_measures
+from ema.audit.readings import run_readings
 from ema.audit.sections import statuses
+from ema.audit.visit import run_visit
 from ema.audit.workflow import AuditWorkflow
 from ema.core.config import workspace_path
 from ema.core.errors import EmaError
@@ -30,6 +33,9 @@ from ema.invoices import InvoiceWorkflow
 from ema.mcp.boundary import call, input_file, optional_file, resolve_roots
 from ema.mcp.models import (
     AuditDraft,
+    AuditMeasurements,
+    AuditReadings,
+    AuditVisit,
     DecisionList,
     FieldList,
     JobList,
@@ -62,7 +68,14 @@ WORKFLOWS: dict[str, Workflow] = {
 READ = ToolAnnotations(readOnlyHint=True)
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
 FieldStatus = Literal[
-    "pending", "uncertain", "accepted", "corrected", "rejected", "conflict", "missing"
+    "pending",
+    "uncertain",
+    "accepted",
+    "corrected",
+    "rejected",
+    "conflict",
+    "missing",
+    "needs_confirmation",
 ]
 
 
@@ -224,6 +237,32 @@ def build_server(ws: Workspace, import_roots: tuple[Path, ...]) -> FastMCP:  # n
                 "draft_path": str(result.draft_path),
                 "review_path": str(result.review_path),
             }
+        )
+
+    @server.tool(description="Register grouped meter and thermal visit photos.", annotations=WRITE)
+    async def audit_visit(job: str) -> AuditVisit:
+        result = await call(ws, "audit_visit", lambda: run_visit(ws, job))
+        return AuditVisit.model_validate(asdict(result))
+
+    @server.tool(
+        description="Read visit photos from a recording; live vision is disabled.",
+        annotations=WRITE,
+    )
+    async def audit_readings(job: str, recording: str | None = None) -> AuditReadings:
+        result = await call(
+            ws,
+            "audit_readings",
+            lambda: run_readings(ws, job, recording=optional_file(import_roots, recording)),
+        )
+        return AuditReadings.model_validate(asdict(result))
+
+    @server.tool(
+        description="Compose chapter-five measurements from confirmed readings.", annotations=WRITE
+    )
+    async def audit_measurements(job: str) -> AuditMeasurements:
+        result = await call(ws, "audit_measurements", lambda: run_measurements(ws, job))
+        return AuditMeasurements.model_validate(
+            {**asdict(result), "plan_path": str(result.plan_path)}
         )
 
     @server.tool(

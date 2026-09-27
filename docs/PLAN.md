@@ -508,15 +508,18 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
     `url {url, snapshot_sha}` · `manual {who, note?}`
   - `highlight ∈ exact | page | none` — what the snippet can honestly show (R18). OCR keeps its
     word boxes (Tesseract TSV), so a scan gets `exact` when the word is found.
-  - `method ∈ questionnaire | anexa | prelucrare | invoice | form | online | manual | calc`
+  - `method ∈ questionnaire | anexa | prelucrare | invoice | form | vision | online | manual | calc`
+    (`vision` uses a `photo` locator and the image file's sha).
   - Readers capture evidence as they read: it is part of every reader's acceptance (S4, S5, S9,
     S12), with a crop/quote test on a scanned PDF and a spreadsheet.
-- **`Value[T]`:** `{value?, unit?, evidence[], derivation?, state, presence, review, revision}`
+- **`Value[T]`:** `{value?, unit?, evidence[], derivation?, state, presence, review, revision, needs_confirmation}`
   - `state` = where it came from: `supplied | extracted | enriched | calculated | manual`
   - `presence` = what Ema's search found: `found | not_found | failed` (`not_found` = no expected
     source has it, and the UI asks for it; `failed` = a reader error with its cause, R21)
   - `review` = what the auditor did with it: `pending | accepted | corrected | rejected`.
     `rejected` is a verdict on a found value; readiness then treats the field as missing.
+  - `needs_confirmation` stays true on a vision reading until an individual human decision;
+    agent decisions and bulk acceptance cannot clear it.
   - `derivation` (calculated values): `{formula_id, inputs: field ids, factor_version}`; the
     snippet shows the inputs, each with its own evidence.
   - A value is absent exactly when `presence` is not `found` and nobody typed one; a typed value
@@ -1152,7 +1155,8 @@ GET        /jobs/{id}/preview.pdf        GET /jobs/{id}/outputs/{name}
 GET/PUT    /settings                     (providers + keys → keyring, workspace path)
 
 added for the design handoff (§5.18):
-GET        /jobs/{id}/fields             ?status=pending|uncertain|accepted   (3c, 3f, 3g rows)
+GET        /jobs/{id}/fields             ?status=pending|uncertain|accepted|needs_confirmation   (3c, 3f, 3g rows)
+GET        /jobs/{id}/visit              grouped meter panels and thermal photos
 POST       /jobs/{id}/fields/{f}/decide  {action, value?, onRevision}   POST /jobs/{id}/fields/accept-batch
 GET        /jobs/{id}/log                POST /jobs/{id}/log/{entry}/undo     (Jurnal, R19)
 GET        /evidence/{id}/snippet.png    ?highlight=1  (page crop, R18)
@@ -1176,13 +1180,15 @@ ema reporting generate --years 2023-2025
 ema audit new --client <cui> --year 2026 ; ema audit add <job> <files…> ; ema audit run <job> <stage>
 ema audit status <job>
 ema audit draft <job> <section> [--draft-recording <file> --support-recording <file>]   (replay only)
+ema audit visit <job> ; ema audit readings <job> [--recording <file>] ; ema audit measurements <job>
 ema audit measures <job> ; ema audit measures-form <dest>
 ema mcp [--import-root <dir>]…                                                             (stdio MCP server)
 ```
 
 **MCP** (S19; `ema mcp`, stdio, server `ema`, SDK `mcp==1.30.0`):
-- eleven tools over the CLI's use cases: `workspace_info`, `job_list`, `job_status`, `job_fields`, `job_decide`,
-  `job_log`, `job_checks`, `audit_sections`, `audit_draft_section`, `audit_measures`, `piee_generate`
+- fourteen tools over the CLI's use cases: `workspace_info`, `job_list`, `job_status`, `job_fields`, `job_decide`,
+  `job_log`, `job_checks`, `audit_sections`, `audit_draft_section`, `audit_visit`, `audit_readings`,
+  `audit_measurements`, `audit_measures`, `piee_generate`
 - one workspace per server, chosen as the CLI chooses it; input files only from `<workspace>/imports/` or an
   `--import-root`; nothing is written outside the workspace
 - every call acts as `agent`: no final export, approval, `done`/`n/a`, undo or delete (R14)
@@ -1613,7 +1619,8 @@ code/ (repository root)
 | S12 | Fill (agent): reading the dossier, record-fact with verified evidence; ch. 2 identity + ch. 4 via S7 | CLIENT-A1 ch. 2 identity + ch. 4 from its Necesar info | S1b, S5, S7, S11 |
 | S13 | The agent's online research (§5.11): company, location, map, equipment | CLIENT-A1: CAEN, address, location text, map, 10 equipment entries with sources | S12 |
 | S14 | Draft (agent): ch. 2–3 in her patterns + style guide, rendered into the base | CLIENT-A1 and CLIENT-A2 ch. 2–3 drafted from their dossiers + research, compared with her own audits' ch. 2–3 (structure, patterns, detail); CLIENT-A1 reviewed by the auditor; traceability coverage reported; a planted unsupported qualitative sentence is flagged | S10b, S13 |
-| S15 | Ch. 5 from visit material (meter-display photos + thermal images → readings via vision → her measurement-sheet model) + ch. 6 measures and financials | CLIENT-A2 ch. 5.1/5.2: the readings from the 36 meter photos match an answer key checked by hand against the photos (not the agent-made final), laid out in her measurement-sheet model, every reading `needs confirmation` until checked; measures table + NPV/payback matching her method | S14 |
+| S15a | Ch. 5 from visit meter-display and thermal photos: recorded vision readings, individual human confirmation, measurement-sheet layout | CLIENT-A2's 36 meter and 26 thermal photos register without dossier intake; a recorded replay is compared with the human panel answer key when available. The chapter uses confirmed readings and marks missing interpretations. | S14 |
+| S15b | Ch. 6 measures from the „Măsuri propuse” form, with energy and CO₂ calculations and TRB when cost savings are supplied | The labelled form feeds traceable measures and chapter-six tables in the auditor's format; missing explanatory narrative blocks the final. | S14 |
 | S16a | API contract (OpenAPI) + mock server. **Frozen:** the job, slot, field, evidence, decision, Jurnal, section and readiness endpoints, backed by S1b/S10. **Provisional** (marked `x-provisional`): the workflow-specific ones (PIEE generation, invoices, reporting, audit stages, export packages), drawn from the screens | Every screen in §5.18 maps to endpoints; every frozen endpoint calls an existing use case; frontend runs on mocks; the two-process dev loop (Vite proxy + `ema serve`) passes the §5.15 session checks | S1b, S10 |
 | S16 | Full HTTP API + SSE progress; every provisional endpoint reconciled with its slice (S6, S8, S9, S12), with a versioned contract diff | OpenAPI covers every CLI use case, nothing left `x-provisional`; the S1b scenario and a real PIEE journey pass through the API | S6, S8, S9, S12 |
 | S17a | Design system: tokens (both themes) + the component layer from 7d/7e | The component sheet reproduced in light and dark and matching 7d/7e screenshots side by side; focus rings, row/button states, toggles match; paper stays paper in dark | S16a |

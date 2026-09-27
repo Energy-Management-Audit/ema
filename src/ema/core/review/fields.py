@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
 from ema.core.errors import EmaError
+from ema.core.review.confirmation import require_human
 from ema.core.review.models import Actor, Candidate, Decision, Evidence, Field, FieldSpec, Manual
 from ema.core.review.store import load_field, save_decision, save_evidence, save_field
 from ema.core.workspace import Workspace
@@ -59,6 +60,8 @@ def propose(  # noqa: PLR0913
     *,
     state: Literal["supplied", "extracted", "enriched", "calculated", "manual"],
     derivation: Any = None,
+    needs_confirmation: bool = False,
+    preserve_reviewed: bool = False,
 ) -> Field:
     spec = (
         key
@@ -71,7 +74,6 @@ def propose(  # noqa: PLR0913
         raise EmaError("evidence_missing", "Valoarea introdusă necesită dovadă.", spec.key)
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
-        save_evidence(db, job, evidence)
         refs = [item.id for item in evidence]
         row = db.execute(
             "SELECT id FROM fields WHERE job_id=? AND key=?", (job, spec.key)
@@ -92,9 +94,12 @@ def propose(  # noqa: PLR0913
                 confidence="exact" if refs else "partial",
                 evidence=refs,
                 derivation=derivation,
+                needs_confirmation=needs_confirmation,
             )
         else:
             old = load_field(db, job, row["id"])
+            if preserve_reviewed and old.review in {"accepted", "corrected"}:
+                return old
             if old.value == value:
                 return old
             candidates = (
@@ -115,6 +120,7 @@ def propose(  # noqa: PLR0913
                     alternatives=candidates,
                     chosen=None,
                     confidence="conflict" if len(candidates) >= 2 else old.confidence,
+                    needs_confirmation=old.needs_confirmation or needs_confirmation,
                 )
             else:
                 field = _changed(
@@ -124,36 +130,41 @@ def propose(  # noqa: PLR0913
                     presence="found",
                     evidence=refs,
                     derivation=derivation,
+                    needs_confirmation=needs_confirmation,
                     review="pending",
                     alternatives=candidates,
                     chosen=None,
                     confidence="conflict" if len(candidates) >= 2 else "partial",
                     failure=None,
                 )
+        save_evidence(db, job, evidence)
         save_field(db, field)
         return field
 
 
-def mark_absent(
+def mark_absent(  # noqa: PLR0913
     ws: Workspace,
     job: str,
     key: str | FieldSpec,
     presence: Literal["not_found", "failed"],
     failure: str | None = None,
     evidence: list[Evidence] | None = None,
+    *,
+    only_if_missing: bool = False,
 ) -> Field:
     spec = key if isinstance(key, FieldSpec) else FieldSpec(key=key, label=key, value_type="text")
     if presence == "failed" and not failure:
         raise EmaError("failure_missing", "Cauza erorii lipseşte.", spec.key)
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
-        save_evidence(db, job, evidence or [])
         evidence_ids = [item.id for item in evidence or []]
         row = db.execute(
             "SELECT id FROM fields WHERE job_id=? AND key=?", (job, spec.key)
         ).fetchone()
         if row:
             old = load_field(db, job, row["id"])
+            if only_if_missing:
+                return old
             if old.state == "manual" or (evidence_ids and old.value is not None):
                 return old
             field = _changed(
@@ -182,6 +193,7 @@ def mark_absent(
                 failure=failure,
                 evidence=evidence_ids,
             )
+        save_evidence(db, job, evidence or [])
         save_field(db, field)
         return field
 
@@ -196,6 +208,8 @@ def fields(ws: Workspace, job: str, *, status: str | None = None) -> list[Field]
         return [field for field in result if field.value is None or field.review == "rejected"]
     if status == "uncertain":
         return [field for field in result if field.confidence in ("partial", "conflict", "none")]
+    if status == "needs_confirmation":
+        return [field for field in result if field.needs_confirmation]
     if status in ("pending", "accepted", "corrected", "rejected"):
         return [field for field in result if field.review == status]
     return result
@@ -298,7 +312,10 @@ def _decide_in_tx(  # noqa: PLR0913
     before = load_field(db, job, field_id)
     if before.revision != on_revision:
         raise EmaError("stale_revision", "Câmpul a fost modificat între timp.", field_id)
+    require_human(before, actor)
     after, evidence = _apply(before, action, value, alternative, actor)
+    if actor == "user" and before.needs_confirmation:
+        after = after.model_copy(update={"needs_confirmation": False})
     save_evidence(db, job, evidence)
     decision = Decision(
         id=uuid.uuid4().hex,
@@ -359,28 +376,6 @@ def decide_in_connection(
         alternative=None,
         batch_id=None,
     )
-
-
-def accept_batch(
-    ws: Workspace, job: str, field_ids_with_revisions: list[tuple[str, int]], actor: Actor
-) -> list[Decision]:
-    batch_id = uuid.uuid4().hex
-    with ws.connect() as db:
-        db.execute("BEGIN IMMEDIATE")
-        return [
-            _decide_in_tx(
-                db,
-                job,
-                field_id,
-                "accept",
-                revision,
-                actor,
-                value=None,
-                alternative=None,
-                batch_id=batch_id,
-            )
-            for field_id, revision in field_ids_with_revisions
-        ]
 
 
 def log(ws: Workspace, job: str) -> list[Decision]:

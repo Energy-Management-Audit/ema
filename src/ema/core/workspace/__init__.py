@@ -166,7 +166,9 @@ class Workspace:
         parts = slot.split("/")
         if (
             not 1 <= len(parts) <= 16
-            or (len(parts) > 2 and parts[0] != "dossier")
+            or (len(parts) > 2 and parts[0] not in {"dossier", "visit"})
+            or (parts[0] == "visit" and len(parts) > 4)
+            or (parts[0] == "visit" and any(len(part) > 255 for part in parts[1:]))
             or any(part in ("", ".", "..") for part in parts)
             or any("\\" in part or any(ord(char) < 32 for char in part) for part in parts)
         ):

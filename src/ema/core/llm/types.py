@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
+
+
+@dataclass(frozen=True)
+class ImageInput:
+    sha256: str
+    media_type: str
+    data: bytes
 
 
 @dataclass(frozen=True)
@@ -43,4 +51,5 @@ class Provider(Protocol):
         synthetic: bool = False,
         *,
         prompt_version: str = "",
+        attachments: Mapping[str, bytes] | None = None,
     ) -> Exchange: ...

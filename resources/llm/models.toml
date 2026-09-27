@@ -1,12 +1,17 @@
 # Checked 2026-09-24. USD per million text tokens, paid Standard tier.
 # Sources: https://ai.google.dev/gemini-api/docs/pricing
 #          https://developers.openai.com/api/docs/pricing
+# Vision sources: https://ai.google.dev/gemini-api/docs/models/gemini-3.6-flash
+#                 https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview
+#                 https://developers.openai.com/api/docs/models/gpt-6-luna
+#                 https://developers.openai.com/api/docs/models/gpt-6-sol
 # Gemini 3.6 Flash prices shown apply through 2026-12-31; review before release.
 # Gemini 3.1 Pro uses the long rates when a prompt exceeds 200k tokens.
 [[models]]
 provider = "gemini"
 id = "gemini-3.6-flash"
 tier = "standard"
+vision = true
 input_usd = 0.75
 cached_input_usd = 0.075
 output_usd = 3.75
@@ -15,6 +20,7 @@ output_usd = 3.75
 provider = "gemini"
 id = "gemini-3.1-pro-preview"
 tier = "stronger"
+vision = true
 input_usd = 2.0
 cached_input_usd = 0.2
 output_usd = 12.0
@@ -26,6 +32,7 @@ long_output_usd = 18.0
 provider = "openai"
 id = "gpt-6-luna"
 tier = "standard"
+vision = true
 input_usd = 0.10
 cached_input_usd = 0.01
 output_usd = 0.50
@@ -34,6 +41,7 @@ output_usd = 0.50
 provider = "openai"
 id = "gpt-6-sol"
 tier = "stronger"
+vision = true
 input_usd = 2.0
 cached_input_usd = 0.2
 output_usd = 10.0

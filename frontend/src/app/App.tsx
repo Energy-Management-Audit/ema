@@ -4,6 +4,7 @@ import { api } from '../api/endpoints.ts'
 import { invalidateJob, useResource } from '../state/resource.ts'
 import { JobProvider } from '../state/job.tsx'
 import { JobScreen } from '../screens/JobScreen.tsx'
+import { ReadingsScreen } from '../screens/ReadingsScreen.tsx'
 import { BootFailure, NoJob, SessionClosed } from '../screens/States.tsx'
 import { navigate } from './navigate.ts'
 import { jobHref, parseRoute } from './route.ts'
@@ -83,5 +84,6 @@ export function App({ bootProblem }: { bootProblem: ApiProblem | null }) {
       </JobProvider>
     )
   }
+  if (route.name === 'audit') return <ReadingsScreen jobId={route.jobId} field={route.field} />
   return <Home />
 }

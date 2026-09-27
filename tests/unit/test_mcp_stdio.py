@@ -50,7 +50,7 @@ def test_stdio_session_lists_and_calls_tools(tmp_path: Path) -> None:
 
     assert seen["init"].serverInfo.name == "ema"
     assert seen["init"].serverInfo.version == __version__
-    assert len(seen["tools"]) == 11
+    assert len(seen["tools"]) == 14
     assert seen["info"]["workspace"] == str(workspace.resolve())
     assert seen["refused"] == refusal("piee_generate", "path_outside_roots", OUTSIDE)
     assert stray == []
@@ -94,5 +94,5 @@ def test_stdio_stream_is_pure_json_rpc_and_closes_cleanly(tmp_path: Path) -> Non
     messages = [json.loads(line) for line in lines if line.strip()]
     assert all(message["jsonrpc"] == "2.0" for message in messages)
     assert [message.get("id") for message in messages] == [1, 2]
-    assert len(messages[1]["result"]["tools"]) == 11
+    assert len(messages[1]["result"]["tools"]) == 14
     assert "Traceback" not in stderr

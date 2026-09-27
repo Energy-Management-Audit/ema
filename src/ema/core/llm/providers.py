@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import json
+from collections.abc import Mapping
 from typing import Any, cast
 
 from google import genai
@@ -23,7 +25,9 @@ def _live_key(key: SecretStr | None, llm_live: bool, environment: str) -> str:
     return key.get_secret_value()
 
 
-def _openai_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _openai_messages(
+    messages: list[dict[str, Any]], attachments: Mapping[str, bytes] | None = None
+) -> list[dict[str, Any]]:
     converted: list[dict[str, Any]] = []
     for message in messages:
         if message["role"] == "assistant" and message.get("tool_calls"):
@@ -51,8 +55,21 @@ def _openai_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "content": json.dumps(message["content"], ensure_ascii=False),
                 }
             )
+        elif message.get("images"):
+            images = message["images"]
+            content: list[dict[str, Any]] = [{"type": "text", "text": str(message["content"])}]
+            for image in images:
+                sha = str(image["sha256"])
+                media = str(image["media_type"])
+                if attachments is None or sha not in attachments:
+                    raise EmaError("image_missing", "Fotografia lipseşte.", sha)
+                encoded = base64.b64encode(attachments[sha]).decode("ascii")
+                content.append(
+                    {"type": "image_url", "image_url": {"url": f"data:{media};base64,{encoded}"}}
+                )
+            converted.append({"role": message["role"], "content": content})
         else:
-            converted.append(message)
+            converted.append({key: value for key, value in message.items() if key != "images"})
     return converted
 
 
@@ -72,6 +89,7 @@ class OpenAIProvider:
         synthetic: bool = False,
         *,
         prompt_version: str = "",
+        attachments: Mapping[str, bytes] | None = None,
     ) -> Exchange:
         del prompt_version
         if not synthetic:
@@ -80,7 +98,7 @@ class OpenAIProvider:
             )
         request: dict[str, Any] = {
             "model": model,
-            "messages": _openai_messages(messages),
+            "messages": _openai_messages(messages, attachments),
             "max_completion_tokens": max_output_tokens,
         }
         if model == "gpt-6-luna":
@@ -127,7 +145,7 @@ class GeminiProvider:
     def __init__(self, key: SecretStr | None, llm_live: bool) -> None:
         self._client = genai.Client(api_key=_live_key(key, llm_live, "EMA_GEMINI_API_KEY"))
 
-    def respond(  # noqa: PLR0913
+    def respond(  # noqa: PLR0913, PLR0912, C901
         self,
         model: str,
         messages: list[dict[str, Any]],
@@ -137,6 +155,7 @@ class GeminiProvider:
         synthetic: bool = False,
         *,
         prompt_version: str = "",
+        attachments: Mapping[str, bytes] | None = None,
     ) -> Exchange:
         del prompt_version
         if not synthetic:
@@ -167,10 +186,20 @@ class GeminiProvider:
                     ]
                     contents.append(types.Content(role="model", parts=parts))
             else:
+                parts = [types.Part.from_text(text=str(message["content"]))]
+                for image in message.get("images", []):
+                    sha = str(image["sha256"])
+                    if attachments is None or sha not in attachments:
+                        raise EmaError("image_missing", "Fotografia lipseşte.", sha)
+                    parts.append(
+                        types.Part.from_bytes(
+                            data=attachments[sha], mime_type=str(image["media_type"])
+                        )
+                    )
                 contents.append(
                     types.Content(
                         role="model" if role == "assistant" else "user",
-                        parts=[types.Part.from_text(text=str(message["content"]))],
+                        parts=parts,
                     )
                 )
         config: dict[str, Any] = {

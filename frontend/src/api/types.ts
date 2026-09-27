@@ -53,7 +53,12 @@ export type Field = {
   alternatives?: Candidate[]
   chosen?: string | null
   failure?: string | null
+  needs_confirmation?: boolean
 }
+
+export type VisitPhoto = { sha: string; slot: string; name: string }
+export type VisitPanel = { id: string; label: string; photos: VisitPhoto[] }
+export type VisitView = { panels: VisitPanel[]; thermal: VisitPhoto[] }
 
 export type Decision = {
   id: string

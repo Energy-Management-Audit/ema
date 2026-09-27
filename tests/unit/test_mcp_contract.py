@@ -1,4 +1,4 @@
-"""The MCP surface is the S19 contract: tools, schemas, no human action (R14)."""
+"""The MCP surface: fourteen tools, their schemas, no human action (R14)."""
 
 import ast
 import tomllib
@@ -17,7 +17,16 @@ from ema.mcp.server import INSTRUCTIONS, build_server
 ROOT = Path(__file__).resolve().parents[2]
 READ: dict[str, Any] = {"readOnlyHint": True}
 WRITE: dict[str, Any] = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False}
-STATUSES = ["pending", "uncertain", "accepted", "corrected", "rejected", "conflict", "missing"]
+STATUSES = [
+    "pending",
+    "uncertain",
+    "accepted",
+    "corrected",
+    "rejected",
+    "conflict",
+    "missing",
+    "needs_confirmation",
+]
 TOOLS: dict[str, tuple[str, dict[str, Any], list[str], list[str]]] = {
     "workspace_info": (
         "Workspace folder, number of jobs and the folders input files must be in.",
@@ -55,6 +64,19 @@ TOOLS: dict[str, tuple[str, dict[str, Any], list[str], list[str]]] = {
         WRITE,
         ["job", "section", "draft_recording", "support_recording"],
         ["job", "section"],
+    ),
+    "audit_visit": ("Register grouped meter and thermal visit photos.", WRITE, ["job"], ["job"]),
+    "audit_readings": (
+        "Read visit photos from a recording; live vision is disabled.",
+        WRITE,
+        ["job", "recording"],
+        ["job"],
+    ),
+    "audit_measurements": (
+        "Compose chapter-five measurements from confirmed readings.",
+        WRITE,
+        ["job"],
+        ["job"],
     ),
     "audit_measures": (
         "Read the audit measures form and prepare chapter 6.",

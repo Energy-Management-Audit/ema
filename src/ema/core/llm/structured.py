@@ -11,6 +11,7 @@ from pydantic import BaseModel, ValidationError
 from ema.core.errors import EmaError
 from ema.core.llm.agent import AgentContext, record_call
 from ema.core.llm.models import selected_model
+from ema.core.llm.types import ImageInput
 
 
 def complete_json[T: BaseModel](
@@ -18,6 +19,8 @@ def complete_json[T: BaseModel](
     schema: type[T],
     prompt: str,
     content: str,
+    *,
+    images: tuple[ImageInput, ...] = (),
 ) -> T:
     if context.provider.name != "replay" and not context.synthetic:
         raise EmaError("ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", "")
@@ -27,10 +30,24 @@ def complete_json[T: BaseModel](
     )
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": prompt},
-        {"role": "user", "content": content},
+        {
+            "role": "user",
+            "content": content,
+            **(
+                {
+                    "images": [
+                        {"sha256": image.sha256, "media_type": image.media_type} for image in images
+                    ]
+                }
+                if images
+                else {}
+            ),
+        },
     ]
+    attachments = {image.sha256: image.data for image in images}
     for attempt in range(2):
         started = time.monotonic()
+        kwargs: dict[str, Any] = {"attachments": attachments} if images else {}
         response = context.provider.respond(
             context.model_id,
             messages,
@@ -38,6 +55,7 @@ def complete_json[T: BaseModel](
             schema.model_json_schema(),
             synthetic=context.synthetic,
             prompt_version=context.prompt_version,
+            **kwargs,
         )
         record_call(
             context,

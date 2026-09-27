@@ -51,6 +51,14 @@ class Photo(BaseModel):
     kind: Literal["photo"] = "photo"
     region: tuple[float, float, float, float] | None = None
 
+    @model_validator(mode="after")
+    def valid_region(self) -> Photo:
+        if self.region is not None:
+            x0, y0, x1, y1 = self.region
+            if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+                raise ValueError("photo region must be normalized and nonempty")
+        return self
+
 
 class Url(BaseModel):
     kind: Literal["url"] = "url"
@@ -86,7 +94,15 @@ class Evidence(BaseModel):
     file_sha: str | None = None
     locator: Locator | None = None
     method: Literal[
-        "questionnaire", "anexa", "prelucrare", "invoice", "online", "manual", "calc", "form"
+        "questionnaire",
+        "anexa",
+        "prelucrare",
+        "invoice",
+        "online",
+        "manual",
+        "calc",
+        "vision",
+        "form",
     ]
     retrieved_at: datetime
     quote: str | None = None
@@ -145,6 +161,7 @@ class Field(BaseModel):
     alternatives: list[Candidate] = PydanticField(default_factory=list[Candidate])
     chosen: str | None = None
     failure: str | None = None
+    needs_confirmation: bool = False
 
     @model_validator(mode="before")
     @classmethod

@@ -95,6 +95,7 @@ def test_materials_status_decisions_undo_and_supersession(tmp_path: Path) -> Non
     assert later.status == Status.LATER
     _code(lambda: set_status(ws, job, "ch5.termic", Status.LATER, "ema", "wrong material"))
     record_material(ws, job, MaterialKind.METER, True, "synthetic intake")
+    propose(ws, job, "visit.date", "2026-09-27", [], state="extracted")
     recompute_ready(ws, job)
     assert get_status(ws, job, "ch5.electric").status == Status.READY
     drafted = mark_drafted(ws, job, "ch5.electric", "agent", ("fact:load",))
@@ -193,6 +194,7 @@ def test_carrier_facts_use_shared_energy_key_and_conditions(tmp_path: Path) -> N
 def test_material_change_marks_fingerprinted_done_stale(tmp_path: Path) -> None:
     ws, job = _job(tmp_path)
     record_material(ws, job, MaterialKind.METER, True, "first")
+    propose(ws, job, "visit.date", "2026-09-27", [], state="extracted")
     recompute_ready(ws, job)
     mark_drafted(ws, job, "ch5.electric", "agent", ("material:meter_photos",))
     set_status(ws, job, "ch5.electric", Status.DONE, "user")
@@ -286,6 +288,7 @@ def test_agent_cannot_undo_human_na_back_to_done(tmp_path: Path) -> None:
 def test_concurrent_material_update_cannot_leave_done_current(tmp_path: Path) -> None:
     ws, job = _job(tmp_path)
     record_material(ws, job, MaterialKind.METER, True, "first")
+    propose(ws, job, "visit.date", "2026-09-27", [], state="extracted")
     recompute_ready(ws, job)
     mark_drafted(ws, job, "ch5.electric", "agent", ())
     barrier = Barrier(2)

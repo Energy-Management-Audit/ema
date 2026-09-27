@@ -1,15 +1,15 @@
 import { api } from '../api/endpoints.ts'
 import type { Client, Job } from '../api/types.ts'
 import { navigate } from '../app/navigate.ts'
-import { jobHref } from '../app/route.ts'
+import { auditHref, jobHref } from '../app/route.ts'
 import { useResource } from '../state/resource.ts'
 import { NavClient, NavGroup, NavJob, Sidebar, SidebarFooter } from '../ui/Shell'
 
-/** PIEE jobs grouped by client, in first-seen order (D6). */
+/** PIEE and audit jobs grouped by client, in first-seen order (D6). */
 export function groupJobs(jobs: Job[]): { slug: string; jobs: Job[] }[] {
   const groups: { slug: string; jobs: Job[] }[] = []
   for (const job of jobs) {
-    if (job.type !== 'piee') continue
+    if (job.type !== 'piee' && job.type !== 'audit') continue
     const group = groups.find((item) => item.slug === job.client_slug)
     if (group) group.jobs.push(job)
     else groups.push({ slug: job.client_slug, jobs: [job] })
@@ -45,10 +45,10 @@ export function JobSidebar({
                 working={active ? working : job.state === 'running'}
                 count={active && count ? count : undefined}
                 onClick={() => {
-                  navigate(jobHref(job.id, 'date'))
+                  navigate(job.type === 'audit' ? auditHref(job.id) : jobHref(job.id, 'date'))
                 }}
               >
-                PIEE {job.year ?? ''}
+                {job.type === 'audit' ? 'Audit energetic' : 'PIEE'} {job.year ?? ''}
               </NavJob>
             )
           }),

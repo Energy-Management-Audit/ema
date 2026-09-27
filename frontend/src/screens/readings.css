@@ -1,0 +1,62 @@
+.readings-screen {
+  padding: 28px 36px 56px;
+  display: grid;
+  gap: 30px;
+  overflow: auto;
+}
+
+.readings-group {
+  display: grid;
+  gap: 8px;
+}
+
+.readings-group > .ema-section-key {
+  margin-bottom: 8px;
+}
+
+.reading-snippet {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.15fr) minmax(230px, 0.85fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.reading-snippet .ema-paper {
+  padding: 12px;
+}
+
+.reading-snippet img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 400px;
+  object-fit: contain;
+}
+
+.reading-snippet__side {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.reading-snippet__side p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.reading-snippet__actions,
+.reading-editor {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (max-width: 800px) {
+  .readings-screen {
+    padding: 20px;
+  }
+  .reading-snippet {
+    grid-template-columns: 1fr;
+  }
+}

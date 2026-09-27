@@ -910,6 +910,7 @@
               "online",
               "manual",
               "calc",
+              "vision",
               "form"
             ],
             "title": "Method",
@@ -1125,6 +1126,11 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "needs_confirmation": {
+            "default": false,
+            "title": "Needs Confirmation",
+            "type": "boolean"
           },
           "presence": {
             "enum": [
@@ -2791,6 +2797,79 @@
           "snapshot_sha"
         ],
         "title": "Url",
+        "type": "object"
+      },
+      "VisitPanel": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "photos": {
+            "items": {
+              "$ref": "#/components/schemas/VisitPhoto"
+            },
+            "title": "Photos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "photos"
+        ],
+        "title": "VisitPanel",
+        "type": "object"
+      },
+      "VisitPhoto": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sha": {
+            "title": "Sha",
+            "type": "string"
+          },
+          "slot": {
+            "title": "Slot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha",
+          "slot",
+          "name"
+        ],
+        "title": "VisitPhoto",
+        "type": "object"
+      },
+      "VisitView": {
+        "properties": {
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/VisitPanel"
+            },
+            "title": "Panels",
+            "type": "array"
+          },
+          "thermal": {
+            "items": {
+              "$ref": "#/components/schemas/VisitPhoto"
+            },
+            "title": "Thermal",
+            "type": "array"
+          }
+        },
+        "required": [
+          "panels",
+          "thermal"
+        ],
+        "title": "VisitView",
         "type": "object"
       }
     }
@@ -6718,7 +6797,8 @@
                     "corrected",
                     "rejected",
                     "conflict",
-                    "missing"
+                    "missing",
+                    "needs_confirmation"
                   ],
                   "type": "string"
                 },
@@ -6897,7 +6977,34 @@
                 }
               }
             },
-            "description": "csrf_required, invalid_origin, session_required"
+            "description": "csrf_required, human_required, invalid_origin, session_required"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "confirmation_individual, stale_revision"
           },
           "421": {
             "content": {
@@ -11472,7 +11579,7 @@
                 }
               }
             },
-            "description": "csrf_required, human_required, invalid_origin, session_required"
+            "description": "ai_client_disabled, csrf_required, human_required, invalid_origin, session_required"
           },
           "404": {
             "content": {
@@ -11526,7 +11633,7 @@
                 }
               }
             },
-            "description": "import_required, job_running, measures_form_invalid, measures_form_missing, not_ready, piee_base_changed, piee_base_missing, piee_base_review_required, stale_revision"
+            "description": "import_required, job_running, measures_form_invalid, measures_form_missing, not_ready, piee_base_changed, piee_base_missing, piee_base_review_required, stale_revision, visit_missing"
           },
           "415": {
             "content": {
@@ -11780,6 +11887,173 @@
         "summary": "Job Status",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/jobs/{job_id}/visit": {
+      "get": {
+        "operationId": "get_visit_jobs__job_id__visit_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "wrong_job_type"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "job_missing"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "Get Visit",
+        "tags": [
+          "audit"
         ]
       }
     },

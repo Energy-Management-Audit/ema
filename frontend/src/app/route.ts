@@ -6,11 +6,21 @@ export type Tab = (typeof TABS)[number]
 export type Route =
   | { name: 'home' }
   | { name: 'job'; jobId: string; tab: Tab; field: string | null }
+  | { name: 'audit'; jobId: string; tab: 'masuratori'; field: string | null }
   | { name: 'unknown' }
 
 export function parseRoute(pathname: string, search = ''): Route {
   const path = pathname.replace(/\/+$/, '')
   if (path === '/app' || path === '') return { name: 'home' }
+  const audit = /^\/app\/audit\/([^/]+)\/(masuratori)$/.exec(path)
+  if (audit?.[1]) {
+    return {
+      name: 'audit',
+      jobId: decodeURIComponent(audit[1]),
+      tab: 'masuratori',
+      field: new URLSearchParams(search).get('camp'),
+    }
+  }
   const match = /^\/app\/piee\/([^/]+)\/([a-z]+)$/.exec(path)
   if (!match?.[1] || !match[2]) return { name: 'unknown' }
   const tab = TABS.find((item) => item === match[2])
@@ -20,9 +30,17 @@ export function parseRoute(pathname: string, search = ''): Route {
 }
 
 export function href(route: Route): string {
+  if (route.name === 'audit') {
+    const base = `/app/audit/${encodeURIComponent(route.jobId)}/${route.tab}`
+    return route.field ? `${base}?camp=${encodeURIComponent(route.field)}` : base
+  }
   if (route.name !== 'job') return '/app/'
   const base = `/app/piee/${encodeURIComponent(route.jobId)}/${route.tab}`
   return route.field ? `${base}?camp=${encodeURIComponent(route.field)}` : base
+}
+
+export function auditHref(jobId: string, field: string | null = null): string {
+  return href({ name: 'audit', jobId, tab: 'masuratori', field })
 }
 
 export function jobHref(jobId: string, tab: Tab, field: string | null = null): string {
