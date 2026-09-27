@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,7 +16,7 @@ from ema.core.review import fields, undo
 from ema.core.review.fields import decide_in_connection
 from ema.core.review.models import Decision, Field
 from ema.core.workspace import Workspace
-from ema.invoices.batch_identity import KEY, BatchClient, proposal
+from ema.invoices.batch_identity import KEY, BatchClient, proposal, source_keys
 from ema.invoices.models import normalize_client_name, normalize_client_tax_id
 
 
@@ -27,6 +26,79 @@ class InvoiceReadiness:
     blocking: tuple[str, ...]
     exportable: int
     omitted: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class BatchSnapshot:
+    field: Field
+    client: BatchClient | None
+    rows: list[dict[str, Any]]
+    run_id: str
+    ended_at: str | None
+    client_slug: str
+    client_cui: str | None
+    decision_id: str
+
+
+def batch_snapshot(ws: Workspace, job: JobId) -> BatchSnapshot:
+    batch_client(ws, job)  # Build a proposal, if needed, before the read transaction.
+    with ws.connect() as db:
+        db.execute("BEGIN")
+        run = db.execute(
+            "SELECT id,ended_at FROM runs WHERE job_id=? AND stage='invoices' "
+            "AND state='ready' AND publication='current' ORDER BY ended_at DESC LIMIT 1",
+            (job,),
+        ).fetchone()
+        if run is None:
+            raise EmaError("invoices_missing", "Extracţia facturilor lipseşte.", job)
+        stored = db.execute(
+            "SELECT data FROM fields WHERE job_id=? AND key=?", (job, KEY)
+        ).fetchone()
+        if stored is None:
+            raise EmaError("invoices_stale", "Facturile trebuie citite din nou.", job)
+        field = Field.model_validate_json(stored["data"])
+        client = BatchClient.from_field(field) if field.value is not None else None
+        if client is not None and client.run_id != run["id"]:
+            raise EmaError("invoices_stale", "Facturile trebuie citite din nou.", job)
+        job_row = db.execute(
+            "SELECT j.client_slug,c.cui FROM jobs j LEFT JOIN clients c ON c.id=j.client_slug "
+            "WHERE j.id=? AND j.deleted=0",
+            (job,),
+        ).fetchone()
+        if job_row is None:
+            raise EmaError("job_missing", "Lucrarea nu există.", job)
+        path = ws.artifact_dir(db, job, "invoices", str(run["id"])) / "outcomes.json"
+        rows: list[dict[str, Any]] = json.loads(path.read_text(encoding="utf-8"))
+        active = {
+            str(row["name"]): str(row["file_sha"])
+            for row in db.execute(
+                "SELECT s.name,v.file_sha FROM slots s JOIN slot_versions v "
+                "ON v.job_id=s.job_id AND v.slot=s.name AND v.version=s.active_version "
+                "WHERE s.job_id=? AND s.name LIKE 'invoices/%'",
+                (job,),
+            )
+        }
+        keys = source_keys(rows)
+        if set(active) != {slot for slot, _sha in keys if slot} or any(
+            slot and active.get(slot) != sha for slot, sha in keys
+        ):
+            raise EmaError("invoices_stale", "Facturile trebuie citite din nou.", job)
+        decision = db.execute(
+            "SELECT d.id FROM decisions d JOIN fields f ON f.id=d.field_id "
+            "WHERE d.job_id=? AND f.key=? AND json_extract(d.data,'$.undone_by') IS NULL "
+            "ORDER BY d.seq DESC LIMIT 1",
+            (job, KEY),
+        ).fetchone()
+        return BatchSnapshot(
+            field,
+            client,
+            rows,
+            str(run["id"]),
+            str(run["ended_at"]) if run["ended_at"] else None,
+            str(job_row["client_slug"]),
+            str(job_row["cui"]) if job_row["cui"] else None,
+            str(decision["id"]) if decision else "",
+        )
 
 
 def _artifact(ws: Workspace, job: JobId) -> Path:
@@ -145,15 +217,33 @@ def _approved(value: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def resolved_outcomes(ws: Workspace, job: JobId) -> list[dict[str, Any]]:
-    rows = copy.deepcopy(raw_outcomes(ws, job))
     field, client = batch_client(ws, job)
+    return _resolve(raw_outcomes(ws, job), field, client, _decision_id(ws, job))
+
+
+def resolve_snapshot(snapshot: BatchSnapshot) -> list[dict[str, Any]]:
+    return _resolve(snapshot.rows, snapshot.field, snapshot.client, snapshot.decision_id)
+
+
+def _resolve(
+    raw: list[dict[str, Any]], field: Field, client: BatchClient | None, decision_id: str
+) -> list[dict[str, Any]]:
+    rows = copy.deepcopy(raw)
     if client is None or field.review not in {"accepted", "corrected"}:
         return rows
     fills = {
-        (item["supplier"], filename): item for item in client.pod_fill for filename in item["files"]
+        (item["supplier"], sha): item
+        for item in client.pod_fill
+        for sha in item.get("file_shas", [])
     }
-    decision_id = _decision_id(ws, job)
-    for row in rows:
+    legacy_fills = {
+        (item["supplier"], filename): item
+        for item in client.pod_fill
+        if "file_shas" not in item
+        for filename in item["files"]
+    }
+    keys = source_keys(rows)
+    for row, (_slot, sha) in zip(rows, keys, strict=True):
         if row["status"] in {"failed", "incompatible", "duplicate", "unsupported"}:
             continue
         for draft in row["drafts"]:
@@ -186,7 +276,9 @@ def resolved_outcomes(ws: Workspace, job: JobId) -> list[dict[str, Any]]:
                 for issue in draft["issues"]
                 if issue["field_id"] not in {"client_name", "client_tax_id"}
             ]
-            fill = fills.get((draft["supplier"], row["source_path"]))
+            fill = fills.get((draft["supplier"], sha)) or legacy_fills.get(
+                (draft["supplier"], row["source_path"])
+            )
             pod_field = values.get("location_identifier")
             if fill and pod_field and not pod_field.get("value"):
                 source_evidence = [
@@ -249,51 +341,60 @@ def readiness(ws: Workspace, job: JobId) -> InvoiceReadiness:
 
 
 def identity_view(ws: Workspace, job: JobId) -> dict[str, Any]:
-    field, client = batch_client(ws, job)
-    with ws.connect() as db:
-        row = db.execute("SELECT client_slug FROM jobs WHERE id=?", (job,)).fetchone()
+    return identity_from_snapshot(batch_snapshot(ws, job))
+
+
+def identity_from_snapshot(snapshot: BatchSnapshot) -> dict[str, Any]:
+    field, client, outcomes = snapshot.field, snapshot.client, snapshot.rows
+    printed = 0
+    other_client = 0
+    if client is not None:
+        for outcome in outcomes:
+            for draft in outcome["drafts"]:
+                values = cast("dict[str, Any]", draft["fields"])
+                name = cast("dict[str, Any]", values.get("client_name") or {})
+                tax = cast("dict[str, Any]", values.get("client_tax_id") or {})
+                if name.get("value") and _matches_name(name, client.name):
+                    printed += 1
+                if (name.get("value") and not _matches_name(name, client.name)) or (
+                    client.tax_id
+                    and tax.get("value")
+                    and normalize_client_tax_id(str(tax["value"]))
+                    != normalize_client_tax_id(client.tax_id)
+                ):
+                    other_client += 1
     candidate = (
         {
-            "client_id": str(row["client_slug"]),
+            "client_id": snapshot.client_slug,
             "cui": client.tax_id,
             "pod": client.pods[0] if client.pods else None,
         }
-        if client is not None and row is not None
+        if client is not None
         else None
     )
     return {
-        "batch_id": client.run_id if client else job,
+        "batch_id": snapshot.run_id,
         "candidate": candidate,
         "confirmed": field.review in {"accepted", "corrected"},
         "evidence_ids": field.evidence,
-    }
-
-
-def batch_view(ws: Workspace, job: JobId) -> dict[str, Any]:
-    identity = identity_view(ws, job)
-    rows: list[dict[str, Any]] = []
-    for row in resolved_outcomes(ws, job):
-        for draft in row["drafts"]:
-            energy = cast("dict[str, Any]", draft["fields"].get("active_energy") or {})
-            raw = energy.get("value")
-            try:
-                consumption = float(raw) if raw is not None else None
-            except (TypeError, ValueError):
-                consumption = None
-            rows.append(
-                {
-                    "id": hashlib.sha256(
-                        f"{row['source_path']}:{draft.get('source_filename', '')}".encode()
-                    ).hexdigest()[:16],
-                    "month": None,
-                    "consumption_kwh": consumption,
-                    "source_evidence_ids": [],
-                    "anomalies": [str(issue["code"]) for issue in draft["issues"]],
-                }
-            )
-    return {
-        "batch_id": identity["batch_id"],
-        "identity": identity,
-        "rows": rows,
-        "missing_months": [],
+        "revision": field.revision,
+        "name": client.name if client else None,
+        "reasons": {
+            "printed": printed,
+            "pods": list(client.pods) if client else [],
+            "other_client": other_client,
+        },
+        "pod_fill": [
+            {
+                "pod": str(item["pod"]),
+                "files": list(item["files"]),
+                "source_count": len(
+                    {source.get("sha") or source["file"] for source in item["sources"]}
+                ),
+            }
+            for item in (client.pod_fill if client is not None else ())
+        ],
+        "memory": list(client.memory) if client else [],
+        "files_total": len(outcomes),
+        "client_cui": snapshot.client_cui,
     }

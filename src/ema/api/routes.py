@@ -202,12 +202,20 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
     )
     def versions(job_id: str, slot: str) -> list[dict[str, object]]:
         get_job(ws, job_id)
-        return [asdict(item) for item in ws.list_versions(job_id, slot)]
+        with ws.connect() as db:
+            rows = db.execute(
+                "SELECT v.*,s.revision AS slot_revision FROM slot_versions v "
+                "JOIN slots s ON s.job_id=v.job_id AND s.name=v.slot "
+                "WHERE v.job_id=? AND v.slot=? ORDER BY v.version",
+                (job_id, slot),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     @app.put("/jobs/{job_id}/slots/{slot:path}", tags=["documents"], response_model=SlotVersion)
     def put_slot(job_id: str, slot: str, body: SlotInput) -> dict[str, object]:
         validate_slot(str(get_job(ws, job_id)["type"]), slot)
-        return asdict(ws.set_slot(job_id, slot, body.file_sha))
+        version, revision = ws.set_slot_with_revision(job_id, slot, body.file_sha)
+        return {**asdict(version), "slot_revision": revision}
 
     @app.delete(
         "/jobs/{job_id}/slots/{slot:path}/versions/{version}",

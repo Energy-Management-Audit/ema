@@ -125,9 +125,13 @@ def extract_batch(
     processor = build_invoice_processor(load_settings(ctx.ws))
     result = processor.execute(paths, source_names=source_names)
     outcomes = list(result.outcomes)
+    sources: list[tuple[str | None, str | None]] = [
+        (version.slot, version.file_sha) for version in versions
+    ]
     for index, failure in preflight_failures or []:
         outcomes.insert(index, failure)
-    (ctx.artifact_dir() / "outcomes.json").write_text(encode(outcomes), encoding="utf-8")
+        sources.insert(index, (None, None))
+    (ctx.artifact_dir() / "outcomes.json").write_text(encode(outcomes, sources), encoding="utf-8")
     failures: list[str] = []
     for outcome in outcomes:
         if outcome.status.value != "failed":

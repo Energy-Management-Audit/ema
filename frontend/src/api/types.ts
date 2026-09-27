@@ -169,6 +169,7 @@ export type SlotVersion = {
   file_sha: string
   origin: string
   converted_from: string | null
+  slot_revision: number
 }
 
 export type FileVersion = {

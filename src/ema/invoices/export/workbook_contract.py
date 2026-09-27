@@ -189,6 +189,14 @@ def summary_value_formula(category: str, detail_last_row: int, draft_id_cell: st
     return f"={summary_net_formula(category, detail_last_row, draft_id_cell)}"
 
 
+def summary_net_value(invoice: InvoiceDraft, category: str) -> Decimal:
+    """The SUMIFS net-value result for one draft and category."""
+    return sum(
+        (detail.net_value for detail in invoice.price_details if detail.category.value == category),
+        Decimal(0),
+    )
+
+
 def _display_unit(value: str) -> str:
     return {
         "kwh": "kWh",

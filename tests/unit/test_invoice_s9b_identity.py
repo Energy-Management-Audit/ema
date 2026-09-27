@@ -86,7 +86,9 @@ def _job(ws: Workspace, tmp_path: Path, rows: list[dict]) -> str:
         path = tmp_path / row["source_path"]
         path.write_bytes(b"synthetic PDF content")
         sha = ws.add_file("example", path)
-        ws.set_slot(job, f"invoices/{index:04d}", sha, origin=path.name)
+        slot = f"invoices/{index:04d}"
+        ws.set_slot(job, slot, sha, origin=path.name)
+        row["slot"], row["file_sha"] = slot, sha
 
     def stage(ctx):  # type: ignore[no-untyped-def]
         ctx.read_slots("invoices")
@@ -182,7 +184,17 @@ def test_new_extraction_requires_new_batch_confirmation(tmp_path: Path) -> None:
     def stage(ctx):  # type: ignore[no-untyped-def]
         ctx.read_slots("invoices")
         (ctx.artifact_dir() / "outcomes.json").write_text(
-            json.dumps([_row("a.pdf", "ALPHA SRL", "POD0001")])
+            json.dumps(
+                [
+                    {
+                        **_row("a.pdf", "ALPHA SRL", "POD0001"),
+                        **{
+                            "slot": "invoices/0001",
+                            "file_sha": ws.list_versions(job, "invoices/0001")[-1].file_sha,
+                        },
+                    }
+                ]
+            )
         )
         return StageOutcome()
 

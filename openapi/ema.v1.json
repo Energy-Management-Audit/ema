@@ -227,6 +227,23 @@
         "title": "Body_upload_clients__client_id__files_post",
         "type": "object"
       },
+      "Body_upload_jobs__job_id__invoices_files_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "contentMediaType": "application/octet-stream",
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "Body_upload_jobs__job_id__invoices_files_post",
+        "type": "object"
+      },
       "CancelResult": {
         "properties": {
           "cancelled": {
@@ -1347,11 +1364,44 @@
         "title": "Health",
         "type": "object"
       },
+      "IdentityReasons": {
+        "properties": {
+          "other_client": {
+            "title": "Other Client",
+            "type": "integer"
+          },
+          "pods": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pods",
+            "type": "array"
+          },
+          "printed": {
+            "title": "Printed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "printed",
+          "pods",
+          "other_client"
+        ],
+        "title": "IdentityReasons",
+        "type": "object"
+      },
       "InvoiceBatchView": {
         "properties": {
           "batch_id": {
             "title": "Batch Id",
             "type": "string"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/InvoiceFile"
+            },
+            "title": "Files",
+            "type": "array"
           },
           "identity": {
             "$ref": "#/components/schemas/InvoiceIdentity"
@@ -1363,19 +1413,46 @@
             "title": "Missing Months",
             "type": "array"
           },
+          "read_ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Ended At"
+          },
           "rows": {
             "items": {
               "$ref": "#/components/schemas/InvoiceRow"
             },
             "title": "Rows",
             "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/InvoiceTotals"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
           }
         },
         "required": [
           "batch_id",
           "identity",
           "rows",
-          "missing_months"
+          "missing_months",
+          "files",
+          "totals"
         ],
         "title": "InvoiceBatchView",
         "type": "object"
@@ -1415,6 +1492,40 @@
         "title": "InvoiceCandidate",
         "type": "object"
       },
+      "InvoiceFile": {
+        "properties": {
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "slot": {
+            "title": "Slot",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slot",
+          "file_name",
+          "status"
+        ],
+        "title": "InvoiceFile",
+        "type": "object"
+      },
       "InvoiceIdentity": {
         "properties": {
           "batch_id": {
@@ -1431,6 +1542,17 @@
               }
             ]
           },
+          "client_cui": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Cui"
+          },
           "confirmed": {
             "title": "Confirmed",
             "type": "boolean"
@@ -1441,12 +1563,56 @@
             },
             "title": "Evidence Ids",
             "type": "array"
+          },
+          "files_total": {
+            "title": "Files Total",
+            "type": "integer"
+          },
+          "memory": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Memory",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "pod_fill": {
+            "items": {
+              "$ref": "#/components/schemas/PodFill"
+            },
+            "title": "Pod Fill",
+            "type": "array"
+          },
+          "reasons": {
+            "$ref": "#/components/schemas/IdentityReasons"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
           }
         },
         "required": [
           "batch_id",
           "confirmed",
-          "evidence_ids"
+          "evidence_ids",
+          "revision",
+          "reasons",
+          "pod_fill",
+          "memory",
+          "files_total"
         ],
         "title": "InvoiceIdentity",
         "type": "object"
@@ -1474,6 +1640,26 @@
         "title": "InvoiceIdentityInput",
         "type": "object"
       },
+      "InvoiceOutlier": {
+        "properties": {
+          "neighbours_mean_kwh": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Neighbours Mean Kwh",
+            "type": "string"
+          },
+          "ratio": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Ratio",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ratio",
+          "neighbours_mean_kwh"
+        ],
+        "title": "InvoiceOutlier",
+        "type": "object"
+      },
       "InvoiceRow": {
         "properties": {
           "anomalies": {
@@ -1486,7 +1672,8 @@
           "consumption_kwh": {
             "anyOf": [
               {
-                "type": "number"
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -1494,9 +1681,42 @@
             ],
             "title": "Consumption Kwh"
           },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "invoice_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Date"
+          },
+          "invoice_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues",
+            "type": "array"
           },
           "month": {
             "anyOf": [
@@ -1509,20 +1729,211 @@
             ],
             "title": "Month"
           },
+          "outlier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InvoiceOutlier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "price_lei_kwh": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Lei Kwh"
+          },
+          "slot": {
+            "title": "Slot",
+            "type": "string"
+          },
           "source_evidence_ids": {
             "items": {
               "type": "string"
             },
             "title": "Source Evidence Ids",
             "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/InvoiceSource"
+            },
+            "title": "Sources",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "supplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier"
+          },
+          "value_lei": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Lei"
           }
         },
         "required": [
           "id",
           "source_evidence_ids",
-          "anomalies"
+          "anomalies",
+          "file_name",
+          "slot",
+          "status",
+          "issues",
+          "sources"
         ],
         "title": "InvoiceRow",
+        "type": "object"
+      },
+      "InvoiceSource": {
+        "properties": {
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page",
+          "snippet"
+        ],
+        "title": "InvoiceSource",
+        "type": "object"
+      },
+      "InvoiceTotals": {
+        "properties": {
+          "consumption_kwh": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Consumption Kwh",
+            "type": "string"
+          },
+          "months": {
+            "title": "Months",
+            "type": "integer"
+          },
+          "price_avg_lei_kwh": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Avg Lei Kwh"
+          },
+          "value_lei": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Value Lei",
+            "type": "string"
+          }
+        },
+        "required": [
+          "months",
+          "consumption_kwh",
+          "value_lei",
+          "price_avg_lei_kwh"
+        ],
+        "title": "InvoiceTotals",
+        "type": "object"
+      },
+      "InvoiceUpload": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/InvoiceUploadAdded"
+            },
+            "title": "Added",
+            "type": "array"
+          },
+          "rejected": {
+            "items": {
+              "$ref": "#/components/schemas/InvoiceUploadRejected"
+            },
+            "title": "Rejected",
+            "type": "array"
+          }
+        },
+        "required": [
+          "added",
+          "rejected"
+        ],
+        "title": "InvoiceUpload",
+        "type": "object"
+      },
+      "InvoiceUploadAdded": {
+        "properties": {
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "sha": {
+            "title": "Sha",
+            "type": "string"
+          },
+          "slot": {
+            "title": "Slot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slot",
+          "file_name",
+          "sha"
+        ],
+        "title": "InvoiceUploadAdded",
+        "type": "object"
+      },
+      "InvoiceUploadRejected": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_name",
+          "code",
+          "reason"
+        ],
+        "title": "InvoiceUploadRejected",
         "type": "object"
       },
       "Issue": {
@@ -2216,6 +2627,32 @@
           "measures_without_term"
         ],
         "title": "PieeSummary",
+        "type": "object"
+      },
+      "PodFill": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "pod": {
+            "title": "Pod",
+            "type": "string"
+          },
+          "source_count": {
+            "title": "Source Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pod",
+          "files",
+          "source_count"
+        ],
+        "title": "PodFill",
         "type": "object"
       },
       "PrelucrareInput": {
@@ -2973,6 +3410,10 @@
             "title": "Slot",
             "type": "string"
           },
+          "slot_revision": {
+            "title": "Slot Revision",
+            "type": "integer"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -2984,7 +3425,8 @@
           "version",
           "file_sha",
           "origin",
-          "converted_from"
+          "converted_from",
+          "slot_revision"
         ],
         "title": "SlotVersion",
         "type": "object"
@@ -7792,6 +8234,33 @@
             },
             "description": "job_missing"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invoices_missing"
+          },
           "421": {
             "content": {
               "application/problem+json": {
@@ -7848,6 +8317,422 @@
           }
         },
         "summary": "Invoices",
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/jobs/{job_id}/invoices/file": {
+      "get": {
+        "operationId": "file_jobs__job_id__invoices_file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "slot",
+            "required": true,
+            "schema": {
+              "title": "Slot",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_slot, wrong_job_type"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "file_missing, job_missing"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "file_type"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "File",
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/jobs/{job_id}/invoices/files": {
+      "post": {
+        "operationId": "upload_jobs__job_id__invoices_files_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "replace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Replace"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_jobs__job_id__invoices_files_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceUpload"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_slot, wrong_job_type"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "csrf_required, invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "job_missing"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "job_running"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "Upload",
         "tags": [
           "invoices"
         ]
@@ -8190,6 +9075,228 @@
           }
         },
         "summary": "Confirm",
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/jobs/{job_id}/invoices/page.png": {
+      "get": {
+        "operationId": "page_jobs__job_id__invoices_page_png_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "slot",
+            "required": true,
+            "schema": {
+              "title": "Slot",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": true,
+            "schema": {
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "crop",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "active_energy",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Crop"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_slot, wrong_job_type"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "evidence_missing, file_missing, job_missing"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "file_type"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "Page",
         "tags": [
           "invoices"
         ]

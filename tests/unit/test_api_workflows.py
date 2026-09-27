@@ -124,7 +124,8 @@ def test_invoice_http_confirm_and_final_export(tmp_path: Path, monkeypatch) -> N
     job = create_job(ws, "invoices", client_id, None)
     source = tmp_path / "synthetic.pdf"
     source.write_bytes(b"synthetic")
-    ws.set_slot(job, "invoices/0001", ws.add_file(client_id, source))
+    digest = ws.add_file(client_id, source)
+    ws.set_slot(job, "invoices/0001", digest)
 
     def field(value: str) -> dict[str, object]:
         return {"value": value, "status": "extracted", "message": None, "evidence": []}
@@ -132,6 +133,8 @@ def test_invoice_http_confirm_and_final_export(tmp_path: Path, monkeypatch) -> N
     rows = [
         {
             "source_path": "synthetic.pdf",
+            "slot": "invoices/0001",
+            "file_sha": digest,
             "status": "exportable",
             "issues": [],
             "reason": None,

@@ -62,6 +62,8 @@ STATUS = {
     "backup_dir_missing": 409,
     "backup_changed": 409,
     "backup_failed": 424,
+    # s17b-invoices
+    "validation_error": 422,
 }
 
 ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
@@ -163,7 +165,7 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "file_type",
         "job_running",
     ),
-    ("GET", "/jobs/{job_id}/invoices"): ("job_missing", "wrong_job_type"),
+    ("GET", "/jobs/{job_id}/invoices"): ("job_missing", "wrong_job_type", "invoices_missing"),
     ("GET", "/jobs/{job_id}/invoices/identity"): (
         "job_missing",
         "invoices_missing",
@@ -173,6 +175,29 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "job_missing",
         "stale_revision",
         "client_memory_conflict",
+    ),
+    # s17b-invoices
+    ("POST", "/jobs/{job_id}/invoices/files"): (
+        "job_missing",
+        "wrong_job_type",
+        "invalid_slot",
+        "job_running",
+        "validation_error",
+    ),
+    ("GET", "/jobs/{job_id}/invoices/page.png"): (
+        "job_missing",
+        "wrong_job_type",
+        "invalid_slot",
+        "file_missing",
+        "evidence_missing",
+        "file_type",
+    ),
+    ("GET", "/jobs/{job_id}/invoices/file"): (
+        "job_missing",
+        "wrong_job_type",
+        "invalid_slot",
+        "file_missing",
+        "file_type",
     ),
     ("POST", "/reporting/runs"): ("invalid_year", "client_missing", "job_running"),
     ("GET", "/reporting/runs/{run_id}"): ("run_missing",),

@@ -164,6 +164,28 @@ class Workspace:
         origin: str = "upload",
         converted_from: str | None = None,
     ) -> SlotVersion:
+        with self.connect() as db:
+            version, _revision = self.set_slot_in_connection(
+                db, job, slot, file_sha, origin=origin, converted_from=converted_from
+            )
+        return version
+
+    def set_slot_with_revision(
+        self, job: str, slot: str, file_sha: str, *, origin: str = "upload"
+    ) -> tuple[SlotVersion, int]:
+        with self.connect() as db:
+            return self.set_slot_in_connection(db, job, slot, file_sha, origin=origin)
+
+    def set_slot_in_connection(
+        self,
+        db: sqlite3.Connection,
+        job: str,
+        slot: str,
+        file_sha: str,
+        *,
+        origin: str = "upload",
+        converted_from: str | None = None,
+    ) -> tuple[SlotVersion, int]:
         parts = slot.split("/")
         if (
             not 1 <= len(parts) <= 16
@@ -174,35 +196,39 @@ class Workspace:
             or any("\\" in part or any(ord(char) < 32 for char in part) for part in parts)
         ):
             raise EmaError("invalid_slot", "Numele fişierului este invalid.", "")
-        with self.connect() as db:
-            job_row = db.execute(
-                "SELECT client_slug FROM jobs WHERE id=? AND deleted=0", (job,)
-            ).fetchone()
-            if job_row is None:
-                raise EmaError("job_missing", "Lucrarea nu există.", job)
-            if (
-                db.execute(
-                    "SELECT 1 FROM files WHERE sha=? AND client_slug=?",
-                    (file_sha, job_row["client_slug"]),
-                ).fetchone()
-                is None
-            ):
-                raise EmaError("file_missing", "Fişierul nu există.", file_sha)
-            db.execute("INSERT OR IGNORE INTO slots (job_id,name) VALUES (?,?)", (job, slot))
-            row = db.execute(
-                "SELECT next_version FROM slots WHERE job_id=? AND name=?", (job, slot)
-            ).fetchone()
-            version = int(row["next_version"])
+        job_row = db.execute(
+            "SELECT client_slug FROM jobs WHERE id=? AND deleted=0", (job,)
+        ).fetchone()
+        if job_row is None:
+            raise EmaError("job_missing", "Lucrarea nu există.", job)
+        if (
             db.execute(
-                "INSERT INTO slot_versions VALUES (?,?,?,?,?,?)",
-                (job, slot, version, file_sha, origin, converted_from),
-            )
-            db.execute(
-                "UPDATE slots SET active_version=?,next_version=next_version+1, "
-                "revision=revision+1 WHERE job_id=? AND name=?",
-                (version, job, slot),
-            )
-        return SlotVersion(job, slot, version, file_sha, origin, converted_from)
+                "SELECT 1 FROM files WHERE sha=? AND client_slug=?",
+                (file_sha, job_row["client_slug"]),
+            ).fetchone()
+            is None
+        ):
+            raise EmaError("file_missing", "Fişierul nu există.", file_sha)
+        db.execute("INSERT OR IGNORE INTO slots (job_id,name) VALUES (?,?)", (job, slot))
+        row = db.execute(
+            "SELECT next_version FROM slots WHERE job_id=? AND name=?", (job, slot)
+        ).fetchone()
+        version = int(row["next_version"])
+        db.execute(
+            "INSERT INTO slot_versions VALUES (?,?,?,?,?,?)",
+            (job, slot, version, file_sha, origin, converted_from),
+        )
+        db.execute(
+            "UPDATE slots SET active_version=?,next_version=next_version+1, "
+            "revision=revision+1 WHERE job_id=? AND name=?",
+            (version, job, slot),
+        )
+        updated = db.execute(
+            "SELECT revision FROM slots WHERE job_id=? AND name=?", (job, slot)
+        ).fetchone()
+        return SlotVersion(job, slot, version, file_sha, origin, converted_from), int(
+            updated["revision"]
+        )
 
     def list_versions(self, job: str, slot: str) -> list[SlotVersion]:
         with self.connect() as db:

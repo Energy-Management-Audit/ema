@@ -61,6 +61,9 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
         ("DELETE", "/settings/providers/{provider}/key"),  # s17b-home-settings
         ("POST", "/backups"),  # s17b-home-settings
         ("GET", "/settings/update"),  # s18-update
+        ("POST", "/jobs/{job_id}/invoices/files"),  # s17b-invoices
+        ("GET", "/jobs/{job_id}/invoices/page.png"),  # s17b-invoices
+        ("GET", "/jobs/{job_id}/invoices/file"),  # s17b-invoices
     }
     diff = Path("openapi/s16-diff.md").read_text(encoding="utf-8")
     added_text = diff.split("### Added\n", 1)[1].split("### Removed\n", 1)[0]

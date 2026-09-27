@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 import subprocess
 import unicodedata
 from dataclasses import dataclass
@@ -44,12 +45,14 @@ def render_evidence_png(
     if path.suffix.lower() != ".pdf":
         raise EmaError("evidence_not_pdf", "Dovada nu provine dintr-un PDF.", "")
     try:
+        if mode == "page":
+            return render_page_png(path, locator.page)
         with pypdfium2.PdfDocument(path) as document:
             if locator.page < 1 or locator.page > len(document):
                 raise EmaError("evidence_missing", "Pagina dovezii lipseşte.", "")
             render_page: Any = document[locator.page - 1]
             image: Image.Image = render_page.render(scale=2).to_pil()
-            if mode == "snippet" and isinstance(locator, PdfRegion):
+            if isinstance(locator, PdfRegion):
                 x0, y0, x1, y1 = locator.bbox
                 box = (int(x0 * 2), int(y0 * 2), int(x1 * 2), int(y1 * 2))
                 image = image.crop(box)
@@ -62,6 +65,89 @@ def render_evidence_png(
             return output.getvalue()
     except (pypdfium2.PdfiumError, OSError) as exc:
         raise EmaError("file_type", "Fişierul PDF este invalid.", "") from exc
+
+
+def render_page_png(path: Path, page: int, scale: int = 2) -> bytes:
+    try:
+        with pypdfium2.PdfDocument(path) as document:
+            if page < 1 or page > len(document):
+                raise EmaError("evidence_missing", "Pagina dovezii lipseşte.", "")
+            render_page: Any = document[page - 1]
+            image: Image.Image = render_page.render(scale=scale).to_pil()
+            output = io.BytesIO()
+            image.save(output, format="PNG")
+            return output.getvalue()
+    except (pypdfium2.PdfiumError, OSError) as exc:
+        raise EmaError("file_type", "Fişierul PDF este invalid.", "") from exc
+
+
+def render_invoice_crop_png(path: Path, page: int, value: str, snippet: str) -> bytes:
+    """Show the printed figure at reading size; retain the full page if no match is found."""
+    target = re.sub(r"\D", "", value)
+    if not target:
+        return render_page_png(path, page)
+    with pdfplumber.open(path) as document:
+        if page < 1 or page > len(document.pages):
+            raise EmaError("evidence_missing", "Pagina dovezii lipseşte.", "")
+        sheet = document.pages[page - 1]
+        words = sheet.extract_words()
+        label = re.sub(r"\W", "", snippet.split(":", 1)[0]).lower()
+        matches: list[tuple[int, float, float, float, float]] = []
+        for start in range(len(words)):
+            for end in range(start + 1, min(start + 4, len(words) + 1)):
+                group = words[start:end]
+                if (
+                    max(float(word["top"]) for word in group)
+                    - min(float(word["top"]) for word in group)
+                    > 5
+                ):
+                    break
+                printed = re.sub(r"\D", "", "".join(str(word["text"]) for word in group))
+                if printed != target:
+                    continue
+                line = " ".join(
+                    str(word["text"])
+                    for word in words
+                    if abs(float(word["top"]) - float(group[0]["top"])) < 8
+                )
+                nearby_label = int(bool(label and label in re.sub(r"\W", "", line).lower()))
+                matches.append(
+                    (
+                        nearby_label,
+                        min(float(word["x0"]) for word in group),
+                        min(float(word["top"]) for word in group),
+                        max(float(word["x1"]) for word in group),
+                        max(float(word["bottom"]) for word in group),
+                    )
+                )
+        if not matches:
+            return render_page_png(path, page)
+        _score, x0, top, x1, bottom = max(matches, key=lambda item: item[0])
+        left = max(0, x0 - 65)
+        upper = max(0, top - 32)
+        right = min(float(sheet.width), max(x1 + 155, left + 270))
+        lower = min(float(sheet.height), max(bottom + 35, upper + 92))
+    scale = 2
+    with pypdfium2.PdfDocument(path) as document:
+        render_page: Any = document[page - 1]
+        rendered: Image.Image = render_page.render(scale=scale).to_pil()
+    image = rendered.crop(
+        (int(left * scale), int(upper * scale), int(right * scale), int(lower * scale))
+    )
+    ImageDraw.Draw(image, "RGBA").rectangle(
+        (
+            int((x0 - left) * scale),
+            int((top - upper) * scale),
+            int((x1 - left) * scale),
+            int((bottom - upper) * scale),
+        ),
+        fill=(207, 151, 48, 55),
+        outline=(172, 107, 12, 255),
+        width=3,
+    )
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
 
 
 @dataclass(frozen=True)

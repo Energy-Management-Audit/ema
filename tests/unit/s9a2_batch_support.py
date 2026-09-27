@@ -25,13 +25,16 @@ def assert_parser_batch_exportable(
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "invoices", "synthetic", None)
     outcomes = []
+    sources: list[tuple[str, str]] = []
     for index, item in enumerate(documents, start=1):
         drafts = tuple(parser.parse(item))
         assert drafts
         source = tmp_path / item.path.name
         source.write_bytes(b"synthetic PDF placeholder")
         digest = ws.add_file("synthetic", source)
-        ws.set_slot(job, f"invoices/{index:04d}", digest, origin=source.name)
+        slot = f"invoices/{index:04d}"
+        ws.set_slot(job, slot, digest, origin=source.name)
+        sources.append((slot, digest))
         metadata = ExtractionMetadata(
             parser_name=type(parser).__name__,
             layout_version=parser.layout_version,
@@ -52,7 +55,9 @@ def assert_parser_batch_exportable(
 
     def stage(ctx: Any) -> StageOutcome:
         ctx.read_slots("invoices")
-        (ctx.artifact_dir() / "outcomes.json").write_text(encode(outcomes), encoding="utf-8")
+        (ctx.artifact_dir() / "outcomes.json").write_text(
+            encode(outcomes, sources), encoding="utf-8"
+        )
         return StageOutcome()
 
     run_stage(ws, job, "invoices", stage)

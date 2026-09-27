@@ -60,6 +60,7 @@ class SlotVersion(BaseModel):
     file_sha: str
     origin: str
     converted_from: str | None
+    slot_revision: int
 
 
 class SectionState(BaseModel):
@@ -286,40 +287,6 @@ class ProviderTest(BaseModel):
     provider: str
     status: Literal["no_key", "ok", "failed"]
     verified_at: str | None = None
-
-
-class InvoiceIdentityInput(BaseModel):
-    client_id: str
-    on_revision: int
-    confirm: bool
-
-
-class InvoiceCandidate(BaseModel):
-    client_id: str
-    cui: str | None = None
-    pod: str | None = None
-
-
-class InvoiceIdentity(BaseModel):
-    batch_id: str
-    candidate: InvoiceCandidate | None = None
-    confirmed: bool
-    evidence_ids: list[str]
-
-
-class InvoiceRow(BaseModel):
-    id: str
-    month: str | None = None
-    consumption_kwh: float | None = None
-    source_evidence_ids: list[str]
-    anomalies: list[str]
-
-
-class InvoiceBatchView(BaseModel):
-    batch_id: str
-    identity: InvoiceIdentity
-    rows: list[InvoiceRow]
-    missing_months: list[str]
 
 
 class ReportingIn(BaseModel):

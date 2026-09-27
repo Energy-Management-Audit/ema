@@ -35,11 +35,15 @@ def _json_value(value: Any) -> Any:
     return value
 
 
-def encode(outcomes: list[DocumentOutcome]) -> str:
+def encode(
+    outcomes: list[DocumentOutcome], sources: list[tuple[str | None, str | None]] | None = None
+) -> str:
     rows: list[dict[str, Any]] = []
-    for outcome in outcomes:
+    for index, outcome in enumerate(outcomes):
         row = asdict(outcome)
         row["source_path"] = outcome.source_path.name
+        if sources is not None:
+            row["slot"], row["file_sha"] = sources[index]
         rows.append(_json_value(row))
     return json.dumps(rows, ensure_ascii=False, sort_keys=True, indent=2)
 
@@ -61,7 +65,7 @@ def _scalar(key: str, value: Any) -> str | Decimal | date | int | None:
     return value
 
 
-def _draft(row: dict[str, Any]) -> InvoiceDraft:
+def decode_draft(row: dict[str, Any]) -> InvoiceDraft:
     fields = {
         key: FieldValue(
             _scalar(key, value["value"]),
@@ -109,5 +113,8 @@ def _draft(row: dict[str, Any]) -> InvoiceDraft:
 def exportable_drafts(payload: str) -> list[InvoiceDraft]:
     rows: list[dict[str, Any]] = json.loads(payload)
     return [
-        _draft(draft) for row in rows if row["status"] == "exportable" for draft in row["drafts"]
+        decode_draft(draft)
+        for row in rows
+        if row["status"] == "exportable"
+        for draft in row["drafts"]
     ]

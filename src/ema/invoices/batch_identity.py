@@ -52,14 +52,10 @@ class BatchClient:
         )
 
 
-def _source_hashes(ws: Workspace, job: str) -> dict[str, str]:
-    mapping: dict[str, str] = {}
-    for slot in ws.list_slots(job, "invoices"):
-        versions = ws.list_versions(job, slot)
-        if versions:
-            active = versions[-1]
-            mapping[active.origin] = active.file_sha
-    return mapping
+def source_keys(rows: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    if any("slot" not in row or "file_sha" not in row for row in rows):
+        raise EmaError("invoices_stale", "Facturile trebuie citite din nou.", "")
+    return [(str(row["slot"] or ""), str(row["file_sha"] or "")) for row in rows]
 
 
 def _names(field: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
@@ -97,11 +93,11 @@ def build(  # noqa: C901
     pods: set[str] = set()
     candidates: list[dict[str, Any]] = []
     proof: list[Evidence] = []
-    sha_by_name = _source_hashes(ws, job)
+    keys = source_keys(rows)
     supplier_pods: dict[str, set[str]] = defaultdict(set)
-    missing_pods: dict[str, list[str]] = defaultdict(list)
+    missing_pods: dict[str, list[tuple[str, str]]] = defaultdict(list)
     pod_sources: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in rows:
+    for row, (_slot, sha) in zip(rows, keys, strict=True):
         filename = str(row["source_path"])
         for draft in row.get("drafts", []):
             supplier = str(draft.get("supplier") or "")
@@ -118,12 +114,17 @@ def build(  # noqa: C901
                 supplier_pods[supplier].add(printed_pod)
                 pod_sources[printed_pod].extend(
                     [
-                        {"file": filename, "page": item["page_number"], "snippet": item["snippet"]}
+                        {
+                            "file": filename,
+                            "sha": sha,
+                            "page": item["page_number"],
+                            "snippet": item["snippet"],
+                        }
                         for item in pod_field.get("evidence", [])
                     ]
                 )
             elif row["status"] not in {"incompatible", "failed", "duplicate"}:
-                missing_pods[supplier].append(filename)
+                missing_pods[supplier].append((filename, sha))
             candidates.append(
                 {
                     "file": filename,
@@ -146,14 +147,14 @@ def build(  # noqa: C901
                 names.append(name)
             for source_field in (data.get("client_name", {}), tax_field, pod_field):
                 for item in source_field.get("evidence", []):
-                    if filename not in sha_by_name:
+                    if not sha:
                         continue
                     snippet = str(item["snippet"])
                     proof.append(
                         Evidence(
                             id=uuid.uuid4().hex,
                             provenance="document",
-                            file_sha=sha_by_name[filename],
+                            file_sha=sha,
                             locator=PdfText(page=int(item["page_number"]), span=snippet),
                             method="invoice",
                             retrieved_at=datetime.now(UTC),
@@ -218,7 +219,8 @@ def build(  # noqa: C901
         {
             "supplier": supplier,
             "pod": next(iter(supplier_pods[supplier])),
-            "files": sorted(set(filenames)),
+            "files": sorted(filename for filename, _sha in filenames),
+            "file_shas": sorted({sha for _filename, sha in filenames if sha}),
             "sources": pod_sources[next(iter(supplier_pods[supplier]))],
         }
         for supplier, filenames in missing_pods.items()
