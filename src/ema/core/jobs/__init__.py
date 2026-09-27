@@ -218,6 +218,7 @@ def _finish(  # noqa: C901
     outcome: StageOutcome | None,
     error: str | None,
     on_finish: Callable[[sqlite3.Connection, str], None] | None = None,
+    failure: EmaError | None = None,
 ) -> None:
     fingerprint_data = {
         "reads": sorted(
@@ -298,6 +299,10 @@ def _finish(  # noqa: C901
             }
         elif state == "cancelled":
             event_type, payload = "stage_cancelled", {"state": "cancelled"}
+        elif failure is not None:
+            # A known refusal keeps its code and message so a screen can say what went wrong.
+            event_type = "stage_failed"
+            payload = {"code": failure.code, "message": failure.user_message_ro}
         else:
             event_type, payload = "stage_failed", {"code": "stage_failed"}
         append(db, context.job, context.run_id, context.stage, event_type, payload)
@@ -350,17 +355,19 @@ def _execute_stage(
     ws, job, run = context.ws, context.job, context.run_id
     outcome: StageOutcome | None = None
     error: str | None = None
+    failure: EmaError | None = None
     fatal: BaseException | None = None
     try:
         outcome = fn(context)
     except BaseException as exc:
         error = str(exc) or type(exc).__name__
+        failure = exc if isinstance(exc, EmaError) else None
         if not isinstance(exc, Exception):
             fatal = exc
         record_failure(ws, job, exc)
     finally:
         try:
-            _finish(ws, context, outcome, error, on_finish)
+            _finish(ws, context, outcome, error, on_finish, failure)
         except Exception as exc:
             record_failure(ws, job, exc)
             with ws.connect() as db:

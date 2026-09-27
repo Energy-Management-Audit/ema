@@ -1,0 +1,317 @@
+/* 3d Raport Word: the progress row, CUPRINS (220) beside the paged preview, and the report panel
+   in the activity column. Paper never inverts; everything else follows the theme tokens. */
+
+.ema-content:has(> .report) {
+  overflow: hidden;
+}
+.report {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.report__crumb {
+  color: var(--section-key);
+  text-decoration: none;
+}
+.report__crumb:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.report__template {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 15px;
+  border: 1px solid rgb(var(--ink-rgb) / 0.14);
+  border-radius: 20px;
+  font-size: 12.5px;
+}
+
+.report__progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 0 0;
+}
+.report__progress-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.report__progress-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.report__progress-line strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.report__count {
+  flex: none;
+  color: var(--section-key);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.report > .ema-failure {
+  margin-top: 16px;
+}
+.report__body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 26px;
+  min-height: 0;
+  padding: 18px 0 0;
+}
+.report__preview {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 4px 26px 0;
+  scrollbar-color: rgb(var(--ink-rgb) / 0.22) transparent;
+  scrollbar-width: thin;
+}
+.report__loading {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+.report__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 44ch;
+  margin: 0;
+  padding: 40px 0 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.report__empty p {
+  margin: 0;
+}
+
+/* CUPRINS */
+.report-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  overflow: auto;
+}
+.report-toc .ema-section-key {
+  padding: 2px 2px 10px;
+}
+.report-toc__item,
+.report-toc__markers {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 2px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  transition:
+    background-color 160ms ease,
+    transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.report-toc__item:not(:disabled) {
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .report-toc__item:not(:disabled):hover {
+    background: var(--row-hover);
+  }
+}
+.report-toc__item:not(:disabled):active {
+  transform: scale(0.98);
+}
+.report-toc__item:disabled {
+  cursor: default;
+}
+.report-toc__item--working {
+  margin: 2px 0;
+  padding: 9px 10px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-weight: 500;
+}
+.report-toc__mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 12px;
+}
+.report-toc__title {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.report-toc__page {
+  flex: none;
+  color: var(--section-key);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.report-toc__markers {
+  color: var(--amber-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+.report-toc__markers .report-toc__mark {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* The paged preview: each page on paper, 560 wide. */
+.report-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+.report-page {
+  position: relative;
+  flex: none;
+  width: 560px;
+  overflow: hidden;
+  border: 1px solid rgba(37, 34, 25, 0.2);
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(37, 34, 25, 0.09);
+  scroll-margin-top: 4px;
+}
+.report-page__number {
+  position: absolute;
+  z-index: 1;
+  top: 18px;
+  right: 22px;
+  color: rgba(37, 34, 25, 0.45);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.report-page__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Ce intră în raport */
+.report-panel__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: auto;
+}
+.report-panel__row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgb(var(--ink-rgb) / 0.08);
+  border-radius: 2px;
+}
+.report-panel__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.report-panel__line--failed {
+  color: var(--error-ink);
+}
+.report-panel__bang,
+.report-panel__dot {
+  width: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.report-panel__bang {
+  color: var(--amber-ink);
+}
+.report-panel__detail {
+  padding-left: 20px;
+  color: var(--ink-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.report-panel__code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.report-panel__marker {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgb(var(--amber-rgb) / 0.18);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.report-panel__fill {
+  align-self: flex-start;
+  margin-left: 20px;
+}
+.report-panel__version {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 16px 0 20px;
+  border-top: 1px solid rgb(var(--ink-rgb) / 0.08);
+}
+.report-panel__file {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+.report-panel__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.report-panel__size {
+  flex: none;
+  color: var(--section-key);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.report-panel__note {
+  color: var(--ink-muted);
+  font-size: 11.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .report-toc__item {
+    transition: background-color 160ms ease;
+  }
+  .report-toc__item:not(:disabled):active {
+    transform: none;
+  }
+}

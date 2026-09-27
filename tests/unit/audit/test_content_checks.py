@@ -31,9 +31,7 @@ def test_narrative_gap_blocks_final_until_corrected(tmp_path: Path) -> None:
     field = mark_absent(
         ws,
         job,
-        FieldSpec(
-            key="narrative.ch5.termic_rezultate", label="Rezultate termice", value_type="text"
-        ),
+        FieldSpec(key="narrative.ch5.panel-1.p1", label="Rezultate termice", value_type="text"),
         "not_found",
     )
     readiness = AuditWorkflow().readiness(ws, job)

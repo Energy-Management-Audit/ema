@@ -1,0 +1,138 @@
+"""The unit plan of an audit job: which repeated units its base keeps."""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Iterable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal
+
+from docx import Document
+
+from ema.audit.base_units import UnitPlan
+from ema.audit.visit import visit_view_from_slots
+from ema.core.errors import EmaError
+from ema.core.review.models import Field
+from ema.core.workspace import SlotVersion, Workspace
+from ema.energy_data.carriers import WATER_CARRIERS, Carrier
+from ema.energy_data.necesar import parse_necesar_info
+from ema.energy_data.source import normal
+
+ProcessesSource = Literal["schemes", "fisa", "default"]
+
+_SCHEME = re.compile(r"^5\.(\d+)\.")
+_FAMILIES: dict[Carrier, str] = {
+    Carrier.electricity_grid: "electricity",
+    Carrier.electricity_pv: "electricity",
+    Carrier.natural_gas: "gas",
+    Carrier.diesel: "fuel",
+    Carrier.petrol: "fuel",
+    Carrier.lpg: "fuel",
+    Carrier.fuel_oil: "fuel",
+    Carrier.clu: "fuel",
+    **dict.fromkeys(WATER_CARRIERS, "water"),
+}
+
+
+@dataclass(frozen=True)
+class JobUnitPlan(UnitPlan):
+    processes_source: ProcessesSource = "default"
+
+
+def process_count(slot_names: Iterable[str], fisa: Path | None) -> tuple[int, ProcessesSource]:
+    """Flow schemes (checklist item 5) first, then the Fişa's `Flux` paragraphs, else one."""
+    schemes = {match.group(1) for name in slot_names if (match := _SCHEME.match(Path(name).name))}
+    if schemes:
+        return len(schemes), "schemes"
+    if fisa is not None:
+        flows = sum(
+            paragraph.text.strip().casefold().startswith("flux")
+            for paragraph in Document(str(fisa)).paragraphs
+        )
+        if flows:
+            return flows, "fisa"
+    return 1, "default"
+
+
+def carrier_families(job_fields: Iterable[Field]) -> frozenset[str]:
+    families: set[str] = set()
+    for field in job_fields:
+        parts = field.key.split(".")
+        if parts[0] != "carrier" or field.presence != "found" or len(parts) < 3:
+            continue
+        carrier = Carrier._value2member_map_.get(parts[1])
+        if isinstance(carrier, Carrier) and carrier in _FAMILIES:
+            families.add(_FAMILIES[carrier])
+    return frozenset(families)
+
+
+def _slot(row: dict[str, object]) -> SlotVersion:
+    return SlotVersion(
+        str(row["job_id"]),
+        str(row["slot"]),
+        int(str(row["version"])),
+        str(row["file_sha"]),
+        str(row["origin"]),
+        None if row["converted_from"] is None else str(row["converted_from"]),
+    )
+
+
+def unit_plan(ws: Workspace, job: str) -> JobUnitPlan:
+    with ws.connect() as db:
+        db.execute("BEGIN")
+        record = db.execute(
+            "SELECT j.client_slug, c.name FROM jobs j LEFT JOIN clients c ON c.id=j.client_slug "
+            "WHERE j.id=?",
+            (job,),
+        ).fetchone()
+        job_fields = [
+            Field.model_validate_json(row["data"])
+            for row in db.execute("SELECT data FROM fields WHERE job_id=?", (job,))
+        ]
+        rows = db.execute(
+            "SELECT v.*, f.relative_path, f.added_at FROM slots s JOIN slot_versions v "
+            "ON v.job_id=s.job_id AND v.slot=s.name AND v.version=s.active_version "
+            "JOIN jobs j ON j.id=s.job_id "
+            "LEFT JOIN files f ON f.sha=v.file_sha AND f.client_slug=j.client_slug "
+            "WHERE s.job_id=? ORDER BY s.name",
+            (job,),
+        ).fetchall()
+    by_key = {field.key: field for field in job_fields}
+    company = by_key.get("audit.company_name")
+    client_name = str(company.value).strip() if company and company.value else ""
+    if not client_name and record is not None:
+        client_name = str(record["name"] or "").strip()
+    if not client_name:
+        raise EmaError("audit_client_name", "Denumirea clientului lipseşte.", "")
+    dossier = [row for row in rows if str(row["slot"]).startswith("dossier/")]
+    fisas = sorted(
+        (
+            row
+            for row in dossier
+            if Path(str(row["slot"])).suffix.lower() == ".docx"
+            and normal(Path(str(row["slot"])).name).startswith("fisa")
+            and row["relative_path"] is not None
+        ),
+        key=lambda row: float(row["added_at"]),
+    )
+    fisa = ws.path(str(fisas[-1]["relative_path"])) if fisas else None
+    processes, source = process_count((str(row["slot"]) for row in dossier), fisa)
+    view = visit_view_from_slots([_slot(dict(row)) for row in rows])
+    checklist = [row for row in dossier if Path(str(row["slot"])).name.startswith("0.")]
+    tables = 0
+    if len(checklist) == 1 and checklist[0]["relative_path"] is not None:
+        info = parse_necesar_info(ws.path(str(checklist[0]["relative_path"])))
+        tables = sum(name.startswith("echipamente ") for name in info.tables)
+    count = by_key.get("audit_measure.count")
+    measures = int(count.value) if count is not None and count.value is not None else 0
+    return JobUnitPlan(
+        client_name=client_name,
+        processes=processes,
+        carriers=carrier_families(job_fields),
+        measured_panels=len(view.panels),
+        thermal_measurements=any(str(row["slot"]).startswith("visit/thermal/") for row in rows),
+        equipment_tables=tables,
+        measures=measures,
+        processes_source=source,
+    )

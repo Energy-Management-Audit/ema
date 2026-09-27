@@ -93,6 +93,56 @@ def _toc_entry(prototype: Any, title: str, bookmark: str) -> Any:
     return entry
 
 
+DEFAULT_TOC = ' TOC \\o "1-2" \\h \\z \\u '
+
+
+def _field_run(kind: str) -> Any:
+    run = OxmlElement("w:r")
+    char = OxmlElement("w:fldChar")
+    char.set(qn("w:fldCharType"), kind)
+    run.append(char)
+    return run
+
+
+def _take_toc_field(root: Any, toc: list[Any]) -> str:
+    """Return the base's TOC instruction and drop a field end left outside the TOC entries."""
+    instruction = DEFAULT_TOC
+    stack: list[bool] = []
+    entries = set(toc)
+    orphans: list[Any] = []
+    for node in root.iter(qn("w:fldChar"), qn("w:instrText")):
+        if node.tag == qn("w:instrText"):
+            if stack and not stack[-1] and (node.text or "").strip().startswith("TOC"):
+                stack[-1] = True
+                instruction = node.text or DEFAULT_TOC
+            continue
+        kind = node.get(qn("w:fldCharType"))
+        if kind == "begin":
+            stack.append(False)
+        elif kind == "end" and stack and stack.pop():
+            paragraph = next(node.iterancestors(qn("w:p")), None)
+            if paragraph is not None and paragraph not in entries:
+                orphans.append(node.getparent())
+    for run in orphans:
+        run.getparent().remove(run)
+    return instruction
+
+
+def _wrap_in_field(entries: list[Any], instruction: str) -> None:
+    """One TOC field around the entries, so Word can renumber them as its table of contents."""
+    first = entries[0]
+    properties = first.find(qn("w:pPr"))
+    code = OxmlElement("w:r")
+    text = OxmlElement("w:instrText")
+    text.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    text.text = instruction
+    code.append(text)
+    index = 1 if properties is not None else 0
+    for offset, run in enumerate((_field_run("begin"), code, _field_run("separate"))):
+        first.insert(index + offset, run)
+    entries[-1].append(_field_run("end"))
+
+
 def refresh_toc(document: Any) -> None:
     root = document.element.body
     body = list(root)
@@ -132,6 +182,7 @@ def refresh_toc(document: Any) -> None:
         )
         for level in (1, 2)
     }
+    instruction = _take_toc_field(root, toc)
     before = toc[0]
     all_roots = [document.element]
     all_roots.extend(section.header._element for section in document.sections)
@@ -143,6 +194,7 @@ def refresh_toc(document: Any) -> None:
     )
     number = max(all_ids, default=0) + 1
     subsection: dict[int, int] = {}
+    entries: list[Any] = []
     for item, start, _ in spans:
         if item.heading.level not in (0, 1):
             continue
@@ -157,7 +209,11 @@ def refresh_toc(document: Any) -> None:
             title = f"{printed}.{subsection[chapter]}. {heading_text}"
         bookmark = f"_Toc{number}"
         _bookmark(body[start], bookmark, number)
-        before.addprevious(_toc_entry(prototypes[item.heading.level + 1], title, bookmark))
+        entry = _toc_entry(prototypes[item.heading.level + 1], title, bookmark)
+        before.addprevious(entry)
+        entries.append(entry)
         number += 1
     for element in toc:
         root.remove(element)
+    if entries:
+        _wrap_in_field(entries, instruction)

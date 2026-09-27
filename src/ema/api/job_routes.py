@@ -21,9 +21,11 @@ from ema.audit.chapter_five import start_measurements
 from ema.audit.intake import audit_intake, select_checklist
 from ema.audit.measures import compose_measures, validate_measures_form
 from ema.audit.read import read_job
+from ema.audit.render import start_audit_render
 from ema.audit.sections import Status, set_status
 from ema.audit.sections_bulk import patch_sections
 from ema.audit.visit import start_visit
+from ema.audit.workflow import AuditWorkflow
 from ema.core.errors import EmaError
 from ema.core.jobs import get_job, run_stage
 from ema.core.jobs.outputs import list_outputs
@@ -36,7 +38,18 @@ from ema.piee.review_workflow import start_word_render
 from ema.piee.workflow import start_generate_for_job, start_import_for_job
 
 _STAGES: dict[str, set[str]] = {
-    "audit": {"intake", "read", "fill", "draft", "visit", "readings", "measurements", "measures"},
+    "audit": {
+        "intake",
+        "read",
+        "fill",
+        "draft",
+        "visit",
+        "readings",
+        "measurements",
+        "measures",
+        "audit_render",
+        "audit_final",
+    },
     "piee": {"piee_import", "piee_generate", "piee_word"},
     "invoices": {"invoices", "invoices_workbook"},
     "reporting": set(),
@@ -122,6 +135,10 @@ def start_named_stage(  # noqa: C901, PLR0911, PLR0912
     if stage == "measures":
         validate_measures_form(ws, job)
         return run_stage(ws, job, stage, compose_measures, on_revision=on_revision)
+    if stage == "audit_render":
+        return start_audit_render(ws, job, "draft", on_revision=on_revision)
+    if stage == "audit_final":
+        return AuditWorkflow().start_final(ws, job, on_revision=on_revision)
     if stage == "piee_import":
         return start_import_for_job(ws, job, on_revision=on_revision)
     if stage == "piee_generate":

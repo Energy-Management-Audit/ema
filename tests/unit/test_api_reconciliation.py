@@ -71,6 +71,7 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
         ("DELETE", "/settings/providers/{provider}/key"),  # s17b-home-settings
         ("POST", "/backups"),  # s17b-home-settings
         ("GET", "/settings/update"),  # s18-update
+        ("GET", "/jobs/{job_id}/audit/report"),  # s17b-audit-report
         ("POST", "/jobs/{job_id}/invoices/files"),  # s17b-invoices
         ("GET", "/jobs/{job_id}/invoices/page.png"),  # s17b-invoices
         ("GET", "/jobs/{job_id}/invoices/file"),  # s17b-invoices

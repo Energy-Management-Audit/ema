@@ -4,14 +4,21 @@ from __future__ import annotations
 
 import sqlite3
 
+from ema.audit.ai_wording import ai_wording
 from ema.audit.visit import slug
 from ema.core.review.models import Field, Issue
+from ema.core.review.section_transition import SectionState, Status
 
 
 def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
     fields = {
         str(row["key"]): Field.model_validate_json(row["data"])
         for row in db.execute("SELECT key,data FROM fields WHERE job_id=?", (job,))
+    }
+    not_applicable = {
+        str(row["section_id"])
+        for row in db.execute("SELECT section_id,data FROM section_states WHERE job_id=?", (job,))
+        if SectionState.parse(row["data"]).status == Status.NA
     }
     count_field = fields.get("audit_measure.count")
     measure_count = (
@@ -55,12 +62,24 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
                     message=f"Confirmaţi valoarea de pe fotografie: {field.label}",
                 )
             )
-        if not key.startswith("narrative."):
+        if not key.startswith("narrative.") or key.removeprefix("narrative.") in not_applicable:
             continue
         if key.startswith("narrative.ch6.measure.") and measure_count is not None:
             suffix = key.removeprefix("narrative.ch6.measure.")
             if suffix.isdecimal() and int(suffix) > measure_count:
                 continue
+        if (
+            isinstance(field.value, str)
+            and field.review != "rejected"
+            and (wording := ai_wording(field.value))
+        ):
+            issues.append(
+                Issue(
+                    code="ai_wording",
+                    field_id=field.id,
+                    message=f"Textul menţionează AI („{wording}”): {field.label}",
+                )
+            )
         if field.value is None or field.review == "rejected":
             issues.append(
                 Issue(

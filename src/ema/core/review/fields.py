@@ -198,6 +198,14 @@ def mark_absent(  # noqa: PLR0913
         return field
 
 
+def decided(field: Field) -> bool:
+    return (
+        field.review == "corrected"
+        or (field.review == "accepted" and field.chosen is not None)
+        or field.state == "manual"
+    )
+
+
 def fields(ws: Workspace, job: str, *, status: str | None = None) -> list[Field]:
     with ws.connect() as db:
         rows = db.execute("SELECT data FROM fields WHERE job_id=? ORDER BY key", (job,)).fetchall()

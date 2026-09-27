@@ -16,12 +16,14 @@ from lxml import etree
 
 from ema.audit.base import build_base, build_configured_base
 from ema.audit.base_anchor import MARKER, _paragraph_text
+from ema.audit.base_identity import derive_identity as _identity
 from ema.audit.base_numeric import approved_fixed_number, has_number
 from ema.audit.base_package import package_issues
 from ema.audit.base_units import UnitPlan, select_units
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.headings import map_headings
 from ema.audit.inventory import inventory
+from ema.audit.render_plan import process_count
 from ema.core.config import Settings
 from ema.core.office.anchors import find
 from ema.core.office.word_api import word_automation, word_available
@@ -35,32 +37,10 @@ def _references(root: Path) -> tuple[Path, Path]:
     return next(audits.glob("*AUDIT-01*.docx")), next(audits.glob("*AUDIT-04*.docx"))
 
 
-def _identity(base: Path) -> tuple[str, ...]:
-    # Derive local-only denylist terms from the base name and ch. 2.1.
-    company = base.stem.split("AUDIT ENERGETIC ", 1)[1].rsplit(" - ", 1)[0]
-    words = re.findall(r"[^\W\d_]{5,}", company)
-    general = " ".join(
-        paragraph.text for paragraph in _section_paragraphs(base, "ch2.date_generale")
-    )
-    identifiers = [
-        match
-        for pattern in (
-            r"\b(?:RO)?\d{7,10}\b",  # CUI
-            r"\bJ\d{1,2}/\d{1,6}/\d{4}\b",  # registration
-            r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}",
-            r"(?:https?://|www\.)[^\s]+",
-            r"\b0\d{9}\b",
-        )
-        for match in re.findall(pattern, general, flags=re.I)
-    ]
-    return tuple(dict.fromkeys((company, *words, *identifiers)))
-
-
 def _CLIENT-A1_plan(root: Path) -> UnitPlan:
     received = root / "audit/cases/audit-case-a/received"
     # Six distinct 5.x Flux schemes; the second 5.1 file is a revision.
-    schemes = {re.match(r"5\.(\d+)\.", path.name).group(1) for path in received.glob("5.*Flux*")}
-    assert schemes == {str(number) for number in range(1, 7)}
+    assert process_count([path.name for path in received.iterdir()], None) == (6, "schemes")
     panels = list(received.glob("13.[56].Armonici*.pdf"))
     assert len(panels) == 2
     info = parse_necesar_info(next(received.glob("*Necesar info*.xls")))
@@ -75,12 +55,9 @@ def _CLIENT-A1_plan(root: Path) -> UnitPlan:
 def _CLIENT-A2_plan(root: Path) -> UnitPlan:
     case = root / "audit/cases/audit-case-b"
     received = case / "received"
-    # The received Fisa has two body paragraphs beginning "Flux".
-    fisa = Document(next(received.glob("Fisa*.docx")))
-    processes = sum(
-        paragraph.text.casefold().strip().startswith("flux") for paragraph in fisa.paragraphs
-    )
-    assert processes == 2
+    # No 5.x schemes; the received Fisa has two body paragraphs beginning "Flux".
+    fisa = next(received.glob("Fisa*.docx"))
+    assert process_count([path.name for path in received.iterdir()], fisa) == (2, "fisa")
     assert list(received.glob("*ATR*.pdf"))  # electricity
     assert list(received.glob("*Gaze*.zip"))  # gas
     panels = list((case / "visit/electrical").glob("tablou-electric-*"))

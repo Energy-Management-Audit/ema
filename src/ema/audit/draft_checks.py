@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel
 from pydantic import Field as ModelField
 
+from ema.audit.ai_wording import ai_wording
 from ema.audit.draft_schema import SECTION_FACTS, DraftText, SectionDraft
 from ema.core.errors import EmaError
 from ema.core.llm.agent import AgentContext
@@ -19,11 +20,6 @@ from ema.core.review.models import Field
 
 TOKEN = re.compile(r"\{\{f:([a-z][a-z0-9_.:-]*)\}\}")
 NUMBER = re.compile(r"\d")
-AI_MENTION = re.compile(
-    r"\b(?:AI|IA|inteligen[țt]a artificial[ăa]|model(?:ul)? de limbaj|"
-    r"chatgpt|gemini|openai|generat automat|asistent virtual)\b",
-    re.I,
-)
 NAME = re.compile(
     r"(?<![.!?]\s)(?<!\w)[A-ZĂÂÎȘȚ][A-Za-zĂÂÎȘȚăâîșț]{1,}(?:\s+[A-ZĂÂÎȘȚ][A-Za-zĂÂÎȘȚăâîșț]{2,})*"
 )
@@ -111,7 +107,7 @@ def check_draft(  # noqa: C901, PLR0912
             lambda match: str(facts[match.group(1)].value) if match.group(1) in facts else "",
             item.text,
         )
-        if AI_MENTION.search(resolved):
+        if ai_wording(resolved):
             fatal.append(DraftReview("ai_mention", location, "AI or disclaimer wording"))
         common = {name.casefold() for name in NAME_COMMON}
         candidates = {

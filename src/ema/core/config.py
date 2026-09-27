@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     audit_base_document: Path | None = None
     audit_measurement_prototype: Path | None = None
     audit_measurement_sheet_model: Path | None = None
+    audit_base_identity: Path | None = None
     piee_base_document: Path | None = None
     piee_base_directory: Path | None = None
     provider: str | None = None

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
+from ema.audit import measure_fields
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.intake import select_checklist
 from ema.audit.sections import recompute_ready, record_applicability
@@ -24,6 +25,9 @@ from ema.energy_data.model import EnergyDataset, field_key
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
 from ema.energy_data.necesar_model import NecesarInfo
 from ema.energy_data.source import Located, normal
+
+# the auditor writes these ch. 4 texts herself; nothing generates them.
+NARRATIVE_SECTIONS = ("ch4.concluzii", "ch4.eficienta", "ch4.bilant_real")
 
 
 @dataclass(frozen=True)
@@ -270,4 +274,11 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
     for section in CATALOGUE:
         if section.id.startswith("ch4."):
             record_applicability(ws, job, section.id)
+    for section in CATALOGUE:
+        if section.id in NARRATIVE_SECTIONS:
+            label = section.title[:1].upper() + section.title[1:]
+            spec = FieldSpec(
+                key=f"narrative.{section.id}", label=label, value_type="text", chapter="ch4"
+            )
+            measure_fields.absent(ws, job, spec)
     return ReadResult(dataset, tuple(result), tuple(issues))

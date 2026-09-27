@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 
 from ema.audit.catalogue import CATALOGUE
@@ -177,8 +178,18 @@ def _specific(
     return result or [Missing("body", "[de completat]")]
 
 
+def _written(text: str | None) -> list[Block]:
+    paragraphs = [part.strip() for part in (text or "").split("\n\n") if part.strip()]
+    if not paragraphs:
+        return [Missing("body", "[de completat]")]
+    return [Paragraph("body", [part]) for part in paragraphs]
+
+
 def chapter_four_blocks(  # noqa: C901
-    dataset: EnergyDataset, factors: FactorTable
+    dataset: EnergyDataset,
+    factors: FactorTable,
+    *,
+    texts: Mapping[str, str] | None = None,
 ) -> list[Block]:
     blocks: list[Block] = []
     raw = {
@@ -250,5 +261,5 @@ def chapter_four_blocks(  # noqa: C901
                 _annual(dataset, factors, Metric("co2"), dataset.years, "t CO₂", "Emisii")
             )
         elif section.id in {"ch4.concluzii", "ch4.eficienta", "ch4.bilant_real"}:
-            blocks.append(Missing("body", "[de completat]"))
+            blocks.extend(_written((texts or {}).get(section.id)))
     return blocks

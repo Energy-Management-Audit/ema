@@ -64,6 +64,12 @@ STATUS = {
     "backup_dir_missing": 409,
     "backup_changed": 409,
     "backup_failed": 424,
+    # s17b-audit-report
+    "audit_base_missing": 409,
+    "audit_client_name": 409,
+    "audit_package": 409,
+    "audit_markers": 409,
+    "audit_ai_wording": 409,
     # s17b-invoices
     "validation_error": 422,
 }
@@ -218,6 +224,8 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "output_missing",
         "file_type",
     ),
+    # s17b-audit-report
+    ("GET", "/jobs/{job_id}/audit/report"): ("job_missing", "wrong_job_type"),
     # s17b-audit-work
     ("GET", "/jobs/{job_id}/audit/documents"): ("job_missing", "wrong_job_type"),
     ("GET", "/jobs/{job_id}/audit/outline"): ("job_missing", "wrong_job_type"),
@@ -267,6 +275,14 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "file_type",
     ),
 }
+# s17b-audit-report
+ROUTE_ERRORS[("POST", "/jobs/{job_id}/stages/{stage}")] += (
+    "audit_base_missing",
+    "audit_client_name",
+    "audit_package",
+    "audit_markers",
+    "audit_ai_wording",
+)
 
 _PROBLEM_SCHEMA = {
     "type": "object",

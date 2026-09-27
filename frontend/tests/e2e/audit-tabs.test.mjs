@@ -5,7 +5,16 @@ import { withHarness } from './helpers.mjs'
 
 test('audit document, review, structure and readings tabs stay in one job shell', async () => {
   await withHarness(
-    { path: `/app/audit/${JOB.id}/documente`, routes },
+    {
+      path: `/app/audit/${JOB.id}/documente`,
+      routes: {
+        ...routes,
+        // s17b-audit-report: Raport Word and Predare read the report, approvals and sections.
+        [`GET /jobs/${JOB.id}/audit/report`]: { body: { draft: null, final: null, word: true } },
+        [`GET /jobs/${JOB.id}/approvals`]: { body: [] },
+        [`GET /jobs/${JOB.id}/sections`]: { body: [] },
+      },
+    },
     async ({ page, requests }) => {
       await page.getByRole('heading', { name: 'Audit energetic 2026' }).waitFor()
       assert.match(await page.getByRole('tab', { name: /Documente/ }).innerText(), /8/)

@@ -11,6 +11,7 @@ from typing import Any
 from openpyxl.utils.cell import column_index_from_string
 
 from ema.core.office.sheets import CellRef
+from ema.core.review.fields import decided
 from ema.core.review.models import Cell, Field
 from ema.energy_data.anexa_cells import Measure
 from ema.energy_data.carriers import Carrier
@@ -27,14 +28,6 @@ _GROUPS = {
 }
 _MEASURE_ATTRIBUTES = ("description", "commissioning_year", "location")
 _PAYBACK_INPUTS = ("investment_thousand_lei", "saving_thousand_lei")
-
-
-def decided(field: Field) -> bool:
-    return (
-        field.review == "corrected"
-        or (field.review == "accepted" and field.chosen is not None)
-        or field.state == "manual"
-    )
 
 
 def _cell_ref(locator: Cell) -> CellRef | None:

@@ -76,6 +76,29 @@ def revision(db: sqlite3.Connection, table: str, row_id: str) -> int | None:
             (job, len(collection), collection),
         ).fetchall()
         return collection_revision([str(row["name"]) for row in rows])
+    elif table == "fields.key":
+        # A key the stage looked up, present or not: absent is revision 0, so an insertion or a
+        # deletion changes it as much as a decision does.
+        job, key = row_id.split(":", 1)
+        row = db.execute(
+            "SELECT revision FROM fields WHERE job_id=? AND key=?", (job, key)
+        ).fetchone()
+        return int(row["revision"]) if row else 0
+    elif table == "fields.prefix":
+        # A field family the stage iterated: which keys it holds and each one's revision.
+        job, prefix = row_id.split(":", 1)
+        rows = db.execute(
+            "SELECT key,revision FROM fields WHERE job_id=? AND substr(key,1,?)=? ORDER BY key",
+            (job, len(prefix), prefix),
+        ).fetchall()
+        return collection_revision([f"{row['key']}@{row['revision']}" for row in rows])
+    elif table == "section_states":
+        # A section never decided has no row yet: revision 0, as the section store counts it.
+        job, section = row_id.split(":", 1)
+        row = db.execute(
+            "SELECT revision FROM section_states WHERE job_id=? AND section_id=?", (job, section)
+        ).fetchone()
+        return int(row["revision"]) if row else 0
     elif table == "jobs.settings":
         row = db.execute(
             "SELECT settings_revision AS revision FROM jobs WHERE id=? AND deleted=0", (row_id,)

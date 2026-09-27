@@ -37,15 +37,43 @@ def _resolved(text: str, facts: dict[str, Field]) -> str:
     return TOKEN.sub(lambda match: _value(facts[match.group(1)]), text)
 
 
-def _writable(document: etree._Element, slot: str) -> etree._Element | None:
+def _outline_styles(styles: etree._Element) -> set[str]:
+    """Style ids that make a paragraph a heading: an outline level on the style or a base."""
+    own: dict[str, tuple[bool, str | None]] = {}
+    for style in styles.iter(qn("w:style")):
+        based = style.find(qn("w:basedOn"))
+        outline = style.find(f"{qn('w:pPr')}/{qn('w:outlineLvl')}") is not None
+        own[style.get(qn("w:styleId"), "")] = (
+            outline,
+            based.get(qn("w:val")) if based is not None else None,
+        )
+    result: set[str] = set()
+    for style_id in own:
+        seen: set[str] = set()
+        current: str | None = style_id
+        while current is not None and current in own and current not in seen:
+            seen.add(current)
+            outline, current_base = own[current]
+            if outline:
+                result.add(style_id)
+                break
+            current = current_base
+    return result
+
+
+def _writable(
+    document: etree._Element, slot: str, outline_styles: set[str]
+) -> etree._Element | None:
     element = find([document], slot)
     if any(parent.tag == qn("w:tbl") for parent in element.iterancestors()):
         return None
     properties = element.find(qn("w:pPr"))
     style = properties.find(qn("w:pStyle")) if properties is not None else None
-    style_name = style.get(qn("w:val"), "").casefold() if style is not None else ""
-    if style_name.startswith(("heading", "titlu")) or (
-        properties is not None and properties.find(qn("w:outlineLvl")) is not None
+    style_id = style.get(qn("w:val"), "") if style is not None else ""
+    if (
+        style_id.casefold().startswith(("heading", "titlu"))
+        or style_id in outline_styles
+        or (properties is not None and properties.find(qn("w:outlineLvl")) is not None)
     ):
         return None
     content = "".join(node.text or "" for node in element.iter(qn("w:t"))).strip()
@@ -82,8 +110,11 @@ def render_section(  # noqa: PLR0913
         and item["classification"] == "variable"
         and item["part"] == "word/document.xml"
     ]
+    outline = _outline_styles(document.styles.element)
     writable = [
-        element for slot in slots if (element := _writable(document.element, slot)) is not None
+        element
+        for slot in slots
+        if (element := _writable(document.element, slot, outline)) is not None
     ]
     paragraphs = [
         MARKER if f"paragraph:{index}" in blocked else _resolved(item.text, facts)

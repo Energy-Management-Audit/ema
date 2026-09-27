@@ -419,6 +419,41 @@
         "title": "AuditOutline",
         "type": "object"
       },
+      "AuditReport": {
+        "properties": {
+          "draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "word": {
+            "title": "Word",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "draft",
+          "final",
+          "word"
+        ],
+        "title": "AuditReport",
+        "type": "object"
+      },
       "BackupResult": {
         "properties": {
           "created_at": {
@@ -4104,6 +4139,220 @@
         "title": "Readiness",
         "type": "object"
       },
+      "RenderChapter": {
+        "properties": {
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "section_id": {
+            "title": "Section Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "section_id"
+        ],
+        "title": "RenderChapter",
+        "type": "object"
+      },
+      "RenderFailure": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "section_id": {
+            "title": "Section Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_id",
+          "code"
+        ],
+        "title": "RenderFailure",
+        "type": "object"
+      },
+      "RenderMarker": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "section_id": {
+            "title": "Section Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_id",
+          "label"
+        ],
+        "title": "RenderMarker",
+        "type": "object"
+      },
+      "RenderSummary": {
+        "properties": {
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/RenderChapter"
+            },
+            "title": "Chapters",
+            "type": "array"
+          },
+          "charts": {
+            "title": "Charts",
+            "type": "integer"
+          },
+          "dropped": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "failures": {
+            "items": {
+              "$ref": "#/components/schemas/RenderFailure"
+            },
+            "title": "Failures",
+            "type": "array"
+          },
+          "fields_confirmed": {
+            "title": "Fields Confirmed",
+            "type": "integer"
+          },
+          "fields_manual": {
+            "title": "Fields Manual",
+            "type": "integer"
+          },
+          "fields_total": {
+            "title": "Fields Total",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "draft",
+              "final"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "markers": {
+            "items": {
+              "$ref": "#/components/schemas/RenderMarker"
+            },
+            "title": "Markers",
+            "type": "array"
+          },
+          "pdf": {
+            "title": "Pdf",
+            "type": "boolean"
+          },
+          "tables": {
+            "title": "Tables",
+            "type": "integer"
+          },
+          "toc_pages_set": {
+            "title": "Toc Pages Set",
+            "type": "boolean"
+          },
+          "unit_plan": {
+            "$ref": "#/components/schemas/RenderUnitPlan"
+          }
+        },
+        "required": [
+          "kind",
+          "chapters",
+          "tables",
+          "charts",
+          "markers",
+          "fields_total",
+          "fields_confirmed",
+          "fields_manual",
+          "unit_plan",
+          "pdf",
+          "toc_pages_set",
+          "dropped",
+          "failures"
+        ],
+        "title": "RenderSummary",
+        "type": "object"
+      },
+      "RenderUnitPlan": {
+        "properties": {
+          "carriers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Carriers",
+            "type": "array"
+          },
+          "client_name": {
+            "title": "Client Name",
+            "type": "string"
+          },
+          "equipment_tables": {
+            "title": "Equipment Tables",
+            "type": "integer"
+          },
+          "measured_panels": {
+            "title": "Measured Panels",
+            "type": "integer"
+          },
+          "measures": {
+            "title": "Measures",
+            "type": "integer"
+          },
+          "processes": {
+            "title": "Processes",
+            "type": "integer"
+          },
+          "processes_source": {
+            "enum": [
+              "schemes",
+              "fisa",
+              "default"
+            ],
+            "title": "Processes Source",
+            "type": "string"
+          },
+          "thermal_measurements": {
+            "title": "Thermal Measurements",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "client_name",
+          "processes",
+          "processes_source",
+          "carriers",
+          "measured_panels",
+          "thermal_measurements",
+          "equipment_tables",
+          "measures"
+        ],
+        "title": "RenderUnitPlan",
+        "type": "object"
+      },
       "ReportException": {
         "properties": {
           "beneficiary": {
@@ -4180,6 +4429,76 @@
           "detail"
         ],
         "title": "ReportException",
+        "type": "object"
+      },
+      "ReportRun": {
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "docx_output_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docx Output Id"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "pdf_output_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdf Output Id"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RenderSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "run_id",
+          "state",
+          "ended_at",
+          "current",
+          "summary",
+          "docx_output_id",
+          "pdf_output_id"
+        ],
+        "title": "ReportRun",
         "type": "object"
       },
       "ReportingIn": {
@@ -9400,6 +9719,173 @@
           }
         },
         "summary": "Get Outline",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/jobs/{job_id}/audit/report": {
+      "get": {
+        "operationId": "get_report_jobs__job_id__audit_report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "wrong_job_type"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "job_missing"
+          },
+          "421": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "invalid_host"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error"
+          }
+        },
+        "summary": "Get Report",
         "tags": [
           "audit"
         ]
@@ -15403,7 +15889,7 @@
                 }
               }
             },
-            "description": "import_required, job_running, measures_form_invalid, measures_form_missing, not_ready, piee_base_changed, piee_base_missing, piee_base_review_required, stale_revision, visit_missing"
+            "description": "audit_ai_wording, audit_base_missing, audit_client_name, audit_markers, audit_package, import_required, job_running, measures_form_invalid, measures_form_missing, not_ready, piee_base_changed, piee_base_missing, piee_base_review_required, stale_revision, visit_missing"
           },
           "415": {
             "content": {

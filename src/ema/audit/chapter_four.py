@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 
@@ -116,6 +117,7 @@ def render_chapter_four(
     base_identity: tuple[str, ...],
     *,
     factors: FactorTable = FACTORS_2026,
+    texts: Mapping[str, str] | None = None,
 ) -> RenderReport:
     """Write all catalogue ch. 4 sections using S7 blocks and sourced values."""
     if not dataset.carriers or not dataset.years:
@@ -128,7 +130,7 @@ def render_chapter_four(
         output,
         ElementLocator(chapter + 1),
         ElementLocator(following + 1),
-        chapter_four_blocks(dataset, factors),
+        chapter_four_blocks(dataset, factors, texts=texts),
         _prototypes(positions, body, chapter, following),
     )
     document = Document(str(output))
