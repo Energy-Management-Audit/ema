@@ -30,6 +30,13 @@ class DocText:
     tables: int
 
 
+def decode_word_text(raw: bytes) -> str:
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return raw.decode("utf-16")
+
+
 class OsaRunner(Protocol):
     def __call__(self, script: str, timeout_s: float) -> OsaResult: ...
 
@@ -274,10 +281,7 @@ class WordMac:
             text_path = Path(directory) / "original.txt"
             tables = self._perform("text", doc, text_path)
             raw = text_path.read_bytes()
-        try:
-            content = raw.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            content = raw.decode("utf-16")
+        content = decode_word_text(raw)
         if tables is None:
             raise OfficeError("word_text", "Word did not return a table count")
         return DocText(content, tables)

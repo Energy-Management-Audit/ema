@@ -14,7 +14,7 @@ from ema.core.jobs import StageContext, StageOutcome, run_stage, status, subscri
 from ema.core.jobs.reads import run_current
 from ema.core.office.anchors import leftover_issues
 from ema.core.office.package import check_standalone
-from ema.core.office.word import WordMac
+from ema.core.office.word_api import word_automation, word_available
 from ema.core.review import base_readiness, fields
 from ema.core.review.models import Field, FieldSpec, Issue, Readiness
 from ema.core.workspace import Workspace
@@ -165,12 +165,12 @@ class PieeWorkflow:
 
 
 def start_word_render(ws: Workspace, job: str, *, on_revision: int | None = None) -> str:
-    """Start the final Word stage without waiting for WordMac."""
+    """Start the final Word stage without waiting for Word automation."""
     _, draft_run, draft_path = _latest_draft(ws, job)
     if not PieeWorkflow().readiness(ws, job).final_ok:
         raise EmaError("not_ready", "Lucrarea nu este pregătită pentru export.", job)
     settings = load_settings(ws)
-    if not settings.word_path.is_dir():
+    if not word_available(settings):
         raise EmaError("word_unavailable", "Microsoft Word nu este disponibil.", "")
     base_dir = base_directory(ws)
     mapping = load_approved_base(base_dir)
@@ -180,7 +180,7 @@ def start_word_render(ws: Workspace, job: str, *, on_revision: int | None = None
         ctx.read_slots("")
         original = ctx.artifact_dir() / "PIEE-final.docx"
         original.write_bytes(draft_path.read_bytes())
-        office = WordMac(app=settings.word_path, timeout_s=settings.word_timeout_s)
+        office = word_automation(settings)
         office.update_toc_pages(original)
         pdf = ctx.artifact_dir() / "PIEE-final.pdf"
         office.render_pdf(original, pdf)

@@ -150,7 +150,9 @@ def _journey(  # noqa: PLR0915
             pass
 
     if stub_word:
-        monkeypatch.setattr("ema.piee.review_workflow.WordMac", StubWord)
+        monkeypatch.setattr(
+            "ema.piee.review_workflow.word_automation", lambda _settings: StubWord()
+        )
     word = client.post(
         f"/jobs/{job}/stages/piee_word",
         json={"on_revision": _revision(client, job)},

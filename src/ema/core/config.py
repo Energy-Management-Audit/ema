@@ -44,10 +44,16 @@ def workspace_path() -> Path:
 
 def _word_default() -> Path:
     if sys.platform == "win32":
-        return (
-            Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"))
-            / "Microsoft Office/root/Office16/WINWORD.EXE"
+        roots = (
+            Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")),
+            Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")),
         )
+        candidates = [
+            root / "Microsoft Office" / office / "Office16" / "WINWORD.EXE"
+            for office in ("root", "")
+            for root in roots
+        ]
+        return next((path for path in candidates if path.is_file()), candidates[0])
     return Path("/Applications/Microsoft Word.app")
 
 

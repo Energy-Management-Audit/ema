@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -12,7 +11,7 @@ from ema.core.errors import EmaError
 from ema.core.office.errors import OfficeError
 from ema.core.office.sniff import FileKind, sniff
 from ema.core.office.text_check import TextCheck, check_text
-from ema.core.office.word import WordMac
+from ema.core.office.word_api import word_automation, word_available
 from ema.core.workspace import SlotVersion, Workspace
 from ema.core.workspace.conversion import publish_conversion
 
@@ -56,11 +55,11 @@ def convert_doc(
     _, source = stored_file(ws, job, version.file_sha)
     if sniff(source).kind != FileKind.DOC:
         raise EmaError("file_type", "Fişierul nu este un document DOC.", source.name)
-    if sys.platform != "darwin" or not settings.word_path.is_dir():
+    if not word_available(settings):
         raise ConversionFailed(
             "needs_conversion", "Open it in Word and save it as .docx, then add it again."
         )
-    word = WordMac(app=settings.word_path, timeout_s=settings.word_timeout_s)
+    word = word_automation(settings)
     with TemporaryDirectory(dir=ws.root) as temp:
         converted = Path(temp) / "converted.docx"
         try:

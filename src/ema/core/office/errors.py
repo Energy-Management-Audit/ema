@@ -15,6 +15,7 @@ _USER_MESSAGES_RO = {
     "word_pdf": "Microsoft Word nu a creat fișierul PDF.",
     "word_docx": "Microsoft Word nu a creat fișierul DOCX.",
     "word_text": "Microsoft Word nu a extras textul documentului.",
+    "word_kill": "Microsoft Word nu a putut fi oprit în siguranţă.",
     "chart_formula": "Formula seriei din grafic nu este validă.",
     "chart_cache": "Datele memorate ale graficului lipsesc.",
     "chart_location": "Graficul nu a fost găsit în document.",

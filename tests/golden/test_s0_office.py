@@ -13,6 +13,7 @@ from lxml import etree
 from openpyxl import load_workbook
 
 from conftest import artifacts_path
+from ema.core.config import Settings
 from ema.core.office.charts import (
     Series,
     build_column_chart,
@@ -21,7 +22,7 @@ from ema.core.office.charts import (
     read_series,
 )
 from ema.core.office.package import check_standalone, inspect, read_parts, write_parts
-from ema.core.office.word import WordMac
+from ema.core.office.word_api import word_automation
 from ema.core.office.workbook import formula_cells
 
 pytestmark = pytest.mark.golden
@@ -121,7 +122,7 @@ def test_piee_standalone_and_editable_caches(references):
                     assert [str(value) for value in categories] == series.categories
     copy = OUTPUT / "piee-standalone.docx"
     shutil.copy2(piee, copy)
-    WordMac().open_check(copy)
+    word_automation(Settings()).open_check(copy)
 
 
 def test_audit_embed_clone_and_build(references):
@@ -139,7 +140,7 @@ def test_audit_embed_clone_and_build(references):
     assert check_standalone(embedded) == []
     for part, expected in original.items():
         assert read_series(embedded, part) == expected
-    WordMac().open_check(embedded)
+    word_automation(Settings()).open_check(embedded)
     source_series = original["word/charts/chart11.xml"][0]
     pv = [
         Series("Energie electrică PV", source_series.categories, [float(i) / 8 for i in range(12)])
@@ -167,8 +168,8 @@ def test_audit_embed_clone_and_build(references):
             assert _workbook_values(archive, chart.embedded, product_series.refs.name) == [
                 product_series.name
             ]
-    WordMac().open_check(cloned_file)
-    WordMac().open_check(built_file)
+    word_automation(Settings()).open_check(cloned_file)
+    word_automation(Settings()).open_check(built_file)
 
 
 def test_toc_page_numbers_and_pdf(references):
@@ -183,10 +184,10 @@ def test_toc_page_numbers_and_pdf(references):
         node.text = "99"
     parts["word/document.xml"] = etree.tostring(original_root, encoding="UTF-8")
     write_parts(parts, scrambled)
-    WordMac().update_toc_pages(scrambled)
+    word_automation(Settings()).update_toc_pages(scrambled)
     _updated_root, updated = _toc(scrambled)
     assert [node.text for _paragraph, node in updated] == original_pages
     assert [_formatting(paragraph) for paragraph, _node in updated] == formatting
     pdf = OUTPUT / "piee-toc-updated.pdf"
-    WordMac().render_pdf(scrambled, pdf)
+    word_automation(Settings()).render_pdf(scrambled, pdf)
     assert len(pypdfium2.PdfDocument(pdf)) == 33

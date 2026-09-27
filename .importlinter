@@ -13,7 +13,7 @@ layers =
     ema.invoices : ema.piee : ema.reporting : ema.audit
     ema.consumption_analysis
     ema.energy_data
-    ema.clients
+    ema.clients : ema.windows
     ema.core
 
 [importlinter:contract:workflows-independent]
@@ -41,6 +41,7 @@ forbidden_modules =
     ema.api
     ema.cli
     ema.mcp
+    ema.windows
 
 [importlinter:contract:mcp-standalone]
 name = MCP never imports the other interfaces

@@ -1,7 +1,5 @@
 """Single-slot legacy intake without launching Word."""
 
-from types import SimpleNamespace
-
 import pytest
 from docx import Document
 from typer.testing import CliRunner
@@ -63,13 +61,9 @@ def test_conversion_adds_version_and_rerun_is_noop(tmp_path, monkeypatch):
     app = tmp_path / "Word.app"
     app.mkdir()
     monkeypatch.setattr("ema.core.intake.load_settings", lambda _ws: Settings(word_path=app))
-    monkeypatch.setattr(conversion_module, "sys", SimpleNamespace(platform="darwin"))
+    monkeypatch.setattr(conversion_module, "word_available", lambda _settings: True)
 
     class FakeWord:
-        def __init__(self, app, timeout_s):
-            assert app == tmp_path / "Word.app"
-            assert timeout_s == 120
-
         def convert_doc(self, _source, target):
             doc = Document()
             doc.add_paragraph("Alpha beta gamma")
@@ -78,7 +72,7 @@ def test_conversion_adds_version_and_rerun_is_noop(tmp_path, monkeypatch):
         def doc_text(self, _source):
             return DocText("Alpha beta gamma", 0)
 
-    monkeypatch.setattr(conversion_module, "WordMac", FakeWord)
+    monkeypatch.setattr(conversion_module, "word_automation", lambda _settings: FakeWord())
     ctx = StageContext(ws, job, "synthetic", "intake")
     result = intake_file(ctx, original.slot)
     versions = ws.list_versions(job, original.slot)
@@ -97,15 +91,12 @@ def test_new_upload_during_conversion_supersedes_result(tmp_path, monkeypatch):
     app = tmp_path / "Word.app"
     app.mkdir()
     monkeypatch.setattr("ema.core.intake.load_settings", lambda _ws: Settings(word_path=app))
-    monkeypatch.setattr(conversion_module, "sys", SimpleNamespace(platform="darwin"))
+    monkeypatch.setattr(conversion_module, "word_available", lambda _settings: True)
     replacement = tmp_path / "new.doc"
     replacement.write_bytes(b"new DOC")
     new_sha = ws.add_file("synthetic", replacement)
 
     class FakeWord:
-        def __init__(self, app, timeout_s):
-            pass
-
         def convert_doc(self, _source, target):
             doc = Document()
             doc.add_paragraph("Alpha beta gamma")
@@ -115,7 +106,7 @@ def test_new_upload_during_conversion_supersedes_result(tmp_path, monkeypatch):
         def doc_text(self, _source):
             return DocText("Alpha beta gamma", 0)
 
-    monkeypatch.setattr(conversion_module, "WordMac", FakeWord)
+    monkeypatch.setattr(conversion_module, "word_automation", lambda _settings: FakeWord())
     result = intake_file(StageContext(ws, job, "synthetic", "intake"), original.slot)
     assert result.status == "superseded"
     versions = ws.list_versions(job, original.slot)
@@ -155,14 +146,11 @@ def test_conversion_timeout_preserves_original(tmp_path, monkeypatch):
     app.mkdir()
 
     class TimeoutWord:
-        def __init__(self, app, timeout_s):
-            pass
-
         def convert_doc(self, _source, _target):
             raise OfficeError("word_timeout", "hung twice")
 
-    monkeypatch.setattr(conversion_module, "WordMac", TimeoutWord)
-    monkeypatch.setattr(conversion_module, "sys", SimpleNamespace(platform="darwin"))
+    monkeypatch.setattr(conversion_module, "word_automation", lambda _settings: TimeoutWord())
+    monkeypatch.setattr(conversion_module, "word_available", lambda _settings: True)
     with pytest.raises(ConversionFailed) as error:
         convert_doc(ws, job, original.slot, original, Settings(word_path=app))
     assert error.value.code == "convert_timeout"

@@ -14,6 +14,7 @@ from ema import __version__
 from ema.api import create_app
 from ema.api.mock import seed as seed_mock
 from ema.cli.audit import audit_app
+from ema.cli.office_worker import office_worker
 from ema.cli.piee import piee_app
 from ema.cli.review import job_review_app
 from ema.core.backup import backup, restore
@@ -58,6 +59,7 @@ _app.add_typer(invoices_app, name="invoices")
 _app.add_typer(piee_app, name="piee")
 _app.add_typer(reporting_app, name="reporting")
 _app.add_typer(audit_app, name="audit")
+_app.command("office-worker", hidden=True)(office_worker)
 
 
 @reporting_app.command("generate")

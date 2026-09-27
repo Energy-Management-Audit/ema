@@ -24,7 +24,7 @@ from ema.audit.headings import map_headings
 from ema.audit.inventory import inventory
 from ema.core.config import Settings
 from ema.core.office.anchors import find
-from ema.core.office.word import WordMac
+from ema.core.office.word_api import word_automation, word_available
 from ema.energy_data.necesar import parse_necesar_info
 
 pytestmark = pytest.mark.golden
@@ -231,9 +231,10 @@ def test_audit_base_for_case(reference_library: Path, tmp_path: Path, case: str)
     _prototype_format(base, prototype, output)
     _fixed_chapters(base, output, identity)
     _toc_in_step(output)
-    word = WordMac()
-    if not word.app.is_dir():
-        pytest.skip(f"Word unavailable at {word.app}")
+    settings = Settings()
+    if not word_available(settings):
+        pytest.skip(f"Word unavailable at {settings.word_path}")
+    word = word_automation(settings)
     word.open_check(output)
     anchors = json.loads(output.with_suffix(".anchors.json").read_text(encoding="utf-8"))
     roots = [Document(output).element]

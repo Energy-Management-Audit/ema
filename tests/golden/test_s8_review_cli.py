@@ -84,7 +84,7 @@ def test_review_decision_and_final_gate(
         def open_check(self, _docx: Path) -> None:
             pass
 
-    monkeypatch.setattr("ema.piee.review_workflow.WordMac", StubWord)
+    monkeypatch.setattr("ema.piee.review_workflow.word_automation", lambda _settings: StubWord())
     final_id = workflow.render(ws, job, "final")
     with ws.connect() as db:
         outputs = db.execute(

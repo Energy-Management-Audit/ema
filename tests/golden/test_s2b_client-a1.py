@@ -15,6 +15,7 @@ from ema.core.jobs import StageContext, StageOutcome, create_job, run_stage, sta
 from ema.core.office.convert import stored_file
 from ema.core.office.sheets import open_book
 from ema.core.office.sniff import FileKind, sniff
+from ema.core.office.word_api import word_available
 from ema.core.workspace import Workspace
 
 pytestmark = pytest.mark.golden
@@ -69,7 +70,7 @@ def _print_table(results: list[ItemOutcome], by_slot: dict[str, Path]) -> None:
 
 def test_CLIENT-A1_legacy_collection_with_word(tmp_path: Path) -> None:
     sources = _sources()
-    assert Settings().word_path.is_dir(), "Word is required for the native golden"
+    assert word_available(Settings()), "Word is required for the native golden"
     ws, job, by_slot = _collection(tmp_path, sources)
     recorded, results = _run(ws, job)
     _print_table(results, by_slot)
