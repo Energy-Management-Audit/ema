@@ -14,7 +14,7 @@ import type {
   Output,
   PieeSummary,
 } from '../api/types.ts'
-import { invalidateJob, jobKey, useResource, type Resource } from './resource.ts'
+import { invalidate, invalidateJob, jobKey, useResource, type Resource } from './resource.ts'
 import { TERMINAL, runReducer, startRun, type RunState } from './run.ts'
 
 const TERMINAL_KEYS = [
@@ -62,7 +62,9 @@ export function JobProvider({ jobId, children }: { jobId: string; children: Reac
   )
   const checks = useResource(jobKey(jobId, 'checks'), () => api.checks(jobId))
   const outputs = useResource(jobKey(jobId, 'outputs'), () => api.outputs(jobId))
-  const summary = useResource(jobKey(jobId, 'summary'), () => api.summary(jobId))
+  const summary = useResource(job.data?.type === 'piee' ? jobKey(jobId, 'summary') : null, () =>
+    api.summary(jobId),
+  )
   const log = useResource(jobKey(jobId, 'log'), () => api.log(jobId))
   const fields = useResource(jobKey(jobId, 'fields'), () => api.fields(jobId))
   const status = useResource(jobKey(jobId, 'status'), () => api.status(jobId))
@@ -101,7 +103,10 @@ export function JobProvider({ jobId, children }: { jobId: string; children: Reac
       (event) => {
         state = runReducer(state, event)
         setProgress(state)
-        if (TERMINAL.has(event.type)) invalidateJob(jobId, ...TERMINAL_KEYS)
+        if (TERMINAL.has(event.type)) {
+          invalidateJob(jobId, ...TERMINAL_KEYS)
+          invalidate('overview')
+        }
       },
       (error) => {
         setRunError(error)

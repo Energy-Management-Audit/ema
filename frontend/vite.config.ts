@@ -15,6 +15,8 @@ export default defineConfig({
       '/evidence': { target: api, changeOrigin: true },
       '/reporting': { target: api, changeOrigin: true },
       '/settings': { target: api, changeOrigin: true },
+      '/backups': { target: api, changeOrigin: true },
+      '/audit': { target: api, changeOrigin: true },
       '/openapi.json': { target: api, changeOrigin: true },
     },
   },

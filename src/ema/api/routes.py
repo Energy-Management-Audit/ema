@@ -26,8 +26,8 @@ from ema.api.models import (
     SlotVersion,
 )
 from ema.api.provisional import install_provisional_routes
+from ema.api.workflows import workflow_for
 from ema.audit.sections import Status, set_status, statuses
-from ema.audit.workflow import AuditWorkflow
 from ema.clients.registry import get_client
 from ema.core.errors import EmaError
 from ema.core.jobs import cancel, create_job, get_job, list_jobs, status
@@ -50,8 +50,6 @@ from ema.core.review.evidence import get_evidence
 from ema.core.review.models import Approval, Decision, Evidence, Field
 from ema.core.review.readiness import approvals, readiness_hash_in_tx
 from ema.core.workspace import Workspace
-from ema.invoices import InvoiceWorkflow
-from ema.piee.review_workflow import PieeWorkflow
 
 
 class NewJob(BaseModel):
@@ -109,16 +107,6 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
     def audit_only(job_id: str) -> None:
         if get_job(ws, job_id)["type"] != "audit":
             raise EmaError("wrong_job_type", "Lucrarea nu este un audit.", "")
-
-    def export_workflow(job_id: str) -> AuditWorkflow | PieeWorkflow | InvoiceWorkflow:
-        job_type = get_job(ws, job_id)["type"]
-        if job_type == "audit":
-            return AuditWorkflow()
-        if job_type == "piee":
-            return PieeWorkflow()
-        if job_type == "invoices":
-            return InvoiceWorkflow()
-        raise EmaError("wrong_job_type", "Exportul nu este disponibil.", "")
 
     @app.get("/jobs", tags=["jobs"], response_model=list[Job])
     def jobs() -> list[dict[str, Any]]:
@@ -312,7 +300,7 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
 
     @app.get("/jobs/{job_id}/export/checks", tags=["export"], response_model=ExportChecks)
     def checks(job_id: str) -> dict[str, Any]:
-        workflow = export_workflow(job_id)
+        workflow = workflow_for(ws, job_id)
         readiness = workflow.readiness(ws, job_id)
         return {
             "readiness": readiness.model_dump(mode="json"),
@@ -357,7 +345,7 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
     def do_export(job_id: str, body: ExportInput, request: Request) -> dict[str, str]:
         if not body.confirm or not getattr(request.state, "human_session", False):
             raise EmaError("human_required", "Confirmarea umană este necesară.", "")
-        workflow = export_workflow(job_id)
+        workflow = workflow_for(ws, job_id)
         with ws.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             job_row = db.execute(

@@ -37,23 +37,21 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
     new_provisional = {key for key, operation in new.items() if operation.get("x-provisional")}
     assert len(old_provisional) == 37
     assert new_provisional == {
-        (method, path)
-        for method, path in (
-            ("POST", "/jobs/{job_id}/sections/{section_id}/draft"),
-            ("PATCH", "/jobs/{job_id}/deadline"),
-            ("GET", "/jobs/{job_id}/preview.pdf"),
-            ("GET", "/jobs/{job_id}/package"),
-            ("POST", "/jobs/{job_id}/invoices/{invoice_id}/anomaly"),
-        )
+        (method, path) for method, path in (("POST", "/jobs/{job_id}/sections/{section_id}/draft"),)
     }
     assert all(new[key]["x-provisional"] == REASONS[key[1]] for key in new_provisional)
     assert len(old_provisional - new_provisional - (old.keys() - new.keys())) == 30
     assert old.keys() - new.keys() == {
         ("GET", "/jobs/{job_id}/facts"),
         ("PATCH", "/jobs/{job_id}/facts"),
+        ("PATCH", "/jobs/{job_id}/deadline"),
+        ("GET", "/jobs/{job_id}/preview.pdf"),
+        ("GET", "/jobs/{job_id}/package"),
+        ("POST", "/jobs/{job_id}/invoices/{invoice_id}/anomaly"),
     }
     # S17b adds the PIEE import, its summary and the approvals read (openapi/s17b-diff.md).
     assert new.keys() - old.keys() == {
+        ("GET", "/jobs/overview"),
         ("GET", "/audit/forms/masuri-propuse.xlsx"),
         ("POST", "/jobs/{job_id}/piee/import"),
         ("GET", "/jobs/{job_id}/piee/summary"),
@@ -86,6 +84,22 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
     client_errors = new[("POST", "/clients")]["responses"]
     assert set(client_errors["403"]["content"]) == {"application/problem+json"}
     assert "client_exists" in client_errors["409"]["description"]
+
+
+def test_removed_provisional_paths_answer_not_found(tmp_path: Path) -> None:
+    ws = Workspace(tmp_path)
+    job = create_job(ws, "audit", "synthetic", 2026)
+    client = TestClient(create_app(ws, 8766, launch_code="synthetic-code"), base_url=BASE)
+    token = client.post("/session", json={"code": "synthetic-code"}).json()["csrf"]
+    for method, path in (
+        ("PATCH", f"/jobs/{job}/deadline"),
+        ("POST", f"/jobs/{job}/invoices/invoice-1/anomaly"),
+        ("GET", f"/jobs/{job}/package"),
+        ("GET", f"/jobs/{job}/preview.pdf"),
+    ):
+        response = client.request(method, path, headers={"x-ema-csrf": token})
+        assert response.status_code == 404
+        assert response.json()["type"] == "urn:ema:error:not_found"
 
 
 def test_unavailable_audit_agents_create_no_run_or_event(tmp_path: Path) -> None:

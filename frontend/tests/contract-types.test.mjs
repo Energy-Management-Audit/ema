@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import test from 'node:test'
 
 const contract = JSON.parse(
   readFileSync(new URL('../../openapi/ema.v1.json', import.meta.url), 'utf8'),
 )
-const source = readFileSync(new URL('../src/api/types.ts', import.meta.url), 'utf8')
+const apiDir = new URL('../src/api/', import.meta.url)
+const source = ['types.ts', ...readdirSync(apiDir).filter((file) => file.endsWith('-types.ts'))]
+  .map((file) => readFileSync(new URL(file, apiDir), 'utf8'))
+  .join('\n')
 
 function declaredTypes() {
   const types = new Map()
@@ -16,7 +19,7 @@ function declaredTypes() {
   return types
 }
 
-test('types.ts property names equal the OpenAPI schemas', () => {
+test('frontend API property names equal the OpenAPI schemas', () => {
   const schemas = contract.components.schemas
   const types = declaredTypes()
   const checked = []
@@ -28,6 +31,7 @@ test('types.ts property names equal the OpenAPI schemas', () => {
   }
   for (const name of [
     'Job',
+    'JobOverview',
     'Field',
     'Decision',
     'Evidence',

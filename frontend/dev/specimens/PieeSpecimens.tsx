@@ -1,11 +1,11 @@
-import { SourceChip } from '../src/ui/Chip'
-import { Button } from '../src/ui/Button'
-import { AnnualCheckLine, CountBar, KpiTile } from '../src/ui/Figures'
-import { DocThumb, ExportCheck, PackageFile } from '../src/ui/Package'
-import { SheetFrame, SheetRow, type Theme } from './SheetParts'
+import { SourceChip } from '../../src/ui/Chip'
+import { Button } from '../../src/ui/Button'
+import { AnnualCheckLine, CountBar, KpiTile } from '../../src/ui/Figures'
+import { DocThumb, ExportCheck, PackageFile } from '../../src/ui/Package'
+import { SheetFrame, SheetRow, type Theme } from '../SheetParts'
 
 /** The six components S17b adds for the PIEE screens, each with its design id. */
-export function PieeSpecimens({ theme }: { theme: Theme }) {
+export function Specimens({ theme }: { theme: Theme }) {
   return (
     <SheetFrame id={`piee-${theme}`} theme={theme}>
       <div

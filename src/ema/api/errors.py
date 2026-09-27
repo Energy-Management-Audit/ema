@@ -112,10 +112,7 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "stale_revision",
     ),
     ("POST", "/jobs/{job_id}/sections/{section_id}/draft"): ("provisional_contract",),
-    ("PATCH", "/jobs/{job_id}/deadline"): ("provisional_contract",),
-    ("GET", "/jobs/{job_id}/preview.pdf"): ("provisional_contract", "output_missing"),
     ("GET", "/jobs/{job_id}/outputs"): ("job_missing",),
-    ("GET", "/jobs/{job_id}/package"): ("provisional_contract",),
     ("POST", "/jobs/{job_id}/export/draft"): (
         "audit_render_unavailable",
         "job_missing",
@@ -171,7 +168,6 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "stale_revision",
         "client_memory_conflict",
     ),
-    ("POST", "/jobs/{job_id}/invoices/{invoice_id}/anomaly"): ("provisional_contract",),
     ("POST", "/reporting/runs"): ("invalid_year", "client_missing", "job_running"),
     ("GET", "/reporting/runs/{run_id}"): ("run_missing",),
     ("PUT", "/settings"): ("key_not_allowed",),

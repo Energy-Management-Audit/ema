@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { jobHref, type Tab } from '../app/route.ts'
+import { AppSidebar } from '../app/AppSidebar.tsx'
 import { navigate } from '../app/navigate.ts'
 import { analysisYears } from '../piee/dataset.ts'
 import { blockingIssues } from '../piee/readiness.ts'
@@ -13,7 +14,6 @@ import { DataTab } from './DataTab.tsx'
 import { DocumentsTab } from './DocumentsTab.tsx'
 import { ExportScreen } from './ExportScreen.tsx'
 import { JobActions, useSlotCount } from './JobHeader.tsx'
-import { JobSidebar } from './JobSidebar.tsx'
 import { JournalTab } from './JournalTab.tsx'
 import { MeasuresTab } from './MeasuresTab.tsx'
 import { problemTitle } from './States.tsx'
@@ -28,7 +28,7 @@ export function JobScreen({ tab, field }: { tab: Tab; field: string | null }) {
   const { checks, jobId } = ctx
   const count = blockingIssues(checks.data).length
   const sidebar = (
-    <JobSidebar activeId={jobId} count={count} working={ctx.run?.state === 'running'} />
+    <AppSidebar activeJobId={jobId} count={count} working={ctx.run?.state === 'running'} />
   )
   if (tab === 'predare') {
     return (

@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 from ema import __version__
 from ema.core.errors import EmaError
+from ema.core.jobs.activity import activity
 from ema.core.jobs.events import ProgressEvent, append, subscribe
 from ema.core.jobs.failure import record_failure
 from ema.core.jobs.fingerprint import collection_revision
@@ -31,6 +32,7 @@ from ema.core.workspace import SlotVersion, Workspace
 
 __all__ = [
     "JobStatus",
+    "activity",
     "cancel",
     "create_job",
     "get_job",

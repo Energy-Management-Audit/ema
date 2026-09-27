@@ -17,9 +17,10 @@ from ema.core.errors import EmaError
 from ema.core.logging import log_exception
 from ema.core.workspace.backup_install import install_backup
 from ema.core.workspace.cleanup import delete_job_rows
+from ema.core.workspace.gc import collect_garbage
 from ema.core.workspace.lock import workspace_lock
 from ema.core.workspace.mutations import delete_job as delete_job_impl
-from ema.core.workspace.references import evidence_uses_file, referenced_files
+from ema.core.workspace.references import referenced_files
 from ema.core.workspace.schema import migrate
 from ema.core.workspace.settings import write_settings
 
@@ -290,50 +291,7 @@ class Workspace:
                     delete_job_rows(db, str(row["id"]))
 
     def gc(self) -> None:
-        with workspace_lock(self.root), self.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            referenced_outputs = {
-                str(row[0]) for row in db.execute("SELECT relative_path FROM outputs")
-            }
-            running = {
-                str(row[0]) for row in db.execute("SELECT id FROM runs WHERE state='running'")
-            }
-            for row in db.execute("SELECT relative_path FROM jobs"):
-                output_dir = self.path(str(row[0])) / "outputs"
-                for path in output_dir.glob("*"):
-                    if (
-                        path.is_file()
-                        and path.relative_to(self.root).as_posix() not in referenced_outputs
-                        and path.name.split("-", 1)[0] not in running
-                        and (
-                            not path.name.startswith(".")
-                            or path.stat().st_mtime < time.time() - 3600
-                        )
-                    ):
-                        path.unlink()
-            rows = db.execute(
-                "SELECT sha,client_slug,relative_path FROM files WHERE added_at<?",
-                (time.time() - 3600,),
-            ).fetchall()
-            for row in rows:
-                used = db.execute(
-                    "SELECT 1 FROM slot_versions sv JOIN jobs j ON j.id=sv.job_id "
-                    "WHERE sv.file_sha=? AND j.client_slug=? LIMIT 1",
-                    (row["sha"], row["client_slug"]),
-                ).fetchone()
-                if used is None:
-                    used = db.execute(
-                        "SELECT 1 FROM run_inputs WHERE file_sha=? AND client_slug=? LIMIT 1",
-                        (row["sha"], row["client_slug"]),
-                    ).fetchone()
-                if used is None and not evidence_uses_file(
-                    db, str(row["sha"]), str(row["client_slug"])
-                ):
-                    self.path(str(row["relative_path"])).unlink(missing_ok=True)
-                    db.execute(
-                        "DELETE FROM files WHERE sha=? AND client_slug=?",
-                        (row["sha"], row["client_slug"]),
-                    )
+        collect_garbage(self)
 
     def referenced_files(self, db: sqlite3.Connection) -> list[tuple[str, str, int]]:
         return referenced_files(db)

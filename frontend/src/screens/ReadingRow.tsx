@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Decision, Field, VisitPhoto } from '../api/types.ts'
 import { api } from '../api/endpoints.ts'
+import { useBlobUrl } from '../api/blobUrl.ts'
+import { ApiProblem } from '../api/client.ts'
 import { parseNumber, withUnit } from '../lib/format.ts'
 import { readingLabel } from '../audit/readings.ts'
 import { Button } from '../ui/Button'
+import { FailureNotice } from '../ui/Feedback.tsx'
 import { Status } from '../ui/Chip'
 import { TextField } from '../ui/Field'
 import { FieldReviewRow, ReviewValue, SourceButton } from '../ui/Review'
@@ -24,6 +27,21 @@ export function ReadingRow({ jobId, field, photo, decisions, focus, refresh }: P
   const [writing, setWriting] = useState(false)
   const [text, setText] = useState('')
   const [invalid, setInvalid] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<string | null>(null)
+  const evidenceId = open && photo ? field.evidence?.[0] : undefined
+  const snippetLoad = useMemo(
+    () => (evidenceId ? () => api.evidenceSnippet(evidenceId, true) : null),
+    [evidenceId],
+  )
+  const pageLoad = useMemo(
+    () => (evidenceId ? () => api.evidencePage(evidenceId) : null),
+    [evidenceId],
+  )
+  const reportImageError = useCallback((error: unknown) => {
+    setImageError(error instanceof ApiProblem ? error.title : 'Cererea nu poate fi procesată.')
+  }, [])
+  const snippetUrl = useBlobUrl(snippetLoad, reportImageError)
+  const pageUrl = useBlobUrl(pageLoad, reportImageError)
   const row = useRef<HTMLDivElement>(null)
   const action = useAction()
   useEffect(() => {
@@ -153,22 +171,22 @@ export function ReadingRow({ jobId, field, photo, decisions, focus, refresh }: P
         snippet={
           open && photo && field.evidence?.[0] ? (
             <div className="reading-snippet">
+              {imageError && (
+                <FailureNotice title="Nu am putut încărca fotografia" actions={null}>
+                  {imageError}
+                </FailureNotice>
+              )}
               <Paper>
-                <img
-                  src={`/evidence/${encodeURIComponent(field.evidence[0])}/snippet.png?highlight=1`}
-                  alt={`Fotografie: ${photo.name}`}
-                />
+                {snippetUrl && <img src={snippetUrl} alt={`Fotografie: ${photo.name}`} />}
               </Paper>
               <div className="reading-snippet__side">
                 <SectionKey>DE CE E MARCAT NESIGUR</SectionKey>
                 <p>Valoare citită de pe fotografie; verifică cifrele pe imagine.</p>
-                <a
-                  href={`/evidence/${encodeURIComponent(field.evidence[0])}/page.png`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Deschide pagina
-                </a>
+                {pageUrl && (
+                  <a href={pageUrl} target="_blank" rel="noreferrer">
+                    Deschide pagina
+                  </a>
+                )}
                 {pending && (
                   <div className="reading-snippet__actions">
                     <Button height={30} loading={action.pending} onClick={accept}>

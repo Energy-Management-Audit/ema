@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ApiProblem } from '../api/client.ts'
+import { AppSidebar } from '../app/AppSidebar.tsx'
 import { api } from '../api/endpoints.ts'
 import { photoForField, readingGroups } from '../audit/readings.ts'
 import { jobKey, invalidateJob, useResource } from '../state/resource.ts'
@@ -7,7 +8,6 @@ import { Button } from '../ui/Button'
 import { FailureNotice } from '../ui/Feedback'
 import { Content, Window } from '../ui/Shell'
 import { SectionKey } from '../ui/Surface'
-import { JobSidebar } from './JobSidebar.tsx'
 import { ReadingRow } from './ReadingRow.tsx'
 import './readings.css'
 
@@ -43,7 +43,7 @@ export function ReadingsScreen({ jobId, field }: { jobId: string; field: string 
   const groups = visit.data && fields.data ? readingGroups(fields.data, visit.data) : []
   return (
     <Window>
-      <JobSidebar activeId={jobId} count={count} working={job.data?.state === 'running'} />
+      <AppSidebar activeJobId={jobId} count={count} working={job.data?.state === 'running'} />
       <Content
         crumb={job.data ? `${job.data.client_slug} ${String(job.data.year ?? '')}` : ''}
         title="Măsurători"

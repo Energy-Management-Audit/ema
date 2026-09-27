@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
+import { AppSidebar } from '../app/AppSidebar.tsx'
 import { ApiProblem } from '../api/client.ts'
 import { EmptyState, FailureNotice } from '../ui/Feedback'
 import { Button } from '../ui/Button'
 import { Window } from '../ui/Shell'
-import { JobSidebar } from './JobSidebar.tsx'
 
 export function problemTitle(error: unknown): string {
   return error instanceof ApiProblem ? error.title : 'Cererea nu poate fi procesată.'
@@ -12,7 +12,7 @@ export function problemTitle(error: unknown): string {
 function Bare({ children, sidebar = true }: { children: ReactNode; sidebar?: boolean }) {
   return (
     <Window>
-      {sidebar ? <JobSidebar /> : <span />}
+      {sidebar ? <AppSidebar current="home" /> : <span />}
       <section className="ema-content app-center">{children}</section>
     </Window>
   )

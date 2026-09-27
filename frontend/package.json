@@ -16,6 +16,7 @@
     "capture": "node scripts/capture-s17a.mjs",
     "e2e": "node --test --test-concurrency=1 tests/e2e/*.test.mjs",
     "capture:s17b": "node scripts/capture-s17b.mjs",
+    "capture:area": "node scripts/capture-area.mjs",
     "golden:s17b": "node scripts/golden-s17b-piee.mjs"
   },
   "engines": {
@@ -36,6 +37,7 @@
   },
   "dependencies": {
     "lucide-react": "^1.48.0",
+    "pdfjs-dist": "6.3.289",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   }

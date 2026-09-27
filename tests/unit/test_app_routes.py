@@ -41,3 +41,40 @@ def test_serve_prints_the_app_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     result = CliRunner().invoke(cli._app, ["serve", "--port", "8766"])
     assert result.exit_code == 0, result.output
     assert "Open http://127.0.0.1:8766/app/#code=" in result.output
+
+
+def test_route_installers_run_in_shared_seam_order(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    names = (
+        "install_overview_routes",
+        "install_routes",
+        "install_client_routes",
+        "install_evidence_routes",
+        "install_job_routes",
+        "install_invoice_routes",
+        "install_piee_routes",
+        "install_reporting_routes",
+        "install_settings_routes",
+        "install_backup_routes",
+        "install_audit_routes",
+        "install_audit_forms",
+        "install_audit_report_routes",
+        "install_error_contract",
+    )
+    observed: list[str] = []
+    for name in names:
+        original = getattr(api, name)
+
+        def record(
+            *args: object, _name: str = name, _original: object = original, **kwargs: object
+        ) -> object:
+            observed.append(_name)
+            return _original(*args, **kwargs)  # type: ignore[operator]
+
+        monkeypatch.setattr(api, name, record)
+    app = create_app(Workspace(tmp_path), 8766)
+    assert observed == list(names)
+    routes = [route.path for route in app.routes]
+    assert routes.index("/jobs/overview") < routes.index("/jobs/{job_id}")
+    assert "/audit/forms/masuri-propuse.xlsx" in routes

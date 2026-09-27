@@ -7,14 +7,17 @@ import type {
   Client,
   ClientFile,
   Decision,
+  DeleteResult,
   Evidence,
   ExportChecks,
   ExportResult,
   Field,
   FileVersion,
   Job,
+  JobOverview,
   JobStatus,
   Output,
+  NewJobResult,
   PieeSummary,
   PrelucrareState,
   RunStart,
@@ -30,6 +33,24 @@ export const api = {
   session: (code: string) => request<SessionResult>('POST', '/session', { code }),
   settings: () => request<SettingsView>('GET', '/settings'),
   jobs: () => request<Job[]>('GET', '/jobs'),
+  overview: () => request<JobOverview[]>('GET', '/jobs/overview'),
+  createJob: (type: 'audit' | 'piee' | 'invoices', client: string, year: number) =>
+    request<NewJobResult>('POST', '/jobs', { type, client, year }),
+  deleteJob: (id: string, revision: number) =>
+    request<DeleteResult>('DELETE', job(id), { confirm: true, on_revision: revision }),
+  startStage: (id: string, stage: string, revision: number) =>
+    request<RunStart>('POST', `${job(id)}/stages/${encodeURIComponent(stage)}`, {
+      on_revision: revision,
+    }),
+  removeVersion: (id: string, slot: string, version: number, revision: number) =>
+    request<DeleteResult>(
+      'DELETE',
+      `${job(id)}/slots/${encodeURIComponent(slot)}/versions/${String(version)}`,
+      { confirm: true, on_revision: revision },
+    ),
+  evidenceSnippet: (id: string, highlight: boolean) =>
+    blob(`/evidence/${encodeURIComponent(id)}/snippet.png?highlight=${highlight ? '1' : '0'}`),
+  evidencePage: (id: string) => blob(`/evidence/${encodeURIComponent(id)}/page.png`),
   clients: () => request<Client[]>('GET', '/clients'),
   client: (id: string) => request<Client>('GET', `/clients/${encodeURIComponent(id)}`),
   job: (id: string) => request<Job>('GET', job(id)),

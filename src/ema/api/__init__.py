@@ -14,13 +14,16 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ema import __version__
 from ema.api.audit_forms import install_audit_forms
+from ema.api.audit_report_routes import install_audit_report_routes
 from ema.api.audit_routes import install_audit_routes
+from ema.api.backup_routes import install_backup_routes
 from ema.api.clients_routes import install_client_routes
 from ema.api.errors import from_ema, install_error_contract, problem
 from ema.api.evidence_routes import install_evidence_routes
 from ema.api.invoice_routes import install_invoice_routes
 from ema.api.job_routes import install_job_routes
 from ema.api.models import Health, SessionResult
+from ema.api.overview_routes import install_overview_routes
 from ema.api.piee_routes import install_piee_routes
 from ema.api.reporting_routes import install_reporting_routes
 from ema.api.routes import install_routes
@@ -136,9 +139,8 @@ def create_app(  # noqa: C901
 
         app.mount("/assets", StaticFiles(directory=frontend / "assets"), name="assets")
 
+    install_overview_routes(app, workspace)
     install_routes(app, workspace, mock=mock)
-    install_audit_routes(app, workspace)
-    install_audit_forms(app, workspace)
     install_client_routes(app, workspace)
     install_evidence_routes(app, workspace, mock=mock)
     install_job_routes(app, workspace)
@@ -146,5 +148,9 @@ def create_app(  # noqa: C901
     install_piee_routes(app, workspace)
     install_reporting_routes(app, workspace)
     install_settings_routes(app, workspace)
+    install_backup_routes(app, workspace)
+    install_audit_routes(app, workspace)
+    install_audit_forms(app, workspace)
+    install_audit_report_routes(app, workspace)
     install_error_contract(app)
     return app

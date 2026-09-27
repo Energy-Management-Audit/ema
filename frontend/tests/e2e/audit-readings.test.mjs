@@ -61,6 +61,11 @@ test('3c reading row confirms one value, shows its photo and undoes the decision
           contentType: 'image/png',
           body: 'png',
         },
+        'GET /evidence/ev-1/page.png': {
+          status: 200,
+          contentType: 'image/png',
+          body: 'png',
+        },
         [`POST ${J}/fields/reading-1/decide`]: (request) => {
           assert.deepEqual(JSON.parse(request.postData()), { action: 'accept', on_revision: 3 })
           current = { ...current, revision: 4, review: 'accepted', needs_confirmation: false }
@@ -94,9 +99,23 @@ test('3c reading row confirms one value, shows its photo and undoes the decision
     async ({ page, requests }) => {
       await page.getByText('Panel 1').waitFor()
       await page.getByText('230 V').waitFor()
+      assert.equal(requests.filter((item) => item.path.endsWith('/piee/summary')).length, 0)
       assert.equal(await page.getByText('Acceptă tot').count(), 0)
+      await page.evaluate(() => {
+        window.revokedBlobUrls = []
+        const original = URL.revokeObjectURL
+        URL.revokeObjectURL = (url) => {
+          window.revokedBlobUrls.push(url)
+          original.call(URL, url)
+        }
+      })
       await page.getByRole('button', { name: 'display.png' }).click()
-      await page.locator('img[src="/evidence/ev-1/snippet.png?highlight=1"]').waitFor()
+      await page.locator('img[src^="blob:"]').waitFor()
+      assert.ok(requests.some((item) => item.path === '/evidence/ev-1/snippet.png?highlight=1'))
+      assert.ok(requests.some((item) => item.path === '/evidence/ev-1/page.png'))
+      await page.getByRole('button', { name: 'display.png' }).click()
+      await page.waitForFunction(() => window.revokedBlobUrls.length === 2)
+      await page.getByRole('button', { name: 'display.png' }).click()
       await page.getByRole('button', { name: 'Acceptă' }).first().click()
       await page.getByText('acceptat').waitFor()
       await page.getByRole('button', { name: 'Anulează' }).click()

@@ -12,7 +12,8 @@ import { build, preview } from 'vite'
 import { defaultRoutes } from '../fixtures/piee/default.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
-const API = /^\/(session|health|jobs|clients|evidence|reporting|settings|openapi\.json)(\/|$|\?)/
+const API =
+  /^\/(session|health|jobs|clients|evidence|reporting|settings|backups|audit|openapi\.json)(\/|$|\?)/
 
 let built = null
 

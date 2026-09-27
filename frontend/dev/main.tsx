@@ -4,7 +4,14 @@ import '../src/ui/base.css'
 import './sheet.css'
 import { ComponentSheet } from './ComponentSheet'
 import { Extensions } from './Extensions'
-import { PieeSpecimens } from './PieeSpecimens'
+import type { Theme } from './SheetParts'
+
+const specimens = Object.entries(
+  import.meta.glob<{ Specimens: ({ theme }: { theme: Theme }) => React.ReactNode }>(
+    './specimens/*.tsx',
+    { eager: true },
+  ),
+).sort(([left], [right]) => left.localeCompare(right))
 
 // Dev-only entry (not in the build): /dev/sheet.html?theme=light|dark
 const theme = new URLSearchParams(location.search).get('theme') === 'dark' ? 'dark' : 'light'
@@ -36,7 +43,9 @@ function Page() {
       <p className="sheet-page__caption">
         <b>S17b</b>Componentele ecranelor PIEE (3g, 7a)
       </p>
-      <PieeSpecimens theme={theme} />
+      {specimens.map(([name, module]) => (
+        <module.Specimens key={name} theme={theme} />
+      ))}
     </main>
   )
 }

@@ -63,7 +63,6 @@ def test_openapi_snapshot_and_provisional_mock(tmp_path: Path) -> None:
     mock = TestClient(create_app(ws, PORT, launch_code="mock-code", mock=True), base_url=BASE)
     mock_session = mock.post("/session", json={"code": "mock-code"})
     assert mock_session.status_code == 200
-    audit_id = next(item["id"] for item in mock.get("/jobs").json() if item["type"] == "audit")
     for method, path in PROVISIONAL:
         operation = observed["paths"][path][method.lower()]
         assert operation["x-provisional"] == REASONS[path]
@@ -89,8 +88,6 @@ def test_openapi_snapshot_and_provisional_mock(tmp_path: Path) -> None:
             "evidence_id",
         ):
             url = url.replace("{" + key + "}", "synthetic")
-        if path.endswith("preview.pdf"):
-            url = url.replace("synthetic", audit_id)
         reply = mock.request(method, url, headers={"x-ema-csrf": mock_session.json()["csrf"]})
         assert reply.status_code == 200, (method, path, reply.text)
         if path.endswith(".pdf"):

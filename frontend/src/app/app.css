@@ -30,3 +30,57 @@ body {
 .app-center .ema-failure {
   max-width: 560px;
 }
+.ema-sidebar__destinations {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ema-nav-item__count {
+  flex: none;
+  color: var(--section-key);
+  font: 11px var(--font-mono);
+}
+.ema-sidebar__more {
+  align-self: flex-start;
+  margin: 3px 0 0 30px;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.ema-sidebar__more:hover {
+  color: var(--ink);
+}
+.ema-sidebar__nav > .ema-failure {
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px;
+}
+.ema-sidebar__nav > .ema-failure .ema-failure__text {
+  min-width: 0;
+}
+.ema-sidebar__nav > .ema-failure .ema-btn {
+  align-self: flex-start;
+}
+.new-job-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.new-job-dialog__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.new-job-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.new-job-dialog__field .ema-field,
+.new-job-dialog__field .ema-select {
+  width: 100%;
+}

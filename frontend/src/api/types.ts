@@ -10,6 +10,27 @@ export type Job = {
   revision: number
 }
 
+export type JobOverview = {
+  id: string
+  type: 'invoices' | 'piee' | 'audit' | 'reporting'
+  client_slug: string
+  year: number | null
+  state: string
+  revision: number
+  client_name: string | null
+  created_at: string
+  updated_at: string
+  final_ok: boolean | null
+  blocking: number | null
+  next: string | null
+  readiness_error: string | null
+  approved_at: string | null
+  finalized: boolean
+}
+
+export type NewJobResult = { id: string }
+export type DeleteResult = { deleted: boolean }
+
 export type Client = {
   id: string
   name?: string | null

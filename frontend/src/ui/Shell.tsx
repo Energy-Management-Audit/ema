@@ -127,27 +127,57 @@ export function NavJob({
 export function NavItem({
   icon,
   active = false,
+  count,
+  onClick,
   children,
 }: {
   icon: LucideIcon
   active?: boolean
+  count?: number
+  onClick?: () => void
   children: ReactNode
 }) {
   return (
-    <button type="button" className="ema-nav-item" aria-current={active ? 'page' : undefined}>
+    <button
+      type="button"
+      className="ema-nav-item"
+      aria-current={active ? 'page' : undefined}
+      onClick={onClick}
+    >
       <Icon icon={icon} size={16} stroke={1.6} />
-      {children}
+      <span
+        className="ema-nav-item__label"
+        title={typeof children === 'string' ? children : undefined}
+      >
+        {children}
+      </span>
+      {count !== undefined && <span className="ema-nav-item__count">{count}</span>}
     </button>
   )
 }
 
 /** The sidebar footer "3c": initials, the user's role, settings. */
-export function SidebarFooter({ initials, name }: { initials: string; name: string }) {
+export function SidebarFooter({
+  initials,
+  name,
+  onSettings,
+}: {
+  initials: string
+  name: string
+  onSettings?: () => void
+}) {
   return (
     <div className="ema-sidebar__footer">
       <span className="ema-avatar">{initials}</span>
       <span className="ema-sidebar__user">{name}</span>
-      <IconButton icon={Settings} label="Setări" size={26} iconSize={15} bordered={false} />
+      <IconButton
+        icon={Settings}
+        label="Setări"
+        size={26}
+        iconSize={15}
+        bordered={false}
+        onClick={onSettings}
+      />
     </div>
   )
 }

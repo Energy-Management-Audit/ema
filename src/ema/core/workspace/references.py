@@ -13,6 +13,8 @@ def referenced_files(db: sqlite3.Connection) -> list[tuple[str, str, int]]:
         "UNION SELECT f.relative_path,f.sha,f.size FROM files f "
         "JOIN evidence e ON json_extract(e.data,'$.file_sha')=f.sha "
         "JOIN jobs j ON j.id=e.job_id AND j.client_slug=f.client_slug "
+        "UNION SELECT f.relative_path,f.sha,f.size FROM files f "
+        "JOIN client_annexes a ON a.sha=f.sha AND a.client_id=f.client_slug "
         "UNION SELECT relative_path,sha,size FROM run_files "
         "UNION SELECT relative_path,sha,size FROM outputs"
     ).fetchall()
@@ -24,6 +26,16 @@ def evidence_uses_file(db: sqlite3.Connection, sha: str, client_slug: str) -> bo
         db.execute(
             "SELECT 1 FROM evidence e JOIN jobs j ON j.id=e.job_id "
             "WHERE json_extract(e.data,'$.file_sha')=? AND j.client_slug=? LIMIT 1",
+            (sha, client_slug),
+        ).fetchone()
+        is not None
+    )
+
+
+def annex_uses_file(db: sqlite3.Connection, sha: str, client_slug: str) -> bool:
+    return (
+        db.execute(
+            "SELECT 1 FROM client_annexes WHERE sha=? AND client_id=? LIMIT 1",
             (sha, client_slug),
         ).fetchone()
         is not None

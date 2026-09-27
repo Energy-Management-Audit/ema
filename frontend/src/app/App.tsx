@@ -4,10 +4,20 @@ import { api } from '../api/endpoints.ts'
 import { invalidateJob, useResource } from '../state/resource.ts'
 import { JobProvider } from '../state/job.tsx'
 import { JobScreen } from '../screens/JobScreen.tsx'
-import { ReadingsScreen } from '../screens/ReadingsScreen.tsx'
-import { BootFailure, NoJob, SessionClosed } from '../screens/States.tsx'
+import { AuditJobScreen } from '../screens/audit/AuditJobScreen.tsx'
+import { ClientsScreen } from '../screens/clients/ClientsScreen.tsx'
+import { ClientScreen } from '../screens/clients/ClientScreen.tsx'
+import { HomeScreen } from '../screens/home/HomeScreen.tsx'
+import { InvoiceJobScreen } from '../screens/invoices/InvoiceJobScreen.tsx'
+import { ReportingScreen } from '../screens/reporting/ReportingScreen.tsx'
+import { SettingsScreen } from '../screens/settings/SettingsScreen.tsx'
+import { BootFailure, SessionClosed, problemTitle } from '../screens/States.tsx'
+import { Button } from '../ui/Button.tsx'
+import { FailureNotice } from '../ui/Feedback.tsx'
+import { Content, Window } from '../ui/Shell.tsx'
+import { AppSidebar } from './AppSidebar.tsx'
 import { navigate } from './navigate.ts'
-import { jobHref, parseRoute } from './route.ts'
+import { jobPath, parseRoute } from './route.ts'
 
 function currentLocation(): string {
   return location.pathname + location.search
@@ -39,15 +49,51 @@ function useLocation(): string {
   return where
 }
 
-function Home() {
-  const jobs = useResource('jobs', () => api.jobs())
-  const first = jobs.data?.find((job) => job.type === 'piee')
+function JobRouteGuard({
+  jobId,
+  prefix,
+  children,
+}: {
+  jobId: string
+  prefix: string
+  children: React.ReactNode
+}) {
+  const job = useResource(`${jobId}/job`, () => api.job(jobId))
+  const mismatch = job.data?.type !== undefined && job.data.type !== prefix
   useEffect(() => {
-    if (first) navigate(jobHref(first.id, 'date'), true)
-  }, [first])
-  if (jobs.error) return <BootFailure problem={jobs.error} />
-  if (jobs.data && !first) return <NoJob />
-  return null
+    if (mismatch && job.data) navigate(jobPath(job.data), true)
+  }, [mismatch, job.data])
+  if (mismatch) return null
+  if (!job.data) {
+    return (
+      <Window>
+        <AppSidebar />
+        <Content crumb="" title="Lucrare">
+          {job.error ? (
+            <FailureNotice
+              title="Nu am putut încărca lucrarea"
+              actions={
+                <Button
+                  variant="secondary"
+                  height={32}
+                  onClick={() => {
+                    invalidateJob(jobId, 'job')
+                  }}
+                >
+                  Încearcă din nou
+                </Button>
+              }
+            >
+              {problemTitle(job.error)}
+            </FailureNotice>
+          ) : (
+            <p className="app-loading">Se încarcă…</p>
+          )}
+        </Content>
+      </Window>
+    )
+  }
+  return children
 }
 
 export function App({ bootProblem }: { bootProblem: ApiProblem | null }) {
@@ -63,10 +109,15 @@ export function App({ bootProblem }: { bootProblem: ApiProblem | null }) {
   const [pathname = '', search = ''] = where.split(/(?=\?)/)
   const route = parseRoute(pathname, search)
   const previous = useRef<string | null>(null)
-  const jobTab = route.name === 'job' ? `${route.jobId}/${route.tab}` : null
+  const jobTab =
+    route.name === 'job' || route.name === 'audit' ? `${route.jobId}/${route.tab}` : null
   useEffect(() => {
     // Entering a job and switching tab refetch the job and its checks (D4).
-    if (route.name === 'job' && previous.current !== null && previous.current !== jobTab) {
+    if (
+      (route.name === 'job' || route.name === 'audit') &&
+      previous.current !== null &&
+      previous.current !== jobTab
+    ) {
       invalidateJob(route.jobId, 'job', 'checks')
     }
     previous.current = jobTab
@@ -79,11 +130,28 @@ export function App({ bootProblem }: { bootProblem: ApiProblem | null }) {
   if (bootProblem) return <BootFailure problem={bootProblem} />
   if (route.name === 'job') {
     return (
-      <JobProvider key={route.jobId} jobId={route.jobId}>
-        <JobScreen tab={route.tab} field={route.field} />
-      </JobProvider>
+      <JobRouteGuard jobId={route.jobId} prefix="piee">
+        <JobProvider key={route.jobId} jobId={route.jobId}>
+          <JobScreen tab={route.tab} field={route.field} />
+        </JobProvider>
+      </JobRouteGuard>
     )
   }
-  if (route.name === 'audit') return <ReadingsScreen jobId={route.jobId} field={route.field} />
-  return <Home />
+  if (route.name === 'audit')
+    return (
+      <JobRouteGuard jobId={route.jobId} prefix="audit">
+        <AuditJobScreen jobId={route.jobId} tab={route.tab} field={route.field} />
+      </JobRouteGuard>
+    )
+  if (route.name === 'invoices')
+    return (
+      <JobRouteGuard jobId={route.jobId} prefix="invoices">
+        <InvoiceJobScreen jobId={route.jobId} />
+      </JobRouteGuard>
+    )
+  if (route.name === 'clients') return <ClientsScreen />
+  if (route.name === 'client') return <ClientScreen clientId={route.clientId} tab={route.tab} />
+  if (route.name === 'reporting') return <ReportingScreen />
+  if (route.name === 'settings') return <SettingsScreen group={route.group} />
+  return <HomeScreen />
 }

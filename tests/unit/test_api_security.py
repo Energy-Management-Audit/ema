@@ -27,7 +27,7 @@ def test_host_origin_cookie_and_csrf_on_all_media(tmp_path: Path) -> None:
     paths = [
         "/jobs",
         f"/jobs/{job}/events",
-        f"/jobs/{job}/preview.pdf",
+        "/jobs/overview",
         "/evidence/synthetic/page.png",
         f"/jobs/{job}/outputs/synthetic",
     ]

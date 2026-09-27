@@ -14,6 +14,7 @@ def delete_job_rows(db: sqlite3.Connection, job_id: str) -> None:
         "client_memory",
         "decisions",
         "section_states",
+        "job_annotations",
         "audit_materials",
         "agent_sessions",
         "llm_calls",

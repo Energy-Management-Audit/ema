@@ -1,6 +1,7 @@
 // Synthetic PIEE job for the e2e harness (D11). Invented company and figures; no client data.
 
 import { ANNUAL, EVIDENCE, FIELDS, JOB } from './fields.mjs'
+import { baseRoutes } from '../base.mjs'
 
 export { ANNUAL, EVIDENCE, FIELDS, JOB, REGISTRU, TERM_P2 } from './fields.mjs'
 
@@ -216,16 +217,7 @@ const files = {
 }
 
 export const defaultRoutes = {
-  'POST /session': { status: 200, body: { csrf: 'csrf-token' } },
-  'GET /settings': {
-    status: 200,
-    body: {
-      theme: 'light',
-      default_provider: null,
-      providers: {},
-      extraction: { ocr: true, flag_uncertain: true, auto_accept_exact: false },
-    },
-  },
+  ...baseRoutes,
   'GET /jobs': { status: 200, body: [job] },
   'GET /clients': { status: 200, body: [client] },
   [`GET /clients/${CLIENT}`]: { status: 200, body: client },
