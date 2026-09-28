@@ -100,7 +100,11 @@ def unit_plan(ws: Workspace, job: str) -> JobUnitPlan:
         ).fetchall()
     by_key = {field.key: field for field in job_fields}
     company = by_key.get("audit.company_name")
-    client_name = str(company.value).strip() if company and company.value else ""
+    client_name = (
+        str(company.value).strip()
+        if company and company.value and company.review != "rejected"
+        else ""
+    )
     if not client_name and record is not None:
         client_name = str(record["name"] or "").strip()
     if not client_name:

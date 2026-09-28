@@ -37,7 +37,8 @@ const SUMMARY: RenderSummary = {
   pdf: true,
   toc_pages_set: true,
   dropped: [],
-  failures: [{ section_id: 'ch6', code: 'draft_slots' }],
+  failures: [{ section_id: 'ch6', code: 'draft_prototype' }],
+  charts_skipped: [],
 }
 
 const FILE = { name: 'Audit-ciorna.docx', size: '2,3 MB' }

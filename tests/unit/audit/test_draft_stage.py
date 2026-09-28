@@ -14,6 +14,7 @@ from tests.audit_replay import (
 )
 from typer.testing import CliRunner
 
+from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_agent import recorded_facts
 from ema.audit.draft_render import render_draft_section, review_payload
 from ema.audit.draft_stage import draft_section
@@ -21,10 +22,10 @@ from ema.audit.sections import get_status
 from ema.cli import _app, app
 from ema.core.errors import EmaError
 from ema.core.jobs import create_job, get_job
-from ema.core.office.anchors import stamp
 from ema.core.workspace import Workspace
 
 SECTION = "ch2.date_generale"
+TITLES = {section.id: section.title for section in CATALOGUE}
 
 
 def _recordings(ws: Workspace, job: str, folder: Path) -> tuple[Path, Path]:
@@ -160,18 +161,15 @@ def test_mismatched_recording_fails_the_run_and_keeps_the_section(tmp_path: Path
 def test_render_writes_the_review_payload(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
-    base, anchors, output = tmp_path / "base.docx", tmp_path / "anchors.json", tmp_path / "o.docx"
+    base, output = tmp_path / "base.docx", tmp_path / "o.docx"
     document = Document()
-    stamp(document.add_paragraph("[de completat]")._p, "company", 1)
+    document.add_paragraph(TITLES["ch2"], style="Heading 1")
+    document.add_paragraph(TITLES[SECTION], style="Heading 2")
+    document.add_paragraph("[de completat]")
+    document.add_paragraph(TITLES["ch2.istorie"], style="Heading 2")
     document.save(str(base))
-    record = {"slot": "company", "section": SECTION, "classification": "variable"}
-    anchors.write_text(
-        json.dumps({"version": 1, "anchors": [{**record, "part": "word/document.xml"}]})
-    )
     facts = recorded_facts(ws, job, SECTION)
-    check = render_draft_section(
-        ws, job, base, anchors, output, draft=CH2_DRAFT, facts=facts, flags=()
-    )
+    check = render_draft_section(ws, job, base, output, draft=CH2_DRAFT, facts=facts, flags=())
 
     written = json.loads(output.with_suffix(".draft-review.json").read_text())
     assert written == json.loads(json.dumps(review_payload(CH2_DRAFT, check, ())))

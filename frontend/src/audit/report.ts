@@ -90,7 +90,7 @@ export type AuditCheck = { label: string; tone: 'ok' | 'err'; detail: string }
 
 const CHECKS: ReadonlyArray<{ label: string; codes: string[]; photos?: true }> = [
   { label: 'Toate secţiunile au răspuns', codes: ['section_open', 'na_recheck'] },
-  { label: 'Nicio ciornă nu e veche', codes: ['stale', 'final_stale'] },
+  { label: 'Nicio ciornă nu e veche', codes: ['stale', 'final_stale', 'cover_photo_changed'] },
   { label: 'Toate diferenţele dintre surse sunt decise', codes: ['conflict'] },
   {
     label: 'Valorile citite de pe fotografii sunt confirmate',

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import shutil
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
+from datetime import date
 from functools import partial
 from pathlib import Path
 from typing import Literal
@@ -13,12 +14,14 @@ from docx import Document
 from pydantic import BaseModel
 
 from ema.audit.base import build_base
-from ema.audit.base_package import package_issues
+from ema.audit.base_package import package_issues, scrub_package, unreviewed_bullets
 from ema.audit.base_toc import refresh_toc
 from ema.audit.base_units import heading_spans_document
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_schema import SECTION_FACTS
+from ema.audit.render_bindings import binding_values, cover_labels, cover_photo, fill_bindings
 from ema.audit.render_plan import JobUnitPlan, ProcessesSource, unit_plan
+from ema.audit.render_sections import mark_render_drafted, refuse_changed_base
 from ema.audit.render_steps import (
     AuditBase,
     ai_wording_hits,
@@ -27,14 +30,19 @@ from ema.audit.render_steps import (
     drop_na_sections,
     droppable,
     sentence,
+    snapshot_base,
     toc_pages,
 )
 from ema.audit.render_writers import (
+    Chain,
+    RenderFailure,
     drafted_sections,
     ready_runs,
+    text_of,
     write_draft,
     write_five,
     write_four,
+    write_intro,
     write_six,
 )
 from ema.core.config import Settings, load_settings
@@ -65,11 +73,6 @@ class RenderMarker(BaseModel):
     label: str
 
 
-class RenderFailure(BaseModel):
-    section_id: str
-    code: str
-
-
 class RenderUnitPlan(BaseModel):
     client_name: str
     processes: int
@@ -95,6 +98,7 @@ class RenderSummary(BaseModel):
     toc_pages_set: bool
     dropped: list[str]
     failures: list[RenderFailure]
+    charts_skipped: list[str] = []
 
 
 def _plan_view(plan: JobUnitPlan) -> RenderUnitPlan:
@@ -110,30 +114,10 @@ def _plan_view(plan: JobUnitPlan) -> RenderUnitPlan:
     )
 
 
-class _Chain:
-    """Each writer reads the previous file and writes a new one; a failed writer is skipped."""
-
-    def __init__(self, folder: Path, start: Path) -> None:
-        self.folder, self.current, self.step = folder, start, 0
-        self.failures: list[RenderFailure] = []
-
-    def apply(self, section_id: str, write: Callable[[Path, Path], object]) -> None:
-        self.step += 1
-        target = self.folder / f"{self.step:02d}-{section_id}.docx"
-        try:
-            write(self.current, target)
-        except Exception as exc:  # one failed section never fails the render (R21)
-            code = exc.code if isinstance(exc, EmaError) else type(exc).__name__
-            self.failures.append(RenderFailure(section_id=section_id, code=code))
-            target.unlink(missing_ok=True)
-            return
-        self.current = target
-
-
 # The field families the render iterates (the reviewed ch. 4 dataset, the unit plan's carriers,
 # the texts and the AI gate) and the single keys it looks up (the unit plan, ch. 2-3 facts).
 ITERATED = ("carrier.", "carrier_tep.", "production.", "turnover.", "energy_costs.", "narrative.")
-LOOKED_UP = ("audit.company_name", "audit_measure.count")
+LOOKED_UP = ("audit.company_name", "audit.address", "audit_measure.count")
 
 
 def _read_fields(ctx: StageContext, keys: Iterable[str]) -> list[Field]:
@@ -192,10 +176,25 @@ def _printed(chapters: list[str]) -> dict[str, int]:
     }
 
 
-def render_audit(  # noqa: C901, PLR0912, PLR0915
+def render_audit(
     ctx: StageContext, kind: Kind, base: AuditBase, settings: Settings
 ) -> StageOutcome:
+    """Render from one snapshot of the configured base, taken when the run starts."""
+    folder = ctx.artifact_dir()
+    base = snapshot_base(base, folder)
+    try:
+        return _render(ctx, kind, base, settings, folder)
+    finally:
+        base.document.unlink(missing_ok=True)
+
+
+def _render(  # noqa: C901, PLR0912, PLR0915
+    ctx: StageContext, kind: Kind, base: AuditBase, settings: Settings, folder: Path
+) -> StageOutcome:
     ws, job = ctx.ws, ctx.job
+    base_sha = base.inputs["audit_base_document"]
+    if kind == "final":
+        refuse_changed_base(ctx, base_sha)
     client = str(get_job(ws, job)["client_slug"])
     dossier = ctx.read_slots("dossier")
     visit = ctx.read_slots("visit")
@@ -204,8 +203,7 @@ def render_audit(  # noqa: C901, PLR0912, PLR0915
     job_fields = _read_fields(ctx, (*LOOKED_UP, *facts))
     _record_sections(ctx)
     plan = unit_plan(ws, job)
-    ctx.record_input(template=base.inputs["audit_base_document"])
-    folder = ctx.artifact_dir()
+    ctx.record_input(template=base_sha)
     (folder / INPUTS).write_text(json.dumps(base.inputs, indent=2), encoding="utf-8")
     start = build_base(
         plan,
@@ -214,15 +212,31 @@ def render_audit(  # noqa: C901, PLR0912, PLR0915
         output=folder / "base.docx",
         base_identity=base.identity,
     )
-    anchors = start.with_suffix(".anchors.json")
-    chain = _Chain(folder, start)
-    chapters = _chapters(start)
     by_key = {field.key: field for field in job_fields}
+    chain = Chain(folder, start)
+    try:
+        photo = cover_photo(ctx, client)
+    except EmaError as exc:  # a wrong file keeps the marker; the rest renders (R21)
+        chain.failures.append(RenderFailure(section_id="front", code=exc.code))
+        photo = None
+    anchors = start.with_suffix(".anchors.json")
+    fill_bindings(start, anchors, binding_values(plan.client_name, job_fields, date.today(), photo))
+    chapters = _chapters(start)
+    failed_intros: set[str] = set()
     for index, chapter_id in enumerate(chapters, 1):
         title = sentence(_CHAPTERS[chapter_id].title)
         ctx.progress(index - 1, len(chapters), f"Capitolul {index} din {len(chapters)} — {title}")
         if ctx.cancelled():
             return StageOutcome()
+        if chapter_id in {"ch3", "ch6"} and not chain.apply(
+            chapter_id,
+            partial(
+                write_intro,
+                section_id=chapter_id,
+                text=text_of(by_key, f"narrative.{chapter_id}"),
+            ),
+        ):
+            failed_intros.add(chapter_id)
         if chapter_id in {"ch2", "ch3"}:
             for section in CATALOGUE:
                 if (
@@ -237,7 +251,6 @@ def render_audit(  # noqa: C901, PLR0912, PLR0915
                             ws=ws,
                             job=job,
                             section=section.id,
-                            anchors=anchors,
                             by_key=by_key,
                         ),
                     )
@@ -268,7 +281,12 @@ def render_audit(  # noqa: C901, PLR0912, PLR0915
     document = Document(str(docx))
     refresh_toc(document)
     document.save(str(docx))
-    if issues := package_issues(docx, base.identity):
+    # Dropping sections leaves their pictures and charts related but unused: none may ship.
+    scrub_package(docx)
+    issues = package_issues(docx, base.identity)
+    if kind == "final":
+        issues += unreviewed_bullets(docx)
+    if issues:
         raise EmaError(
             "audit_package", "Pachetul Word al auditului este invalid.", "; ".join(issues[:3])
         )
@@ -276,7 +294,7 @@ def render_audit(  # noqa: C901, PLR0912, PLR0915
         raise EmaError(
             "audit_ai_wording", "Raportul final conţine formulări despre AI.", "; ".join(hits)
         )
-    counts = body_counts(docx)
+    counts = body_counts(docx, cover_labels(anchors))
     if kind == "final" and counts.markers:
         sections = dict.fromkeys(section_id for section_id, _ in counts.markers)
         raise EmaError(
@@ -324,6 +342,11 @@ def render_audit(  # noqa: C901, PLR0912, PLR0915
     if summary.pdf:
         ctx.save_output(pdf, pdf.name)
     ctx.save_output(docx, docx.name, kind=kind)
+    if kind == "draft":
+        failed = failed_intros | {
+            item.section_id for item in chain.failures if item.section_id == "ch4"
+        }
+        mark_render_drafted(ctx, docx, base_sha, failed)
     return StageOutcome(item_failures=[item.section_id for item in chain.failures])
 
 

@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from tests.unit.audit.render_seams import FakeWord, fill_writer, outputs, synthetic_render
+from tests.unit.audit.render_seams import (
+    FakeWord,
+    fill_writer,
+    outputs,
+    synthetic_render,
+    write_intros,
+)
 
 from ema.api import create_app
 from ema.audit import render
@@ -36,6 +42,7 @@ def _start(client: TestClient, headers: dict[str, str], job: str, stage: str) ->
 def ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Workspace, str]:
     """Every section n/a for readiness, the report's markers written, Word present."""
     ws, job, _ = synthetic_render(tmp_path, monkeypatch)
+    write_intros(ws, job)
     for section in CATALOGUE:
         set_status(ws, job, section.id, Status.NA, "user")
     monkeypatch.setattr(render, "_statuses", lambda ws, job: {"ch4.bilant_real": Status.NA})

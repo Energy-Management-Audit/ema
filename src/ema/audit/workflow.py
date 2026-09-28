@@ -6,10 +6,12 @@ import sqlite3
 
 from ema.audit.content_checks import content_issues
 from ema.audit.render import start_audit_render
+from ema.audit.render_bindings import COVER_SLOT
 from ema.audit.render_report import newest_final
 from ema.audit.sections import audit_readiness
 from ema.core.errors import EmaError
 from ema.core.jobs import status, subscribe
+from ema.core.jobs.reads import revision
 from ema.core.review.models import Issue, Readiness
 from ema.core.workspace import Workspace
 
@@ -23,6 +25,26 @@ def _newest_docx_in(db: sqlite3.Connection, job: str, stage: str) -> tuple[str, 
         (job, stage),
     ).fetchone()
     return (str(row["run_id"]), str(row["id"]), str(row["sha"])) if row else None
+
+
+def _cover_changed(db: sqlite3.Connection, job: str) -> bool:
+    """The newest draft showed another cover photo (or none) than the one uploaded now: a final
+    would print a photo nobody saw in a draft."""
+    draft = _newest_docx_in(db, job, "audit_render")
+    if draft is None:
+        return False
+    reads = {
+        (str(row["table_name"]), str(row["row_id"])): int(row["revision"])
+        for row in db.execute(
+            "SELECT table_name,row_id,revision FROM run_reads WHERE run_id=? "
+            "AND ((table_name='slots.collection' AND row_id=?) "
+            "OR (table_name='slots' AND row_id=?))",
+            (draft[0], f"{job}:cover", f"{job}:{COVER_SLOT}"),
+        )
+    }
+    photo = ("slots", f"{job}:{COVER_SLOT}")
+    wanted = [("slots.collection", f"{job}:cover"), *([photo] if photo in reads else [])]
+    return any(reads.get(key) != revision(db, *key) for key in wanted)
 
 
 class AuditWorkflow:
@@ -41,6 +63,13 @@ class AuditWorkflow:
                 Issue(
                     code="final_stale",
                     message="Versiunea finală nu mai corespunde datelor. Generează-o din nou.",
+                )
+            )
+        if _cover_changed(db, job):
+            issues.append(
+                Issue(
+                    code="cover_photo_changed",
+                    message="Fotografia sediului s-a schimbat după ciornă. Refaceţi ciorna.",
                 )
             )
         result.blocking.extend(issues)

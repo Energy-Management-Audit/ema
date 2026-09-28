@@ -1,7 +1,6 @@
 """S17b acceptance: the CLIENT-A1 dossier rendered into the auditor's base through Word (level 2/3).
 
-The final is proven as a gate on real data: markers no field or n/a can clear (cover, ch. 1,
-ch. 7) refuse it. The positive final -> approve -> export path is the unit test's, Word faked.
+The draft and its marker inventory; the final, approved and exported, is test_s17b_audit_final.
 """
 
 from __future__ import annotations
@@ -35,8 +34,8 @@ from ema.audit.read import read_job
 from ema.audit.render import RenderSummary, start_audit_render
 from ema.audit.render_steps import ai_wording_hits
 from ema.audit.sections import Status, refresh_staleness, set_status, statuses
+from ema.audit.sections_bulk import patch_sections
 from ema.audit.workflow import AuditWorkflow
-from ema.core.errors import EmaError
 from ema.core.jobs import create_job, run_stage, status, subscribe
 from ema.core.review import decide, fields, propose
 from ema.core.review.models import Evidence, Manual
@@ -55,6 +54,7 @@ CH3_DRAFT = SectionDraft(
     ],
 )
 ORDER = {section.id: index for index, section in enumerate(CATALOGUE)}
+CHAPTER = {section.id: section.chapter for section in CATALOGUE}
 
 
 def _wait(ws: Workspace, job: str, run: str) -> dict[str, object]:
@@ -75,8 +75,10 @@ def _supply(ws: Workspace, job: str, key: str, value: object) -> None:
     propose(ws, job, key, value, [evidence], state="supplied")
 
 
-def seed_job(root: Path, workspace: Path, tmp_path: Path) -> tuple[Workspace, str]:
-    """The CLIENT-A1 dossier read, two replayed drafts and the synthetic measures form (no render)."""
+def seed_job(
+    root: Path, workspace: Path, tmp_path: Path, form: Path | None = None
+) -> tuple[Workspace, str]:
+    """The CLIENT-A1 dossier read, two replayed drafts and a synthetic measures form (no render)."""
     received = root / "audit/cases/audit-case-a/received"
     ws = Workspace(workspace)
     job = create_job(ws, "audit", "CLIENT-A1-golden", 2026)
@@ -98,7 +100,8 @@ def seed_job(root: Path, workspace: Path, tmp_path: Path) -> tuple[Workspace, st
                 ws, job, draft, tmp_path / f"support-{index}.json", None
             ),
         )
-    ws.set_slot(job, "measures", ws.add_file("CLIENT-A1-golden", _synthetic_form(tmp_path / "m.xlsx")))
+    form = form or _synthetic_form(tmp_path / "m.xlsx")
+    ws.set_slot(job, "measures", ws.add_file("CLIENT-A1-golden", form))
     run_measures(ws, job)
     return ws, job
 
@@ -124,18 +127,57 @@ def _settings(root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tu
     return tuple(json.loads(Path(values["EMA_AUDIT_BASE_IDENTITY"]).read_text("utf-8")))
 
 
-def prepare_final(ws: Workspace, job: str) -> None:
-    """Final readiness the only way the use cases allow: texts written, drafted -> done, n/a."""
+def review_inputs(ws: Workspace, job: str) -> dict[str, str]:
+    """Step 2 of the final (D8): her texts written, one reading corrected and one rejected.
+
+    Returns the two reviewed keys; their ch. 4 cells are what the final golden checks.
+    """
     for field in fields(ws, job):
         if field.key.startswith("narrative.") and field.value is None:
             decide(ws, job, field.id, "correct", field.revision, "user", value="Text verificat.")
     run_measures(ws, job)  # ch. 6 is composed again with the texts just written
+    reviewed: dict[str, str] = {}
+    for carrier, action in (("electricity_grid", "correct"), ("natural_gas", "reject")):
+        field = min(
+            (
+                item
+                for item in fields(ws, job)
+                if re.fullmatch(rf"carrier\.{carrier}\.\d{{4}}\.\d{{2}}", item.key)
+                and item.value is not None
+            ),
+            key=lambda item: item.key,
+        )
+        value = {"value": 1234.5} if action == "correct" else {}
+        decide(ws, job, field.id, action, field.revision, "user", **value)  # type: ignore[arg-type]
+        reviewed[action] = field.key
+    return reviewed
+
+
+def confirm_chapters(ws: Workspace, job: str) -> None:
+    """Step 4 of the final (D8): per chapter, one confirmation of its drafts; the rest n/a."""
     refresh_staleness(ws, job)
+    chapters: dict[int, list[dict[str, object]]] = {}
     for state in statuses(ws, job):
         if state.status == Status.DRAFTED and not state.stale:
-            set_status(ws, job, state.section_id, Status.DONE, "user")
-        elif state.status != Status.DONE:
+            chapters.setdefault(CHAPTER[state.section_id], []).append(
+                {
+                    "section_id": state.section_id,
+                    "status": "done",
+                    "on_revision": state.revision,
+                    "confirm": True,
+                }
+            )
+    for items in chapters.values():
+        patch_sections(ws, job, items)
+    for state in statuses(ws, job):
+        if state.status not in (Status.DONE, Status.NA):
             set_status(ws, job, state.section_id, Status.NA, "user", "golden")
+
+
+def prepare_final(ws: Workspace, job: str) -> None:
+    """Final readiness the way the use cases allow: texts, reviewed data, chapters confirmed."""
+    review_inputs(ws, job)
+    confirm_chapters(ws, job)
 
 
 def _outputs(ws: Workspace, job: str, run: str) -> dict[str, Path]:
@@ -293,32 +335,10 @@ def test_CLIENT-A1_audit_render_through_word(
         for name in ("Audit-ciorna.docx", "Audit-ciorna.pdf"):
             shutil.copyfile(outputs[name], Path(parity) / name)
 
-    # The final gate on real data: done where drafted, n/a elsewhere, the texts written.
-    prepare_final(ws, job)
-    readiness = AuditWorkflow().readiness(ws, job)
-    assert readiness.final_ok, [issue.code for issue in readiness.blocking]
-    record = _wait(ws, job, AuditWorkflow().start_final(ws, job))
-    assert record["state"] == "failed"
-    with ws.connect() as db:
-        event = db.execute(
-            "SELECT payload FROM job_events WHERE run_id=? AND type='stage_failed'",
-            (record["id"],),
-        ).fetchone()
-    assert json.loads(event["payload"]) == {
-        "code": "audit_markers",
-        "message": "Raportul final are câmpuri necompletate.",
-    }
-    named = str(record["error"]).split("; ")
-    assert {"front", "ch1", "ch7"} <= {item.split(".", 1)[0] for item in named}
-    assert "ch4.bilant_real" not in named and "ch4.concluzii" not in named
-    with pytest.raises(EmaError) as refused:
-        AuditWorkflow().render(ws, job, "final")
-    assert refused.value.code == "output_missing"
     print(
         f"S17b audit render: chapters={len(summary.chapters)} tables={summary.tables} "
         f"charts={summary.charts} markers={len(summary.markers)} "
-        f"fields={summary.fields_confirmed}/{summary.fields_total} pages={len(pages)} "
-        f"final refused: {len(named)} sections"
+        f"fields={summary.fields_confirmed}/{summary.fields_total} pages={len(pages)}"
     )
 
 

@@ -58,3 +58,17 @@ def applies(  # noqa: PLR0911
     if condition.op == "any":
         return True if True in values else None if None in values else False
     return False if False in values else None if None in values else True
+
+
+def condition_source(condition: Condition) -> str:
+    """The condition as recorded in a section's applicability reason."""
+    if condition.op == "carrier":
+        return "carrier:" + ",".join(carrier.value for carrier in condition.carriers)
+    if condition.children:
+        return (
+            condition.op
+            + "("
+            + ",".join(condition_source(child) for child in condition.children)
+            + ")"
+        )
+    return condition.op + (":" + condition.key if condition.key else "")

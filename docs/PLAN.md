@@ -780,9 +780,9 @@ answer, and export calls it; no interface keeps its own rules.
 | From → to | Who | When |
 |---|---|---|
 | `missing` ↔ `ready` | Ema | computed from the facts the section needs |
-| `ready` → `drafted` | Ema or an agent | the Draft stage ran |
+| `ready` → `drafted` | Ema or an agent | the Draft stage ran, or a draft render wrote the section itself (fixed text, chapter intros, ch. 4) |
 | `drafted` → `done` | **a human only** (R14) | |
-| `done` → `drafted` + `stale` | Ema | an input in the draft's fingerprint changed; the Jurnal records which |
+| `done` → `drafted` + `stale` | Ema | an input in the fingerprint changed (a fact, a material or the configured base); the Jurnal records which |
 | `drafted` + `stale` → `drafted` | Ema or an agent | the section was re-drafted |
 | any → `later(reason)` | a human; Ema only for visit / measurements / thermography / map while that material is absent | |
 | `later` → computed | a human, or Ema when the awaited material arrives | |
@@ -881,13 +881,15 @@ The catalogue (each section's kind and sources):
 | 2.1 Date generale (+ manager energetic) | data + conditional text | clients, Anexa 2–3, questionnaire; ≥/< 1000 tep rule |
 | 2.2 Localizarea companiei | narrative + map | online (locality/county, population), OSM map or `later: map` |
 | 2.3 Istoria companiei | narrative | online (company site, press) + client |
+| 3 Introducere | narrative | written by the auditor in Revizuire: `narrative.ch3` „Introducerea capitolului 3”; blocks the final until written |
 | 3.1 Fluxuri tehnologice / secții + dotări | narrative + tables + figures | dossier (flows, permit, schemes) + visit photos + equipment enrichment |
 | 3.2 Utilități (apă, energie electrică, gaz / termică, carburanți, aer comprimat…) | narrative + tables | dossier + questionnaire + visit |
 | 3.3 Iluminat · 3.4 Parc auto · 3.5 Contorizare · 3.6 Automatizare | data + narrative | questionnaire (fleet, buildings) + visit |
 | 4.x Analiza consumurilor | data blocks | `consumption_analysis` |
 | 5 Bilanțuri energetice (electro + termic) | method text + results + narrative | visit material: **photos of meter/analyser displays grouped by panel** (e.g. Siemens PAC3220: THD, voltages, currents, cos φ) and FLIR images → a vision model reads the values into `MeasurementFacts` (the photo is the source; the auditor confirms) → her measurement-sheet pattern (figure + values + interpretation vs. norms). `later` until received |
+| 6 Introducere | narrative | written by the auditor in Revizuire: `narrative.ch6` „Introducerea capitolului 6”; blocks the final until written |
 | 6.1 Indicatori financiari · 6.2 Măsuri generale | fixed/parameterised text | template + calc |
-| 6.3 Măsuri specifice · 6.4 Sinteza | auditor measures form + table + deterministic tep, CO₂ and TRB | labelled „Măsuri propuse” form with cell evidence; per-measure narrative remains a marked gap that blocks final export until a later draft-agent slice |
+| 6.3 Măsuri specifice · 6.4 Sinteza | auditor measures form + table + deterministic tep, CO₂ and TRB | labelled „Măsuri propuse” form with cell evidence; per-measure narrative remains a marked gap that blocks final export until a later draft-agent slice; 6.4 closes with `narrative.ch6.sinteza` „Încheierea sintezei măsurilor”, written by the auditor |
 | 7 Surse de finanțare | fixed text | template |
 
 **Draft rules for AI narrative:**
@@ -1504,6 +1506,8 @@ code/ (repository root)
 - Conventional Commits; features squash-merged.
 - SemVer: a release bumps the minor version, a hotfix the patch.
 - Golden tests run locally before feature PRs and before every release PR.
+- A new audit base, or a renewed licence on her cover, needs `scripts/audit_base_digests.py` and a
+  digest review before the release PR.
 - **Orca** runs the agents (09-23; it replaced Conductor). `orca.yaml` (committed) holds the
   worktree setup script: `uv sync --all-groups` and both hook types (`pre-commit install -t
   pre-commit -t pre-push`). Agent instructions

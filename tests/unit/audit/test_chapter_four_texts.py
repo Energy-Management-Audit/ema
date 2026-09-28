@@ -73,6 +73,8 @@ def test_na_section_text_never_blocks_the_final(tmp_path: Path) -> None:
     assert labels == {
         "Concluziile privind analiza consumului echivalent de energie",
         "Analiza eficienței utilizării energiei",
+        "Introducerea capitolului 3",
+        "Introducerea capitolului 6",
     }
 
 

@@ -67,7 +67,9 @@ def test_report_lists_the_newest_draft_with_its_summary_and_files(
         "toc_pages_set",
         "dropped",
         "failures",
+        "charts_skipped",
     }
+    assert summary["charts_skipped"] == []
     assert set(summary["chapters"][0]) == {"number", "title", "section_id", "page"}
     assert summary["unit_plan"]["processes_source"] == "default"
 

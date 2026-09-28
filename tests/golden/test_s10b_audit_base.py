@@ -17,7 +17,7 @@ from lxml import etree
 from ema.audit.base import build_base, build_configured_base
 from ema.audit.base_anchor import MARKER, _paragraph_text
 from ema.audit.base_identity import derive_identity as _identity
-from ema.audit.base_numeric import approved_fixed_number, has_number
+from ema.audit.base_numeric import approved_fixed_text, has_number
 from ema.audit.base_package import package_issues
 from ema.audit.base_units import UnitPlan, select_units
 from ema.audit.catalogue import CATALOGUE
@@ -140,7 +140,7 @@ def _fixed_chapters(base: Path, output: Path, identity: tuple[str, ...]) -> None
                 assert source.style.style_id == target.style.style_id  # type: ignore[attr-defined]
                 continue  # its printed chapter number changes when ch5 is inserted
             xml_text = _paragraph_text(source._p)  # type: ignore[attr-defined]
-            if has_number(xml_text) and not approved_fixed_number(xml_text):
+            if has_number(xml_text) and not approved_fixed_text(xml_text):
                 assert MARKER in target.text  # type: ignore[attr-defined]
                 continue
             assert _paragraph_signature(source) == _paragraph_signature(target)

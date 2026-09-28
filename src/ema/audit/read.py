@@ -28,6 +28,8 @@ from ema.energy_data.source import Located, normal
 
 # the auditor writes these ch. 4 texts herself; nothing generates them.
 NARRATIVE_SECTIONS = ("ch4.concluzii", "ch4.eficienta", "ch4.bilant_real")
+# She writes the introductions of chapters 3 and 6 the same way.
+INTRO_SECTIONS = ("ch3", "ch6")
 
 
 @dataclass(frozen=True)
@@ -208,6 +210,25 @@ def _read_details(ws: Workspace, job: str, info: NecesarInfo, sha: str) -> list[
     return result
 
 
+def _texts_to_write(ws: Workspace, job: str) -> None:
+    """The texts the auditor writes herself exist from the start, absent until she writes them."""
+    for section in CATALOGUE:
+        if section.id in NARRATIVE_SECTIONS:
+            label = section.title[:1].upper() + section.title[1:]
+            spec = FieldSpec(
+                key=f"narrative.{section.id}", label=label, value_type="text", chapter="ch4"
+            )
+            measure_fields.absent(ws, job, spec)
+    for section_id in INTRO_SECTIONS:
+        spec = FieldSpec(
+            key=f"narrative.{section_id}",
+            label=f"Introducerea capitolului {section_id.removeprefix('ch')}",
+            value_type="text",
+            chapter=section_id,
+        )
+        measure_fields.absent(ws, job, spec)
+
+
 def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = None) -> ReadResult:
     """Read source workbooks without an AI provider or a document engine."""
     info = parse_necesar_info(necesar)
@@ -274,11 +295,5 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
     for section in CATALOGUE:
         if section.id.startswith("ch4."):
             record_applicability(ws, job, section.id)
-    for section in CATALOGUE:
-        if section.id in NARRATIVE_SECTIONS:
-            label = section.title[:1].upper() + section.title[1:]
-            spec = FieldSpec(
-                key=f"narrative.{section.id}", label=label, value_type="text", chapter="ch4"
-            )
-            measure_fields.absent(ws, job, spec)
+    _texts_to_write(ws, job)
     return ReadResult(dataset, tuple(result), tuple(issues))

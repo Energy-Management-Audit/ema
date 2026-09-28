@@ -69,6 +69,7 @@ def _outline(paragraph: Paragraph) -> int | None:
     return None
 
 
+_NUMBERED = re.compile(r"^\s*\d+(?:\.\d+)*[.\s-]+")
 _CAPTION = re.compile(r"^(?:tabel(?:ul)?|fig(?:ura)?\.?|grafic(?:ul)?)\b", re.IGNORECASE)
 
 
@@ -115,6 +116,39 @@ def _template(template: str, title: str) -> tuple[tuple[str, str], ...] | None:
         return None
     keys = [piece[1:-1] for piece in pieces if piece.startswith("{")]
     return tuple(zip(keys, match.groups(), strict=True))
+
+
+def _folded(text: str) -> tuple[str, list[int]]:
+    """`normalize`'s folding, one character at a time, with each folded character's source index."""
+    folded: list[str] = []
+    index: list[int] = []
+    for position, char in enumerate(text):
+        lowered = char.casefold().replace("ş", "ș").replace("ţ", "ț")
+        for piece in unicodedata.normalize("NFKD", lowered):
+            if not unicodedata.combining(piece):
+                folded.append(piece)
+                index.append(position)
+    return "".join(folded), index
+
+
+def slot_values(template: str, text: str) -> dict[str, str]:
+    """Each slot of a heading's catalogue template as the heading itself writes it."""
+    numbered = _NUMBERED.match(text)
+    offset = numbered.end() if numbered else 0
+    folded, index = _folded(text[offset:])
+    pieces = re.split(r"(\{[a-z_]+\})", normalize(template))
+    pattern = "".join(
+        "(.+?)" if piece.startswith("{") else r"\s+".join(map(re.escape, piece.split(" ")))
+        for piece in pieces
+    )
+    match = re.fullmatch(rf"\s*{pattern}[\s.,:;–\-—]*", folded)
+    if match is None:
+        return {}
+    names = [piece[1:-1] for piece in pieces if piece.startswith("{")]
+    return {
+        name: text[offset + index[match.start(group)] : offset + index[match.end(group) - 1] + 1]
+        for group, name in enumerate(names, 1)
+    }
 
 
 def _chapter(title: str) -> int | None:  # noqa: PLR0911

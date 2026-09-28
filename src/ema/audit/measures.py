@@ -164,9 +164,22 @@ def compose_measures(ctx: StageContext) -> StageOutcome:
     )
     if company is not None:
         ctx.record_read("fields", company.id, company.revision)
+    closing = absent(
+        ctx.ws,
+        ctx.job,
+        FieldSpec(
+            key="narrative.ch6.sinteza",
+            label="Încheierea sintezei măsurilor",
+            value_type="text",
+            chapter="ch6",
+        ),
+    )
     plan = ChapterSixPlan(
         company_name=str(company.value) if company and company.value is not None else None,
         measures=planned,
+        closing=str(closing.value)
+        if closing.value is not None and closing.review != "rejected"
+        else None,
     )
     folder = ctx.artifact_dir() / "sections"
     folder.mkdir(parents=True, exist_ok=True)

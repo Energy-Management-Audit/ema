@@ -185,6 +185,31 @@ def test_table_formats_numeric_value_and_marks_missing_cell(tmp_path: Path) -> N
     assert [value.text for value in report.values] == ["1.234,50", "date indisponibile"]
 
 
+def test_table_header_overwrites_the_prototype_header_of_the_same_shape(tmp_path: Path) -> None:
+    source, prototypes, locator = _source(tmp_path)
+    out = tmp_path / "out.docx"
+    render(
+        source,
+        out,
+        locator,
+        [Table("table", [[["2023"], ["1"]]], header=[["Anul", "Consum"]])],
+        prototypes,
+    )
+    table = next(node for node in _body(out) if node.tag == W + "tbl")
+    header = table.findall(W + "tr")[0]
+    assert [_text(cell) for cell in header.findall(W + "tc")] == ["Anul", "Consum"]
+    for header_rows in ([["Anul"]], [["Anul", "Consum"], ["", ""]]):
+        with pytest.raises(OfficeError) as refused:
+            render(
+                source,
+                out,
+                locator,
+                [Table("table", [[["2023"], ["1"]]], header=header_rows)],
+                prototypes,
+            )
+        assert refused.value.code == "block_prototype"
+
+
 @pytest.mark.parametrize(
     ("value", "decimals", "expected"),
     [(1234.5, 2, "1.234,50"), (-1234.5, 2, "-1.234,50"), (1234.5, 0, "1.235")],

@@ -9,14 +9,11 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Literal
 
-from ema.audit.applicability import applies, fact_fields
-from ema.audit.catalogue import (
-    CATALOGUE,
-    Condition,
-    MaterialKind,
-    Section,
-)
-from ema.audit.staleness import capture_inputs, current_inputs, snapshot_inputs
+from ema.audit import base_entry
+from ema.audit.applicability import applies, condition_source, fact_fields
+from ema.audit.catalogue import CATALOGUE, MaterialKind, Section
+from ema.audit.staleness import base_changed, capture_inputs, current_inputs, snapshot_inputs
+from ema.core.config import load_settings
 from ema.core.errors import EmaError
 from ema.core.review.models import Actor, Decision, Field, Issue, Readiness
 from ema.core.review.section_transition import SectionState, Status, transition
@@ -245,17 +242,9 @@ def record_applicability(ws: Workspace, job: str, section_id: str) -> SectionSta
     before = get_status(ws, job, section_id)
     materials, facts = _inputs(ws, job)
     outcome = applies(section.applies_when, materials, facts)
-
-    def source(item: Condition) -> str:
-        if item.op == "carrier":
-            return "carrier:" + ",".join(carrier.value for carrier in item.carriers)
-        if item.children:
-            return item.op + "(" + ",".join(source(child) for child in item.children) + ")"
-        return item.op + (":" + item.key if item.key else "")
-
     reason = (
         "trigger: " if outcome is True else "absent: " if outcome is False else "unknown: "
-    ) + source(section.applies_when)
+    ) + condition_source(section.applies_when)
     return _save(
         ws,
         job,
@@ -272,19 +261,15 @@ def mark_drafted(
     section_id: str,
     actor: Literal["ema", "agent"],
     fingerprint: tuple[str, ...],
+    *,
+    detail: str | None = None,
 ) -> SectionState:
     before = get_status(ws, job, section_id)
     after = transition(before, Status.DRAFTED, actor)
     fact_revisions, material_inputs = capture_inputs(ws, job, _section(section_id), fingerprint)
-    all_inputs = tuple(
-        dict.fromkeys(
-            (
-                *fingerprint,
-                *(f"fact:{key}" for key in fact_revisions),
-                *(f"material:{key}" for key in material_inputs),
-            )
-        )
-    )
+    facts = (f"fact:{key}" for key in fact_revisions)
+    materials = (f"material:{key}" for key in material_inputs)
+    all_inputs = tuple(dict.fromkeys((*fingerprint, *facts, *materials)))
     return _save(
         ws,
         job,
@@ -296,6 +281,7 @@ def mark_drafted(
             material_inputs=material_inputs,
         ),
         actor,
+        detail,
     )
 
 
@@ -356,19 +342,32 @@ def audit_readiness(ws: Workspace, job: str, db: sqlite3.Connection | None = Non
 
 
 def refresh_staleness(
-    ws: Workspace, job: str, db: sqlite3.Connection | None = None
+    ws: Workspace, job: str, db: sqlite3.Connection | None = None, *, base_sha: str | None = None
 ) -> list[SectionState]:
+    """Mark stale what a changed fact, material or configured base left behind."""
     if db is None:
         with ws.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            return refresh_staleness(ws, job, connection)
+            return refresh_staleness(ws, job, connection, base_sha=base_sha)
+    current = base_sha or base_entry.base_sha(load_settings(ws))
+    return [
+        _save(ws, job, state, transition(state, Status.DRAFTED, "ema", old), "ema", old, db=db)
+        if current is not None and (old := base_changed(state, current)) is not None
+        else state
+        for state in _refresh_inputs(ws, job, db)
+    ]
+
+
+def _refresh_inputs(ws: Workspace, job: str, db: sqlite3.Connection) -> list[SectionState]:
     facts, materials = current_inputs(db, job)
     result: list[SectionState] = []
     for section, before in zip(CATALOGUE, statuses(ws, job, db), strict=True):
-        if before.status not in (Status.DRAFTED, Status.DONE) or before.stale:
-            result.append(before)
-            continue
-        if before.fact_revisions is None or before.material_inputs is None:
+        if (
+            before.status not in (Status.DRAFTED, Status.DONE)
+            or before.stale
+            or before.fact_revisions is None
+            or before.material_inputs is None
+        ):
             result.append(before)
             continue
         current_facts, current_materials = snapshot_inputs(

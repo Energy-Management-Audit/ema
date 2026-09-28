@@ -85,7 +85,8 @@ def test_stage_facts_evidence_narrative_and_rerun(tmp_path: Path) -> None:
     decide(ws, job, narrative.id, "correct", narrative.revision, "user", value="Verified text")
     readiness = AuditWorkflow().readiness(ws, job)
     assert readiness.draft_ok
-    assert [issue.code for issue in readiness.blocking].count("narrative_missing") == 1
+    # The second measure's description and the synthesis closing are still to write.
+    assert [issue.code for issue in readiness.blocking].count("narrative_missing") == 2
     assert get_status(ws, job, "ch6.measure").stale
 
 
@@ -106,7 +107,7 @@ def test_shorter_form_scopes_old_narrative(tmp_path: Path) -> None:
     assert result.measures == 1
     assert [issue.code for issue in AuditWorkflow().readiness(ws, job).blocking].count(
         "narrative_missing"
-    ) == 1
+    ) == 2
 
 
 def test_changed_form_cell_stales_chapter_six(tmp_path: Path) -> None:
@@ -154,3 +155,24 @@ def test_missing_slot_and_header_have_contract_errors(tmp_path: Path) -> None:
     with pytest.raises(EmaError) as invalid:
         run_measures(ws, job)
     assert invalid.value.code == "measures_form_invalid"
+
+
+def test_synthesis_closing_is_her_text_unless_rejected(tmp_path: Path) -> None:
+    ws, job = _job(tmp_path, [[1, "Lighting", "Less use", "Energie electrică", 1, "MWh", 2, 1]])
+    result = run_measures(ws, job)
+    closing = next(field for field in fields(ws, job) if field.key == "narrative.ch6.sinteza")
+    assert (closing.label, closing.chapter, closing.value) == (
+        "Încheierea sintezei măsurilor",
+        "ch6",
+        None,
+    )
+    assert ChapterSixPlan.model_validate_json(result.plan_path.read_text("utf-8")).closing is None
+    decide(ws, job, closing.id, "correct", closing.revision, "user", value="Concluzie.")
+    result = run_measures(ws, job)
+    plan = ChapterSixPlan.model_validate_json(result.plan_path.read_text("utf-8"))
+    assert plan.closing == "Concluzie."
+    assert "fact:narrative.ch6.sinteza" in get_status(ws, job, "ch6.sinteza").fingerprint
+    written = next(field for field in fields(ws, job) if field.key == "narrative.ch6.sinteza")
+    decide(ws, job, written.id, "reject", written.revision, "user")
+    result = run_measures(ws, job)
+    assert ChapterSixPlan.model_validate_json(result.plan_path.read_text("utf-8")).closing is None

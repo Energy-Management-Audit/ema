@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from docx import Document
@@ -14,15 +15,17 @@ from tests.unit.audit.render_seams import (
     run_render,
     summary_of,
     synthetic_render,
+    write_intros,
 )
 
-from ema.audit import render
+from ema.audit import render, render_writers
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.render import start_audit_render
 from ema.audit.render_steps import body_counts
 from ema.audit.sections import Status, set_status
 from ema.core.errors import EmaError
 from ema.core.workspace import Workspace
+from ema.energy_data.model import EnergyDataset
 
 TITLES = {section.id: section.title for section in CATALOGUE}
 
@@ -73,10 +76,13 @@ def test_draft_without_word_writes_every_chapter_in_order(
         (number, f"ch{number}", None) for number in range(1, 8)
     ]
     assert summary.chapters[1].title == "Descrierea şi istoricul societăţii"
+    # Chapters 3 and 6 open with her introduction: unwritten, it is a marker (D4).
     assert [marker.section_id for marker in summary.markers] == [
         "ch2.date_generale",
+        "ch3",
         "ch3.flux",
         "ch4.bilant_real",
+        "ch6",
     ]
     assert summary.markers[0].label == "Date generale"
     assert (summary.tables, summary.charts) == (1, 0)
@@ -157,9 +163,10 @@ def test_final_needs_word_and_no_marker(
     monkeypatch.setattr(render, "word_automation", lambda settings: word)
     record = run_render(ws, job_id, "final")
     assert record["state"] == "failed"
-    assert record["error"] == "ch2.date_generale; ch3.flux; ch4.bilant_real"
+    assert record["error"] == "ch2.date_generale; ch3; ch3.flux; ch4.bilant_real; ch6"
     assert failed_payload(ws, job_id)["code"] == "audit_markers"
     assert word.calls == []
+    write_intros(ws, job_id)
     set_status(ws, job_id, "ch4.bilant_real", Status.NA, "user")
     monkeypatch.setattr(render, "write_draft", fill_writer("ch2.date_generale", "ch3.flux"))
     record = run_render(ws, job_id, "final")
@@ -193,3 +200,30 @@ def test_markers_before_the_first_heading_belong_to_front(tmp_path: Path) -> Non
         ("ch1", "Descrierea şi scopul auditului"),
         ("ch1", "Descrierea şi scopul auditului"),
     ]
+
+
+def test_a_dataset_without_readings_is_a_ch4_item_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    empty = EnergyDataset(years=(), carriers={})
+    monkeypatch.setattr(
+        render_writers, "select_checklist", lambda dossier: SimpleNamespace(file_sha="x")
+    )
+    monkeypatch.setattr(render_writers, "parse_necesar_info", lambda path: None)
+    monkeypatch.setattr(render_writers, "to_dataset", lambda info: empty)
+    ws = SimpleNamespace(file_path=lambda client, sha: tmp_path / "necesar.xls")
+    with pytest.raises(EmaError) as refused:
+        render_writers.write_four(
+            tmp_path / "in.docx",
+            tmp_path / "out.docx",
+            ws=ws,  # type: ignore[arg-type]
+            client="synthetic",
+            dossier=[],
+            job_fields=[],
+            identity=("Forbidden Base SRL",),
+        )
+    assert (refused.value.code, refused.value.user_message_ro) == (
+        "ch4_no_data",
+        "Capitolul 4 nu are date de consum.",
+    )
+    assert not (tmp_path / "out.docx").exists()

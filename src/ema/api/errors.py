@@ -70,6 +70,9 @@ STATUS = {
     "audit_package": 409,
     "audit_markers": 409,
     "audit_ai_wording": 409,
+    # s17b-audit-final
+    "sections_stale": 409,
+    "cover_photo_type": 415,
     # s17b-invoices
     "validation_error": 422,
 }
@@ -125,6 +128,7 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "section_missing",
         "human_required",
         "stale_revision",
+        "sections_stale",
     ),
     ("POST", "/jobs/{job_id}/sections/{section_id}/draft"): ("provisional_contract",),
     ("GET", "/jobs/{job_id}/outputs"): ("job_missing",),
@@ -282,6 +286,14 @@ ROUTE_ERRORS[("POST", "/jobs/{job_id}/stages/{stage}")] += (
     "audit_package",
     "audit_markers",
     "audit_ai_wording",
+)
+
+# s17b-audit-final: only an audit's cover photo is checked for its type when it is set.
+ROUTE_ERRORS[("PUT", "/jobs/{job_id}/slots/{slot:path}")] = (
+    "job_missing",
+    "invalid_slot",
+    "file_missing",
+    "cover_photo_type",
 )
 
 _PROBLEM_SCHEMA = {

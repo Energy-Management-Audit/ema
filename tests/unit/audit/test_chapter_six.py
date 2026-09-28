@@ -6,7 +6,13 @@ from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
 
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.chapter_six import ChapterSixPlan, PlannedMeasure, render_chapter_six
+from ema.audit.chapter_six import (
+    MEASURE_HEADER,
+    SYNTHESIS_HEADER,
+    ChapterSixPlan,
+    PlannedMeasure,
+    render_chapter_six,
+)
 
 TITLES = {section.id: section.title for section in CATALOGUE}
 
@@ -55,9 +61,10 @@ def _base(path: Path, *, chapter_five: bool) -> Path:
     return path
 
 
-def _plan() -> ChapterSixPlan:
+def _plan(closing: str | None = "Concluzie verificată.") -> ChapterSixPlan:
     return ChapterSixPlan(
         company_name="Synthetic factory",
+        closing=closing,
         measures=(
             PlannedMeasure(
                 title="Lighting",
@@ -95,7 +102,8 @@ def test_render_measures_with_and_without_chapter_five(tmp_path: Path) -> None:
         assert "lighting;" in text and "insulation." in text
         assert f"Tabelul {expected}.1" in text
         assert f"Tabelul {expected}.3" in text
-        assert "Retained closing paragraph" in text
+        assert "Retained closing paragraph" not in text
+        assert "Concluzie verificată." in text
         assert "Financing preserved" in text
         assert "Old measure" not in text
         assert text.count("[de completat]") == 1
@@ -111,3 +119,25 @@ def test_render_measures_with_and_without_chapter_five(tmp_path: Path) -> None:
         assert doc.tables[0].cell(2, 3).text == "12,35"
         assert doc.tables[0].cell(2, 5).text == "0,5"
         assert doc.tables[1].cell(2, 2).text == "[de completat]"
+
+
+def _cells(table: object) -> list[list[str]]:
+    rows = table._tbl.tr_lst  # type: ignore[attr-defined]
+    return [
+        ["".join(t.text or "" for t in tc.iter(tc.tag.replace("tc", "t"))) for tc in tr.tc_lst]
+        for tr in rows
+    ]
+
+
+def test_headers_are_her_labels_and_the_closing_is_the_reviewed_text(tmp_path: Path) -> None:
+    base = _base(tmp_path / "base.docx", chapter_five=True)
+    output = tmp_path / "output.docx"
+    render_chapter_six(base, output, _plan(closing=None), ("Old measure",))
+    doc = Document(output)
+    measure, synthesis = _cells(doc.tables[0]), _cells(doc.tables[2])
+    assert measure[:2] == [list(row) for row in MEASURE_HEADER]
+    assert synthesis[:2] == [list(row) for row in SYNTHESIS_HEADER]
+    paragraphs = [item.text for item in doc.paragraphs]
+    closing = paragraphs.index(TITLES["ch7"]) - 1
+    assert paragraphs[closing] == "[de completat]"
+    assert "Retained closing paragraph" not in paragraphs

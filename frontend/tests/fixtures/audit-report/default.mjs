@@ -73,6 +73,7 @@ export const SUMMARY = {
   toc_pages_set: true,
   dropped: ['ch4.bilant_real'],
   failures: [],
+  charts_skipped: [],
 }
 
 export const DRAFT_RUN = {

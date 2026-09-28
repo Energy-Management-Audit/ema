@@ -1,4 +1,4 @@
-"""Render checked narrative into existing paragraph anchors only."""
+"""Render a checked draft over its section's own region of the base."""
 
 # pyright: reportPrivateUsage=false
 
@@ -9,17 +9,13 @@ from decimal import Decimal
 from pathlib import Path
 from typing import cast
 
-from docx import Document
-from docx.oxml.ns import qn
-from lxml import etree
-
 from ema.audit.base_anchor import MARKER
 from ema.audit.draft_checks import TOKEN, DraftCheck, DraftReview, check_draft
-from ema.audit.draft_schema import SectionDraft
+from ema.audit.draft_schema import DraftText, SectionDraft
+from ema.audit.section_body import replace_section_body
 from ema.audit.sections import mark_drafted, recompute_ready
 from ema.core.errors import EmaError
-from ema.core.office.anchors import find
-from ema.core.office.block_text import set_text
+from ema.core.office.blocks import Block, Caption, Missing, Num, Paragraph, Ref, Segment, Table
 from ema.core.office.numbers_ro import format_number
 from ema.core.review.models import Field
 from ema.core.workspace import Workspace
@@ -37,54 +33,39 @@ def _resolved(text: str, facts: dict[str, Field]) -> str:
     return TOKEN.sub(lambda match: _value(facts[match.group(1)]), text)
 
 
-def _outline_styles(styles: etree._Element) -> set[str]:
-    """Style ids that make a paragraph a heading: an outline level on the style or a base."""
-    own: dict[str, tuple[bool, str | None]] = {}
-    for style in styles.iter(qn("w:style")):
-        based = style.find(qn("w:basedOn"))
-        outline = style.find(f"{qn('w:pPr')}/{qn('w:outlineLvl')}") is not None
-        own[style.get(qn("w:styleId"), "")] = (
-            outline,
-            based.get(qn("w:val")) if based is not None else None,
-        )
-    result: set[str] = set()
-    for style_id in own:
-        seen: set[str] = set()
-        current: str | None = style_id
-        while current is not None and current in own and current not in seen:
-            seen.add(current)
-            outline, current_base = own[current]
-            if outline:
-                result.add(style_id)
-                break
-            current = current_base
-    return result
+def _cell(text: DraftText, location: str, blocked: set[str], facts: dict[str, Field]) -> Segment:
+    return Num(None, 0) if location in blocked else _resolved(text.text, facts)
 
 
-def _writable(
-    document: etree._Element, slot: str, outline_styles: set[str]
-) -> etree._Element | None:
-    element = find([document], slot)
-    if any(parent.tag == qn("w:tbl") for parent in element.iterancestors()):
-        return None
-    properties = element.find(qn("w:pPr"))
-    style = properties.find(qn("w:pStyle")) if properties is not None else None
-    style_id = style.get(qn("w:val"), "") if style is not None else ""
-    if (
-        style_id.casefold().startswith(("heading", "titlu"))
-        or style_id in outline_styles
-        or (properties is not None and properties.find(qn("w:outlineLvl")) is not None)
-    ):
-        return None
-    content = "".join(node.text or "" for node in element.iter(qn("w:t"))).strip()
-    if content.startswith(("Tabel", "Fig.", "Figura", "Grafic")):
-        return None
-    return element
+def draft_blocks(draft: SectionDraft, facts: dict[str, Field], blocked: set[str]) -> list[Block]:
+    """The section as blocks: a flagged text or cell becomes the marker, a figure a marker."""
+    blocks: list[Block] = [
+        Missing(item.kind, MARKER)
+        if f"paragraph:{index}" in blocked
+        else Paragraph(item.kind, [_resolved(item.text, facts)])
+        for index, item in enumerate(draft.paragraphs)
+    ]
+    for index, table in enumerate(draft.tables):
+        ref = f"{draft.section}.{index}"
+        caption = _cell(table.caption, f"table:{index}:caption", blocked, facts)
+        blocks.append(Caption("caption", "tab", ref, ["Tabelul ", Ref("tab", ref), " ", caption]))
+        rows = [
+            [
+                [_cell(cell, f"table:{index}:{row}:{column}", blocked, facts)]
+                for column, cell in enumerate(cells)
+            ]
+            for row, cells in enumerate(table.rows)
+        ]
+        header = [MARKER if isinstance(cell[0], Num) else str(cell[0]) for cell in rows[0]]
+        blocks.append(Table("table", rows[1:], header_rows=1, header=[header]))
+    blocks.extend(Missing("body", MARKER) for _ in draft.figures)
+    if draft.status == "missing":
+        blocks.append(Missing("body", MARKER))
+    return blocks
 
 
-def render_section(  # noqa: PLR0913
+def render_section(
     base: Path,
-    anchors: Path,
     output: Path,
     draft: SectionDraft,
     facts: dict[str, Field],
@@ -92,44 +73,15 @@ def render_section(  # noqa: PLR0913
     *,
     job: str,
 ) -> DraftCheck:
-    """Replace only this section's paragraph bookmarks; defer non-paragraph slots."""
+    """Write the checked draft over the section's own region of the base."""
     if output.resolve() == base.resolve():
         raise ValueError("output must not overwrite audit base")
     check = check_draft(draft, facts, job)
     if check.fatal:
         raise EmaError("draft_invalid", "Redactarea nu a trecut verificările.", draft.section)
     blocked = {issue.location for issue in (*check.review, *flags)}
-    mapping = json.loads(anchors.read_text(encoding="utf-8"))
-    if mapping.get("version") != 1:
-        raise ValueError("unsupported audit anchor map")
-    document = Document(str(base))
-    slots = [
-        item["slot"]
-        for item in mapping["anchors"]
-        if item["section"] == draft.section
-        and item["classification"] == "variable"
-        and item["part"] == "word/document.xml"
-    ]
-    outline = _outline_styles(document.styles.element)
-    writable = [
-        element
-        for slot in slots
-        if (element := _writable(document.element, slot, outline)) is not None
-    ]
-    paragraphs = [
-        MARKER if f"paragraph:{index}" in blocked else _resolved(item.text, facts)
-        for index, item in enumerate(draft.paragraphs)
-    ]
-    if draft.status == "missing":
-        paragraphs.append(MARKER)
-    if len(paragraphs) > len(writable):
-        raise EmaError(
-            "draft_slots", "Secţiunea nu are suficiente ancore de paragraf.", draft.section
-        )
-    for element, text in zip(writable, paragraphs, strict=False):
-        set_text(element, text, missing=text == MARKER)
     output.parent.mkdir(parents=True, exist_ok=True)
-    document.save(str(output))
+    replace_section_body(base, output, draft.section, draft_blocks(draft, facts, blocked))
     return check
 
 
@@ -171,7 +123,6 @@ def render_draft_section(  # noqa: PLR0913
     ws: Workspace,
     job: str,
     base: Path,
-    anchors: Path,
     output: Path,
     *,
     draft: SectionDraft,
@@ -179,7 +130,7 @@ def render_draft_section(  # noqa: PLR0913
     flags: tuple[DraftReview, ...],
 ) -> DraftCheck:
     """Publish paragraph output and capture the exact fact dependency for staleness."""
-    check = render_section(base, anchors, output, draft, facts, flags, job=job)
+    check = render_section(base, output, draft, facts, flags, job=job)
     review_path = output.with_suffix(".draft-review.json")
     review_path.write_text(
         json.dumps(review_payload(draft, check, flags), ensure_ascii=False, indent=2),

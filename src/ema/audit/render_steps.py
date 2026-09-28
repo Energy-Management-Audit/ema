@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
+import shutil
+from collections.abc import Iterable, Iterator, Mapping
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ from ema.core.office.package import read_parts, xml
 from ema.core.review.models import Field
 
 _CHART = "{http://schemas.openxmlformats.org/drawingml/2006/chart}chart"
+_PAGE_PARTS = re.compile(r"word/(?:header|footer)\d*\.xml")
 # The cover, the TOC and anything else before the first heading, as the base anchors name it.
 FRONT = "front"
 _TITLES = {section.id: section.title for section in CATALOGUE} | {
@@ -71,6 +73,15 @@ def configured_base(settings: Settings) -> AuditBase:
     return AuditBase(
         paths["audit_base_document"], paths["audit_measurement_prototype"], identity, inputs
     )
+
+
+def snapshot_base(base: AuditBase, folder: Path) -> AuditBase:
+    """The base as this run reads it: one copy, hashed and built from, whatever the configured
+    path holds later. The caller removes the copy when the run ends."""
+    copy = folder / "audit-base-snapshot.docx"
+    shutil.copyfile(base.document, copy)
+    sha = hashlib.sha256(copy.read_bytes()).hexdigest()
+    return replace(base, document=copy, inputs={**base.inputs, "audit_base_document": sha})
 
 
 def sentence(title: str) -> str:
@@ -140,8 +151,12 @@ def _text(element: Any) -> str:
     return "".join(node.text or "" for node in element.iter(qn("w:t")))
 
 
-def body_counts(docx: Path) -> Counts:
-    """Markers left in the body with their innermost section, tables and native charts."""
+def body_counts(docx: Path, labels: Mapping[str, str] | None = None) -> Counts:
+    """Markers left in the body with their innermost section, tables and native charts.
+
+    ``labels`` names a marker by the bookmark of its paragraph (the cover photo) instead of
+    by its section's title.
+    """
     document: Any = Document(str(docx))
     spans = heading_spans_document(document)
     elements = list(document.element.body)
@@ -156,8 +171,20 @@ def body_counts(docx: Path) -> Counts:
             default=None,
         )
         section_id = owner[0].section_id if owner else FRONT
+        named = labels or {}
+        for paragraph in element.iter(qn("w:p")):
+            names = [str(node.get(qn("w:name"))) for node in paragraph.iter(qn("w:bookmarkStart"))]
+            label = next((named[name] for name in names if name in named), None)
+            if label is not None and (own := _text(paragraph).count(MARKER)):
+                markers.extend([(section_id, label)] * own)
+                count -= own
         label = sentence(_TITLES.get(section_id, section_id))
         markers.extend([(section_id, label)] * count)
+    # A header or footer repeats on every page; its marker belongs to the cover's review.
+    parts = read_parts(docx)
+    for name in sorted(part for part in parts if _PAGE_PARTS.fullmatch(part)):
+        count = _text(xml(parts, name)).count(MARKER)
+        markers.extend([(FRONT, _TITLES[FRONT])] * count)
     tables = sum(element.tag == qn("w:tbl") for element in elements)
     charts = sum(1 for element in elements for _ in element.iter(_CHART))
     return Counts(markers, tables, charts)

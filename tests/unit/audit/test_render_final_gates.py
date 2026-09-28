@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 from pathlib import Path
 
 import pytest
 from docx import Document
+from lxml import etree
+from PIL import Image
 from tests.unit.audit.render_seams import (
     TITLES,
     FakeWord,
@@ -15,13 +19,15 @@ from tests.unit.audit.render_seams import (
     outputs,
     run_render,
     synthetic_render,
+    write_intros,
     write_narrative,
 )
 
-from ema.audit import render
+from ema.audit import base_numeric, render
 from ema.audit.render_steps import ai_wording_hits
 from ema.audit.sections import Status, set_status
 from ema.audit.workflow import AuditWorkflow
+from ema.core.office.package import P, R, W, encoded, read_parts, write_parts, xml
 from ema.core.workspace import Workspace
 
 
@@ -42,6 +48,7 @@ def test_every_text_part_is_read(tmp_path: Path) -> None:
 @pytest.fixture
 def final(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Workspace, str]:
     ws, job, _ = synthetic_render(tmp_path, monkeypatch)
+    write_intros(ws, job)
     set_status(ws, job, "ch4.bilant_real", Status.NA, "user")
     monkeypatch.setattr(render, "write_draft", fill_writer("ch2.date_generale", "ch3.flux"))
     monkeypatch.setattr(render, "write_four", narrative_writer("ch4.concluzii"))
@@ -85,3 +92,81 @@ def test_clean_text_passes(final: tuple[Workspace, str]) -> None:
     record = run_render(ws, job, "final")
     assert record["state"] == "ready", record["error"]
     assert [name for name, _ in outputs(ws, job)] == ["Audit-final.pdf", "Audit-final.docx"]
+
+
+def test_a_marker_in_a_header_refuses_the_final(
+    final: tuple[Workspace, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws, job = final
+    write_narrative(ws, job, "ch4.concluzii", "Consumul a scăzut după modernizare.")
+    built = render.build_base
+
+    def with_header(plan: object, *, output: Path, **kwargs: object) -> Path:
+        path = built(plan, output=output, **kwargs)
+        document = Document(str(path))
+        document.sections[0].header.paragraphs[0].text = "Audit energetic [de completat]"
+        document.save(str(path))
+        return path
+
+    monkeypatch.setattr(render, "build_base", with_header)
+    record = run_render(ws, job, "final")
+    assert record["state"] == "failed"
+    assert _failure(ws, job)["code"] == "audit_markers"
+    assert record["error"] == "front"
+    assert outputs(ws, job) == []
+
+
+def _png(color: str) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (4, 4), color).save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+def _picture_bullet(path: Path, picture: bytes) -> None:
+    """Her numbering's picture bullet, as word/numbering.xml relates it to word/media."""
+    parts = read_parts(path)
+    parts["word/media/bullet.png"] = picture
+    parts["word/_rels/numbering.xml.rels"] = (
+        f'<Relationships xmlns="{P}"><Relationship Id="rIdBullet" Type="{R}/image" '
+        'Target="media/bullet.png"/></Relationships>'
+    ).encode()
+    numbering = xml(parts, "word/numbering.xml")
+    bullet = etree.fromstring(
+        f'<w:numPicBullet xmlns:w="{W}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:r="{R}" '
+        'w:numPicBulletId="0"><w:pict><v:shape><v:imagedata r:id="rIdBullet"/></v:shape>'
+        "</w:pict></w:numPicBullet>"
+    )
+    numbering.insert(0, bullet)
+    parts["word/numbering.xml"] = encoded(numbering)
+    types = xml(parts, "[Content_Types].xml")
+    if not any(item.get("Extension") == "png" for item in types):
+        etree.SubElement(types, f"{{{types.nsmap[None]}}}Default", Extension="png").set(
+            "ContentType", "image/png"
+        )
+        parts["[Content_Types].xml"] = encoded(types)
+    write_parts(parts, path)
+
+
+@pytest.mark.parametrize(("color", "state"), [("red", "ready"), ("blue", "failed")])
+def test_a_changed_picture_bullet_refuses_the_final(
+    final: tuple[Workspace, str], monkeypatch: pytest.MonkeyPatch, color: str, state: str
+) -> None:
+    """Round 2: a picture bullet ships only by the digest of its own bytes."""
+    ws, job = final
+    write_narrative(ws, job, "ch4.concluzii", "Consumul a scăzut după modernizare.")
+    reviewed = frozenset({hashlib.sha256(_png("red")).hexdigest()})
+    monkeypatch.setitem(base_numeric._ALLOWED, "synthetic", reviewed)  # pyright: ignore[reportPrivateUsage]
+    built = render.build_base
+
+    def with_bullet(plan: object, *, output: Path, **kwargs: object) -> Path:
+        path = built(plan, output=output, **kwargs)
+        _picture_bullet(path, _png(color))
+        return path
+
+    monkeypatch.setattr(render, "build_base", with_bullet)
+    record = run_render(ws, job, "final")
+    assert record["state"] == state, record["error"]
+    if state == "failed":
+        assert _failure(ws, job)["code"] == "audit_package"
+        assert record["error"] == "unreviewed picture bullet: word/media/bullet.png"
+        assert outputs(ws, job) == []

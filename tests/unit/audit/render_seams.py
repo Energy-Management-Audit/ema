@@ -104,7 +104,7 @@ def synthetic_render(
 
     def build(plan: object, *, output: Path, **_: object) -> Path:
         _base(output)
-        output.with_suffix(".anchors.json").write_text("{}", encoding="utf-8")
+        output.with_suffix(".anchors.json").write_text('{"version": 1, "anchors": []}', "utf-8")
         return output
 
     def writer(name: str, fill: str | None = None):
@@ -188,9 +188,18 @@ def narrative_writer(section: str):
 
 
 def write_narrative(ws: Workspace, job: str, section: str, text: str) -> None:
-    """the auditor writes a ch. 4 text: the field exists absent after read, then she corrects it."""
+    """the auditor writes a text: the field exists absent after read, then she corrects it."""
     spec = FieldSpec(
-        key=f"narrative.{section}", label=TITLES[section], value_type="text", chapter="ch4"
+        key=f"narrative.{section}",
+        label=TITLES[section],
+        value_type="text",
+        chapter=section.split(".", maxsplit=1)[0],
     )
     field = mark_absent(ws, job, spec, "not_found")
     decide(ws, job, field.id, "correct", field.revision, "user", value=text)
+
+
+def write_intros(ws: Workspace, job: str) -> None:
+    """The introductions of chapters 3 and 6, which a final needs written."""
+    for section in ("ch3", "ch6"):
+        write_narrative(ws, job, section, f"Introducere {section}.")

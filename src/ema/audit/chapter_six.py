@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -16,6 +17,7 @@ from ema.audit.base_anchor import MARKER
 from ema.audit.base_package import package_issues
 from ema.audit.base_toc import refresh_toc
 from ema.audit.base_units import heading_spans_document
+from ema.audit.chapter_four_blocks import _written
 from ema.core.office.block_text import set_text
 from ema.core.office.blocks import (
     Block,
@@ -53,6 +55,18 @@ class PlannedMeasure(BaseModel):
 class ChapterSixPlan(BaseModel):
     company_name: str | None
     measures: tuple[PlannedMeasure, ...]
+    closing: str | None = None
+
+
+# Her column labels, read from the base's first chapter-six tables.
+MEASURE_HEADER = (
+    ("Măsuri propuse", "Efect", "Economie de energie", "Investiţie", "Durată recuperare"),
+    ("", "", "tep/an", "t CO2", "mii lei", "ani"),
+)
+SYNTHESIS_HEADER = (
+    ("Măsuri propuse", "Economie de energie", "Investiţie", "Durată recuperare"),
+    ("", "tep/an", "t CO2", "mii lei", "ani"),
+)
 
 
 def _text(element: etree._Element) -> str:
@@ -124,11 +138,16 @@ def _layout(base: Path) -> tuple[int, int, int, Prototypes, list[Block]]:
         "synthesis_title": body[synth_caption + 1],
         "synthesis_table": body[synthesis_table],
     }
+    # Her closing prose gives way to the reviewed text; empty and layout paragraphs stay.
     closing: list[Block] = []
     for index in range(synthesis_table + 1, following):
+        if _text(body[index]):
+            elements.setdefault("closing", body[index])
+            continue
         key = f"closing:{index}"
         elements[key] = body[index]
         closing.append(Retained(key))
+    elements.setdefault("closing", body[prose])
     return start, following, chapter, Prototypes(elements, chapter, MARKER), closing
 
 
@@ -203,7 +222,12 @@ def _blocks(plan: ChapterSixPlan, closing: list[Block]) -> list[Block]:
                     "table_title",
                     ["Sinteza măsurii de eficiență energetică propusă pentru implementare"],
                 ),
-                Table("measure_table", [_measure_row(item)], header_rows=2),
+                Table(
+                    "measure_table",
+                    [_measure_row(item)],
+                    header_rows=2,
+                    header=[list(row) for row in MEASURE_HEADER],
+                ),
                 Paragraph(
                     "body",
                     [
@@ -240,8 +264,12 @@ def _blocks(plan: ChapterSixPlan, closing: list[Block]) -> list[Block]:
                 ["Sinteza măsurilor de eficiență energetică propuse pentru implementare"],
             ),
             Table(
-                "synthesis_table", [_synthesis_row(item) for item in plan.measures], header_rows=2
+                "synthesis_table",
+                [_synthesis_row(item) for item in plan.measures],
+                header_rows=2,
+                header=[list(row) for row in SYNTHESIS_HEADER],
             ),
+            *(replace(block, proto="closing") for block in _written(plan.closing)),
             *closing,
         )
     )

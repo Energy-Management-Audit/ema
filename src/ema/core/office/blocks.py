@@ -63,6 +63,7 @@ class Table:
     proto: str
     rows: list[list[list[Segment]]]
     header_rows: int = 1
+    header: list[list[str]] | None = None
 
 
 @dataclass(frozen=True)
@@ -266,6 +267,13 @@ def _table_rows(  # noqa: PLR0913
     rows = node.findall(f"{{{W}}}tr")
     if block.header_rows < 0 or len(rows) <= block.header_rows:
         raise OfficeError("block_prototype", "Table needs a first data row")
+    if block.header is not None:
+        widths = [len(row.findall(f"{{{W}}}tc")) for row in rows[: block.header_rows]]
+        if [len(row) for row in block.header] != widths:
+            raise OfficeError("block_prototype", "Table header differs from prototype")
+        for row, texts in zip(rows, block.header, strict=False):
+            for cell, text in zip(row.findall(f"{{{W}}}tc"), texts, strict=True):
+                set_text(cell, text)
     template = rows[block.header_rows]
     for row in rows[block.header_rows :]:
         node.remove(row)

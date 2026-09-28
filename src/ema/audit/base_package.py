@@ -8,6 +8,7 @@ from typing import Any
 from docx.oxml.ns import qn
 from lxml import etree
 
+from ema.audit.base_numeric import approved_fixed_image
 from ema.core.office.anchors import leftover_issues
 from ema.core.office.package import (
     R,
@@ -92,7 +93,11 @@ def scrub_package(path: Path) -> None:
     _prune_relationships(parts)
     while True:
         referenced = _asset_references(parts)
-        unused = [name for name in parts if name.startswith(_ASSETS) and name not in referenced]
+        unused = [
+            name
+            for name in parts
+            if name.startswith(_ASSETS) and not name.endswith(".rels") and name not in referenced
+        ]
         if not unused:
             break
         for name in unused:
@@ -105,6 +110,24 @@ def scrub_package(path: Path) -> None:
             content_types.remove(item)
     parts["[Content_Types].xml"] = encoded(content_types)
     write_parts(parts, path)
+
+
+def unreviewed_bullets(path: Path) -> list[str]:
+    """Her numbering's picture bullets that no image digest approves; none may ship in a final."""
+    parts = read_parts(path)
+    rels = "word/_rels/numbering.xml.rels"
+    if rels not in parts:
+        return []
+    targets = (
+        target_part("word/numbering.xml", relation.get("Target", ""))
+        for relation in xml(parts, rels)
+        if relation.get("Type", "").endswith("/image")
+    )
+    return [
+        f"unreviewed picture bullet: {name}"
+        for name in targets
+        if name not in parts or not approved_fixed_image(parts[name])
+    ]
 
 
 def _relationship_issues(parts: dict[str, bytes], name: str) -> list[str]:
@@ -165,7 +188,9 @@ def package_issues(  # noqa: C901
     references = _asset_references(parts)
     bookmark_ids: set[str] = set()
     for name, data in parts.items():
-        if name.startswith(_ASSETS) and name not in references:
+        if name.startswith(_ASSETS) and (
+            owner_part(name) not in parts if name.endswith(".rels") else name not in references
+        ):
             issues.append(f"orphan asset: {name}")
         if name.endswith(".rels"):
             issues.extend(_relationship_issues(parts, name))

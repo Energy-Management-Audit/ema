@@ -7,6 +7,7 @@ import sqlite3
 from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import AuditFact, Condition, Section
 from ema.core.review.models import Field
+from ema.core.review.section_transition import SectionState, Status
 from ema.core.workspace import Workspace
 
 
@@ -68,3 +69,17 @@ def capture_inputs(
 ) -> tuple[dict[str, int | None], dict[str, tuple[bool, str] | None]]:
     with ws.connect() as db:
         return snapshot_inputs(section, fingerprint, *current_inputs(db, job))
+
+
+def base_changed(state: SectionState, current: str) -> str | None:
+    """The `base:` entry of a confirmed or drafted section written from another base."""
+    if state.status not in (Status.DRAFTED, Status.DONE) or state.stale:
+        return None
+    return next(
+        (
+            item
+            for item in state.fingerprint
+            if item.startswith("base:") and item != f"base:{current}"
+        ),
+        None,
+    )

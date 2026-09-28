@@ -1,17 +1,8 @@
-"""Draft trust boundary: references, missing facts, names and render isolation."""
+"""Draft trust boundary: references, missing facts and names (rendering: test_section_body)."""
 
-import json
-from pathlib import Path
-
-import pytest
-from docx import Document
-from docx.oxml.ns import qn
-
-from ema.audit.draft_checks import DraftReview, check_draft
-from ema.audit.draft_render import render_section, unrendered_items
+from ema.audit.draft_checks import check_draft
+from ema.audit.draft_render import unrendered_items
 from ema.audit.draft_schema import DraftFigure, DraftTable, DraftText, SectionDraft
-from ema.core.errors import EmaError
-from ema.core.office.anchors import stamp
 from ema.core.review.models import Field
 
 
@@ -88,64 +79,3 @@ def test_uncited_and_nonrenderable_items_are_reviewed() -> None:
         "unrendered_figure",
     }
     assert len(unrendered_items(rich)) == 2
-
-
-def test_render_changes_only_selected_paragraph_and_blocks_unsupported(tmp_path: Path) -> None:
-    base, output, anchors = (
-        tmp_path / name for name in ("base.docx", "output.docx", "base.anchors.json")
-    )
-    document = Document()
-    first = document.add_paragraph("[de completat]")
-    second = document.add_paragraph("[de completat]")
-    stamp(first._p, "one", 1)
-    stamp(second._p, "two", 2)
-    document.save(str(base))
-    anchors.write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "anchors": [
-                    {
-                        "slot": "one",
-                        "section": "ch2.date_generale",
-                        "classification": "variable",
-                        "part": "word/document.xml",
-                    },
-                    {
-                        "slot": "two",
-                        "section": "ch2.istorie",
-                        "classification": "variable",
-                        "part": "word/document.xml",
-                    },
-                ],
-            }
-        )
-    )
-    facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
-    draft = _draft("Societatea {{f:audit.company_name}} produce bunuri.", ["audit.company_name"])
-    render_section(base, anchors, output, draft, facts, (), job="synthetic")
-    rendered = Document(str(output))
-    assert [p.text for p in rendered.paragraphs] == [
-        "Societatea Atelier Exemplu produce bunuri.",
-        "[de completat]",
-    ]
-    assert next(rendered.paragraphs[0]._p.iter(qn("w:bookmarkStart")), None) is not None
-    rerendered = tmp_path / "rerendered.docx"
-    render_section(output, anchors, rerendered, draft, facts, (), job="synthetic")
-    assert Document(str(rerendered)).paragraphs[1].text == "[de completat]"
-    flagged = (DraftReview("unsupported", "paragraph:0", "unsupported claim"),)
-    render_section(base, anchors, output, draft, facts, flagged, job="synthetic")
-    assert Document(str(output)).paragraphs[0].text == "[de completat]"
-    with pytest.raises(EmaError) as error:
-        render_section(
-            base,
-            anchors,
-            output,
-            SectionDraft(
-                section="ch2.date_generale", status="drafted", paragraphs=draft.paragraphs * 2
-            ),
-            facts,
-            (),
-            job="synthetic",
-        )
-    assert error.value.code == "draft_slots"

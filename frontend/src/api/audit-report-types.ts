@@ -42,6 +42,7 @@ export type RenderSummary = {
   toc_pages_set: boolean
   dropped: string[]
   failures: RenderFailure[]
+  charts_skipped: string[]
 }
 
 export type ReportRun = {

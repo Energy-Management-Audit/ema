@@ -109,6 +109,15 @@ test('a stale final counts as an old draft and never blocks the next final', () 
     readiness: { ...stale.readiness, blocking: [{ code: 'ai_wording', message: 'AI' }] },
   }
   assert.equal(auditChecks(ai, undefined, false)[3].tone, 'err')
+  const photo = {
+    ...stale,
+    readiness: {
+      ...stale.readiness,
+      blocking: [{ code: 'cover_photo_changed', message: 'Fotografia sediului s-a schimbat.' }],
+    },
+  }
+  assert.equal(canGenerateFinal(photo), false)
+  assert.deepEqual(auditChecks(photo, undefined, false)[1].detail, '1')
 })
 
 test('the five checks derive from the blocking codes', () => {

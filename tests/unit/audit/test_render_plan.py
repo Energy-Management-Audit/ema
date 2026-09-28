@@ -12,7 +12,7 @@ from openpyxl import Workbook
 from ema.audit.render_plan import JobUnitPlan, process_count, unit_plan
 from ema.core.errors import EmaError
 from ema.core.jobs import create_job
-from ema.core.review import mark_absent, propose
+from ema.core.review import decide, mark_absent, propose
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace
 
@@ -93,8 +93,11 @@ def test_unit_plan_counts_every_unit_from_the_job(tmp_path: Path) -> None:
         measures=3,
         processes_source="fisa",
     )
-    propose(ws, job, spec, "Nume din anexă SA", [], state="extracted")
+    named = propose(ws, job, spec, "Nume din anexă SA", [], state="extracted")
     assert unit_plan(ws, job).client_name == "Nume din anexă SA"
+    # A name she rejected is not the client's: the client record names it, as without one (D2).
+    decide(ws, job, named.id, "reject", named.revision, "user")
+    assert unit_plan(ws, job).client_name == "Client Sintetic SRL"
 
 
 def test_unit_plan_without_photos_form_or_name(tmp_path: Path) -> None:

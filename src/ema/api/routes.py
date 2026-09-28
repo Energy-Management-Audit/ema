@@ -27,6 +27,7 @@ from ema.api.models import (
 )
 from ema.api.provisional import install_provisional_routes
 from ema.api.workflows import workflow_for
+from ema.audit.render_bindings import COVER_SLOT, checked_photo
 from ema.audit.sections import Status, set_status, statuses
 from ema.clients.registry import get_client
 from ema.core.errors import EmaError
@@ -213,7 +214,10 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
 
     @app.put("/jobs/{job_id}/slots/{slot:path}", tags=["documents"], response_model=SlotVersion)
     def put_slot(job_id: str, slot: str, body: SlotInput) -> dict[str, object]:
-        validate_slot(str(get_job(ws, job_id)["type"]), slot)
+        job = get_job(ws, job_id)
+        validate_slot(str(job["type"]), slot)
+        if slot == COVER_SLOT:
+            checked_photo(ws.file_path(str(job["client_slug"]), body.file_sha))
         version, revision = ws.set_slot_with_revision(job_id, slot, body.file_sha)
         return {**asdict(version), "slot_revision": revision}
 
@@ -370,6 +374,7 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
                 else workflow.readiness(ws, job_id)
             )
             if not readiness.final_ok:
+                db.commit()  # Persist audit staleness before refusing the export.
                 raise EmaError("not_ready", "Lucrarea nu este pregătită.", "")
             current_hash = readiness_hash_in_tx(ws, db, job_id, readiness, workflow)
             if body.readiness_hash != current_hash:

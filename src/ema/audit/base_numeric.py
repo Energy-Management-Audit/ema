@@ -1,7 +1,9 @@
-"""Reviewed numeric text retained from the AUDIT-01 audit base.
+"""Reviewed fixed text retained from the AUDIT-01 audit base.
 
 Each digest approves one exact paragraph or cell; edits require a new review.
-The grouped reasons are legislation, law or ISO standards, and section numbering.
+The grouped reasons are legislation, law or ISO standards, section numbering, the firm's
+cover, her fixed chapter prose, heading slot values she writes the same in every audit and
+her numbering's picture bullets.
 """
 
 from __future__ import annotations
@@ -11,7 +13,8 @@ import re
 
 _NUMBER = re.compile(r"\d")
 
-# SHA-256 of stripped source text, grouped by review reason.
+# SHA-256 of stripped source text (of the bytes, for a picture; of the line with each field as
+# `{PAGE}`, for her page numbering), grouped by review reason.
 _ALLOWED: dict[str, frozenset[str]] = {
     "law": frozenset(
         {
@@ -161,6 +164,59 @@ _ALLOWED: dict[str, frozenset[str]] = {
             "be6ee311c232a1c345194ba77c5329b412a9f499d8bc427965f04fbadfdbbf3d",
         }
     ),
+    "cover": frozenset(
+        {
+            "dbc761c895174f70e9d1f7a0f2c082737ed8777fcc82c4607a02b6ca1bbe7a3a",
+            "a586586f40c69056df477af8f2b3d2fb056ff217e8f44bf3dada80d524f06ac8",
+            "b9e5cbf7dcce12bbc67d27c081155d678d5316e03ae955e3af3dc3929ac2789e",
+            "ddd1c5629bd6d7705a973ced917ec2cf868420819d204f99ef9ae6d9e5784057",
+            "7eeae81ab3e1a53621a7c963a0325a16f7ee4d459e3523da124557406e5a9625",
+            "615140c5115b4e3b1ca4322776c03aa2270ba51bf656483de1828fbff35a1eca",
+            "10c443b3f08afdc1f8b79a43c9f0f41c0c020bcbdde4bec54a9e9e6578bc1413",
+            "d355ca30caf67267ede78574966d9d14ffce15147699d59e5e058d2237ace6dc",
+            "5e5c53373b4f2c368af8787c2762e9a60c890b94eec491e6260abede28c04e0c",
+            "8ee6d423ddfc242abd6b5e544614e762ec05d85fa8e646886dccf29846638c00",
+            "dc339c5c011ce8dcc80ad54d6deae660564c89995d1bb692eb42e3ea6be22be7",
+            "ce2101a243626de50c565e2cd1dce8356ebda9fe6349540118367f9e4213b4ab",
+            "316ff31d3d865012e68e8a6d8e6316c30774e2a8b164b4b29042594ab7ddbfa1",
+            "657a2e116824008a23ee43a4f144e1846862a4aec7b61a060638a1cea00dc48f",
+            "e1998bac3bb79eb4a3f286abe58ba8d2b69e93ecb013adaf274ccd26bea619fc",
+            "1b5a62e011f81f6dd0a3d82beb827198d617951b98b0cff7379beb7cf25e1e07",
+            "a3d233c4ac80e536148d04ac3f7668bf8c55858d50a7a57f9d7838afba94f7cc",
+            "5e8b346d2d35cecb008ab746f26f450f5b977c4dd8414f1d609d2b93c016447e",
+        }
+    ),
+    "fixed_prose": frozenset(
+        {
+            "5f74504eea38468ba4b6f8aad3fe9b11ddf875fcc164056334683372fd047007",
+            "b0e90f430d028ece97ebeb4f6ec616fb46a41b29765d2dab7dcd9e2d617506b7",
+            "a2fa2a25933fba45a62f19d65f4004a012052f6ae1c979da879ce03b9c7f904b",
+            "d8d7ebb4ff43d96f96f43d860318753cd2ddbde63310279612ad3f7f2cb500fb",
+            "464ee8e7dda8a491e2ceeb22167cac6dc2c5c8426ce436850acc2ae613d4e192",
+            "6a1c7ab012ca5b8f224287338d54c7b78c85b0296a34722b343b9e8844aa503c",
+            "262fea5469ef926dd5d6a57bd04dfdf951f1862fa7c1404922748e3329f98d79",
+            "1f6efd90be11edc6a65bc27bc6b19ce898252a9a593518bc169e2e0e1a7f2704",
+            "f2e4acb6aaec67dd705dba01d1e354a5620aae2b7346d752702db838b383148d",
+            "1c2213dd8172f369ecccdb585b93bf454fc8146d1563533fa8839a2fbd2f0fe3",
+            "6b8ef391209eb4ab90d89a20468760e7240ffe3f60b6d81045e35befa71d47f1",
+            "9f88e0b4945e0f79a5df7f67fb64bc1857b9c1159debc358462fcc3a8cf507d5",
+            "0801d83eddd131f555bb25e045558af99f323ab3abba257081a8c761c63c106a",
+            "9cdf7c2763a4eb0e954ef4fb39457be427035ed3a3715310ac740e3e6031776c",
+            "1066f2714e873d9724593909b04490aa013ce12d797dcf09c576cb993aafd805",
+        }
+    ),
+    "heading_slot": frozenset(
+        {
+            "9f16ac97114f27baffcbe3d2b4d8a0aa937c1dded984ab51102bfe023c077834",
+        }
+    ),
+    # Her numbering's picture bullets (word/numbering.xml), in every audit she delivered.
+    "picture_bullet": frozenset(
+        {
+            "ebe0f3b27259f742c5e959c6776d24e852f4e5b5387018c0950c42d24562f9dd",
+            "039fe79b74e6d3d561e32d4af570e6ca70db6bb3718395be2bf278b9e601279a",
+        }
+    ),
     "section_number": frozenset(
         {
             "baae87d18c4c4f54293476228d8ac4e868447cc1f9da23620cde1a2248ce59e5",
@@ -180,6 +236,11 @@ def has_number(text: str) -> bool:
     return bool(_NUMBER.search(text))
 
 
-def approved_fixed_number(text: str) -> bool:
+def approved_fixed_text(text: str) -> bool:
     digest = hashlib.sha256(text.strip().encode()).hexdigest()
+    return any(digest in entries for entries in _ALLOWED.values())
+
+
+def approved_fixed_image(data: bytes) -> bool:
+    digest = hashlib.sha256(data).hexdigest()
     return any(digest in entries for entries in _ALLOWED.values())

@@ -14,6 +14,7 @@ from tests.golden.test_s10b_audit_base import _identity, _references
 
 from ema.audit.base import build_base
 from ema.audit.base_units import UnitPlan
+from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_agent import (
     DraftTools,
     draft_section_replay,
@@ -24,37 +25,32 @@ from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.sections import get_status, refresh_staleness
 from ema.core.jobs import create_job
 from ema.core.llm import Limits
-from ema.core.office.anchors import find, stamp
+from ema.core.office.anchors import find
 from ema.core.review.fields import propose
 from ema.core.review.models import Evidence, Field, Manual
 from ema.core.workspace import Workspace
 
 pytestmark = pytest.mark.golden
+TITLES = {section.id: section.title for section in CATALOGUE}
 
 
-def _base(tmp_path: Path) -> tuple[Path, Path]:
-    base, anchors = tmp_path / "base.docx", tmp_path / "base.anchors.json"
+def _base(tmp_path: Path) -> Path:
+    """Each drafted section's own region: its heading, then what it replaces."""
+    base = tmp_path / "base.docx"
     document = Document()
-    slots = (
-        ("ch2.date_generale", "company", "[de completat]"),
-        ("ch2.date_generale", "claim", "[de completat]"),
-        ("ch3.flux", "process", "[de completat]"),
-    )
-    records = []
-    for index, (section, slot, text) in enumerate(slots, 1):
-        paragraph = document.add_paragraph(text)
-        stamp(paragraph._p, slot, index)
-        records.append(
-            {
-                "slot": slot,
-                "section": section,
-                "classification": "variable",
-                "part": "word/document.xml",
-            }
-        )
+    for text, style in (
+        (TITLES["ch2"], "Heading 1"),
+        (TITLES["ch2.date_generale"], "Heading 2"),
+        ("[de completat]", None),
+        ("[de completat]", None),
+        (TITLES["ch3"], "Heading 1"),
+        (TITLES["ch3.flux"], "Heading 2"),
+        ("[de completat]", None),
+        (TITLES["ch3.utilitati"], "Heading 2"),
+    ):
+        document.add_paragraph(text, style=style)
     document.save(str(base))
-    anchors.write_text(json.dumps({"version": 1, "anchors": records}))
-    return base, anchors
+    return base
 
 
 def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
@@ -121,8 +117,7 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
         ).model_dump()
     )
     assert rejected == {"accepted": False, "errors": ["literal_number"]}
-    base, anchors = _base(tmp_path)
-    rendered = base
+    rendered = _base(tmp_path)
     coverage = []
     for index, draft in enumerate(drafts):
         state, replayed, checked, flags = draft_section_replay(
@@ -143,7 +138,6 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
             ws,
             job,
             rendered,
-            anchors,
             output,
             draft=replayed,
             facts=recorded_facts(ws, job, draft.section),
@@ -154,9 +148,10 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
         assert len(review["review"]) == (1 if index == 0 else 0)
         rendered = output
     texts = [p.text for p in Document(str(rendered)).paragraphs]
-    assert "Atelier Exemplu" in texts[0] and "85" in texts[0]
-    assert texts[1] == "[de completat]"  # unsupported prose withheld
-    assert "asamblare" in texts[2]
+    general = texts.index(TITLES["ch2.date_generale"]) + 1
+    assert "Atelier Exemplu" in texts[general] and "85" in texts[general]
+    assert texts[general + 1] == "[de completat]"  # unsupported prose withheld
+    assert "asamblare" in texts[texts.index(TITLES["ch3.flux"]) + 1]
     assert coverage == [1.0, 1.0]
     synthetic_structure = {
         draft.section: {"paragraphs": len(draft.paragraphs), "tables": len(draft.tables)}
@@ -230,7 +225,7 @@ def test_synthetic_paragraph_in_auditor_base(tmp_path: Path) -> None:
             DraftText(text="Societatea {{f:audit.company_name}}.", fact_ids=["audit.company_name"])
         ],
     )
-    render_section(base, anchors, output, draft, fact, (), job="synthetic")
+    render_section(base, output, draft, fact, (), job="synthetic")
     after_document = Document(str(output))
     after = find([after_document.element], other_slot)
     assert "".join(node.text or "" for node in after.iter(qn("w:t"))) == before_text
