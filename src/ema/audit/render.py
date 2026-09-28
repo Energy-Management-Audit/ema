@@ -214,6 +214,7 @@ def _render(  # noqa: C901, PLR0912, PLR0915
     )
     by_key = {field.key: field for field in job_fields}
     chain = Chain(folder, start)
+    charts_skipped: list[str] = []
     try:
         photo = cover_photo(ctx, client)
     except EmaError as exc:  # a wrong file keeps the marker; the rest renders (R21)
@@ -264,6 +265,9 @@ def _render(  # noqa: C901, PLR0912, PLR0915
                     dossier=dossier,
                     job_fields=job_fields,
                     identity=base.identity,
+                    chart_source=base.document,
+                    client_name=plan.client_name,
+                    charts_skipped=charts_skipped,
                 ),
             )
         elif chapter_id == "ch5" and (runs := ready_runs(ws, job, "measurements")):
@@ -337,6 +341,7 @@ def _render(  # noqa: C901, PLR0912, PLR0915
         toc_pages_set=bool(pages),
         dropped=dropped,
         failures=chain.failures,
+        charts_skipped=charts_skipped,
     )
     (folder / "render.json").write_text(summary.model_dump_json(indent=2), encoding="utf-8")
     if summary.pdf:

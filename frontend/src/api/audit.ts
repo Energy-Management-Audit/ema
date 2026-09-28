@@ -32,6 +32,17 @@ export const auditApi = {
       ...(reason ? { reason } : {}),
       ...(status === 'done' || status === 'n/a' ? { confirm: true } : {}),
     }),
+  patchSections: (id: string, nodes: OutlineNode[]) =>
+    request<OutlineNode[]>(
+      'PATCH',
+      `${job(id)}/sections`,
+      nodes.map((node) => ({
+        section_id: node.id,
+        status: 'done',
+        on_revision: node.revision,
+        confirm: true,
+      })),
+    ),
   acceptBatch: (id: string, fields: [string, number][]) =>
     request<Decision[]>('POST', `${job(id)}/fields/accept-batch`, { fields }),
   decide: (id: string, field: Field, action: 'accept' | 'reject' | 'correct', value?: string) =>

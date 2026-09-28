@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from PIL import Image
 from tests.conftest import artifacts_path
+from tests.golden.s17b_chart_oracle import assert_final_charts, expected_charts
 from tests.golden.test_s17b_audit_render import (
     _outputs,
     _package_checks,
@@ -43,12 +44,14 @@ from ema.audit.chapter_six import MEASURE_HEADER, SYNTHESIS_HEADER
 from ema.audit.measures_form import write_measures_form
 from ema.audit.render import RenderSummary, start_audit_render
 from ema.audit.render_bindings import COVER_SLOT
+from ema.audit.render_dataset import reviewed_dataset
 from ema.audit.render_sections import RENDER_DRAFTED
 from ema.audit.render_steps import body_counts, section_ids
 from ema.audit.sections import Status, statuses
 from ema.audit.workflow import AuditWorkflow
 from ema.core.review import fields
 from ema.core.workspace import Workspace
+from ema.energy_data.necesar import parse_necesar_info, to_dataset
 
 pytestmark = pytest.mark.golden
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -279,3 +282,44 @@ def test_CLIENT-A1_final_approved_and_exported(
         f"charts={summary.charts} markers=0 done={done} na={len(na)} pages={len(pages)} "
         f"exported={copy.name}"
     )
+
+
+def test_CLIENT-A1_final_charts(
+    reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _settings(reference_library, tmp_path, monkeypatch)
+    form = _complete_form(tmp_path / "all.xlsx")
+    ws, job = seed_job(reference_library, tmp_path / "workspace", tmp_path, form)
+    _supply(ws, job, "audit.address", ADDRESS)
+    photo = _cover_photo(tmp_path / "cover.png")
+    ws.set_slot(job, COVER_SLOT, ws.add_file("CLIENT-A1-golden", photo))
+    reviewed = review_inputs(ws, job)
+    _draft_marks(ws, job)
+    confirm_chapters(ws, job)
+    final = _wait(ws, job, AuditWorkflow().start_final(ws, job))
+    assert final["state"] == "ready", final["error"]
+    with ws.connect() as db:
+        folder = ws.artifact_dir(db, job, "audit_final", str(final["id"]))
+    summary = RenderSummary.model_validate_json((folder / "render.json").read_text("utf-8"))
+    docx = _outputs(ws, job, str(final["id"]))["Audit-final.docx"]
+    source = next(
+        (reference_library / "audit/cases/audit-case-a/received").glob("*Necesar info*.xls")
+    )
+    dataset = reviewed_dataset(to_dataset(parse_necesar_info(source)), fields(ws, job))
+    expected = expected_charts(dataset, "Atelier Exemplu SRL")
+    assert_final_charts(docx, expected)
+    assert summary.charts == len(expected)
+    assert summary.charts_skipped == [
+        "ch4.electricitate_pv:electricity_pv",
+        "ch4.echiv_pv:electricity_pv",
+        "ch4.specific_pv:electricity_pv",
+    ]
+    for action, carrier, point in (("correct", "electricitate", 1234.5), ("reject", "gaz", None)):
+        year, month = (int(part) for part in reviewed[action].split(".")[-2:])
+        chart = next(
+            item
+            for item in expected
+            if f"anului {year}" in item.caption
+            and ("din SEN" if carrier == "electricitate" else "gaz natural") in item.caption
+        )
+        assert chart.series[0].values[month - 1] == point

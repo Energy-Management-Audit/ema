@@ -5,8 +5,7 @@
 //   EMA_REFERENCE=… EMA_ARTIFACTS=… node frontend/scripts/golden-s17b-audit-report.mjs [--out <dir>]
 //   exit 0 pass · 1 fail · 2 Blocked: word_unavailable
 //
-// Round-1 revision: a real audit's final is refused for markers no field or n/a can clear
-// (cover, ch. 1, ch. 7), so the journey ends at Predare X1 with that refusal, not at X4.
+// The reviewed values are set before the UI draft; the human chapter confirmation stays open.
 
 import { execFileSync, spawn } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -78,6 +77,10 @@ try {
   const job = seeded.job
   check(Boolean(job), 'seeded: CLIENT-A1 intake + read, two replayed drafts, three measures')
   const env = { ...base, ...seeded.env }
+  check(
+    python(['review-ui', workspace, scratch, job], env).reviewed,
+    'reviewed inputs before draft',
+  )
   server = await serve(env)
   browser = await chromium.launch()
   const context = await browser.newContext({
@@ -181,12 +184,39 @@ try {
   }
   check(true, `the panel lists ${String(markers)} empty fields`)
 
-  // Predare: final readiness through the use cases, then the final is refused for markers.
-  const prepared = python(['final', workspace, scratch, job], env)
+  const prepared = python(['final-ui', workspace, scratch, job], env)
+  check(prepared.left.length > 0 && prepared.final_ok === false, 'chapter 1 awaits confirmation')
+  await page.goto(`${server.origin}/app/audit/${job}/structura`)
+  const before = await api(page, `/jobs/${job}/audit/outline`)
+  const pending = new Map(prepared.left.map((item) => [item.section_id, item.revision]))
   check(
-    prepared.final_ok === true,
-    'final_ok through the use cases (drafted -> done, the rest n/a)',
+    prepared.left.every((item) => {
+      const node = before.nodes.find((candidate) => candidate.id === item.section_id)
+      return node?.status === 'drafted' && !node.stale && node.revision === item.revision
+    }),
+    'the 3j board reads every pending drafted node at its revision',
   )
+  const beforeChecks = await api(page, `/jobs/${job}/export/checks`)
+  check(!beforeChecks.readiness.final_ok, 'readiness blocks the unconfirmed chapter')
+  const chapter = page.locator('.audit-chapter').first()
+  await chapter.getByRole('button', { name: 'Deschide' }).click()
+  const confirm = chapter.getByRole('button', { name: 'Marchează ca pregătit' })
+  check(await confirm.isEnabled(), 'the chapter 1 confirmation is enabled')
+  const confirmed = page.waitForResponse((response) =>
+    response.url().endsWith(`/jobs/${job}/sections`),
+  )
+  await confirm.click()
+  await confirmed
+  const after = await api(page, `/jobs/${job}/audit/outline`)
+  check(
+    prepared.left.every((item) => {
+      const node = after.nodes.find((candidate) => candidate.id === item.section_id)
+      return node?.status === 'done' && node.revision === pending.get(item.section_id) + 1
+    }),
+    'the chapter click completes each drafted node once',
+  )
+  check((await api(page, `/jobs/${job}/export/checks`)).readiness.final_ok, 'the final is ready')
+  await page.screenshot({ path: join(out, 'ui-07-chapter-confirmed.png') })
   await page.goto(`${server.origin}/app/audit/${job}/predare`)
   const final = page.getByRole('button', { name: 'Generează versiunea finală' })
   await final.waitFor()
@@ -198,24 +228,15 @@ try {
     null,
     { timeout: 30_000 },
   )
-  await shot(page, 'predare-x1')
   await final.click()
-  const refused = page
-    .getByRole('alert')
-    .filter({ hasText: 'Raportul final are câmpuri necompletate.' })
-  await refused.waitFor({ timeout: 900_000 })
-  await shot(page, 'predare-refused')
+  const approve = page.getByRole('button', { name: 'Aprobă şi exportă' })
+  await approve.waitFor({ timeout: 900_000 })
+  check(await approve.isEnabled(), 'the final document is ready for approval')
+  await approve.click()
+  await page.getByText('Copia finală e în dosarul de exporturi al lucrării.').waitFor()
   const finals = (await api(page, `/jobs/${job}/audit/report`)).final
-  check(
-    finals?.state === 'failed' && (await refused.count()) === 1,
-    'the final is refused for markers, by its title (the sections are in the Python golden)',
-  )
-  await page.reload()
-  await refused.waitFor()
-  check(
-    (await page.getByRole('button', { name: 'Aprobă şi exportă' }).count()) === 0,
-    'a reload keeps X1 with the refusal; nothing to approve',
-  )
+  check(finals?.state === 'ready', 'the approved final is ready')
+  await page.screenshot({ path: join(out, 'ui-08-final-exported.png') })
   check(offOrigin.length === 0, 'no request outside the app origin')
   check(consoleLines.length === 0, 'no console message from the app')
 } catch (error) {

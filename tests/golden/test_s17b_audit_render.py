@@ -18,6 +18,7 @@ from docx import Document
 from docx.oxml.ns import qn
 from tests.audit_replay import CH2_DRAFT, draft_recording, support_recording
 from tests.conftest import artifacts_path
+from tests.golden.s17b_audit_ui_fixture import prepare_all_but
 from tests.golden.test_s10b_audit_base import _references
 from tests.golden.test_s15b_chapter_six_base import _synthetic_form
 
@@ -350,10 +351,37 @@ if __name__ == "__main__":
     command, workspace, scratch = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
     library = Path(os.environ["EMA_REFERENCE"])
     if command == "seed":
+        from tests.golden.test_s17b_audit_final import _complete_form
+
         settings = base_settings(library, scratch)
         os.environ.update(settings)
-        _, seeded = seed_job(library, workspace, scratch)
+        _, seeded = seed_job(library, workspace, scratch, _complete_form(scratch / "all.xlsx"))
         print(json.dumps({"job": seeded, "env": settings}))
+    elif command == "review-ui":
+        from tests.golden.test_s17b_audit_final import _cover_photo
+
+        from ema.audit.render_bindings import COVER_SLOT
+
+        ws = Workspace(workspace)
+        _supply(ws, sys.argv[4], "audit.address", "Str. Exemplu nr. 1, Localitatea Exemplu")
+        ws.set_slot(
+            sys.argv[4], COVER_SLOT, ws.add_file("CLIENT-A1-golden", _cover_photo(scratch / "cover.png"))
+        )
+        review_inputs(ws, sys.argv[4])
+        print(json.dumps({"reviewed": True}))
+    elif command == "final-ui":
+        ws = Workspace(workspace)
+        left = prepare_all_but(ws, sys.argv[4], "ch1")
+        print(
+            json.dumps(
+                {
+                    "left": [
+                        {"section_id": item.section_id, "revision": item.revision} for item in left
+                    ],
+                    "final_ok": False,
+                }
+            )
+        )
     else:
         prepare_final(Workspace(workspace), sys.argv[4])
         print(

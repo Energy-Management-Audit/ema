@@ -221,6 +221,9 @@ def test_a_dataset_without_readings_is_a_ch4_item_failure(
             dossier=[],
             job_fields=[],
             identity=("Forbidden Base SRL",),
+            chart_source=tmp_path / "base.docx",
+            client_name="Synthetic SRL",
+            charts_skipped=[],
         )
     assert (refused.value.code, refused.value.user_message_ro) == (
         "ch4_no_data",

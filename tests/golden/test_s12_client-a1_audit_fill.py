@@ -97,7 +97,15 @@ def test_CLIENT-A1_read_to_chapter_four(reference_library: Path, tmp_path: Path)
         output=base,
         base_identity=identity,
     )
-    report = render_chapter_four(base, output, read.dataset, identity)
+    report, skipped = render_chapter_four(
+        base,
+        output,
+        read.dataset,
+        identity,
+        chart_source=base_source,
+        client="Atelier Exemplu SRL",
+    )
+    assert "ch4.electricitate_pv:electricity_pv" in skipped
     assert not package_issues(output, identity)
     assert report.values
     assert all(use.fact for use in report.values)

@@ -10,6 +10,7 @@ import { EmaWidget } from '../../ui/Feedback.tsx'
 import { ProgressBar } from '../../ui/Feedback.tsx'
 import { SectionKey } from '../../ui/Surface.tsx'
 import { SectionActions } from './SectionActions.tsx'
+import { ChapterConfirm } from './ChapterConfirm.tsx'
 
 export function StructureTab({ outline }: { outline: AuditOutline }) {
   const [expanded, setExpanded] = useState<string | null>('ch3')
@@ -154,6 +155,7 @@ function ChapterOpen({ root, nodes }: { root: OutlineNode; nodes: OutlineNode[] 
           )}
         </div>
       </div>
+      <ChapterConfirm root={root} nodes={nodes} />
     </div>
   )
 }

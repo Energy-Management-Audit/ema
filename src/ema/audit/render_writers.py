@@ -120,6 +120,9 @@ def write_four(  # noqa: PLR0913
     dossier: list[SlotVersion],
     job_fields: list[Field],
     identity: tuple[str, ...],
+    chart_source: Path,
+    client_name: str,
+    charts_skipped: list[str],
 ) -> None:
     checklist = select_checklist(dossier)
     parsed = to_dataset(parse_necesar_info(ws.file_path(client, checklist.file_sha)))
@@ -132,7 +135,16 @@ def write_four(  # noqa: PLR0913
         for section_id in NARRATIVE_SECTIONS
         if (text := text_of(by_key, f"narrative.{section_id}")) is not None
     }
-    render_chapter_four(source, target, dataset, identity, texts=texts)
+    _, skipped = render_chapter_four(
+        source,
+        target,
+        dataset,
+        identity,
+        chart_source=chart_source,
+        client=client_name,
+        texts=texts,
+    )
+    charts_skipped.extend(skipped)
 
 
 def write_five(

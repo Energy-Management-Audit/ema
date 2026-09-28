@@ -7,7 +7,9 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from docx import Document
 from lxml import etree
@@ -17,9 +19,12 @@ from ema.audit.base_toc import refresh_toc
 from ema.audit.base_units import heading_spans_document
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four_blocks import chapter_four_blocks
+from ema.audit.chapter_four_chart_placement import place_chart_groups
+from ema.audit.chapter_four_charts import STYLE_PART, chapter_chart_groups
 from ema.core.office.block_text import set_text
-from ema.core.office.blocks import ElementLocator, Prototypes, RenderReport
-from ema.core.office.package import read_parts, xml
+from ema.core.office.blocks import ElementLocator, NativeChart, Prototypes, RenderReport
+from ema.core.office.chart_blocks import chart_caption_prototype, import_chart_style
+from ema.core.office.package import encoded, read_parts, write_parts, xml
 from ema.core.office.region import replace_region
 from ema.energy_data.factors import FACTORS_2026, FactorTable
 from ema.energy_data.model import EnergyDataset
@@ -110,29 +115,57 @@ def _prototypes(
     return Prototypes(elements, 4)
 
 
-def render_chapter_four(
+def render_chapter_four(  # noqa: PLR0913
     base: Path,
     output: Path,
     dataset: EnergyDataset,
     base_identity: tuple[str, ...],
     *,
+    chart_source: Path,
+    client: str,
     factors: FactorTable = FACTORS_2026,
     texts: Mapping[str, str] | None = None,
-) -> RenderReport:
+) -> tuple[RenderReport, list[str]]:
     """Write all catalogue ch. 4 sections using S7 blocks and sourced values."""
     if not dataset.carriers or not dataset.years:
         raise ValueError("chapter four needs located carrier readings and years")
     if not base_identity:
         raise ValueError("base identity denylist is required")
     chapter, following, positions, body = _located(base)
-    report = replace_region(
-        base,
-        output,
-        ElementLocator(chapter + 1),
-        ElementLocator(following + 1),
-        chapter_four_blocks(dataset, factors, texts=texts),
-        _prototypes(positions, body, chapter, following),
-    )
+    groups, skipped = chapter_chart_groups(dataset, factors, client)
+    blocks = place_chart_groups(chapter_four_blocks(dataset, factors, texts=texts), groups)
+    prototypes = _prototypes(positions, body, chapter, following)
+    with TemporaryDirectory() as directory:
+        working = base
+        end = following + 1
+        if groups:
+            working = Path(directory) / "chart-style.docx"
+            parts = read_parts(base)
+            style_part, drawing = import_chart_style(chart_source, parts)
+            root = xml(parts, "word/document.xml")
+            parent = root.find(W + "body")
+            assert parent is not None
+            parent.insert(chapter + 1, drawing)
+            parts["word/document.xml"] = encoded(root)
+            write_parts(parts, working)
+            prototypes.elements.update(
+                chart=drawing, chart_caption=chart_caption_prototype(chart_source)
+            )
+            blocks = [
+                replace(block, part=style_part)
+                if isinstance(block, NativeChart) and block.part == STYLE_PART
+                else block
+                for block in blocks
+            ]
+            end += 1
+        report = replace_region(
+            working,
+            output,
+            ElementLocator(chapter + 1),
+            ElementLocator(end),
+            blocks,
+            prototypes,
+        )
     document = Document(str(output))
     refresh_toc(document)
     document.save(str(output))
@@ -140,4 +173,4 @@ def render_chapter_four(
     if issues:
         output.unlink(missing_ok=True)
         raise ValueError("chapter-four package invalid: " + "; ".join(issues[:8]))
-    return report
+    return report, skipped

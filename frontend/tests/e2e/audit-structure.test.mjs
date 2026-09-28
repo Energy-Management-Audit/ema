@@ -144,3 +144,106 @@ test('note conflict stays visible and refreshes outline', async () => {
     },
   )
 })
+
+test('3j chapter confirmation sends every drafted node with its revision', async () => {
+  const outline = structuredClone(OUTLINE)
+  outline.nodes.find((node) => node.id === 'ch1').status = 'drafted'
+  const drafted = outline.nodes.filter((node) => node.chapter === 1 && node.status === 'drafted')
+  await withHarness(
+    {
+      path: `/app/audit/${JOB.id}/structura`,
+      routes: {
+        ...routes,
+        [`GET ${J}/audit/outline`]: { body: outline },
+        [`PATCH ${J}/sections`]: { body: drafted.map((node) => ({ ...node, status: 'done' })) },
+      },
+    },
+    async ({ page, requests }) => {
+      await page.getByRole('button', { name: 'Deschide' }).first().click()
+      const confirm = page.getByRole('button', { name: 'Marchează ca pregătit' })
+      assert.equal(await confirm.isDisabled(), false)
+      const patched = page.waitForResponse((response) => response.url().endsWith(`${J}/sections`))
+      const refreshed = page.waitForResponse((response) =>
+        response.url().endsWith(`${J}/audit/outline`),
+      )
+      await confirm.click()
+      await patched
+      await refreshed
+      assert.deepEqual(
+        requests.find((item) => item.path === `${J}/sections`).body,
+        drafted.map((node) => ({
+          section_id: node.id,
+          status: 'done',
+          on_revision: node.revision,
+          confirm: true,
+        })),
+      )
+      assert.ok(requests.filter((item) => item.path === `${J}/audit/outline`).length >= 2)
+    },
+  )
+})
+
+test('3j chapter confirmation is disabled without drafted nodes', async () => {
+  const outline = structuredClone(OUTLINE)
+  outline.nodes.find((node) => node.id === 'ch1.scop').status = 'done'
+  await withHarness(
+    {
+      path: `/app/audit/${JOB.id}/structura`,
+      routes: { ...routes, [`GET ${J}/audit/outline`]: { body: outline } },
+    },
+    async ({ page, requests }) => {
+      await page.getByRole('button', { name: 'Deschide' }).first().click()
+      assert.equal(
+        await page.getByRole('button', { name: 'Marchează ca pregătit' }).isDisabled(),
+        true,
+      )
+      assert.equal(
+        requests.some((item) => item.path === `${J}/sections`),
+        false,
+      )
+    },
+  )
+})
+
+test('3j stale chapter confirmation refetches and names the newly stale drafted nodes', async () => {
+  const updated = structuredClone(OUTLINE)
+  updated.nodes.find((node) => node.id === 'ch1.scop').stale = true
+  await withHarness(
+    {
+      path: `/app/audit/${JOB.id}/structura`,
+      routes: {
+        ...routes,
+        [`PATCH ${J}/sections`]: problem('sections_stale', 409, 'Unele secţiuni au ciorna veche.'),
+      },
+    },
+    async ({ page, requests, setRoute }) => {
+      await page.getByRole('button', { name: 'Deschide' }).first().click()
+      setRoute(`GET ${J}/audit/outline`, { body: updated })
+      await page.getByRole('button', { name: 'Marchează ca pregătit' }).click()
+      await page.getByRole('alert').getByText('Ciorna e veche la: Scopul auditului.').waitFor()
+      assert.ok(requests.filter((item) => item.path === `${J}/audit/outline`).length >= 2)
+    },
+  )
+})
+
+test('3j revision conflict refetches the outline and shows the prescribed message', async () => {
+  await withHarness(
+    {
+      path: `/app/audit/${JOB.id}/structura`,
+      routes: {
+        ...routes,
+        [`PATCH ${J}/sections`]: problem(
+          'stale_revision',
+          409,
+          'Secţiunea s-a modificat între timp.',
+        ),
+      },
+    },
+    async ({ page, requests }) => {
+      await page.getByRole('button', { name: 'Deschide' }).first().click()
+      await page.getByRole('button', { name: 'Marchează ca pregătit' }).click()
+      await page.getByRole('alert').getByText('Secţiunea s-a modificat între timp.').waitFor()
+      assert.ok(requests.filter((item) => item.path === `${J}/audit/outline`).length >= 2)
+    },
+  )
+})

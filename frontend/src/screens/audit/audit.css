@@ -241,6 +241,15 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 22px;
 }
+.audit-chapter__confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.audit-chapter__confirm .audit-error {
+  margin: 0;
+}
 .audit-chapter__detail > div {
   min-width: 0;
 }
