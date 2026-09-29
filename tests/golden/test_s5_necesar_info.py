@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path, case_value
 
 from conftest import artifacts_path
 from ema.core.office.sheets import open_book
@@ -20,8 +21,8 @@ from .s3_book import year as filed_year
 pytestmark = pytest.mark.golden
 
 CASES = {
-    "CLIENT-P1": (
-        "piee/cases/piee-case-a/received/Necesar info 2025 - CLIENT-P1 - completat .xls",
+    "piee-case-a": (
+        case_path("piee-case-a", "necesar"),
         5,
         1,
         [
@@ -30,9 +31,8 @@ CASES = {
             ("values_missing", "Cons energetice!A45"),
         ],
     ),
-    "CLIENT-A3": (
-        "audit/cases/audit-case-c/received/Necesar info aferente anului 2025 - "
-        "CLIENT-A3 - 16.03.2026.xls",
+    "audit-case-c": (
+        case_path("audit-case-c", "necesar"),
         6,
         1,
         [
@@ -52,8 +52,8 @@ CASES = {
             ("table_header_ambiguous", "Autovehicule!H7"),
         ],
     ),
-    "CLIENT-A1": (
-        "audit/cases/audit-case-a/received/0.Necesar info CLIENT-A1 _2026.xls",
+    "audit-case-a": (
+        case_path("audit-case-a", "necesar"),
         6,
         3,
         [
@@ -96,7 +96,7 @@ def test_read_matches_private_cell_snapshot(reference_library: Path, case: str) 
     assert all(len(block.years) == year_count for block in info.carriers.values())
     assert [(i.code, i.ref.a1 if i.ref else None) for i in info.issues] == expected_issues
     _assert_blank_sum_issues(path, info)
-    expected_path = artifacts_path("s5", "expected") / f"{case}.json"
+    expected_path = artifacts_path("s5", "expected") / f"{case_value(case, 'snapshot')}.json"
     assert expected_path.exists(), f"Generate and review the local S5 snapshot: {expected_path}"
     snapshot = json.loads(expected_path.read_text())
     assert set(snapshot) == {carrier.value for carrier in info.carriers}
@@ -136,11 +136,11 @@ def test_other_sheet_structure(reference_library: Path, case: str) -> None:
     dataset = to_dataset(info)
     assert all(item.name.ref.sheet for item in info.production)
     assert all(item.unit.ref.sheet for item in info.production)
-    if case == "CLIENT-P1":
+    if case == "piee-case-a":
         assert len(info.water) == 3
         assert len(info.production) == 1
         assert not dataset.energy_costs_lei
-    elif case == "CLIENT-A3":
+    elif case == "audit-case-c":
         assert len(info.water) == 3
         assert len(info.other_consumption) == 5
         assert len(info.tables["autovehicule"].rows) == 22
@@ -171,7 +171,7 @@ def test_consumption_blocks_match_private_inventory(reference_library: Path, cas
     for line in inventory.read_text().splitlines():
         fields = line.split("\t")
         assert len(fields) == 8
-        if fields[0] == case:
+        if fields[0] == case_value(case, "snapshot"):
             case_lines += 1
             expected.add((fields[1], fields[3], int(fields[4]), fields[6]))
     assert expected and len(expected) == case_lines
@@ -213,7 +213,7 @@ def _prelucrare_years(path: Path) -> set[int]:
     }
 
 
-@pytest.mark.parametrize("case", ["CLIENT-P1", "CLIENT-A3"])
+@pytest.mark.parametrize("case", ["piee-case-a", "audit-case-c"])
 def test_delivered_prelucrare_has_no_overlapping_energy_year(
     reference_library: Path, case: str
 ) -> None:
@@ -233,9 +233,9 @@ def _same_unit(first: Located, second: Located) -> bool:
     return a == b
 
 
-def test_CLIENT-P1_anexa_cross_document_check(reference_library: Path) -> None:
-    received = reference_library / "piee/cases/piee-case-a/received"
-    necesar = parse_necesar_info(received / Path(CASES["CLIENT-P1"][0]).name)
+def test_piee_case_a_anexa_cross_document_check(reference_library: Path) -> None:
+    received = reference_library / case_path("piee-case-a", "received")
+    necesar = parse_necesar_info(received / Path(CASES["piee-case-a"][0]).name)
     anexa = parse_anexa(next(received.glob("*Anexa*.xlsx")))
     matches: list[str] = []
     mismatches: list[str] = []
@@ -255,6 +255,6 @@ def test_CLIENT-P1_anexa_cross_document_check(reference_library: Path) -> None:
     assert not mismatches
     assert not uncomparable
     print(
-        "CLIENT-P1 Anexa level 1 cross-document: "
+        "piee_case_a Anexa level 1 cross-document: "
         f"matches={matches}, mismatches={mismatches}, uncomparable={uncomparable}"
     )

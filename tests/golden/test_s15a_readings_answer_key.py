@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 from tests.conftest import artifacts_path
+from tests.golden.cases import case_path
 from tests.workspace_jobs import create_job
 
 from ema.audit.chapter_five import run_measurements
@@ -76,8 +77,8 @@ def _compare(
 
 
 def test_recorded_panel_readings_match_human_key(reference_library: Path, tmp_path: Path) -> None:
-    default_key = (
-        reference_library / "audit/cases/audit-case-b/visit/electrical/answer-key.json"
+    default_key = reference_library / case_path(
+        "audit-case-b", "visit", "electrical", "answer-key.json"
     )
     answer_key = Path(os.environ.get("EMA_S15_ANSWER_KEY", str(default_key)))
     if not answer_key.is_file():
@@ -91,7 +92,7 @@ def test_recorded_panel_readings_match_human_key(reference_library: Path, tmp_pa
     key = json.loads(answer_key.read_text(encoding="utf-8"))
     assert key["version"] == 2 and key["level"] == "panel"
 
-    visit = reference_library / "audit/cases/audit-case-b/visit"
+    visit = reference_library / case_path("audit-case-b", "visit")
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "audit", "synthetic", 2026)
     panels = sorted((visit / "electrical").glob("tablou-electric-*"))

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path
 from tests.workspace_jobs import register_client
 
 from ema.core.review import base_readiness, decide, fields
@@ -21,10 +22,10 @@ def _only(folder: Path, pattern: str) -> Path:
     return files[0]
 
 
-def test_CLIENT-P2_conflicts_require_shared_review_decisions(
+def test_piee_case_b_conflicts_require_shared_review_decisions(
     reference_library: Path, tmp_path: Path
 ) -> None:
-    folder = reference_library / "piee/cases/piee-case-b"
+    folder = reference_library / case_path("piee-case-b")
     ws = Workspace(tmp_path / "workspace")
     register_client(ws, "golden-client")
     job = import_piee(
@@ -58,10 +59,10 @@ def test_CLIENT-P2_conflicts_require_shared_review_decisions(
     )
 
 
-def test_CLIENT-P1_unit_disagreements_are_review_conflicts(
+def test_piee_case_a_unit_disagreements_are_review_conflicts(
     reference_library: Path, tmp_path: Path
 ) -> None:
-    folder = reference_library / "piee/cases/piee-case-a"
+    folder = reference_library / case_path("piee-case-a")
     ws = Workspace(tmp_path / "workspace")
     register_client(ws, "golden-client")
     job = import_piee(

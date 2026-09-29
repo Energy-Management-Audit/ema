@@ -130,7 +130,7 @@ def test_engie_splits_locations_and_preserves_negative_adjustment() -> None:
     assert all(draft.is_exportable for draft in drafts)
 
 
-def test_engie_companion_recognition_uses_labeled_client_identity() -> None:
+def test_engie_companion_recognition_uses_supplier_and_document_structure() -> None:
     parser = EngieEInvoiceCompanionParser()
     document = InputDocument(
         Path("synthetic-engie-invoice.pdf"),
@@ -140,9 +140,14 @@ def test_engie_companion_recognition_uses_labeled_client_identity() -> None:
         Path("synthetic-engie-invoice.pdf"),
         (_page(1, "ENGIE Romania S.A.\nFactura eFactura"),),
     )
+    other_supplier = InputDocument(
+        Path("synthetic-invoice.pdf"),
+        (_page(1, "Furnizor Test S.A.\nFactura eFactura"),),
+    )
 
     assert parser.recognizes(document)
-    assert not parser.recognizes(without_client)
+    assert parser.recognizes(without_client)
+    assert not parser.recognizes(other_supplier)
 
 
 def test_bad_file_does_not_stop_following_invoice(tmp_path: Path) -> None:

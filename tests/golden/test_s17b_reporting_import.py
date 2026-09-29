@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from openpyxl import load_workbook
+from tests.golden.cases import case_path
 
 from ema.core.workspace import Workspace
 from ema.energy_data.annex_index import import_annexes
@@ -91,11 +92,7 @@ def test_imported_reporting_equals_s6_sources(reference_library: Path, tmp_path:
         if len(years) == 3:
             actual = load_workbook(_output(ws, str(run["output_id"])), data_only=True)
             delivered = load_workbook(
-                next(
-                    (reference_library / "energy-manager-reporting/cases/2023-2025/final").glob(
-                        "*.xlsx"
-                    )
-                ),
+                next((reference_library / case_path("report-2023-2025", "final")).glob("*.xlsx")),
                 data_only=True,
             )
             for year in years:

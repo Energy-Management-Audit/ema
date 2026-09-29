@@ -1,4 +1,4 @@
-"""CLIENT-P2 figures are compared with the auditor's delivered, native-chart final."""
+"""piee_case_b figures are compared with the auditor's delivered, native-chart final."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from docx.oxml.ns import qn
+from tests.golden.cases import case_path
 
 from conftest import artifacts_path
 from ema.core.office.chart_series import Series, read_series
@@ -101,10 +102,10 @@ def _series(left: Series, right: Series, *, scale: float = 1) -> bool:
     )
 
 
-def test_CLIENT-P2_figure_inventory_and_numbers_match_or_have_pinned_reason(
+def test_piee_case_b_figure_inventory_and_numbers_match_or_have_pinned_reason(
     reference_library: Path, tmp_path: Path
 ) -> None:
-    case = reference_library / "piee/cases/piee-case-b"
+    case = reference_library / case_path("piee-case-b")
     final = next((case / "final").glob("*.docx"))
     data = load(
         2025,

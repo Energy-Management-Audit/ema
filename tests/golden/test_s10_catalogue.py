@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from docx import Document
+from tests.golden.cases import case_path
 
 from ema.audit.catalogue import CATALOGUE, AuditFact
 from ema.audit.headings import headings, map_headings
@@ -15,26 +16,19 @@ from ema.audit.inventory import inventory
 
 pytestmark = pytest.mark.golden
 
-FILES = {
-    "AUDIT-01": "*AUDIT-01*.docx",
-    "AUDIT-02": "*AUDIT-02*.docx",
-    "AUDIT-03": "*AUDIT-03*.docx",
-    "AUDIT-04": "*AUDIT-04*.docx",
-    "pcm": "Cap 2-3-4 V2.docx",
-    "CLIENT-A3": "*CLIENT-A3*.docx",
-}
+FILES = ("audit-01", "audit-02", "audit-03", "audit-04", "audit-05", "audit-06")
 EXPECTED_MAP = {
-    "AUDIT-01": (53, 0),
-    "AUDIT-02": (48, 0),
-    "AUDIT-03": (63, 0),
-    "AUDIT-04": (48, 0),
-    "pcm": (41, 0),
-    "CLIENT-A3": (40, 6),
+    "audit-01": (53, 0),
+    "audit-02": (48, 0),
+    "audit-03": (63, 0),
+    "audit-04": (48, 0),
+    "audit-05": (41, 0),
+    "audit-06": (40, 6),
 }
 EXPECTED_INVENTORY = {
-    "AUDIT-01": (2, 1, 1, 0, 0, 9, 2, 5),
-    "AUDIT-03": (6, 2, 39, 6, 2, 9, 2, 3),
-    "AUDIT-02": (0, 0, 0, 0, 0, 9, 0, 4),
+    "audit-01": (2, 1, 1, 0, 0, 9, 2, 5),
+    "audit-03": (6, 2, 39, 6, 2, 9, 2, 3),
+    "audit-02": (0, 0, 0, 0, 0, 9, 0, 4),
 }
 INVENTORY_KINDS = (
     "processes",
@@ -54,14 +48,7 @@ PV_FROM_PIEE = {
 
 
 def _references() -> dict[str, Path]:
-    root = Path(os.environ["EMA_REFERENCE"]) / "audit" / "finished-audits"
-    assert root.is_dir(), "EMA_REFERENCE/audit/finished-audits unavailable"
-    result = {}
-    for audit, pattern in FILES.items():
-        matches = list(root.glob(pattern))
-        assert len(matches) == 1, f"{audit}: expected one reference document"
-        result[audit] = matches[0]
-    return result
+    return {audit: case_path(audit) for audit in FILES}
 
 
 def _condition(section) -> str:  # type: ignore[no-untyped-def]
@@ -101,7 +88,7 @@ def test_reference_heading_union_and_inventory() -> None:  # noqa: C901, PLR0912
             f"{len(mapping.unmapped)}"
         )
         assert not mapping.unmapped, [(heading.text, heading.path) for heading in mapping.unmapped]
-        if audit != "CLIENT-A3":
+        if audit != "audit-06":
             assert not mapping.old_template_only
         assert (len(mapping.mapped), len(mapping.old_template_only)) == EXPECTED_MAP[audit]
     print("id | kind | applies_when | prototype | audits")
@@ -109,7 +96,7 @@ def test_reference_heading_union_and_inventory() -> None:  # noqa: C901, PLR0912
         present = [
             audit
             for audit in FILES
-            if audit != "CLIENT-A3"
+            if audit != "audit-06"
             and any(item.section_id == section.id for item in maps[audit].mapped)
         ]
         print(
@@ -135,7 +122,7 @@ def test_reference_heading_union_and_inventory() -> None:  # noqa: C901, PLR0912
     print("template section | masked heading | audit counts")
     for (section, masked), counts in sorted(template_counts.items()):
         print(f"{section} | {masked} | {dict(counts)}")
-    for audit in ("AUDIT-01", "AUDIT-03", "AUDIT-02"):
+    for audit in ("audit-01", "audit-03", "audit-02"):
         result = inventory(paths[audit])
         mapping = maps[audit]
         safe = {item.heading.text: item.safe_text for item in mapping.mapped}

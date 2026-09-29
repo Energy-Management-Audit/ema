@@ -222,7 +222,7 @@ ANALYSIS: tuple[Section, ...] = (
         "data_blocks",
         ("consumption_analysis",),
         aliases=("Bilanțul energetic real",),
-        prototype="AUDIT-02",
+        prototype="audit-02",
     ),
     section(
         "ch5",
@@ -231,7 +231,7 @@ ANALYSIS: tuple[Section, ...] = (
         None,
         "measurements",
         ("measurements",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         when=Condition(
             "any", children=(material(MaterialKind.METER), material(MaterialKind.THERMAL))
         ),
@@ -243,7 +243,7 @@ ANALYSIS: tuple[Section, ...] = (
         "ch5",
         "measurements",
         ("measurements",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         when=material(MaterialKind.METER),
     ),
     section(
@@ -253,7 +253,7 @@ ANALYSIS: tuple[Section, ...] = (
         "ch5",
         "measurements",
         ("measurements",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         when=material(MaterialKind.METER),
     ),
     section(
@@ -263,7 +263,7 @@ ANALYSIS: tuple[Section, ...] = (
         "ch5",
         "measurements",
         ("measurements",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         when=material(MaterialKind.METER),
     ),
     section(
@@ -273,7 +273,7 @@ ANALYSIS: tuple[Section, ...] = (
         "ch5",
         "measurements",
         ("measurements",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         when=material(MaterialKind.METER),
     ),
     section(
@@ -283,7 +283,7 @@ ANALYSIS: tuple[Section, ...] = (
         "ch5",
         "measurements",
         ("measurements",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         when=material(MaterialKind.THERMAL),
     ),
     section(
@@ -293,7 +293,7 @@ ANALYSIS: tuple[Section, ...] = (
         "ch5",
         "measurements",
         ("measurements",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         when=material(MaterialKind.THERMAL),
     ),
     section(
@@ -303,7 +303,7 @@ ANALYSIS: tuple[Section, ...] = (
         "ch5",
         "measurements",
         ("measurements",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         when=material(MaterialKind.THERMAL),
     ),
     section(

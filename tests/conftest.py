@@ -32,7 +32,18 @@ def reference_library() -> Path:
     path = Path(location).expanduser()
     if not path.is_dir():
         pytest.skip(f"EMA_REFERENCE points at {path}, which does not exist")
+    if not (path / "cases.toml").is_file():
+        pytest.skip("EMA_REFERENCE/cases.toml unavailable; golden not verified")
     return path
+
+
+@pytest.fixture(autouse=True)
+def require_local_case_mapping(request: pytest.FixtureRequest) -> None:
+    if (
+        request.node.get_closest_marker("golden")
+        and not (Path(os.environ.get("EMA_REFERENCE", "")).expanduser() / "cases.toml").is_file()
+    ):
+        pytest.skip("EMA_REFERENCE/cases.toml unavailable; golden not verified")
 
 
 def artifacts_path(*parts: str) -> Path:

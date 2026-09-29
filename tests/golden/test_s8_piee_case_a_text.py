@@ -1,4 +1,4 @@
-"""Pin each semantic difference from the approved CLIENT-P1 text and tables."""
+"""Pin each semantic difference from the approved piee_case_a text and tables."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from docx import Document
 from docx.document import Document as DocxDocument
 from docx.oxml.ns import qn
 from lxml import etree
+from tests.golden.cases import case_path
 
 from conftest import artifacts_path
 from ema.core.office.numbers_ro import format_number
@@ -191,10 +192,10 @@ def _paragraph_difference(actual: etree._Element, approved: etree._Element, key:
     return category
 
 
-def test_CLIENT-P1_text_and_tables_have_only_pinned_differences(  # noqa: C901
+def test_piee_case_a_text_and_tables_have_only_pinned_differences(  # noqa: C901
     reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    case = reference_library / "piee/cases/piee-case-a"
+    case = reference_library / case_path("piee-case-a")
     data = load(
         2025,
         next(case.rglob("Anexa*.xlsx")),

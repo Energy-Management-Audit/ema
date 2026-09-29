@@ -6,6 +6,7 @@ import pytest
 from docx import Document
 from openpyxl import load_workbook
 from tests.conftest import artifacts_path
+from tests.golden.cases import case_path
 from tests.workspace_jobs import create_job
 
 from ema.audit.base import build_base
@@ -56,10 +57,9 @@ def _synthetic_form(path: Path) -> Path:
 
 @pytest.mark.parametrize("with_ch5", [False, True])
 def test_three_measures_in_base(reference_library: Path, tmp_path: Path, with_ch5: bool) -> None:
-    root = reference_library / "audit" / "finished-audits"
-    AUDIT-01 = next(root.glob("*AUDIT-01*.docx"))
-    measurements = next(root.glob("*AUDIT-04*.docx"))
-    identity = (AUDIT-01.stem.split("AUDIT ENERGETIC ", 1)[1].rsplit(" - ", 1)[0],)
+    audit_01 = case_path("audit-01")
+    measurements = case_path("audit-04")
+    identity = (audit_01.stem.split("AUDIT ENERGETIC ", 1)[1].rsplit(" - ", 1)[0],)
     output_dir = artifacts_path("s15b", "with-ch5" if with_ch5 else "without-ch5")
     output_dir.mkdir(parents=True, exist_ok=True)
     base = build_base(
@@ -72,7 +72,7 @@ def test_three_measures_in_base(reference_library: Path, tmp_path: Path, with_ch
             0,
             1,
         ),
-        base_document=AUDIT-01,
+        base_document=audit_01,
         measurement_prototype=measurements,
         output=output_dir / "base.docx",
         base_identity=identity,
@@ -87,10 +87,10 @@ def test_three_measures_in_base(reference_library: Path, tmp_path: Path, with_ch
     report = render_chapter_six(base, output, plan, identity)
     document = Document(output)
     text = "\n".join(paragraph.text for paragraph in document.paragraphs)
-    reference_body = list(Document(AUDIT-01).element.body)
+    reference_body = list(Document(audit_01).element.body)
     reference_titles = [
         "".join(node.text or "" for node in reference_body[unit.element_range[0]].iter())
-        for unit in inventory(AUDIT-01).measures
+        for unit in inventory(audit_01).measures
     ]
     chapter = 6 if with_ch5 else 5
     assert [number.number for number in report.numbers] == [

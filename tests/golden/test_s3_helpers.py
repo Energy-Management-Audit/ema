@@ -56,7 +56,7 @@ def test_expected_difference_checks_value_and_missing_reason() -> None:
         EnergyDataset((2022,), {}),
         FactorTable("synthetic", 2022, (), ()),
     )
-    key = ("CLIENT-P1", "TEP", "purchased_heat", 2022, None)
+    key = ("piee-case-a", "TEP", "purchased_heat", 2022, None)
     assert _expected_or_match(key, None, ("carrier.purchased_heat.2022",), 0, context) == (0, 1)
     with pytest.raises(AssertionError, match="expected missing value"):
         _expected_or_match(key, 1, (), 0, context)
@@ -64,10 +64,10 @@ def test_expected_difference_checks_value_and_missing_reason() -> None:
         _expected_or_match(key, None, ("wrong.reason",), 0, context)
     with pytest.raises(AssertionError, match="expected filed zero"):
         _expected_or_match(key, None, ("carrier.purchased_heat.2022",), 1, context)
-    total_key = ("CLIENT-P2", "TEP", "total", 2024, 1)
+    total_key = ("piee-case-b", "TEP", "total", 2024, 1)
     with pytest.raises(AssertionError, match="expected filed relation failed"):
         _expected_or_match(total_key, None, ("carrier.lpg.2024.01",), 2, context)
-    relation_key = ("CLIENT-A3", "Chelt-Cifra afaceri", "intensity", 2024, None)
+    relation_key = ("audit-case-c", "Chelt-Cifra afaceri", "intensity", 2024, None)
     relation_context = ReviewContext(
         set(),
         [],

@@ -1,4 +1,4 @@
-// D12 golden (local only): the PIEE journey on CLIENT-P1's received files through the built app, the
+// D12 golden (local only): the PIEE journey on piee-case-a's received files through the built app, the
 // real API and Word for Mac. Client values stay in the workspace and the artifacts folder; the
 // script prints only pass/fail lines, file names and hashes.
 //
@@ -13,6 +13,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { MONTHS } from '../src/piee/labels.ts'
+import { casePath } from './case-path.mjs'
 
 const reference = process.env.EMA_REFERENCE
 if (!reference) throw new Error('EMA_REFERENCE is not set.')
@@ -22,7 +23,7 @@ const out =
   outFlag > 0 ? resolve(process.argv[outFlag + 1]) : join(artifacts, 's17b-piee', 'golden')
 mkdirSync(out, { recursive: true })
 const repo = fileURLToPath(new URL('../..', import.meta.url))
-const received = join(reference, 'piee/cases/piee-case-a/received')
+const received = casePath('piee-case-a', 'received')
 const pick = (pattern) =>
   join(
     received,
@@ -136,7 +137,7 @@ try {
         'piee',
         'generate',
         '--client',
-        'CLIENT-P1',
+        'piee-case-a',
         '--year',
         '2025',
         '--anexa',

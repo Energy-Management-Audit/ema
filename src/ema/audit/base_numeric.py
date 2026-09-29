@@ -1,4 +1,4 @@
-"""Reviewed fixed text retained from the AUDIT-01 audit base.
+"""Reviewed fixed text retained from the audit-01 audit base.
 
 Each digest approves one exact paragraph or cell; edits require a new review.
 The grouped reasons are legislation, law or ISO standards, section numbering, the firm's

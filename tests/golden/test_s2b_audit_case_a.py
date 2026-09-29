@@ -1,4 +1,4 @@
-"""CLIENT-A1 legacy collection acceptance using the private reference library."""
+"""audit_case_a legacy collection acceptance using the private reference library."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from docx import Document
+from tests.golden.cases import case_path
 from tests.workspace_jobs import create_job
 
 from ema.core.config import Settings
@@ -26,7 +27,7 @@ def _sources() -> list[Path]:
     reference = os.environ.get("EMA_REFERENCE")
     if not reference:
         pytest.skip("EMA_REFERENCE unavailable; golden not verified")
-    received = Path(reference) / "audit/cases/audit-case-a/received"
+    received = Path(reference) / case_path("audit-case-a", "received")
     sources = sorted(path for path in received.iterdir() if path.suffix.lower() in {".doc", ".xls"})
     assert len(sources) == 12
     assert sum(path.suffix.lower() == ".doc" for path in sources) == 7
@@ -35,11 +36,11 @@ def _sources() -> list[Path]:
 
 def _collection(tmp_path: Path, sources: list[Path]) -> tuple[Workspace, str, dict[str, Path]]:
     ws = Workspace(tmp_path / "workspace")
-    job = create_job(ws, "audit", "CLIENT-A1-golden", 2026)
+    job = create_job(ws, "audit", "audit_case_a-golden", 2026)
     by_slot = {}
     for number, source in enumerate(sources, 1):
         slot = f"dossier/{number:04}"
-        ws.set_slot(job, slot, ws.add_file("CLIENT-A1-golden", source))
+        ws.set_slot(job, slot, ws.add_file("audit_case_a-golden", source))
         by_slot[slot] = source
     return ws, job, by_slot
 
@@ -69,7 +70,7 @@ def _print_table(results: list[ItemOutcome], by_slot: dict[str, Path]) -> None:
         )
 
 
-def test_CLIENT-A1_legacy_collection_with_word(tmp_path: Path) -> None:
+def test_audit_case_a_legacy_collection_with_word(tmp_path: Path) -> None:
     sources = _sources()
     assert word_available(Settings()), "Word is required for the native golden"
     ws, job, by_slot = _collection(tmp_path, sources)
@@ -104,7 +105,7 @@ def test_CLIENT-A1_legacy_collection_with_word(tmp_path: Path) -> None:
             assert item.original_words == item.converted_words or item.warning
 
 
-def test_CLIENT-A1_legacy_collection_without_word(tmp_path: Path, monkeypatch) -> None:
+def test_audit_case_a_legacy_collection_without_word(tmp_path: Path, monkeypatch) -> None:
     sources = _sources()
     monkeypatch.setenv("EMA_WORD_PATH", str(tmp_path / "missing-word.app"))
     ws, job, by_slot = _collection(tmp_path, sources)

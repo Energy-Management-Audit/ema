@@ -7,17 +7,15 @@ import os
 from pathlib import Path
 
 import xlrd
+from tests.golden.cases import case_path, case_value
 
 from ema.energy_data.carriers import carrier_for
 from ema.energy_data.source import normal
 
 CASES = {
-    "CLIENT-P1": "piee/cases/piee-case-a/received/Necesar info 2025 - CLIENT-P1 - completat .xls",
-    "CLIENT-A3": (
-        "audit/cases/audit-case-c/received/Necesar info aferente anului 2025 - "
-        "CLIENT-A3 - 16.03.2026.xls"
-    ),
-    "CLIENT-A1": "audit/cases/audit-case-a/received/0.Necesar info CLIENT-A1 _2026.xls",
+    "piee-case-a": case_path("piee-case-a", "necesar"),
+    "audit-case-c": (case_path("audit-case-c", "necesar")),
+    "audit-case-a": case_path("audit-case-a", "necesar"),
 }
 WATER = {"water_potable", "water_industrial", "water_storm"}
 
@@ -68,7 +66,7 @@ def main() -> None:
     output.mkdir(parents=True, exist_ok=True)
     for case, relative in CASES.items():
         data = snapshot(reference / relative)
-        target = output / f"{case}.json"
+        target = output / f"{case_value(case, 'snapshot')}.json"
         target.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
         print(f"{case}: {sum(len(years) for years in data.values())} year groups -> {target}")
 

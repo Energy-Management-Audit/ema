@@ -29,19 +29,19 @@ from ema.invoices.parsers.engie_text import plain_text
 from ema.invoices.parsers.identity_fields import field_issues as issues_for_fields
 from ema.invoices.parsers.identity_fields import required_value as required
 from ema.invoices.parsers.normalization import normalize_quantity_and_price
-from ema.invoices.parsers.supplier_numbers import parse_supplier_decimal
-from ema.invoices.parsers.CLIENT-I7_identity import (
+from ema.invoices.parsers.reinvoicing_identity import (
     category_for,
     price_issue,
     reconciles,
 )
-from ema.invoices.parsers.CLIENT-I7_patterns import (
+from ema.invoices.parsers.reinvoicing_patterns import (
     CONSUMPTION_PERIOD_PATTERN,
     ELECTRIC_POD,
     METER,
     NUMBER,
     Segment,
 )
+from ema.invoices.parsers.supplier_numbers import parse_supplier_decimal
 
 
 def electric_segments(document: InputDocument, billing_period: str | None) -> tuple[Segment, ...]:

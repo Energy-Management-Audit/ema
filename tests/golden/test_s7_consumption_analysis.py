@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 from docx import Document
 from lxml import etree
+from tests.golden.cases import case_path
 from tests.golden.s7_coverage import retained_categories
 from tests.golden.s7_layout import build_blocks
 from tests.golden.s7_reader import _monthly, _text, read_chapter
@@ -34,10 +34,7 @@ OUTPUT = artifacts_path("s7")
 
 
 def _source(name: str) -> Path:
-    root = Path(os.environ["EMA_REFERENCE"]) / "audit" / "finished-audits"
-    matches = list(root.glob(f"*{name}*.docx"))
-    assert len(matches) == 1
-    return matches[0]
+    return case_path(name)
 
 
 def _chart_types(parts: dict[str, bytes], part: str) -> tuple[str, ...]:
@@ -47,7 +44,7 @@ def _chart_types(parts: dict[str, bytes], part: str) -> tuple[str, ...]:
     return tuple(node.tag for node in plot if node.tag.endswith("Chart"))
 
 
-@pytest.mark.parametrize("name", ["AUDIT-01", "AUDIT-02"])
+@pytest.mark.parametrize("name", ["audit-01", "audit-02"])
 def test_raw_monthly_tables_are_dataset_backed(name: str) -> None:
     case = read_chapter(_source(name), name.lower())
     for section_id, carrier in (
@@ -65,7 +62,7 @@ def test_raw_monthly_tables_are_dataset_backed(name: str) -> None:
                 )
 
 
-@pytest.mark.parametrize("name", ["AUDIT-01", "AUDIT-02"])
+@pytest.mark.parametrize("name", ["audit-01", "audit-02"])
 def test_gas_table_and_chart_regenerate_from_chapter_four(name: str) -> None:
     source = _source(name)
     case = read_chapter(source, name.lower())
@@ -148,17 +145,17 @@ def test_gas_table_and_chart_regenerate_from_chapter_four(name: str) -> None:
 
 def test_equivalent_chart_cache_exceptions_are_pinned() -> None:
     expected = {
-        ("AUDIT-01", "ch4.echiv_electric", 2023),
-        ("AUDIT-01", "ch4.echiv_electric", 2024),
-        ("AUDIT-01", "ch4.echiv_electric", 2025),
-        ("AUDIT-01", "ch4.echiv_gaz", 2024),
-        ("AUDIT-01", "ch4.echiv_gaz", 2025),
-        ("AUDIT-01", "ch4.echiv_carburant", 2024),
-        ("AUDIT-02", "ch4.echiv_carburant", 2023),
-        ("AUDIT-02", "ch4.echiv_carburant", 2024),
+        ("audit-01", "ch4.echiv_electric", 2023),
+        ("audit-01", "ch4.echiv_electric", 2024),
+        ("audit-01", "ch4.echiv_electric", 2025),
+        ("audit-01", "ch4.echiv_gaz", 2024),
+        ("audit-01", "ch4.echiv_gaz", 2025),
+        ("audit-01", "ch4.echiv_carburant", 2024),
+        ("audit-02", "ch4.echiv_carburant", 2023),
+        ("audit-02", "ch4.echiv_carburant", 2024),
     }
     found = set()
-    for name in ("AUDIT-01", "AUDIT-02"):
+    for name in ("audit-01", "audit-02"):
         case = read_chapter(_source(name), name.lower())
         for section_id in (
             "ch4.echiv_electric",
@@ -178,7 +175,7 @@ def test_equivalent_chart_cache_exceptions_are_pinned() -> None:
     assert found == expected
 
 
-@pytest.mark.parametrize("name,expected_generated", [("AUDIT-01", 63), ("AUDIT-02", 39)])
+@pytest.mark.parametrize("name,expected_generated", [("audit-01", 63), ("audit-02", 39)])
 def test_whole_chapter_roundtrip_with_reported_block_coverage(  # noqa: PLR0915
     name: str, expected_generated: int
 ) -> None:
@@ -269,7 +266,7 @@ def test_whole_chapter_roundtrip_with_reported_block_coverage(  # noqa: PLR0915
             ]
             allowed = (
                 [(1, 2)]
-                if name == "AUDIT-02" and section_id == "ch4.echiv_electric" and table_index == 0
+                if name == "audit-02" and section_id == "ch4.echiv_electric" and table_index == 0
                 else []
             )
             assert differences == allowed
@@ -280,7 +277,7 @@ def test_whole_chapter_roundtrip_with_reported_block_coverage(  # noqa: PLR0915
             )
             assert source_chart.series.name == result_chart.series.name
             assert source_chart.series.categories == result_chart.series.categories
-            if name == "AUDIT-01" and section_id in {
+            if name == "audit-01" and section_id in {
                 "ch4.specific_electric",
                 "ch4.specific_gaz",
             }:

@@ -30,13 +30,13 @@ which keeps the repo free of markdown sprawl.
 - 2026-09-18 **Step 2 done:** analysis of the real material (§3.2; details in `$EMA_REFERENCE/_analysis/`).
 - 2026-09-18 **Step 3 done:** Festival/camp dropped, new repo, git flow, standards (§3.3, §6).
 - 2026-09-19 **Step 4 drafted:** architecture (§5) + roadmap (§7) + frontend brief.
-- 2026-09-19 CLIENT-A2 final audit + original `.rar` added to the library. **This is the first complete
+- 2026-09-19 audit-case-b final audit + original `.rar` added to the library. **This is the first complete
   input→final audit pair**; its ch. 4 tables supply the 2023–2025 dataset (§9). *Corrected
   09-23: the final was produced with an agent, so only its inputs are used (§5.16).*
-- 2026-09-19 pywebview and repo layout confirmed; CLIENT-A2 electrical photos added (the case is
+- 2026-09-19 pywebview and repo layout confirmed; audit-case-b electrical photos added (the case is
   now complete); Downloads duplicates moved to Trash.
 - 2026-09-19 Telemetry: none. Export = deliverables only, import = input data (no job transfer).
-- 2026-09-19 **CLIENT-P1 PIEE redone in the auditor's CLIENT-I5 format** (her request of 19 Sep). Vlad
+- 2026-09-19 **piee-case-a PIEE redone in the auditor's piee-01 format** (her request of 19 Sep). Vlad
   sends it.
   - The rules are captured as the **PIEE format contract (§5.10)**.
   - The golden and the reference scripts are in the library.
@@ -65,8 +65,8 @@ which keeps the repo free of markdown sprawl.
     (§5.16).
   - Open for Vlad: §9.
 - 2026-09-23 **Vlad's answers to round 1:**
-  - The CLIENT-A2 final was produced with an agent, not by the auditor: its inputs stay as test
-    inputs, its text is never a reference or base (§5.16). The audit base is AUDIT-01 2026.
+  - The audit-case-b final was produced with an agent, not by the auditor: its inputs stay as test
+    inputs, its text is never a reference or base (§5.16). The audit base is audit-01 2026.
   - The goal, restated: her exact results, automated (§2.1). Audits work like the PIEE: her
     latest finished audit filled in, by an AI agent under the hood (§5.7, §5.9 W3).
   - **Mac first**, Windows port after (R17, S18); this replaces round 1's "Windows build from S1".
@@ -74,7 +74,7 @@ which keeps the repo free of markdown sprawl.
     approved PIEE (§5.7).
   - The design handoff is implemented as made; Claude draws the missing screens and checks them
     visually (R20, §5.18).
-  - the auditor approved the CLIENT-P1 PIEE, pies included (§5.10).
+  - The auditor approved the piee-case-a PIEE, pies included (§5.10).
   - Online research: the agent chooses and judges its sources (§5.11).
 - 2026-09-23 **Architecture review, round 2 (Codex, the last): 8 findings**, 7 accepted and 1 in
   part:
@@ -85,8 +85,8 @@ which keeps the repo free of markdown sprawl.
   - drafts report traceability coverage, not truth, and vision readings wait for a human (§5.12)
   - final export needs a human approval, and R14 is a policy with guardrails (§5.9)
   - Word edits happen on a working copy (§5.18); the dev loop is same-origin (§5.1)
-  - Vlad, the same day: the CLIENT-A2 final was produced with an agent, so it is inputs only,
-    and the audit base is AUDIT-01 2026 (§5.7, §5.16)
+  - Vlad, the same day: the audit-case-b final was produced with an agent, so it is inputs only,
+    and the audit base is audit-01 2026 (§5.7, §5.16)
   - The review is closed; Vlad's decisions on it are F1–F3 in §4.
 - 2026-09-23 **Ready for implementation:** the plan is on `dev`, and the S0, S1 and S1b slice
   specs are written (level 3, §0); Codex starts S0 and S1 in parallel.
@@ -111,14 +111,13 @@ which keeps the repo free of markdown sprawl.
 
 ### 2.1 What Ema is
 
-- **Ema** is a female-persona AI assistant for **Energy Management & Audit SRL** (the auditor
-  AUDITOR, lead auditor / attested energy manager). The name reads as both "Energy Management
-  Assistant" and E.M.A.
+- **Ema** is a female-persona AI assistant for **Energy Management & Audit SRL** (the auditor, lead auditor / attested energy manager). The name reads as both
+  "Energy Management Assistant" and E.M.A.
 - She prepares EMA's recurring paperwork so the auditor can focus on analysis, site visits and
   client relationships.
 - **The goal (Vlad, 09-23): automate the auditor's workflows by producing her exact results.** Every
   deliverable is her own document — her template, same style, same layout — filled in for the
-  client, as the approved CLIENT-P1 PIEE is. Under the hood an AI agent does the filling where rules
+  client, as the approved piee-case-a PIEE is. Under the hood an AI agent does the filling where rules
   cannot (the audit); nothing in the output differs from what she would make.
 - The UI speaks as Ema, in Romanian. Code, documentation and specs are in English, using the
   Romanian business terms (anexa, tep, Necesar info, Prelucrare date).
@@ -230,7 +229,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
   - review gates blocked the extraction meant to satisfy them
   - PIEE readers pinned to cell addresses read wrong numbers silently
   - PIEE had two code paths and the UI used the untested one
-  - the CLIENT-A1 audit and CLIENT-P1 PIEE had to be produced by an agent calling internals directly
+  - the audit-case-a audit and piee-case-a PIEE had to be produced by an agent calling internals directly
 - **Security to-dos (user):**
   - rotate the Gemini key pasted in the 18 Sep chat
   - change the shared mailbox password sent in plain text in the 15 Jul email
@@ -241,7 +240,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
    - Ch. 1 (scope/method, ~8k words) and ch. 7 (financing) are 86–100 % identical across her audits.
    - Ch. 4 = templated sentences with numbers.
    - Ch. 2–3 and the specific measures are client-specific.
-2. **the auditor's master structure** (same tree in all her 2026 audits):
+2. **The auditor's master structure** (same tree in all her 2026 audits):
    1. Descrierea și scopul auditului
    2. Descrierea și istoricul societății
    3. Descrierea situației existente
@@ -275,19 +274,19 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
    - *Prelucrare date*: a stable core of ~10 sheets plus per-client extras, rolling 3 years.
    - → **Every reader goes by label.**
 8. **EMA's 13-item document request checklist** (Necesar info „diverse") already numbers the
-   dossier files (CLIENT-A1 2.1, 5.x, 9.x…) → completeness + classification.
+   dossier files (audit-case-a 2.1, 5.x, 9.x…) → completeness + classification.
 9. **Invoices:**
    - 29/29 text PDFs (EDS, MET, ENGIE) exportable.
-   - All failures are client identity (CLIENT-I2 24; 11 OCR'd ALIVE).
+   - All failures are client identity (invoice-case-b 24; 11 OCR'd ALIVE).
    - MET gas + SEE re-invoicing documents are stopped by design.
 10. **Thermography** = FLIR screenshots via WhatsApp (no radiometric data; the overlay is
     readable).
-11. **How the auditor's PIEE is actually built (found 2026-09-19 from her CLIENT-I5 PIEE):**
+11. **How the auditor's PIEE is actually built (found 2026-09-19 from her piee-01 PIEE):**
     - All 31 bar charts are **linked charts**: they point at her *Prelucrare date* workbook (in her
       OneDrive) by cell reference, e.g. `'Consum Gaz'!$D$12:$O$12`, and keep a cached copy of the
       values.
     - The 6 pie charts (PV share, energy mix, one per year) are **pasted pictures**.
-    - Her CLIENT-P1 workbook uses **the same template layout** as the CLIENT-I5 one; almost every
+    - Her piee-case-a workbook uses **the same template layout** as the piee-01 one; almost every
       chart reference lands on the right cell.
     - So her yearly workflow is: build the client's *Prelucrare date* in her template layout →
       copy last year's PIEE → re-point the chart links → rewrite the numbers in the text and tables.
@@ -296,7 +295,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
       embedded chart data** + refresh the chart caches + turn the pie pictures into native pie
       charts + replace text and tables. The full rule set is the PIEE format contract (§5.10).
     - **The deliverable is standalone (user, 2026-09-19):** no links to external workbooks (her
-      CLIENT-I5 links point into her personal OneDrive and break on any other machine). Charts stay
+      piee-01 links point into her personal OneDrive and break on any other machine). Charts stay
       native and editable in Word (Edit Data) with their data embedded in the `.docx`. The
       *Prelucrare date* workbook is delivered separately, only as a working file. This is higher fidelity than
       building charts from scratch, and it makes S0 much less risky: the native charts already
@@ -341,8 +340,8 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 | 09-19 | Windows distribution: **unsigned installer + in-app update check** (SmartScreen warning accepted) |
 | 09-19 | PDF stack: **replace PyMuPDF (AGPL) with pypdfium2 + pdfplumber** during S9, keeping the golden results |
 | 09-19 | **No telemetry**; diagnostics on demand only |
-| 09-19 | Missing data in deliverables → a short red marker, no explanation (R4c); styling kept exactly (R4b). First applied to the CLIENT-P1 PIEE: missing water and 2025 monthly PV values marked red, both water types kept, the 2025 gas jump presented as is |
-| 09-19 | **PIEE = clone the auditor's latest finished PIEE and change only client content**; charts standalone (embedded data), pies native; the rule set is the PIEE format contract (§5.10) with the CLIENT-P1 2026 PIEE as golden |
+| 09-19 | Missing data in deliverables → a short red marker, no explanation (R4c); styling kept exactly (R4b). First applied to the piee-case-a PIEE: missing water and 2025 monthly PV values marked red, both water types kept, the 2025 gas jump presented as is |
+| 09-19 | **PIEE = clone the auditor's latest finished PIEE and change only client content**; charts standalone (embedded data), pies native; the rule set is the PIEE format contract (§5.10) with the piee-case-a 2026 PIEE as golden |
 | 09-19 | Document preview: **paged, scrollable whole-document view (docx → PDF → pdf.js)**; **no in-app editing** (corrections via facts + regenerate; polishing in Word) |
 | 09-19 | AI: **no automatic routing**. Gemini is the default, OpenAI optional; the provider and model are chosen manually in Settings from a short curated list (a standard default + one stronger option each; no overkill or underpowered models); costs are logged per job, no cap for now |
 | 09-21 | **Design handoff is the frontend reference** (§5.18); `FRONTEND_BRIEF.md` is now only the record of the ask. Authority: HTML > README > this plan, except on what the data is, where the plan wins |
@@ -356,7 +355,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 | 09-23 | **Audits work like the PIEE:** her latest finished audit cloned and filled in, same style and layout; an AI agent does the filling under the hood (§5.7, §5.9 W3, §5.12). The goal is her exact results, automated, nothing different (§2.1) |
 | 09-23 | **Online research: the agent is free** to find information and judge whether a source is legitimate; no site or field allowlist; every fact stays traceable (§5.11) |
 | 09-23 | **The handoff is implemented as made**, resizable across desktop sizes (R20); Claude draws the missing screens in its direction and checks them visually (§5.18) |
-| 09-23 | **the auditor approved the CLIENT-P1 PIEE** (Vlad showed it to her): the S8 golden is approved, and the pies stay exactly as made |
+| 09-23 | **The auditor approved the piee-case-a PIEE** (Vlad showed it to her): the S8 golden is approved, and the pies stay exactly as made |
 | 09-23 | **Mac first, Windows after** (R17): quick development to get the app working locally and well; Vlad runs the jobs with it meanwhile; then the Windows port (S18) on Vlad's Windows PC |
 
 ---
@@ -625,7 +624,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
   versioned by year with their source (from the auditor's „Principali factori", „Factori de
   conversie in MWh" (Eurostat) and „impact de mediu" sheets). A factor change never rewrites a
   past job.
-- **Verified** by reproducing her *Prelucrare date* numbers (CLIENT-P1, CLIENT-P2, CLIENT-A3).
+- **Verified** by reproducing her *Prelucrare date* numbers (piee-case-a, piee-case-b, audit-case-c).
 - **Source policy, per field and year.** When sources differ, Ema proposes a winner in this order
   and shows the conflict for a human to choose; nothing is averaged or adjusted:
   1. the auditor's *Prelucrare date*, for the years it covers (R8)
@@ -646,7 +645,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 - **Her workbook's factors are read with her values.** When her *Prelucrare date* is imported, the
   factors on its sheets are recorded with it; a difference from Ema's factor table shows in the
   conflict's derivation instead of being recomputed away.
-- Goldens cover a matching total, a real mismatch, and a year without monthly data (CLIENT-P1
+- Goldens cover a matching total, a real mismatch, and a year without monthly data (piee-case-a
   2025 PV). If the library holds no real mismatch, S3 uses a unit fixture and says so.
 
 ### 5.7 Document engine (template + slots + blocks)
@@ -659,7 +658,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
    it writes a reference to a recorded fact, and the engine inserts the value, formatted the
    Romanian way. A number it needs that is not a fact yet (a percentage change) it gets from a
    calculation tool, which records it as a calculated fact first.
-2. **The engine** (deterministic Python, the way the CLIENT-P1 script works) opens her document,
+2. **The engine** (deterministic Python, the way the piee-case-a script works) opens her document,
    finds the section's anchors, and writes the content into her own paragraphs, tables and
    charts, inside her runs, cloning her element where the client needs more of them.
 3. **Word** then lays the result out: TOC page numbers and the PDF (below).
@@ -670,8 +669,8 @@ Regenerating a section rewrites only its anchors.
 
 - **Templates** in `templates/`, built from the auditor's real documents:
   - `audit_master.docx`: **her latest finished audit, cloned** exactly as the PIEE is, with its
-    anchor map. **Provisional base: AUDIT-01 2026**, her latest own audit in the library (last
-    saved 6 Aug). The CLIENT-A2 final is newer but was produced with an agent, so it is never a
+    anchor map. **Provisional base: audit-01 2026**, her latest own audit in the library (last
+    saved 6 Aug). The audit-case-b final is newer but was produced with an agent, so it is never a
     base or a style reference (R1). the auditor may name another (§9); a change of base re-runs S10b
     only; the §5.10 anchor rules and leftover check apply.
     Fixed chapters (1, 6.1–6.2, 7), header, footer, styles, green tables, captions and the TOC
@@ -680,16 +679,16 @@ Regenerating a section rewrites only its anchors.
     heading, paragraphs, table and figure for it, so every added part is formatted exactly like
     hers. A test case is never filled into its own base.
   - **Her reference set: all her own audits in the library, used together** (Vlad, 09-23). One
-    document is the base to clone (AUDIT-01), but all of them feed the rest:
-    - her 2026 audits: **AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04**, and **AUDIT-05** (`Cap 2-3-4 V2`,
+    document is the base to clone (audit-01), but all of them feed the rest:
+    - her 2026 audits: **audit-01, audit-02, audit-03, audit-04**, and **audit-05** (`Cap 2-3-4 V2`,
       ch. 2–4). They are the source for the section catalogue and its variants, the phrase bank,
       the agent's style guide and worked examples, and the prototypes for a section or unit the
       base lacks. They share her template and styles, so a prototype taken from one of them fits
       the base.
-    - **CLIENT-A3 2022** is the older template, by the previous auditor: a content and domain
+    - **audit-06 2022** is the older template, by the previous auditor: a content and domain
       reference only (what a section covers, what data it needs), never style, layout or wording.
-    - The CLIENT-A2 final: never (§5.16).
-  - `piee_master.docx`: **her latest finished PIEE kept verbatim** (today the CLIENT-I5
+    - The audit-case-b final: never (§5.16).
+  - `piee_master.docx`: **her latest finished PIEE kept verbatim** (today the piee-01
     `MODEL_2026.docx`) plus its anchor map, which classifies every element as fixed or variable
     (§5.10). Client content is replaced in place per §5.10, never re-laid out.
   - `energy_manager_report.xlsx`, `prelucrare_date.xlsx`: her layouts
@@ -710,7 +709,7 @@ Regenerating a section rewrites only its anchors.
   - **Word lays the document out, on the Mac too.** Through the Office adapter, Word for Mac is
     driven by AppleScript: open the filled `.docx`, *update page numbers* on the TOC (numbers
     only; entries and spacing untouched), save, *save as PDF*, close. **Proven 2026-09-23** on a
-    copy of the approved CLIENT-P1 PIEE with all 28 TOC numbers scrambled to 99: Word restored
+    copy of the approved piee-case-a PIEE with all 28 TOC numbers scrambled to 99: Word restored
     exactly the approved numbers, the TOC paragraphs were unchanged, and the PDF had its 33 pages.
     Needs the macOS Automation permission for Word (granted), and the files placed in Word's
     sandbox container (`~/Library/Containers/com.microsoft.Word/Data/`) for the operation, then
@@ -727,15 +726,15 @@ Regenerating a section rewrites only its anchors.
   year's job. The engine re-fills the same template. It never diffs Word files.
 - **Risk:** python-docx has no chart support. Native charts are built as raw chart parts
   (DrawingML + an embedded xlsx).
-  - **Partly proven (2026-09-19, CLIENT-P1 PIEE):** the result opened cleanly in Word for Mac,
+  - **Partly proven (2026-09-19, piee-case-a PIEE):** the result opened cleanly in Word for Mac,
     with editable data. That covered rewriting her existing chart parts, embedding their
     workbooks, and adding native 3D pies.
-  - **Her audits link their charts too** (found 09-23): all 30 charts of AUDIT-01 point at her
+  - **Her audits link their charts too** (found 09-23): all 30 charts of audit-01 point at her
     OneDrive copy of the client's Necesar info (`'Consum Gaz'!$C$7`…). So the audit base needs the
     same link → embedded-workbook rewrite as the PIEE, and it is one piece of code for both.
   - **S0 still proves, in Word for Mac** (Windows Word again at the port), three separate
     things; none stands in for another:
-    1. the PIEE path, as a repeatable check: the CLIENT-P1 golden (rewritten charts, removed series
+    1. the PIEE path, as a repeatable check: the piee-case-a golden (rewritten charts, removed series
        and figures, embedded workbooks, native pies) opens without repair, Edit Data works on a
        bar chart and a pie, and the package has zero external relationships and one workbook per
        chart
@@ -856,14 +855,14 @@ and write her chapters. Each stage is re-runnable on its own, and per section:
 | 7 Export | readiness allows it (every section `done` or `n/a`, none `stale`) → final `.docx` | `outputs/final-<n>.docx` |
 
 **Audit section catalogue: one general structure built from all her audits** (Vlad, 09-23).
-Her audits differ by client: AUDIT-01 and AUDIT-02 have no measurement chapter (their „Măsuri" is
-ch. 5), while AUDIT-04 and AUDIT-03 have ch. 5 „Bilanțurile energetice", with both an electrical
-part (bilanț, fișă, rezultate, concluzii) and a thermal part (bilanț, fișă, rezultate). CLIENT-A3
+Her audits differ by client: audit-01 and audit-02 have no measurement chapter (their „Măsuri" is
+ch. 5), while audit-04 and audit-03 have ch. 5 „Bilanțurile energetice", with both an electrical
+part (bilanț, fișă, rezultate, concluzii) and a thermal part (bilanț, fișă, rezultate). audit-06
 2022 (the old template) has electrical measurements only. So:
 - **The catalogue is the union** of every section in her audits (the §5.7 reference set). Each
   section records **when it applies** (e.g. electrical part: meter/analyser photos received;
   thermal part: thermal images received) and **which of her audits supplies its prototype** when
-  the base lacks it (ch. 5 comes from AUDIT-03 or AUDIT-04, since AUDIT-01 has none).
+  the base lacks it (ch. 5 comes from audit-03 or audit-04, since audit-01 has none).
 - **Nothing is dropped silently.** For every catalogue section the Fill stage records whether it
   applies and why (the input that triggers it, or its absence). A section that applies is filled
   or `later`; one that doesn't is proposed `n/a` with its reason, and only a human confirms `n/a`
@@ -914,18 +913,17 @@ The catalogue (each section's kind and sources):
 
 ### 5.10 PIEE format contract
 
-Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically, with no LLM.
+Settled 2026-09-19 on the piee-case-a PIEE. W2 must reproduce it deterministically, with no LLM.
 
-- **Golden:** `$EMA_REFERENCE/piee/cases/piee-case-a/generated/Program de îmbunătățire a eficienței
-  energetice CLIENT-P1 SA_2026.docx`, prepared for the auditor on 2026-09-19. **Approved by
+- **Golden:** `case_path("piee-case-a", "approved")` in the untracked mapping, prepared for the auditor on 2026-09-19. **Approved by
   the auditor** (reported 09-23), pies included: evidence level 4 (§5.16). The format is proven; S8
   makes the system produce it for any client.
-- **Reference implementation:** `…/piee-case-a/working/CLIENT-I5-format-generator/`
+- **Reference implementation:** `case_path("piee-case-a", "generator")`
   (`data_tg.py`, `build_tg.py`, `charts_tg.py`). These are one-off scripts, not product code. S8
   re-implements them inside `piee` + the document engine and must reproduce the golden.
 
 **Base**
-- The base is **the auditor's latest finished PIEE, cloned** (today `MODEL_2026.docx`, CLIENT-I5).
+- The base is **the auditor's latest finished PIEE, cloned** (today `MODEL_2026.docx`, piee-01).
   Only client content changes.
 - These are never touched: styles, fonts, heading numbering, header („ANTET"), the page-number
   footer, caption styles, table styles, and the signature/stamp images.
@@ -940,7 +938,7 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
 - **Anchors are found by id, never by their words or position.** When a base version's map is
   built, each variable anchor is stamped with a hidden bookmark (`_ema_<slot>`; Word hides
   bookmarks starting with `_`). The engine finds anchors only by those bookmarks: not by
-  paragraph index (the one-off CLIENT-P1 script's `P(237)`, which breaks as soon as a paragraph
+  paragraph index (the one-off piee-case-a script's `P(237)`, which breaks as soon as a paragraph
   moves), and not by matching the text in them. The `_ema_` bookmarks are stripped from the
   exported file. Words are used only where nothing else is stable: once, to build a base's map,
   checked by a human preview (§10.6); in the leftover check; and in the readers of client files,
@@ -958,7 +956,7 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
   product words.
 - Negative fixtures (unit): a base-client string planted in a header, a chart cache, an embedded
   workbook cell, a hyperlink target, alt text and `docProps` each fail the check.
-- The engine counts as reusable only once both S8 cases pass: CLIENT-P1 (the golden) and piee-case-b.
+- The engine counts as reusable only once both S8 cases pass: piee-case-a (the golden) and piee-case-b 2025.
 
 **Client identity**
 - The client name is replaced everywhere: body, captions, tables, **TOC hyperlink text**,
@@ -976,21 +974,21 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
 
 **Numbers and wording**
 - Period = the last 3 years.
-- **Production unit = the client's own unit** (CLIENT-P1: mii MWh of gas transported). Specific
+- **Production unit = the client's own unit** (piee-case-a: mii MWh of gas transported). Specific
   consumption = tep per that unit. Units in text, table captions and axis titles all follow it.
 - Factors are those of her workbook: electricity and gas 0.086 tep/MWh; motorină 1.015 tep/t;
   benzină 1.05 tep/t. CO₂: 0.226 / 0.1787 / 3.259 / 3.068.
 - **Cross-check: total tep must equal Anexa 2–3 „Date anuale".** A mismatch is a conflict, not a
   warning.
 - Number formats (Romanian, `1.234,56`):
-  - presentation follows her prototype table by table (its `Num.grouping`): her AUDIT-01 tables write numbers ≥ 1000
+  - presentation follows her prototype table by table (its `Num.grouping`): her audit-01 tables write numbers ≥ 1000
     without a thousands separator. `1.234,56` is the default only where the prototype does not say.
   - monthly tables and annual lines: 2 decimals
   - specific consumption and intensity: 4 decimals
   - CO₂ table: integers
 - Trend word from the least-squares slope: `creștere` if > 0, otherwise `scădere`. A flat series
   is phrased as „s-a menținut constantă".
-- Values are presented as filed, with no smoothing. Example: the piee-case-a gas jump.
+- Values are presented as filed, with no smoothing. Example: the piee-case-a 2025 gas jump.
 
 **Sections, missing data, numbering**
 - A carrier that **the client doesn't have** is removed: its series, and its words in the text
@@ -1032,7 +1030,7 @@ Settled 2026-09-19 on the CLIENT-P1 PIEE. W2 must reproduce it deterministically
   - where the labels are much wider than in her data (≥ 5–6 digits), the plot area is also
     auto-laid out, so titles don't overlap the labels
 - **Pies:** her pasted pie pictures become **native 3D pie charts** of the same size. the auditor
-  approved the CLIENT-P1 pies and wants them **exactly like that** (09-23), so this spec is fixed:
+  approved the piee-case-a pies and wants them **exactly like that** (09-23), so this spec is fixed:
   - common style:
     - colours `4F81BD` / `C0504D` / `9BBB59`
     - Times New Roman
@@ -1247,11 +1245,11 @@ reached, never just „passed":
 3. **Word-visual** — opened and checked in native Word (Word for Mac now, Windows from the port)
 4. **approved** — the auditor accepted this output
 
-- The CLIENT-P1 2026 PIEE golden is level 4: the auditor approved it, pies included (09-23). CLIENT-P2
+- The piee-case-a 2026 PIEE golden is level 4: the auditor approved it, pies included (09-23). piee-case-b
   2025 is level 2.
 - S7 is level 2 for presentation only (its datasets come from her audits' own ch. 4 tables).
   Extraction from original inputs is tested in S5, on the cases that have a Necesar info.
-- **The CLIENT-A2 final is not a reference** (09-23): it was produced with an agent, not written
+- **The audit-case-b final is not a reference** (09-23): it was produced with an agent, not written
   by the auditor. Its inputs (dossier, thermal images, the 36 meter photos) are real test inputs; its
   text and figures are never compared against, mined for phrases, or used as a style guide (R1).
 - S14/S15 are compared with her own audits (structure, patterns, level of detail) and reviewed by
@@ -1443,11 +1441,11 @@ assembled from those parts.
 
 | Source | Decision | Notes |
 |---|---|---|
-| Legacy `ema-invoice-extractor` (parsers, OCR, exporter/verifier, CLIENT-I7 parsers) | **Port** into `invoices` | the proven contract; add batch identity + the ALIVE OCR fix |
+| Legacy `ema-invoice-extractor` (parsers, OCR, exporter/verifier, reinvoicing parsers) | **Port** into `invoices` | the proven contract; add batch identity + the ALIVE OCR fix |
 | ARGUS `python/modules/invoice` | Drop | older than the legacy repo |
 | PIEE `trends.py`, domain models | **Port and adapt** | into `energy_data` / `consumption_analysis` |
 | PIEE readers, `docx_renderer`, `template_preserving`, image charts | **Rewrite** | label-based readers; template engine; native charts |
-| CLIENT-P1 one-off scripts (`$EMA_REFERENCE/…/CLIENT-I5-format-generator/`) | **Reference** for S8 | executable form of the §5.10 contract; not product code |
+| piee-case-a one-off scripts (`$EMA_REFERENCE/…/piee-01-format-generator/`) | **Reference** for S8 | executable form of the §5.10 contract; not product code |
 | auditor_prime `romanian_format.py`, `calculation_formulas.py`, `calculation_units.py`, `visual_quality.visual_font` | **Port** (review first) | formatting, formulas, the Romanian-glyph font fallback |
 | auditor_prime `definitions/ema_full_energy_audit_v1` | **Reference** | superseded by `audit_master.docx`; mine it for section requirements |
 | auditor_prime `enrichment_*`, `official_adapters.py` | **Review** | reuse the ANAF/registry adapters if sound |
@@ -1603,24 +1601,24 @@ code/ (repository root)
 | S1 | Repo skeleton: tooling, `scripts/check` = CI, import contracts, `core` workspace/jobs/logging/errors, backup/restore, CLI + API health, the resource path helper | CI green; `ema --help`; job-folder round-trip; backup → restore into a clean folder; an interrupted delete finished on restart | none |
 | S1b | Review core: fields + evidence, decisions (Jurnal) + undo, conflicts, readiness contract; the `ema job …` CLI | On a synthetic job: correction → re-run → undo → export; a decision on an old revision refused; an undo superseded by a later decision refused; the same outcomes through the CLI and the use cases the API will call | S1 |
 | S2 | `core.office`: label-finding xls/xlsx readers; docx block engine (from S0) | A sample section rendered in her style, checked against her audit | S0, S1 |
-| S2b | Legacy intake: type sniffing (incl. HTML-as-`.xls`) + `.doc` conversion with versions | All 12 CLIENT-A1 legacy files usable (5 `.xls` read, 7 `.doc` converted, text verified, converted by Word); a deliberately hung conversion is killed at its timeout and the batch continues | S1 |
-| S3 | `energy_data` model, carriers + aliases, factors, `calc` | Reproduces CLIENT-P1 / CLIENT-P2 / CLIENT-A3 *Prelucrare* tep, specific consumption, emissions | S1 |
+| S2b | Legacy intake: type sniffing (incl. HTML-as-`.xls`) + `.doc` conversion with versions | All 12 audit-case-a legacy files usable (5 `.xls` read, 7 `.doc` converted, text verified, converted by Word); a deliberately hung conversion is killed at its timeout and the batch continues | S1 |
+| S3 | `energy_data` model, carriers + aliases, factors, `calc` | Reproduces piee-case-a / piee-case-b / audit-case-c *Prelucrare* tep, specific consumption, emissions | S1 |
 | S4 | Anexa 2–3 reader | All 38 real annexes parse; exact values on 5 (both form generations, 3 fuel-header variants) | S2, S3 |
-| S5 | Necesar info reader (PIEE + audit versions) | CLIENT-P1, CLIENT-A3, CLIENT-A1 parse; monthly values match the sheets | S2, S3 |
-| S5b | *Prelucrare date* reader (authoritative) + writer (her layout, formulas) | Reads CLIENT-P1 / CLIENT-A3 / CLIENT-P2; the generated CLIENT-P1 2023–2025 matches the reconstructed one | S3, S5 |
-| S6 | Energy-manager report | Reproduces the delivered 2023 (37 companies) and 2025 CLIENT-R1/client-r2 reports | S4 |
-| S7 | `consumption_analysis` + phrase bank (from her own audits and PIEEs only) | **AUDIT-01** ch. 4 regenerated from the dataset taken from its own tables (then AUDIT-02 / AUDIT-05): same sections, tables, chart types, phrasing, numbers | S2, S3 |
-| S8 | PIEE per the format contract (§5.10): clone her latest PIEE, change client content only | The Word check passes on the generated CLIENT-P1 PIEE. CLIENT-P1 2026 regenerated equals the golden (text, tables, chart caches, embedded workbooks, pies); piee-case-b: numbers match her final. Both run through `core.review` via the CLI: one conflict resolved by a decision, one missing field rendered red, the final export refused until the conflict is resolved | S1b, S4, S5, S5b, S7 |
-| S9a | Invoices port (**pypdfium2 + pdfplumber** instead of PyMuPDF), the unchanged workbook contract, `core.pdf` | 29/29 text invoices unchanged vs the legacy output; the 2025 rows equal the delivered CLIENT-I5 and invoice-case-d workbooks | S1 |
-| S9b | Batch client identity (confirmed once, through `core.review`) + the CUI/POD memory + the OMV Petrom and ALIVE parsers (ALIVE through OCR, with the ALIVE OCR fix) | CLIENT-I2 24 + ALIVE 13 exportable after one confirmation | S1b, S9a |
+| S5 | Necesar info reader (PIEE + audit versions) | piee-case-a, audit-case-c, audit-case-a parse; monthly values match the sheets | S2, S3 |
+| S5b | *Prelucrare date* reader (authoritative) + writer (her layout, formulas) | Reads piee-case-a / audit-case-c / piee-case-b; the generated piee-case-a 2023–2025 matches the reconstructed one | S3, S5 |
+| S6 | Energy-manager report | Reproduces the delivered 2023 (37 companies) and 2025 report-2025 clients A and B reports | S4 |
+| S7 | `consumption_analysis` + phrase bank (from her own audits and PIEEs only) | **audit-01** ch. 4 regenerated from the dataset taken from its own tables (then audit-02 / audit-05): same sections, tables, chart types, phrasing, numbers | S2, S3 |
+| S8 | PIEE per the format contract (§5.10): clone her latest PIEE, change client content only | The Word check passes on the generated piee-case-a PIEE. piee-case-a 2026 regenerated equals the golden (text, tables, chart caches, embedded workbooks, pies); piee-case-b 2025: numbers match her final. Both run through `core.review` via the CLI: one conflict resolved by a decision, one missing field rendered red, the final export refused until the conflict is resolved | S1b, S4, S5, S5b, S7 |
+| S9a | Invoices port (**pypdfium2 + pdfplumber** instead of PyMuPDF), the unchanged workbook contract, `core.pdf` | 29/29 text invoices unchanged vs the legacy output; the 2025 rows equal the delivered invoice-case-e and invoice-case-d workbooks | S1 |
+| S9b | Batch client identity (confirmed once, through `core.review`) + the CUI/POD memory + the OMV Petrom and ALIVE parsers (ALIVE through OCR, with the ALIVE OCR fix) | invoice-case-b 24 + ALIVE 13 exportable after one confirmation | S1b, S9a |
 | S9a2 | The remaining invoice parser families: Next Energy (e-Factura), Getica, Electric Planners, Hidroelectrica, Enel/PPC | Each family's legacy cases unchanged vs the legacy output (the by-supplier library) | S9a |
-| S10 | Audit section catalogue + status transitions (§5.9) + an inventory of the base's repeatable units (processes, equipment tables, measured panels, carriers) | Every heading of every audit in the reference set (AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05; CLIENT-A3 2022 for content) maps to a catalogue section, checked by a script that fails on any unmapped heading; each section has its applicability condition and prototype source; each transition in the table, including `done` → `stale` on a changed input | S1b |
-| S10b | Audit base: AUDIT-01 cloned + anchor map + fixed chapters + cloning repeatable units | Ch. 1 and ch. 7 identical to her text for a new client; the base filled for CLIENT-A1 and for CLIENT-A2 (different process counts, carrier mixes and measured panels) keeps her formatting and leaves no untouched anchor | S2, S10 |
-| S11 | Audit intake + the agent loop (`run_agent`) + checklist classification by the agent + completeness | CLIENT-A1 dossier fully read; checklist report correct | S2b, S10 |
-| S12 | Fill (agent): reading the dossier, record-fact with verified evidence; ch. 2 identity + ch. 4 via S7 | CLIENT-A1 ch. 2 identity + ch. 4 from its Necesar info | S1b, S5, S7, S11 |
-| S13 | The agent's online research (§5.11): company, location, map, equipment | CLIENT-A1: CAEN, address, location text, map, 10 equipment entries with sources | S12 |
-| S14 | Draft (agent): ch. 2–3 in her patterns + style guide, rendered into the base | CLIENT-A1 and CLIENT-A2 ch. 2–3 drafted from their dossiers + research, compared with her own audits' ch. 2–3 (structure, patterns, detail); CLIENT-A1 reviewed by the auditor; traceability coverage reported; a planted unsupported qualitative sentence is flagged | S10b, S13 |
-| S15a | Ch. 5 from visit meter-display and thermal photos: recorded vision readings, individual human confirmation, measurement-sheet layout | CLIENT-A2's 36 meter and 26 thermal photos register without dossier intake; a recorded replay is compared with the human panel answer key when available. The chapter uses confirmed readings and marks missing interpretations. | S14 |
+| S10 | Audit section catalogue + status transitions (§5.9) + an inventory of the base's repeatable units (processes, equipment tables, measured panels, carriers) | Every heading of every audit in the reference set (audit-01, audit-02, audit-03, audit-04, audit-05; audit-06 2022 for content) maps to a catalogue section, checked by a script that fails on any unmapped heading; each section has its applicability condition and prototype source; each transition in the table, including `done` → `stale` on a changed input | S1b |
+| S10b | Audit base: audit-01 cloned + anchor map + fixed chapters + cloning repeatable units | Ch. 1 and ch. 7 identical to her text for a new client; the base filled for audit-case-a and for audit-case-b (different process counts, carrier mixes and measured panels) keeps her formatting and leaves no untouched anchor | S2, S10 |
+| S11 | Audit intake + the agent loop (`run_agent`) + checklist classification by the agent + completeness | audit-case-a dossier fully read; checklist report correct | S2b, S10 |
+| S12 | Fill (agent): reading the dossier, record-fact with verified evidence; ch. 2 identity + ch. 4 via S7 | audit-case-a ch. 2 identity + ch. 4 from its Necesar info | S1b, S5, S7, S11 |
+| S13 | The agent's online research (§5.11): company, location, map, equipment | audit-case-a: CAEN, address, location text, map, 10 equipment entries with sources | S12 |
+| S14 | Draft (agent): ch. 2–3 in her patterns + style guide, rendered into the base | audit-case-a and audit-case-b ch. 2–3 drafted from their dossiers + research, compared with her own audits' ch. 2–3 (structure, patterns, detail); audit-case-a reviewed by the auditor; traceability coverage reported; a planted unsupported qualitative sentence is flagged | S10b, S13 |
+| S15a | Ch. 5 from visit meter-display and thermal photos: recorded vision readings, individual human confirmation, measurement-sheet layout | audit-case-b's 36 meter and 26 thermal photos register without dossier intake; a recorded replay is compared with the human panel answer key when available. The chapter uses confirmed readings and marks missing interpretations. | S14 |
 | S15b | Ch. 6 measures from the „Măsuri propuse” form, with energy and CO₂ calculations and TRB when cost savings are supplied | The labelled form feeds traceable measures and chapter-six tables in the auditor's format; missing explanatory narrative blocks the final. | S14 |
 | S16a | API contract (OpenAPI) + mock server. **Frozen:** the job, slot, field, evidence, decision, Jurnal, section and readiness endpoints, backed by S1b/S10. **Provisional** (marked `x-provisional`): the workflow-specific ones (PIEE generation, invoices, reporting, audit stages, export packages), drawn from the screens | Every screen in §5.18 maps to endpoints; every frozen endpoint calls an existing use case; frontend runs on mocks; the two-process dev loop (Vite proxy + `ema serve`) passes the §5.15 session checks | S1b, S10 |
 | S16 | Full HTTP API + SSE progress; every provisional endpoint reconciled with its slice (S6, S8, S9, S12), with a versioned contract diff | OpenAPI covers every CLI use case, nothing left `x-provisional`; the S1b scenario and a real PIEE journey pass through the API | S6, S8, S9, S12 |
@@ -1641,7 +1639,7 @@ code/ (repository root)
 
 **Done on 2026-09-21:**
 1. ✅ The library moved to `~/Code/projects/ema/data/` (`$EMA_REFERENCE`); the scripts inside
-   it were repointed and still reproduce the CLIENT-P1 PIEE.
+   it were repointed and still reproduce the piee-case-a PIEE.
 2. ✅ The campaign is archived at `~/Code/projects/_archive/ema-campaign/`, with its final state
    committed. ARGUS and the three legacy repos kept their `.git`, so they stay readable for
    porting; their uncommitted work was committed locally and not pushed.
@@ -1679,10 +1677,10 @@ use; not urgent while the app is in development (Vlad, 09-23).
    through AppleScript (proven 09-23, §5.7).
 7. ~~Who draws the screens the handoff lacks~~: Claude, in the handoff's direction, checked
    visually (09-23, §5.18).
-8. ~~the auditor's verdict on the CLIENT-P1 PIEE~~: approved, pies included (09-23).
+8. ~~the auditor's verdict on the piee-case-a PIEE~~: approved, pies included (09-23).
 
 **From the auditor**, ranked by how much they unblock:
-1. ~~CLIENT-A2 inputs~~ **resolved (2026-09-19):**
+1. ~~audit-case-b inputs~~ **resolved (2026-09-19):**
    - The `.rar` from the 14 Aug email = exactly the 4 received files (hashes verified).
    - The final's ch. 4 contains the full monthly dataset 2023–2025 (20 tables: production,
      electricity, gas, fuels, water), so the dataset can be rebuilt from her own tables.
@@ -1691,17 +1689,17 @@ use; not urgent while the app is in development (Vlad, 09-23).
    - **Electrical measurements added (2026-09-19):** `electro.rar` holds 36 Siemens PAC3220 meter
      display photos across 4 panels (THD, voltages, currents…), which are the inputs of ch. 5.1.
      It also holds the auditor's model for „Fișa de măsurători electroenergetice", written from
-     analyser screen photos. Together with the 26 thermal images (ch. 5.2), CLIENT-A2 now covers
+     analyser screen photos. Together with the 26 thermal images (ch. 5.2), audit-case-b now covers
      every chapter.
-   - Nice to have only: CLIENT-A2's Necesar info / *Prelucrare date*.
-2. **Which finished audit is her current base.** Provisional: AUDIT-01 2026, her latest own audit
+   - Nice to have only: audit-case-b's Necesar info / *Prelucrare date*.
+2. **Which finished audit is her current base.** Provisional: audit-01 2026, her latest own audit
    in the library (§5.7); work does not wait for the answer. A blank template is no longer needed.
 3. Confirm that her *Prelucrare date* values are always taken as-is from the client's Necesar
    info, and which one wins if they differ (the proposed order is in §5.6; her answer changes only
    that order).
-4. Anexa 2–3 + Necesar info for **CLIENT-I5 2025** (so the CLIENT-I5 PIEE has a matching input set).
+4. Anexa 2–3 + Necesar info for **piee-01 2025** (so the PIEE base has a matching input set).
 5. Invoice examples for **Next Energy, Getica, Electric Planners, Hidroelectrica, Enel/PPC**, and
-   the CLIENT-I7 / CLIENT-I3 / invoice-case-d 2023–2024 PDFs if still available.
+   the invoice source / invoice-case-c / invoice-case-d 2023–2024 PDFs if still available.
 6. How she wants SEE re-invoicing documents represented later (ignore vs cost lines).
 
 ---
@@ -1761,7 +1759,7 @@ objects.
     - `.doc` conversion on machines without Office
 
 **Docker: not for the product now.**
-- the auditor needs a normal Windows app. Docker Desktop on Windows needs WSL2 and is heavy and
+- The auditor needs a normal Windows app. Docker Desktop on Windows needs WSL2 and is heavy and
   unfamiliar.
 - For development, `uv` already gives reproducible Python environments, and Orca isolates
   work in worktrees.
@@ -1791,18 +1789,18 @@ objects.
 `~/Code/projects/ema/data/` (`$EMA_REFERENCE`, moved out of the campaign on 2026-09-21):
 **250 catalogued files, ~203 MB**
 (2026-09-19; 206 files / 161 MB at the Step 1 build). Each file is listed in `catalog.csv` with its
-sha256 and original location. Also: `README.md`, `_requirements/auditor-requirements.md`,
+sha256 and original location. Also: `README.md`, the private requirements notes,
 `_analysis/01–03`.
 
 | Area | Contents |
 |---|---|
-| `audit/finished-audits/` | 6 human-written audits: AUDIT-02, AUDIT-01, AUDIT-04, AUDIT-03 (2026), CLIENT-A3 2022 (previous auditor), AUDIT-05 (`Cap 2-3-4 V2.docx`, ch. 1–4) |
-| `audit/cases/` | CLIENT-A1 2026 (27 received files); audit-case-b (4 received + the original `.rar`; `visit/thermography/` 26 thermal images; `visit/electrical/tablou-electric-1..4/` 36 PAC3220 display photos + `electro.rar`; the delivered final under `final/`, **produced with an agent: inputs only, never a reference**); audit-case-c (Necesar info + Prelucrare) |
-| `piee/` | 36 Anexa 2–3 (2025); CLIENT-I5 PIEE `MODEL_2026` (the auditor; the current PIEE base); CLIENT-P1 case (inputs; reconstructed workbook; `working/CLIENT-I5-format-generator/` scripts; `generated/`: the 18 Sep ARGUS version and **the 19 Sep CLIENT-I5-format golden**); CLIENT-P2 case (inputs, legacy output, final) |
-| `invoices/` | 79 real invoices + 6 supporting docs by client (invoice-case-d, CLIENT-I5, CLIENT-I6, CLIENT-I2, CLIENT-I1); accepted workbooks; `by-supplier/` symlinks |
-| `energy-manager-reporting/` | the auditor's model + delivered 2023, 2023–2025, 2025 CLIENT-R1/client-r2 reports |
+| `audit/finished-audits/` | 6 human-written audits: audit-02, audit-01, audit-04, audit-03 (2026), audit-06 2022 (previous auditor), audit-05 (`Cap 2-3-4 V2.docx`, ch. 1–4) |
+| `audit/cases/` | audit-case-a 2026 (27 received files); audit-case-b 2026 (4 received + the original `.rar`; `visit/thermography/` 26 thermal images; `visit/electrical/tablou-electric-1..4/` 36 PAC3220 display photos + `electro.rar`; the delivered final under `final/`, **produced with an agent: inputs only, never a reference**); audit-case-c 2025 (Necesar info + Prelucrare) |
+| `piee/` | 36 Anexa 2–3 (2025); piee-01 PIEE `MODEL_2026` (the auditor; the current PIEE base); piee-case-a case (inputs; reconstructed workbook; `working/piee-01-format-generator/` scripts; `generated/`: the 18 Sep ARGUS version and **the 19 Sep piee-01-format golden**); piee-case-b case (inputs, legacy output, final) |
+| `invoices/` | 79 real invoices + 6 supporting docs by client (invoice-case-d, invoice-case-e, invoice-case-f, invoice-case-b, invoice-case-a); accepted workbooks; `by-supplier/` symlinks |
+| `energy-manager-reporting/` | the auditor's model + delivered 2023, 2023–2025, 2025 report-2025 clients A and B reports |
 | `design/handoff-2026-09-21/` | the design handoff: README spec, design system (7a–7e), light screens (3b–3j), dark screens (6a–6c), the superseded exploration and the current-UI recreation (§5.18) |
 
 Roles: `received` · `working` · `generated` (never under `audit/`) · `final` · `visit`.
-Cleanup: 1.4 GB moved to `~/.Trash/ema-cleanup-2026-09-18/`; the CLIENT-P1 working copies to
+Cleanup: 1.4 GB moved to `~/.Trash/ema-cleanup-2026-09-18/`; the piee-case-a working copies to
 `~/.Trash/ema-cleanup-2026-09-19/` (both restorable until the Trash is emptied).

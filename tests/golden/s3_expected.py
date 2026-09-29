@@ -17,8 +17,8 @@ class ExpectedDifference(NamedTuple):
 EXPECTED_DIFFERENCES: dict[CellKey, ExpectedDifference] = {}
 
 for case, carrier, years in (
-    ("CLIENT-P1", "electricity_pv", (2022, 2023, 2024)),
-    ("CLIENT-P2", "sunflower_husks", (2023, 2024, 2025)),
+    ("piee-case-a", "electricity_pv", (2022, 2023, 2024)),
+    ("piee-case-b", "sunflower_husks", (2023, 2024, 2025)),
 ):
     for item_year in years:
         EXPECTED_DIFFERENCES[case, "impact de mediu", "total", item_year, None] = (
@@ -26,46 +26,52 @@ for case, carrier, years in (
         )
 
 for item_year in (2022, 2023, 2024):
-    EXPECTED_DIFFERENCES["CLIENT-P1", "TEP", "purchased_heat", item_year, None] = ExpectedDifference(
-        "missing", f"carrier.purchased_heat.{item_year}", "filed_zero"
+    EXPECTED_DIFFERENCES["piee-case-a", "TEP", "purchased_heat", item_year, None] = (
+        ExpectedDifference("missing", f"carrier.purchased_heat.{item_year}", "filed_zero")
     )
     for carrier in ("water_potable", "water_industrial"):
-        EXPECTED_DIFFERENCES["CLIENT-P1", "Consumuri specifice", carrier, item_year, None] = (
+        EXPECTED_DIFFERENCES["piee-case-a", "Consumuri specifice", carrier, item_year, None] = (
             ExpectedDifference("missing", f"energy.not_energy.{carrier}", "filed_zero")
         )
-    EXPECTED_DIFFERENCES["CLIENT-A3", "Consumuri specifice", "purchased_heat", item_year, None] = (
-        ExpectedDifference("missing", "energy.absent_carrier.purchased_heat", "filed_zero")
-    )
+    EXPECTED_DIFFERENCES[
+        "audit-case-c", "Consumuri specifice", "purchased_heat", item_year, None
+    ] = ExpectedDifference("missing", "energy.absent_carrier.purchased_heat", "filed_zero")
     for month in (*range(1, 13), None):
-        EXPECTED_DIFFERENCES["CLIENT-A3", "TEP", "ctl", item_year, month] = ExpectedDifference(
+        EXPECTED_DIFFERENCES["audit-case-c", "TEP", "ctl", item_year, month] = ExpectedDifference(
             "missing", f"carrier.ctl.{item_year}", "filed_zero"
         )
 
-EXPECTED_DIFFERENCES["CLIENT-P1", "impact de mediu", "diesel", 2022, None] = ExpectedDifference(
+EXPECTED_DIFFERENCES["piee-case-a", "impact de mediu", "diesel", 2022, None] = ExpectedDifference(
     "relation", "impact_diesel_input"
 )
-EXPECTED_DIFFERENCES["CLIENT-P1", "impact de mediu", "petrol", 2022, None] = ExpectedDifference(
+EXPECTED_DIFFERENCES["piee-case-a", "impact de mediu", "petrol", 2022, None] = ExpectedDifference(
     "missing", "factor.co2.petrol.", "filed_zero"
 )
-EXPECTED_DIFFERENCES["CLIENT-P1", "impact de mediu", "lpg", 2023, None] = ExpectedDifference(
+EXPECTED_DIFFERENCES["piee-case-a", "impact de mediu", "lpg", 2023, None] = ExpectedDifference(
     "missing", "carrier.lpg.2023", "filed_zero"
 )
 
 for item_year, months in ((2023, (*range(1, 12), None)), (2024, (*range(1, 10), 11, None))):
     for month in months:
         for carrier in ("lpg", "total"):
-            EXPECTED_DIFFERENCES["CLIENT-P2", "TEP", carrier, item_year, month] = ExpectedDifference(
-                "missing",
-                f"carrier.lpg.{item_year}.",
-                "filed_relation" if carrier == "total" or month is None else "filed_zero",
-                "tep_sum" if carrier == "total" else "lpg_monthly_sum" if month is None else None,
+            EXPECTED_DIFFERENCES["piee-case-b", "TEP", carrier, item_year, month] = (
+                ExpectedDifference(
+                    "missing",
+                    f"carrier.lpg.{item_year}.",
+                    "filed_relation" if carrier == "total" or month is None else "filed_zero",
+                    "tep_sum"
+                    if carrier == "total"
+                    else "lpg_monthly_sum"
+                    if month is None
+                    else None,
+                )
             )
     for sheet, label in (
         ("impact de mediu", "lpg"),
         ("Chelt-Cifra afaceri", "intensity"),
         ("Consumuri specifice", "total"),
     ):
-        EXPECTED_DIFFERENCES["CLIENT-P2", sheet, label, item_year, None] = ExpectedDifference(
+        EXPECTED_DIFFERENCES["piee-case-b", sheet, label, item_year, None] = ExpectedDifference(
             "missing",
             f"carrier.lpg.{item_year}.",
             "filed_relation",
@@ -77,22 +83,22 @@ for item_year, months in ((2023, (*range(1, 12), None)), (2024, (*range(1, 10), 
         )
 
 for month in (*range(1, 13), None):
-    EXPECTED_DIFFERENCES["CLIENT-P2", "TEP", "electricity_pv", 2025, month] = ExpectedDifference(
+    EXPECTED_DIFFERENCES["piee-case-b", "TEP", "electricity_pv", 2025, month] = ExpectedDifference(
         "missing", "carrier.electricity_pv.2025", "filed_relation", "pv_annual_sum"
     )
 for item_year in (2023, 2024, 2025):
-    EXPECTED_DIFFERENCES["CLIENT-P2", "Consumuri specifice", "petrol", item_year, None] = (
+    EXPECTED_DIFFERENCES["piee-case-b", "Consumuri specifice", "petrol", item_year, None] = (
         ExpectedDifference("relation", "diesel_specific")
     )
-EXPECTED_DIFFERENCES["CLIENT-P2", "Chelt-Cifra afaceri", "intensity", 2025, None] = ExpectedDifference(
-    "relation", "production_value_intensity"
+EXPECTED_DIFFERENCES["piee-case-b", "Chelt-Cifra afaceri", "intensity", 2025, None] = (
+    ExpectedDifference("relation", "production_value_intensity")
 )
-EXPECTED_DIFFERENCES["CLIENT-A3", "Chelt-Cifra afaceri", "intensity", 2024, None] = (
+EXPECTED_DIFFERENCES["audit-case-c", "Chelt-Cifra afaceri", "intensity", 2024, None] = (
     ExpectedDifference("relation", "scaled_intensity")
 )
-EXPECTED_DIFFERENCES["CLIENT-A3", "impact de mediu", "lpg", 2023, None] = ExpectedDifference(
+EXPECTED_DIFFERENCES["audit-case-c", "impact de mediu", "lpg", 2023, None] = ExpectedDifference(
     "missing", "carrier.lpg.2023", "filed_zero"
 )
-EXPECTED_DIFFERENCES["CLIENT-A3", "impact de mediu", "ctl", 2024, None] = ExpectedDifference(
+EXPECTED_DIFFERENCES["audit-case-c", "impact de mediu", "ctl", 2024, None] = ExpectedDifference(
     "missing", "carrier.ctl.2024", "filed_zero"
 )

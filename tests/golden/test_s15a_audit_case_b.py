@@ -1,10 +1,11 @@
-"""Visit registration against the local CLIENT-A2 folder inventory, without vision calls."""
+"""Visit registration against the local audit_case_b folder inventory, without vision calls."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path
 from tests.workspace_jobs import create_job
 
 from ema.audit.applicability import applies
@@ -18,10 +19,10 @@ from ema.core.workspace import Workspace
 pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
-def test_CLIENT-A2_visit_inventory_and_disabled_vision(
+def test_audit_case_b_visit_inventory_and_disabled_vision(
     reference_library: Path, tmp_path: Path
 ) -> None:
-    visit = reference_library / "audit/cases/audit-case-b/visit"
+    visit = reference_library / case_path("audit-case-b", "visit")
     panels = sorted((visit / "electrical").glob("tablou-electric-*"))
     thermal = sorted((visit / "thermography").glob("*.jpeg"))
     assert [len(list(panel.glob("*.jpeg"))) for panel in panels] == [4, 9, 8, 15]

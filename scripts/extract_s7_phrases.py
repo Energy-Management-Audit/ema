@@ -8,35 +8,26 @@ import re
 from pathlib import Path
 
 from docx import Document
+from tests.golden.cases import case_path, private_terms
 
 from ema.core.resources import resource_path
 
 SOURCES = {
-    "audit-01": "audit/finished-audits/*AUDIT-01*.docx",
-    "audit-02": "audit/finished-audits/*AUDIT-02*.docx",
-    "audit-03": "audit/finished-audits/*AUDIT-03*.docx",
-    "audit-04": "audit/finished-audits/*AUDIT-04*.docx",
-    "audit-05": "audit/finished-audits/Cap 2-3-4 V2.docx",
-    "piee-01": "piee/**/*MODEL_2026.docx",
-    "piee-02": "piee/**/*CLIENT-P2*FINAL V4.docx",
-    "piee-03": "piee/**/*CLIENT-P1 SA_2026.docx",
+    "audit-01": case_path("audit-01"),
+    "audit-02": case_path("audit-02"),
+    "audit-03": case_path("audit-03"),
+    "audit-04": case_path("audit-04"),
+    "audit-05": case_path("audit-05"),
+    "piee-01": case_path("piee-01"),
+    "piee-02": case_path("piee-02"),
+    "piee-03": case_path("piee-03"),
 }
 TREND_EVIDENCE = {
     "growth": (("audit-01", 838), ("audit-01", 843), ("audit-02", 694)),
     "decline": (("audit-01", 848), ("audit-01", 859), ("audit-02", 777)),
     "constant": (("piee-03", 135),),
 }
-CLIENT_WORDS = (
-    "AUDIT-01",
-    "AUDIT-02",
-    "AUDIT-03",
-    "AUDIT-04",
-    "AUDIT-04",
-    "AUDIT-05",
-    "CLIENT-I5",
-    "CLIENT-P2",
-    "CLIENT-P1",
-)
+CLIENT_WORDS = private_terms()
 ALLOWED_CAPITAL_WORDS = frozenset({"Conform", "În", "Curba", "Consumul", "Valoarea", "MWh", "SEN"})
 CAPITAL_WORD = re.compile(r"(?<!\w)[A-ZĂÂÎȘȚŞŢ][\w-]*")
 
@@ -76,11 +67,8 @@ def _category(text: str) -> str:
 
 def extract(root: Path) -> list[dict[str, str | int]]:
     patterns: list[dict[str, str | int]] = []
-    for source, glob in SOURCES.items():
-        matches = list(root.glob(glob))
-        if len(matches) != 1:
-            raise ValueError(f"{source}: expected one source document, got {len(matches)}")
-        for index, paragraph in enumerate(Document(matches[0]).paragraphs):
+    for source, path in SOURCES.items():
+        for index, paragraph in enumerate(Document(path).paragraphs):
             text = " ".join(paragraph.text.split())
             if not ((TREND.search(text) and FIGURE.match(text)) or VALUE_BULLET.match(text)):
                 continue

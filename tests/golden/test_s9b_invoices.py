@@ -129,7 +129,7 @@ def _alive_positions(raw: list[dict]) -> None:
 @pytest.mark.parametrize(
     ("case", "pin_set", "expected_count"),
     [
-        ("CLIENT-I2", "OMV PETROM S.A.", 24),
+        ("invoice-case-b", "OMV PETROM S.A.", 24),
         ("invoice-case-f", "ALIVE CAPITAL S.A.", 13),
     ],
 )
@@ -161,7 +161,7 @@ def test_s9b_batch_confirmation_and_parser_regression(
     decision = confirm_client(ws, job)
     assert readiness(ws, job).exportable == expected_count
     assert export(ws, job, destination).is_file()
-    if case == "CLIENT-I2":
+    if case == "invoice-case-b":
         supplier_files = {
             supplier: {
                 row["source_path"]
@@ -182,7 +182,7 @@ def test_s9b_batch_confirmation_and_parser_regression(
     with pytest.raises(EmaError) as undone:
         export(ws, job, destination)
     assert undone.value.code == "invoices_unconfirmed_client"
-    if case == "CLIENT-I2":
+    if case == "invoice-case-b":
         forgotten = tmp_path / "after-undo"
         _, forgotten_job, _ = _run_case(forgotten, case, baseline, ws)
         _, forgotten_proposal = batch_client(ws, forgotten_job)

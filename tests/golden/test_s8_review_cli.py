@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path
 from typer.testing import CliRunner
 
 from conftest import artifacts_path
@@ -25,10 +26,10 @@ pytestmark = [pytest.mark.golden, pytest.mark.word]
 def test_review_decision_and_final_gate(
     reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case_name: str
 ) -> None:
-    base = next((reference_library / "piee/finished-programs").glob("*MODEL_2026.docx"))
+    base = case_path("piee-01")
     monkeypatch.setenv("EMA_PIEE_BASE_DOCUMENT", str(base))
     monkeypatch.setenv("EMA_PIEE_BASE_DIRECTORY", str(artifacts_path("s8", "base")))
-    case = reference_library / "piee/cases" / case_name
+    case = case_path(case_name)
     anexa = next(case.rglob("Anexa*.xlsx"))
     necesar = next(case.rglob("Necesar*.xls"), None)
     prelucrare = next(case.rglob("*Prelucrare*.xls*"))
@@ -118,11 +119,11 @@ def test_review_decision_and_final_gate(
 def test_cli_generate_review_and_refuse_unresolved_final(
     reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    base = next((reference_library / "piee/finished-programs").glob("*MODEL_2026.docx"))
+    base = case_path("piee-01")
     monkeypatch.setenv("EMA_WORKSPACE", str(tmp_path / "workspace"))
     monkeypatch.setenv("EMA_PIEE_BASE_DOCUMENT", str(base))
     monkeypatch.setenv("EMA_PIEE_BASE_DIRECTORY", str(artifacts_path("s8", "base")))
-    case = reference_library / "piee/cases/piee-case-b"
+    case = reference_library / case_path("piee-case-b")
     anexa = next(case.rglob("Anexa*.xlsx"))
     prelucrare = next(case.rglob("*Prelucrare*.xls*"))
     create_client(Workspace(tmp_path / "workspace"), "Synthetic", "12345678")

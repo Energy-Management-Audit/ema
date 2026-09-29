@@ -28,6 +28,7 @@ interfaces (api, cli, mcp) -> workflows (invoices, piee, audit, reporting)
 
 `scripts/check` is the non-mutating gate run by CI and the pre-push hook: ruff format and check,
 the 400-line file limit, pyright strict on `src/`, import contracts, and non-golden unit tests.
+Client, person and place names never appear in code, commits, branch names, PR text or issues; use case codes only.
 Commit hooks may fix formatting. Install both with
 `uv run pre-commit install --install-hooks -t pre-commit -t pre-push`.
 

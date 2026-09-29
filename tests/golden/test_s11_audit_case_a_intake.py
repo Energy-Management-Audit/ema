@@ -1,4 +1,4 @@
-"""CLIENT-A1 dossier completeness against its own checklist (evidence level 1)."""
+"""audit_case_a dossier completeness against its own checklist (evidence level 1)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path
 from tests.workspace_jobs import create_job
 
 from ema.audit.intake import audit_intake
@@ -16,14 +17,14 @@ from ema.core.workspace import Workspace
 pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
-def test_CLIENT-A1_intake_is_complete_and_uses_no_ai(tmp_path: Path) -> None:
-    root = Path(os.environ["EMA_REFERENCE"]) / "audit/cases/audit-case-a/received"
+def test_audit_case_a_intake_is_complete_and_uses_no_ai(tmp_path: Path) -> None:
+    root = Path(os.environ["EMA_REFERENCE"]) / case_path("audit-case-a", "received")
     sources = sorted(path for path in root.iterdir() if path.is_file())
     assert len(sources) == 27
     ws = Workspace(tmp_path / "workspace")
-    job = create_job(ws, "audit", "CLIENT-A1-golden", 2026)
+    job = create_job(ws, "audit", "audit_case_a-golden", 2026)
     for source in sources:
-        ws.set_slot(job, f"dossier/{source.name}", ws.add_file("CLIENT-A1-golden", source))
+        ws.set_slot(job, f"dossier/{source.name}", ws.add_file("audit_case_a-golden", source))
     run = run_stage(ws, job, "audit_intake", audit_intake)
     for _ in subscribe(ws, job):
         pass

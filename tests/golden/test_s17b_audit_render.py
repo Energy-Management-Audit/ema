@@ -1,4 +1,4 @@
-"""S17b acceptance: the CLIENT-A1 dossier rendered into the auditor's base through Word (level 2/3).
+"""S17b: the case A dossier rendered through Word in the auditor's base (level 2/3).
 
 The draft and its marker inventory; the final, approved and exported, is test_s17b_audit_final.
 """
@@ -18,6 +18,7 @@ from docx import Document
 from docx.oxml.ns import qn
 from tests.audit_replay import CH2_DRAFT, draft_recording, support_recording
 from tests.conftest import artifacts_path
+from tests.golden.cases import case_path
 from tests.golden.s17b_audit_ui_fixture import prepare_all_but
 from tests.golden.test_s10b_audit_base import _references
 from tests.golden.test_s15b_chapter_six_base import _synthetic_form
@@ -80,12 +81,12 @@ def _supply(ws: Workspace, job: str, key: str, value: object) -> None:
 def seed_job(
     root: Path, workspace: Path, tmp_path: Path, form: Path | None = None
 ) -> tuple[Workspace, str]:
-    """The CLIENT-A1 dossier read, two replayed drafts and a synthetic measures form (no render)."""
-    received = root / "audit/cases/audit-case-a/received"
+    """Read the case A dossier, two replayed drafts and a synthetic measures form."""
+    received = root / case_path("audit-case-a", "received")
     ws = Workspace(workspace)
-    job = create_job(ws, "audit", "CLIENT-A1-golden", 2026)
+    job = create_job(ws, "audit", "audit_case_a-golden", 2026)
     for source in sorted(path for path in received.iterdir() if path.is_file()):
-        ws.set_slot(job, f"dossier/{source.name}", ws.add_file("CLIENT-A1-golden", source))
+        ws.set_slot(job, f"dossier/{source.name}", ws.add_file("audit_case_a-golden", source))
     for stage, fn in (("intake", audit_intake), ("read", read_job)):
         record = _wait(ws, job, run_stage(ws, job, stage, fn))
         assert record["state"] == "ready", (stage, record["error"])
@@ -103,7 +104,7 @@ def seed_job(
             ),
         )
     form = form or _synthetic_form(tmp_path / "m.xlsx")
-    ws.set_slot(job, "measures", ws.add_file("CLIENT-A1-golden", form))
+    ws.set_slot(job, "measures", ws.add_file("audit_case_a-golden", form))
     run_measures(ws, job)
     return ws, job
 
@@ -221,7 +222,7 @@ def _heading_checks(docx: Path, base: Path, summary: RenderSummary) -> None:
     def headings(path: Path) -> list[str]:
         return [
             item.section_id
-            for item in map_headings(path, "AUDIT-01").mapped
+            for item in map_headings(path, "audit-01").mapped
             if item.section_id != "ch6.measure"
         ]
 
@@ -301,11 +302,11 @@ def _delivered() -> list[Path]:
 
 @pytest.mark.parametrize("audit", _delivered(), ids=lambda path: path.name)
 def test_no_ai_wording_in_delivered_audits(audit: Path) -> None:
-    """The final gate's AI rule on every audit the auditor delivered: no false alarm (fix round 1)."""
+    """The final gate's AI rule raises no false alarms on delivered audits."""
     assert ai_wording_hits(audit, []) == []
 
 
-def test_CLIENT-A1_audit_render_through_word(
+def test_audit_case_a_audit_render_through_word(
     reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     identity = _settings(reference_library, tmp_path, monkeypatch)
@@ -370,7 +371,9 @@ if __name__ == "__main__":
         ws = Workspace(workspace)
         _supply(ws, sys.argv[4], "audit.address", "Str. Exemplu nr. 1, Localitatea Exemplu")
         ws.set_slot(
-            sys.argv[4], COVER_SLOT, ws.add_file("CLIENT-A1-golden", _cover_photo(scratch / "cover.png"))
+            sys.argv[4],
+            COVER_SLOT,
+            ws.add_file("audit_case_a-golden", _cover_photo(scratch / "cover.png")),
         )
         review_inputs(ws, sys.argv[4])
         print(json.dumps({"reviewed": True}))

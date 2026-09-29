@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from docx.oxml.ns import qn
+from tests.golden.cases import case_path
 
 from conftest import artifacts_path
 from ema.core.office.package import read_parts, xml
@@ -21,7 +22,7 @@ def test_draft_is_standalone_and_marks_remaining_fields(tmp_path: Path, case_nam
     reference = os.environ.get("EMA_REFERENCE")
     if reference is None:
         pytest.fail("EMA_REFERENCE is required for the S8 golden")
-    case = Path(reference) / "piee/cases" / case_name
+    case = case_path(case_name)
     anexa = next(case.rglob("Anexa*.xlsx"))
     necesar = next(case.rglob("Necesar*.xls"), None)
     prelucrare = next(case.rglob("*Prelucrare*.xls*"))

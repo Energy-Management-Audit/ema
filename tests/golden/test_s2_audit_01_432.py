@@ -1,4 +1,4 @@
-"""Round-trip the auditor's AUDIT-01 section 4.3.2 without storing client data."""
+"""Round-trip the auditor's audit_01 section 4.3.2 without storing client data."""
 
 import copy
 import os
@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from lxml import etree
+from tests.golden.cases import case_path
 
 from conftest import artifacts_path
 from ema.core.office.blocks import (
@@ -139,15 +140,11 @@ def _shape(node: etree._Element) -> tuple[str, str, list[bytes], bytes, list[byt
     )
 
 
-def test_AUDIT-01_432_round_trip() -> None:  # noqa: C901, PLR0912, PLR0915
+def test_audit_01_432_round_trip() -> None:  # noqa: C901, PLR0912, PLR0915
     reference = os.environ.get("EMA_REFERENCE")
     if not reference:
         pytest.skip("EMA_REFERENCE unavailable; golden not verified")
-    source = (
-        Path(reference)
-        / "audit/finished-audits"
-        / ("AUDIT ENERGETIC AUDIT-01 ORAS - 2026.docx")
-    )
+    source = case_path("audit-01")
     assert source.is_file()
     parts = read_parts(source)
     body = _body(parts)

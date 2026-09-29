@@ -56,7 +56,7 @@ def _monthly_axis(axis: etree._Element) -> None:
 
 
 def column_axes(root: etree._Element, series: list[Series]) -> None:
-    # AUDIT-01's monthly category labels are Times New Roman 10 pt, rotated 45 degrees.
+    # audit-01's monthly category labels are Times New Roman 10 pt, rotated 45 degrees.
     if series and all(len(item.categories) == 12 for item in series):
         for axis in root.findall(f".//{{{C}}}catAx"):
             _monthly_axis(axis)

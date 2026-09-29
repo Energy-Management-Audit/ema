@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from tests.golden.cases import case_path
 
 from ema.energy_data.calc import annual, co2, indicators, specific_consumption, tep, tep_total
 from ema.energy_data.carriers import Carrier, carrier_for
@@ -21,33 +22,30 @@ from .s3_workbooks import load_case, specific_cells
 
 CASES = (
     (
-        "CLIENT-P1",
-        "piee/cases/piee-case-a/received/CLIENT-P1 - Prelucrare date program "
-        "eficienta energetica 2022-2024.xls",
+        "piee-case-a",
+        case_path("piee-case-a", "prelucrare"),
         (2022, 2023, 2024),
     ),
     (
-        "CLIENT-P2",
-        "piee/cases/piee-case-b/received/CLIENT-P2 - Prelucrare date program "
-        "eficienta energetica 2025 (1).xlsx",
+        "piee-case-b",
+        case_path("piee-case-b", "prelucrare"),
         (2023, 2024, 2025),
     ),
     (
-        "CLIENT-A3",
-        "audit/cases/audit-case-c/received/CLIENT-A3 - Prelucrare date program "
-        "eficienta energetica 2025.xls",
+        "audit-case-c",
+        case_path("audit-case-c", "prelucrare"),
         (2022, 2023, 2024),
     ),
 )
 
 IGNORED_TEP_ROWS = {
-    ("CLIENT-P2", "energie termica surse recupetrabile tep"): (
+    ("piee-case-b", "energie termica surse recupetrabile tep"): (
         "Filed recovered heat has no physical source in the S3 dataset or matching carrier."
     )
 }
 
 NOT_COMPARED = {
-    ("CLIENT-P2", "TEP", "electricity_pv", 2024, None): (
+    ("piee-case-b", "TEP", "electricity_pv", 2024, None): (
         "Typed recovered-electricity annual value has no source sheet; filed totals exclude it."
     )
 }
@@ -290,7 +288,7 @@ def test_prelucrare(case: str, relative: str, years: tuple[int, ...]) -> None:  
         )
         matched += a
         differences += b
-        if case == "CLIENT-P2" and carrier is None and result.value is None:
+        if case == "piee-case-b" and carrier is None and result.value is None:
             months = (month,) if month is not None else range(1, 13)
             available = (
                 tep(ds, factors, item, item_year, current_month).value
@@ -314,7 +312,7 @@ def test_prelucrare(case: str, relative: str, years: tuple[int, ...]) -> None:  
         differences += b
         if carrier is None and result.value is None:
             accounted = _accounted_co2_subtotal(ds, factors, item_year, co2_filed)
-            if accounted is not None and not (case == "CLIENT-P1" and item_year == 2022):
+            if accounted is not None and not (case == "piee-case-a" and item_year == 2022):
                 assert math.isclose(accounted, filed, rel_tol=1e-9, abs_tol=1e-9)
     for item_year, filed in intensity_filed.items():
         a, b = _expected_or_match(
@@ -330,7 +328,7 @@ def test_prelucrare(case: str, relative: str, years: tuple[int, ...]) -> None:  
         result = specific_consumption(ds, factors, item_year, carrier, "main")
         label = carrier.value if carrier is not None else "total"
         value = result.value
-        if case == "CLIENT-P1" and carrier == Carrier.electricity_grid:
+        if case == "piee-case-a" and carrier == Carrier.electricity_grid:
             pv = specific_consumption(ds, factors, item_year, Carrier.electricity_pv, "main")
             value = value + pv.value if value is not None and pv.value is not None else None
         a, b = _expected_or_match(
@@ -344,7 +342,7 @@ def test_prelucrare(case: str, relative: str, years: tuple[int, ...]) -> None:  
         differences += b
     unused = {key for key in EXPECTED_DIFFERENCES if key[0] == case and key not in seen}
     assert not unused, f"unexercised expected differences: {unused}"
-    if case == "CLIENT-P2":
+    if case == "piee-case-b":
         assert not_compared == 1
         assert all(tep_total_excluding_pv(book, item_year, None) for item_year in (2024, 2025))
     assert not unreviewed, "\n".join(unreviewed[:80]) + f"\n{len(unreviewed)} unreviewed"

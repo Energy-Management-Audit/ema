@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 from collections import Counter
 from datetime import date, datetime
@@ -12,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from openpyxl import load_workbook
+from tests.golden.cases import case_path, case_value
 from tests.workspace_jobs import create_job
 
 from conftest import artifacts_path
@@ -25,8 +25,8 @@ from ema.invoices import (
 )
 
 _BASELINE = artifacts_path("s9a-baseline")
-_TEXT_CASES = ("invoice-case-d", "CLIENT-I5", "invoice-case-a")
-_OUTCOME_CASES = ("CLIENT-I2", "invoice-case-f")
+_TEXT_CASES = ("invoice-case-d", "invoice-case-e", "invoice-case-a")
+_OUTCOME_CASES = ("invoice-case-b", "invoice-case-f")
 _SNIPPET_EXCEPTION = (
     "invoice-case-a",
     "Factura energie consum februarie 2025.pdf",
@@ -49,16 +49,8 @@ _SOURCE_FIELDS = (
 )
 
 
-def _reference() -> Path:
-    location = os.environ.get("EMA_REFERENCE")
-    assert location, "EMA_REFERENCE is required for this golden test"
-    root = Path(location).expanduser()
-    assert root.is_dir(), "EMA_REFERENCE does not exist"
-    return root / "invoices/cases"
-
-
 def _baseline(case: str) -> tuple[list[dict[str, object]], Path]:
-    directory = _BASELINE / case
+    directory = _BASELINE / case_value(case, "baseline")
     outcome_file = directory / "outcomes.json"
     assert outcome_file.is_file(), f"missing immutable S9a baseline: {case}/outcomes.json"
     outcomes = json.loads(outcome_file.read_text(encoding="utf-8"))
@@ -69,7 +61,7 @@ def _baseline(case: str) -> tuple[list[dict[str, object]], Path]:
 
 
 def _source_paths(case: str, expected: list[dict[str, object]]) -> list[Path]:
-    directory = _reference() / case / "received"
+    directory = case_path(case, "received")
     found = {path.name: path for path in directory.rglob("*") if path.suffix.lower() == ".pdf"}
     names = {str(row["source_path"]) for row in expected}
     missing = names - found.keys()
@@ -224,7 +216,7 @@ def _row_key(row: tuple[object, ...]) -> tuple[str, ...]:
 
 
 def _compare_delivered(case: str, generated_path: Path) -> None:
-    delivered_path = next((_reference() / case / "final").glob("*.xlsx"))
+    delivered_path = next(case_path(case, "final").glob("*.xlsx"))
     generated = load_workbook(generated_path, data_only=False)["Centralizator"]
     delivered = load_workbook(delivered_path, data_only=False)["Centralizator"]
     reference_rows = {
@@ -274,7 +266,7 @@ def test_text_pdf_regression_and_delivered_rows(tmp_path: Path, case: str) -> No
     confirm_client(ws, job)
     generated = export(ws, job, destination)
     _compare_workbooks(case, generated, baseline_workbook)
-    if case in ("invoice-case-d", "CLIENT-I5"):
+    if case in ("invoice-case-d", "invoice-case-e"):
         _compare_delivered(case, generated)
 
 

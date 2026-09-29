@@ -234,13 +234,17 @@ def _old_only(heading: Heading) -> str | None:
 
 
 def map_headings(docx: Path, audit_id: str) -> HeadingMap:
+    found, captions = _scan(docx)
+    return _map_found(found, captions, audit_id)
+
+
+def _map_found(found: list[Heading], captions: list[Heading], audit_id: str) -> HeadingMap:
     mapped: list[MappedHeading] = []
     ignored: list[tuple[Heading, str]] = []
     old: list[tuple[Heading, str]] = []
     unmapped: list[Heading] = []
     chapter: int | None = None
     stack: list[tuple[int, str]] = []
-    found, captions = _scan(docx)
     for heading in found:
         while stack and stack[-1][0] >= heading.level:
             stack.pop()
@@ -257,8 +261,50 @@ def map_headings(docx: Path, audit_id: str) -> HeadingMap:
             stack.append((heading.level, matches[0].section_id))
         elif len(matches) > 1:
             unmapped.append(heading)
-        elif audit_id == "CLIENT-A3" and (reason := _old_only(heading)) is not None:
+        elif audit_id == "audit-06" and (reason := _old_only(heading)) is not None:
             old.append((heading, reason))
         else:
             unmapped.append(heading)
     return HeadingMap(tuple(mapped), tuple(ignored), tuple(old), tuple(unmapped), tuple(captions))
+
+
+_PROFILE_SHAPES: dict[str, tuple[int, int, int, int, int, int]] = {
+    # Mapped headings, process sections, measurement sections, measures, ch. 6, older headings.
+    "audit-01": (53, 2, 0, 5, 10, 0),
+    "audit-02": (48, 0, 0, 4, 9, 0),
+    "audit-03": (63, 6, 8, 3, 8, 0),
+    "audit-04": (48, 0, 8, 5, 10, 0),
+    "audit-05": (41, 0, 0, 0, 0, 0),
+    "audit-06": (40, 5, 0, 7, 12, 6),
+}
+
+
+def select_profile(mapping: HeadingMap, source: Path) -> str:
+    """Choose the unique closest reviewed outline using structural section counts."""
+    sections = [item.section_id for item in mapping.mapped]
+    shape = (
+        len(sections),
+        sections.count("ch3.process"),
+        sum(section.startswith("ch5") for section in sections),
+        sections.count("ch6.measure"),
+        sum(section.startswith("ch6") for section in sections),
+        len(mapping.old_template_only),
+    )
+    weights = (1, 3, 4, 2, 3, 5)
+    scores = {
+        profile: -sum(
+            weight * abs(actual - expected)
+            for actual, expected, weight in zip(shape, prototype, weights, strict=True)
+        )
+        for profile, prototype in _PROFILE_SHAPES.items()
+    }
+    best = max(scores.values())
+    winners = [profile for profile, score in scores.items() if score == best]
+    if not sections or best < -15 or len(winners) != 1:
+        raise ValueError(f"Cannot select audit profile for {source}: scores={scores}")
+    return winners[0]
+
+
+def profile_for_document(docx: Path) -> str:
+    """Classify a configured audit source without relying on its filename."""
+    return select_profile(map_headings(docx, "audit-06"), docx)

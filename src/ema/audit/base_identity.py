@@ -20,7 +20,7 @@ _IDENTIFIERS = (
 
 def _general_text(base: Path) -> str:
     paragraphs = Document(str(base)).paragraphs
-    mapping = map_headings(base, "AUDIT-01")
+    mapping = map_headings(base, "audit-01")
     heading = next(
         item.heading for item in mapping.mapped if item.section_id == "ch2.date_generale"
     )

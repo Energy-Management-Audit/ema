@@ -4,13 +4,13 @@ import io
 import math
 import os
 import shutil
-from pathlib import Path
 from zipfile import ZipFile
 
 import pypdfium2
 import pytest
 from lxml import etree
 from openpyxl import load_workbook
+from tests.golden.cases import case_path
 
 from conftest import artifacts_path
 from ema.core.config import Settings
@@ -35,13 +35,8 @@ def references():
     base = os.environ.get("EMA_REFERENCE")
     if not base:
         pytest.skip("EMA_REFERENCE unavailable; golden not verified")
-    root = Path(base)
-    piee = (
-        root
-        / "piee/cases/piee-case-a/generated"
-        / ("Program de îmbunătățire a eficienței energetice CLIENT-P1 SA_2026.docx")
-    )
-    audit = root / "audit/finished-audits" / ("AUDIT ENERGETIC AUDIT-01 ORAS - 2026.docx")
+    piee = case_path("piee-case-a", "approved")
+    audit = case_path("audit-01")
     assert piee.is_file() and audit.is_file()
     OUTPUT.mkdir(parents=True, exist_ok=True)
     return piee, audit

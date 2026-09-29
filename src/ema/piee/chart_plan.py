@@ -1,4 +1,4 @@
-"""S7 analysis values bound to the reviewed CLIENT-I5 chart bookmarks."""
+"""S7 analysis values bound to the reviewed approved PIEE chart bookmarks."""
 
 from __future__ import annotations
 

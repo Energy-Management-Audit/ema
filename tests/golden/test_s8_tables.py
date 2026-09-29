@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from docx.oxml.ns import qn
+from tests.golden.cases import case_path
 
 from conftest import artifacts_path
 from ema.core.office.anchors import AnchorLedger
@@ -37,11 +38,11 @@ def _tables(path: Path) -> list[tuple[int, list[list[str]]]]:
 
 
 @pytest.mark.golden
-def test_CLIENT-P1_monthly_and_equivalent_tables_match_approved(tmp_path: Path) -> None:
+def test_piee_case_a_monthly_and_equivalent_tables_match_approved(tmp_path: Path) -> None:
     reference = os.environ.get("EMA_REFERENCE")
     if reference is None:
         pytest.fail("EMA_REFERENCE is required for the S8 golden")
-    case = Path(reference) / "piee/cases/piee-case-a"
+    case = Path(reference) / case_path("piee-case-a")
     data = load(
         2025,
         next(case.rglob("Anexa*.xlsx")),

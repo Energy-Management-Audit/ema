@@ -1,4 +1,4 @@
-"""CLIENT-P1's received files through `ema mcp`: an agent generates and reviews a PIEE draft.
+"""piee_case_a's received files through `ema mcp`: an agent generates and reviews a PIEE draft.
 
 Evidence level 1 (regression): the MCP draft equals the draft the shared use case produces from
 the same inputs in the same workspace.
@@ -16,6 +16,7 @@ import pytest
 from docx import Document
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from tests.golden.cases import case_path
 from tests.mcp_client import structured
 
 from conftest import artifacts_path
@@ -35,14 +36,14 @@ def _texts(path: Path) -> tuple[list[str], list[str]]:
     return paragraphs, cells
 
 
-def test_agent_generates_and_reviews_CLIENT-P1_over_stdio(
+def test_agent_generates_and_reviews_piee_case_a_over_stdio(
     reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     base = next((reference_library / "piee/finished-programs").glob("*MODEL_2026.docx"))
     monkeypatch.setenv("EMA_PIEE_BASE_DOCUMENT", str(base))
     monkeypatch.setenv("EMA_PIEE_BASE_DIRECTORY", str(artifacts_path("s8", "base")))
     monkeypatch.setenv("EMA_WORKSPACE", str(tmp_path / "workspace"))
-    received = reference_library / "piee/cases/piee-case-a/received"
+    received = reference_library / case_path("piee-case-a", "received")
     anexa = next(received.glob("Anexa*.xlsx"))
     necesar = next(received.glob("Necesar*.xls"))
     prelucrare = next(received.glob("*Prelucrare*.xls*"))

@@ -1,4 +1,4 @@
-"""Run the CLIENT-P1 PIEE journey and compare Mac/Windows document contents."""
+"""Run the piee-case-a PIEE journey and compare Mac/Windows document contents."""
 
 from __future__ import annotations
 
@@ -216,7 +216,7 @@ def run(ema: str, inputs: Path, out: Path) -> None:
                 "piee",
                 "generate",
                 "--client",
-                "CLIENT-P1",
+                "piee-case-a",
                 "--year",
                 "2025",
                 "--anexa",

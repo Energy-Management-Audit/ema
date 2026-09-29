@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from tests.golden.anexa_location import _field_location, _measure_location, _monthly_location
+from tests.golden.cases import case_path
 
 from ema.core.office.sheets import open_book
 from ema.energy_data.anexa import parse_anexa
@@ -60,33 +61,33 @@ _COMMON_MONTHLY = {
 }
 # Reviewed field inventory and row counts from the independent dump. No client values.
 _CASES = {
-    "CLIENT-P1": (
+    "anexa-case-a": (
         _COMMON_IDENTITY | {"contact_person", "ownership_state", "ownership_private"},
         _COMMON_ANNUAL | {"purchased_heat_gcal", "clu_raw", "clu_tep"},
         _COMMON_MONTHLY | {"purchased_heat", "clu", "water_industrial"},
         (16, 25),
     ),
-    "CLIENT-X3": (
+    "anexa-case-b": (
         _COMMON_IDENTITY
         | {"contact_person", "consumer_contact_person", "ownership_state", "website_target"},
         _COMMON_ANNUAL | {"purchased_heat_gcal", "clu_raw", "clu_tep"},
         _COMMON_MONTHLY | {"clu", "water_industrial"},
         (7, 7),
     ),
-    "CLIENT-P2": (
+    "anexa-case-c": (
         _COMMON_IDENTITY | {"contact_person"},
         _COMMON_ANNUAL
         | {"purchased_heat_gcal", "lpg_raw", "lpg_tep", "biomass_raw", "biomass_tep"},
         _COMMON_MONTHLY | {"purchased_heat", "lpg", "biomass"},
         (18, 11),
     ),
-    "CLIENT-X1": (
+    "anexa-case-d": (
         _COMMON_IDENTITY,
         (_COMMON_ANNUAL - {"purchased_heat_gcal"}) | {"clu_raw", "clu_tep"},
         _COMMON_MONTHLY | {"purchased_heat", "clu", "water_potable"},
         (23, 15),
     ),
-    "CLIENT-X2": (
+    "anexa-case-e": (
         _COMMON_IDENTITY | {"contact_person", "ownership_private"},
         _COMMON_ANNUAL | {"purchased_heat_gcal", "clu_raw", "clu_tep", "lpg_raw", "lpg_tep"},
         _COMMON_MONTHLY | {"purchased_heat", "clu", "lpg", "water_industrial"},
@@ -96,7 +97,7 @@ _CASES = {
 
 
 def _case(reference_library: Path, fragment: str) -> Path:
-    return next((reference_library / "piee" / "anexa-2-3-2025").glob(f"*{fragment}*.xls*"))
+    return case_path(fragment)
 
 
 def _dump(reference_library: Path, path: Path) -> dict[str, list[list[str]]]:
@@ -145,8 +146,8 @@ def _ownership_flags(
 ) -> None:
     # F2 rejects the filed flags/neighboring label rather than inventing percentages.
     rejected = {
-        "CLIENT-X1": {"ownership_state", "ownership_private"},
-        "CLIENT-X2": {"ownership_state"},
+        "anexa-case-d": {"ownership_state", "ownership_private"},
+        "anexa-case-e": {"ownership_state"},
     }.get(fragment, set())
     flags = [issue for issue in issues if issue.code == "ownership_flag"]
     assert {issue.detail for issue in flags} == rejected
@@ -257,7 +258,7 @@ def test_complete_fields_match_source_dump(reference_library: Path, fragment: st
     path = _case(reference_library, fragment)
     sheets = _dump(reference_library, path)
     parsed = parse_anexa(path)
-    if fragment == "CLIENT-X2":
+    if fragment == "anexa-case-e":
         assert "CHESTIONAR DE ANALIZĂ" in sheets["Info companie"][0][0]
     identity, annual, monthly, counts = _CASES[fragment]
     assert set(parsed.identity) == identity
