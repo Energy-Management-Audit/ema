@@ -13,6 +13,7 @@ from typing import cast
 from lxml import etree
 
 from ema.core.office.chart_ids import refresh_unique_ids
+from ema.core.office.chart_layout import automatic_layout, column_axes
 from ema.core.office.chart_location import cloned_caption, source_paragraph
 from ema.core.office.chart_series import Series, SeriesRefs, _ref, read_series
 from ema.core.office.errors import OfficeError
@@ -375,6 +376,8 @@ def _column_root(
                 marker.set("val", str(index))
         bar.insert(insert_at + index, node)
     _set_series(root, series, None)
+    automatic_layout(root, series)
+    column_axes(root, series)
     axes = plot.findall(f"{{{C}}}valAx")
     if axes:
         titles = _elements(

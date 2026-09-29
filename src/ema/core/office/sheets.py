@@ -16,6 +16,7 @@ from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from ema.core.office.errors import OfficeError
+from ema.core.office.sheet_formulas import XlsFormulas, formula_inputs_blank
 from ema.core.office.sniff import FileKind, sniff
 
 type Scalar = str | float | int | datetime | None
@@ -71,6 +72,8 @@ class Sheet(Protocol):
 
     def value(self, row: int, col: int) -> CellValue: ...
 
+    def formula_inputs_blank(self, row: int, col: int) -> bool: ...
+
     def find_label(self, labels: Sequence[str], *, within: CellRange | None = None) -> CellRef: ...
 
     def read_right(self, anchor: CellRef, offset: int = 1) -> CellValue: ...
@@ -106,6 +109,9 @@ class _Sheet:
             self._hyperlink(row, col),
             self._number_format(row, col),
         )
+
+    def formula_inputs_blank(self, row: int, col: int) -> bool:
+        return False
 
     def _number_format(self, row: int, col: int) -> str | None:
         return None
@@ -205,13 +211,38 @@ class _XlsxSheet(_Sheet):
     def _number_format(self, row: int, col: int) -> str | None:
         return self._formulas.cell(row, col).number_format
 
+    def formula_inputs_blank(self, row: int, col: int) -> bool:
+        formula = self._formulas.cell(row, col).value
+        workbook = cast(Workbook, self._formulas.parent)
+        return formula_inputs_blank(
+            formula if isinstance(formula, str) and formula.startswith("=") else None,
+            self.name,
+            lambda name, r, c: workbook[name].cell(r, c).value,
+        )
+
 
 class _XlsSheet(_Sheet):
-    def __init__(self, sheet: xlrd.sheet.Sheet, book: xlrd.book.Book) -> None:
+    def __init__(
+        self, sheet: xlrd.sheet.Sheet, book: xlrd.book.Book, formulas: XlsFormulas
+    ) -> None:
         super().__init__(sheet.name, sheet.nrows, sheet.ncols)
         self._sheet = sheet
         self._book = book
         self._datemode: Literal[0, 1] = book.datemode
+        self._formulas = formulas
+
+    def formula_inputs_blank(self, row: int, col: int) -> bool:
+        return formula_inputs_blank(
+            self._formulas.formula(self.name, row, col), self.name, self._dependency
+        )
+
+    def _dependency(self, name: str, row: int, col: int) -> Scalar:
+        if self._formulas.contains(name, row, col):
+            return "=formula"
+        sheet = self._book.sheet_by_name(name)
+        if row > sheet.nrows or col > sheet.ncols:
+            return None
+        return cast(Scalar, sheet.cell_value(row - 1, col - 1))
 
     def _number_format(self, row: int, col: int) -> str | None:
         if row > self.max_row or col > self.max_col:
@@ -265,8 +296,9 @@ class _XlsxBook:
 
 
 class _XlsBook:
-    def __init__(self, book: xlrd.book.Book) -> None:
+    def __init__(self, book: xlrd.book.Book, formulas: XlsFormulas) -> None:
         self._book = book
+        self._formulas = formulas
 
     @property
     def sheet_names(self) -> tuple[str, ...]:
@@ -277,7 +309,7 @@ class _XlsBook:
             raise OfficeError(
                 "sheet_missing", f"{name}; available: {', '.join(self._book.sheet_names())}"
             )
-        return _XlsSheet(self._book.sheet_by_name(name), self._book)
+        return _XlsSheet(self._book.sheet_by_name(name), self._book, self._formulas)
 
     def close(self) -> None:
         self._book.release_resources()
@@ -291,7 +323,8 @@ def open_book(path: Path) -> Book:
             load_workbook(path, read_only=False, data_only=False),
         )
     if detected.kind == FileKind.XLS:
-        return _XlsBook(xlrd.open_workbook(str(path), formatting_info=True))
+        book = xlrd.open_workbook(str(path), formatting_info=True)
+        return _XlsBook(book, XlsFormulas(path, book))
     raise OfficeError(
         "unsupported_format", f"{path.name}: {detected.kind.value}; {detected.detail}"
     )

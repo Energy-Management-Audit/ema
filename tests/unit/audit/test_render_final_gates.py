@@ -18,6 +18,7 @@ from tests.unit.audit.render_seams import (
     narrative_writer,
     outputs,
     run_render,
+    summary_of,
     synthetic_render,
     write_intros,
     write_narrative,
@@ -27,6 +28,7 @@ from ema.audit import base_numeric, render
 from ema.audit.render_steps import ai_wording_hits
 from ema.audit.sections import Status, set_status
 from ema.audit.workflow import AuditWorkflow
+from ema.core.office.missing_text import MISSING_TEXT, TABLE_MISSING_NOTE, TABLE_MISSING_TEXT
 from ema.core.office.package import P, R, W, encoded, read_parts, write_parts, xml
 from ema.core.workspace import Workspace
 
@@ -92,6 +94,42 @@ def test_clean_text_passes(final: tuple[Workspace, str]) -> None:
     record = run_render(ws, job, "final")
     assert record["state"] == "ready", record["error"]
     assert [name for name, _ in outputs(ws, job)] == ["Audit-final.pdf", "Audit-final.docx"]
+
+
+@pytest.mark.parametrize("kind", ["draft", "final"])
+@pytest.mark.parametrize("missing_text", [MISSING_TEXT, TABLE_MISSING_TEXT])
+def test_sourced_missing_cells_keep_dev_counts_and_final_gate_outcome(
+    final: tuple[Workspace, str], monkeypatch: pytest.MonkeyPatch, kind: str, missing_text: str
+) -> None:
+    ws, job = final
+    write_narrative(ws, job, "ch4.concluzii", "Consumul a scăzut după modernizare.")
+    original = render.write_four
+    word = FakeWord()
+    monkeypatch.setattr(render, "word_automation", lambda settings: word)
+
+    def with_missing_cells(source: Path, target: Path, **kwargs: object) -> None:
+        original(source, target, **kwargs)
+        document = Document(target)
+        heading = next(p for p in document.paragraphs if p.text == TITLES["ch4.concluzii"])
+        table = document.add_table(rows=1, cols=3)
+        for cell in table.rows[0].cells[:2]:
+            cell.text = missing_text
+        table.rows[0].cells[2].text = "Available"
+        note = document.add_paragraph(
+            TABLE_MISSING_NOTE if missing_text == TABLE_MISSING_TEXT else MISSING_TEXT
+        )
+        heading._p.addnext(table._tbl)
+        table._tbl.addnext(note._p)
+        document.save(target)
+
+    monkeypatch.setattr(render, "write_four", with_missing_cells)
+    record = run_render(ws, job, kind)
+    assert record["state"] == "ready", record["error"]
+    stage = "audit_render" if kind == "draft" else "audit_final"
+    assert summary_of(ws, job, str(record["id"]), stage).markers == []
+    assert word.calls == ["toc", "pdf", "open"]
+    name = "ciorna" if kind == "draft" else "final"
+    assert [output for output, _ in outputs(ws, job)] == [f"Audit-{name}.pdf", f"Audit-{name}.docx"]
 
 
 def test_a_marker_in_a_header_refuses_the_final(

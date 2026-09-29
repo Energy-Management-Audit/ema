@@ -55,7 +55,12 @@ def _values(
         number(cell_at(sheet, row, col, issues), issues, unit=unit)
         for col in range(start, start + 12)
     )
-    total = number(cell_at(sheet, row, start + 12, issues), issues, unit=unit)
+    total_cell = cell_at(sheet, row, start + 12, issues)
+    total = (
+        None
+        if sheet.formula_inputs_blank(row, start + 12)
+        else number(total_cell, issues, unit=unit)
+    )
     if (
         check == "physical"
         and total is not None
@@ -107,7 +112,14 @@ def _year_values(
     tep_total = None
     if not water and _unit(cell_at(sheet, row + 1, 1, issues).value) == "tep":
         tep_months, tep_total = _values(sheet, row + 1, issues, "tep", 2, check="none")
-    return YearValues(months, total, tep_months, tep_total)
+    return YearValues(
+        months,
+        total,
+        tep_months,
+        tep_total,
+        unit=unit,
+        total_inputs_blank=sheet.formula_inputs_blank(row, 2 + len(months)),
+    )
 
 
 def _installed_power(sheet: Sheet, row: int, block: Consumption, issues: list[ReaderIssue]) -> None:

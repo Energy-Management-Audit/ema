@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from conftest import artifacts_path
+from ema.core.office.sheets import open_book
 from ema.energy_data.anexa import parse_anexa
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
 from ema.energy_data.source import Located, normal
@@ -23,7 +24,11 @@ CASES = {
         "piee/cases/piee-case-a/received/Necesar info 2025 - CLIENT-P1 - completat .xls",
         5,
         1,
-        [],
+        [
+            ("values_missing", "Cons energetice!A39"),
+            ("values_missing", "Cons energetice!A42"),
+            ("values_missing", "Cons energetice!A45"),
+        ],
     ),
     "CLIENT-A3": (
         "audit/cases/audit-case-c/received/Necesar info aferente anului 2025 - "
@@ -31,7 +36,17 @@ CASES = {
         6,
         1,
         [
+            ("values_missing", "Cons energetice!A44"),
+            ("values_missing", "Cons energetice!A49"),
+            ("values_missing", "Cons energetice!A50"),
+            ("values_missing", "Cons energetice!A54"),
+            ("values_missing", "Cons energetice!A55"),
+            ("values_missing", "Cons energetice!A56"),
+            ("values_missing", "Cons energetice!A59"),
+            ("values_missing", "Cons energetice!A60"),
+            ("values_missing", "Cons energetice!A61"),
             ("label_from_unit_cell", "Productii!B3"),
+            ("values_missing", "Productii!A3"),
             ("table_header_ambiguous", "Autovehicule!F7"),
             ("table_header_ambiguous", "Autovehicule!G7"),
             ("table_header_ambiguous", "Autovehicule!H7"),
@@ -44,10 +59,32 @@ CASES = {
         [
             ("value_missing", "Cons energetice!B11"),
             ("value_missing", "Cons energetice!B26"),
+            ("values_missing", "Cons energetice!A83"),
+            ("values_missing", "Cons energetice!A87"),
+            ("values_missing", "Cons energetice!A91"),
+            ("values_missing", "Cons energetice!A96"),
+            ("values_missing", "Cons energetice!A99"),
+            ("values_missing", "Cons energetice!A102"),
             ("label_from_unit_cell", "Productia!B4"),
         ],
     ),
 }
+
+
+def _blank_total(path: Path, sheet: str, row: int, col: int = 14) -> bool:
+    book = open_book(path)
+    try:
+        return book.sheet(sheet).formula_inputs_blank(row, col)
+    finally:
+        book.close()
+
+
+def _assert_blank_sum_issues(path: Path, info) -> None:
+    for issue in info.issues:
+        if issue.code == "values_missing":
+            assert issue.ref is not None
+            col = 14 if issue.ref.sheet == "Cons energetice" else 15
+            assert _blank_total(path, issue.ref.sheet, issue.ref.row, col)
 
 
 @pytest.mark.parametrize("case", list(CASES))
@@ -58,6 +95,7 @@ def test_read_matches_private_cell_snapshot(reference_library: Path, case: str) 
     assert len(info.carriers) == carrier_count
     assert all(len(block.years) == year_count for block in info.carriers.values())
     assert [(i.code, i.ref.a1 if i.ref else None) for i in info.issues] == expected_issues
+    _assert_blank_sum_issues(path, info)
     expected_path = artifacts_path("s5", "expected") / f"{case}.json"
     assert expected_path.exists(), f"Generate and review the local S5 snapshot: {expected_path}"
     snapshot = json.loads(expected_path.read_text())
@@ -78,7 +116,7 @@ def test_read_matches_private_cell_snapshot(reference_library: Path, case: str) 
                     assert found.ref.col == month + 1
                     assert found.unit is not None
             total = values.total
-            if expected["total"] is None:
+            if expected["total"] is None or _blank_total(path, "Cons energetice", expected["row"]):
                 assert total is None
             else:
                 assert total is not None and total.value == pytest.approx(expected["total"])
@@ -142,7 +180,18 @@ def test_consumption_blocks_match_private_inventory(reference_library: Path, cas
     for carrier, block in (*info.carriers.items(), *info.water.items()):
         for year, values in block.years.items():
             located = next((value for value in (*values.months, values.total) if value), None)
-            assert located is not None, (case, carrier.value, year)
+            if located is None:
+                assert values.unit is not None
+                matches = [
+                    entry
+                    for entry in expected
+                    if entry[:3] == (block.label.ref.a1, carrier.value, year)
+                ]
+                assert len(matches) == 1
+                sheet, address = matches[0][3].split("!")
+                assert _blank_total(reference_library / CASES[case][0], sheet, int(address[1:]))
+                found.add(matches[0])
+                continue
             found.add(
                 (
                     block.label.ref.a1,

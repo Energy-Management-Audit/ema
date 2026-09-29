@@ -28,6 +28,7 @@ from ema.core.office.package import (
     write_parts,
     xml,
 )
+from ema.core.office.paragraph_properties import keep_paragraph
 from ema.core.office.workbook import formula_at, formula_cells
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -65,7 +66,9 @@ def chart_caption_prototype(source_docx: Path) -> etree._Element:
     _, _, paragraph = _chapter_four_style(source_docx)
     caption = paragraph.getnext()
     assert caption is not None
-    return copy.deepcopy(caption)
+    result = copy.deepcopy(caption)
+    keep_paragraph(result, "keepLines")
+    return result
 
 
 def _normalize_style(chart: etree._Element) -> None:  # noqa: C901
@@ -155,6 +158,7 @@ def import_chart_style(source_docx: Path, parts: dict[str, bytes]) -> tuple[str,
     )
     parts[document_rels_path] = encoded(document_rels)
     drawing = copy.deepcopy(paragraph)
+    keep_paragraph(drawing, "keepNext")
     chart_nodes = list(drawing.iter(f"{{{C}}}chart"))
     if len(chart_nodes) != 1:
         raise OfficeError("chart_style", "Source drawing needs one chart")

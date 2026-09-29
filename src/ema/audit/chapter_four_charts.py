@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four_blocks import FUEL, TITLES
-from ema.audit.chapter_four_chart_text import ANNUAL, MONTHS, STYLE_PART, SUBJECT, WATER_ANNUAL
-from ema.consumption_analysis.analysis import Metric, value
+from ema.audit.chapter_four_chart_text import (
+    ANNUAL,
+    MONTHS,
+    STYLE_PART,
+    SUBJECT,
+    WATER_ANNUAL,
+    is_turnover_unit,
+    scaled_unit,
+)
+from ema.audit.chapter_four_chart_values import chart_series, has_chart_data
+from ema.consumption_analysis.analysis import Metric
 from ema.consumption_analysis.metric_kind import MetricKind
-from ema.core.office.blocks import Block, NativeChart, Paragraph
-from ema.core.office.chart_series import Series
+from ema.core.office.blocks import Block, Missing, NativeChart, Paragraph
+from ema.core.office.missing_text import MISSING_TEXT
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FactorTable
 from ema.energy_data.model import EnergyDataset
@@ -111,8 +120,13 @@ def _specs(dataset: EnergyDataset) -> tuple[list[_Spec], list[str]]:  # noqa: C9
             result.append(
                 _Spec(
                     "ch4.productie",
-                    product.replace("_", " "),
-                    ((product.replace("_", " "), Metric("production", product=product)),),
+                    None,
+                    (
+                        (
+                            dataset.production_name.get(product, ""),
+                            Metric("production", product=product),
+                        ),
+                    ),
                     years,
                     dataset.production_unit[product],
                     monthly=True,
@@ -273,38 +287,12 @@ def _specs(dataset: EnergyDataset) -> tuple[list[_Spec], list[str]]:  # noqa: C9
     return result, skipped
 
 
-def _series(
-    dataset: EnergyDataset,
-    factors: FactorTable,
-    spec: _Spec,
-    categories: list[str],
-    year: int | None,
-) -> list[Series]:
-    return [
-        Series(
-            name,
-            categories,
-            [
-                value(dataset, factors, replace(metric, month=month), year)[0]
-                for month in range(1, len(categories) + 1)
-            ]
-            if year is not None
-            else [value(dataset, factors, metric, int(category))[0] for category in categories],
-        )
-        for name, metric in spec.series
-    ]
-
-
-def _drawn(series: list[Series]) -> bool:
-    return any(point is not None for item in series for point in item.values)
-
-
 def _caption(spec: _Spec, client: str, k: int, letter: str | None, year: int | None) -> str:
     prefix = f"Fig. nr. 4.{k} " + (f"{letter}) " if letter else "")
     if spec.production:
         if year is not None:
             subject = (
-                "cifrei lunare de afaceri" if "lei" in spec.unit.lower() else "producției lunare"
+                "cifrei lunare de afaceri" if is_turnover_unit(spec.unit) else "producției lunare"
             )
             return (
                 prefix + f"Evoluția lunară a {subject} înregistrate de către {client} "
@@ -323,32 +311,47 @@ def _caption(spec: _Spec, client: str, k: int, letter: str | None, year: int | N
 
 
 def _group(
-    dataset: EnergyDataset, factors: FactorTable, spec: _Spec, client: str, k: int
+    dataset: EnergyDataset,
+    factors: FactorTable,
+    spec: _Spec,
+    client: str,
+    k: int,
+    skipped: list[str],
 ) -> ChartGroup:
     monthly: list[Block] = []
+    key = spec.section
+    if spec.section in {"ch4.apa", "ch4.specific_apa"}:
+        key += ":" + spec.series[0][1].carriers[0].value
+    unit, _ = scaled_unit(spec.unit, spec.series[0][1].kind)
     letter = 0
     if spec.monthly:
         for year in spec.years:
-            series = _series(dataset, factors, spec, list(MONTHS), year)
-            if not _drawn(series):
+            series = chart_series(dataset, factors, spec.series, spec.unit, list(MONTHS), year)
+            caption = _caption(spec, client, k, chr(ord("a") + letter), year)
+            letter += 1
+            if not has_chart_data(series):
+                monthly.append(Missing("body", f"{caption}: {MISSING_TEXT}"))
+                skipped.append(f"{key}:{year}:no_data")
                 continue
             monthly.extend(
                 (
-                    NativeChart("chart", STYLE_PART, series, column_axis_title=spec.unit + "/lună"),
+                    NativeChart("chart", STYLE_PART, series, column_axis_title=unit + "/lună"),
                     Paragraph(
                         "chart_caption",
-                        [_caption(spec, client, k, chr(ord("a") + letter), year), "", "", ""],
+                        [caption, "", "", ""],
                     ),
                 )
             )
-            letter += 1
-    annual_series = _series(dataset, factors, spec, [str(year) for year in spec.years], None)
+    annual_series = chart_series(
+        dataset, factors, spec.series, spec.unit, [str(year) for year in spec.years], None
+    )
     annual: list[Block] = []
-    if _drawn(annual_series):
+    caption = _caption(spec, client, k, chr(ord("a") + letter) if letter else None, None)
+    if has_chart_data(annual_series):
         axis = (
-            spec.unit
-            if spec.section.startswith("ch4.specific_") or spec.section == "ch4.intensitate"
-            else spec.unit + "/an"
+            unit
+            if spec.series[0][1].kind in {"specific", "water_specific", "intensity"}
+            else unit + "/an"
         )
         annual.extend(
             (
@@ -356,7 +359,7 @@ def _group(
                 Paragraph(
                     "chart_caption",
                     [
-                        _caption(spec, client, k, chr(ord("a") + letter) if letter else None, None),
+                        caption,
                         "",
                         "",
                         "",
@@ -364,6 +367,9 @@ def _group(
                 ),
             )
         )
+    else:
+        annual.append(Missing("body", f"{caption}: {MISSING_TEXT}"))
+        skipped.append(f"{key}:annual:no_data")
     return ChartGroup(spec.label, monthly, annual)
 
 
@@ -375,7 +381,7 @@ def chapter_chart_groups(
     number = 1
     for section in (item.id for item in CATALOGUE if item.id.startswith("ch4.")):
         for spec in (item for item in specs if item.section == section):
-            group = _group(dataset, factors, spec, client, number)
+            group = _group(dataset, factors, spec, client, number, skipped)
             if group.monthly or group.annual:
                 groups.setdefault(section, []).append(group)
                 number += 1

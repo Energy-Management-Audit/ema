@@ -209,9 +209,8 @@ def _document_checks(
     synthesis = next(item for item in _region(document, "ch6.sinteza") if item.tag == W + "tbl")
     assert _header(measure, 2) == [list(row) for row in MEASURE_HEADER]
     assert _header(synthesis, 2) == [list(row) for row in SYNTHESIS_HEADER]
-    # Her ch. 4 monthly tables print without thousands grouping (TablePlan.grouping, S7).
-    corrected = _cell(document, "ch4.electricitate", reviewed["correct"]) == "1234,50"
-    rejected = _cell(document, "ch4.gaz", reviewed["reject"]) == "date indisponibile"
+    corrected = _cell(document, "ch4.electricitate", reviewed["correct"]) == "1.234,50"
+    rejected = _cell(document, "ch4.gaz", reviewed["reject"]) == "—"
     assert corrected and rejected, (corrected, rejected)
 
 
@@ -338,6 +337,15 @@ def test_CLIENT-A1_final_charts(
         "ch4.electricitate_pv:electricity_pv",
         "ch4.echiv_pv:electricity_pv",
         "ch4.specific_pv:electricity_pv",
+        "ch4.carburant:2023:no_data",
+        "ch4.carburant:2024:no_data",
+        "ch4.carburant:2025:no_data",
+        "ch4.apa:water_potable:2023:no_data",
+        "ch4.apa:water_potable:2024:no_data",
+        "ch4.apa:water_potable:2025:no_data",
+        "ch4.apa:water_potable:annual:no_data",
+        "ch4.specific_apa:water_potable:annual:no_data",
+        "ch4.mediu:annual:no_data",
     ]
     for action, carrier, point in (("correct", "electricitate", 1234.5), ("reject", "gaz", None)):
         year, month = (int(part) for part in reviewed[action].split(".")[-2:])

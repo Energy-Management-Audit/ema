@@ -4,7 +4,8 @@ from docx import Document
 from lxml import etree
 from test_chart_rewrite_package import package
 
-from ema.core.office.blocks import ElementLocator, NativeChart, Prototypes
+from ema.audit.chapter_four_charts import chart_blocks
+from ema.core.office.blocks import ElementLocator, Missing, NativeChart, Prototypes
 from ema.core.office.chart_blocks import chart_caption_prototype, import_chart_style
 from ema.core.office.chart_series import Series
 from ema.core.office.package import (
@@ -17,6 +18,9 @@ from ema.core.office.package import (
     xml,
 )
 from ema.core.office.region import replace_region
+from ema.energy_data.carriers import Carrier
+from ema.energy_data.factors import FACTORS_2026
+from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
@@ -72,3 +76,55 @@ def test_import_style_and_retire_it_after_region_replacement(tmp_path) -> None:
     assert rels_path(style) not in result
     assert len(inspect(out).charts) == 1
     assert check_standalone(out) == []
+
+
+def test_missing_chart_caption_renders_from_mixed_authored_runs(tmp_path) -> None:
+    source = package(tmp_path)
+    parts = read_parts(source)
+    root = xml(parts, "word/document.xml")
+    body = root.find(W + "body")
+    assert body is not None
+    caption = etree.Element(W + "p")
+    for index, text in enumerate(("Fig. nr. 4.1 ", "Authored subject", " ", "Client")):
+        run = etree.SubElement(caption, W + "r")
+        props = etree.SubElement(run, W + "rPr")
+        etree.SubElement(props, W + "sz").set(W + "val", "24")
+        if index != 2:
+            etree.SubElement(props, W + "i")
+        if index == 1:
+            etree.SubElement(props, W + "iCs")
+        etree.SubElement(run, W + "t").text = text
+    body.insert(1, caption)
+    parts["word/document.xml"] = etree.tostring(root)
+    write_parts(parts, source)
+    target = tmp_path / "target.docx"
+    document = Document()
+    for text in ("Start", "Old", "End"):
+        document.add_paragraph(text)
+    document.save(target)
+    dataset = EnergyDataset(
+        (2025,),
+        {Carrier.electricity_grid: {2025: CarrierSeries(annual=Reading(0, "MWh"))}},
+        {},
+        {},
+    )
+    missing, _ = chart_blocks("ch4.electricitate", dataset, FACTORS_2026, "Client")
+    assert all(isinstance(block, Missing) and block.proto == "body" for block in missing)
+    body = etree.Element(W + "p")
+    run = etree.SubElement(body, W + "r")
+    etree.SubElement(etree.SubElement(run, W + "rPr"), W + "sz").set(W + "val", "24")
+    etree.SubElement(run, W + "t").text = "Body prototype"
+    out = tmp_path / "missing.docx"
+    replace_region(
+        target,
+        out,
+        ElementLocator(1),
+        ElementLocator(3),
+        missing,
+        Prototypes({"body": body, "chart_caption": chart_caption_prototype(source)}, 4),
+    )
+    paragraphs = Document(out).paragraphs[1:-1]
+    assert [paragraph.text for paragraph in paragraphs] == [block.text for block in missing]
+    for paragraph in paragraphs:
+        assert all(run.font.size.pt == 12 for run in paragraph.runs)
+        assert all(str(run.font.color.rgb) == "FF0000" for run in paragraph.runs)

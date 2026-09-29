@@ -166,23 +166,36 @@ def test_missing_reference_and_red_marker(tmp_path: Path) -> None:
     assert red_text == "date indisponibile"
 
 
-def test_table_formats_numeric_value_and_marks_missing_cell(tmp_path: Path) -> None:
+@pytest.mark.parametrize("marker", [None, "—"])
+def test_table_formats_numeric_value_and_marks_missing_cell(
+    tmp_path: Path, marker: str | None
+) -> None:
     source, prototypes, locator = _source(tmp_path)
     out = tmp_path / "out.docx"
     report = render(
         source,
         out,
         locator,
-        [Table("table", [[["2023"], [Num(1234.5, 2)]], [["2024"], [Num(None, 2)]]])],
+        [
+            Table(
+                "table",
+                [
+                    [["2023"], [Num(1234.5, 2, fact="available-reading")]],
+                    [["2024"], [Num(None, 2, fact="missing-reading")]],
+                ],
+                missing_text=marker,
+            )
+        ],
         prototypes,
     )
     table = next(node for node in _body(out) if node.tag == W + "tbl")
     rows = table.findall(W + "tr")
     assert _text(rows[1].findall(W + "tc")[1]) == "1.234,50"
     missing_cell = rows[2].findall(W + "tc")[1]
-    assert _text(missing_cell) == "date indisponibile"
+    assert _text(missing_cell) == (marker or "date indisponibile")
     assert any(colour.get(W + "val") == "FF0000" for colour in missing_cell.iter(W + "color"))
-    assert [value.text for value in report.values] == ["1.234,50", "date indisponibile"]
+    assert [value.text for value in report.values] == ["1.234,50", marker or "date indisponibile"]
+    assert [value.fact for value in report.values] == ["available-reading", "missing-reading"]
 
 
 def test_table_header_overwrites_the_prototype_header_of_the_same_shape(tmp_path: Path) -> None:

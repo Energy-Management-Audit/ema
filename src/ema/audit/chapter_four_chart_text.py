@@ -1,6 +1,28 @@
 """Verbatim caption templates for the supported chapter-four charts."""
 
+import re
+
+from ema.consumption_analysis.metric_kind import MetricKind
 from ema.energy_data.carriers import Carrier
+
+
+def is_turnover_unit(unit: str) -> bool:
+    return re.search(r"\blei\b", unit, re.IGNORECASE) is not None
+
+
+def scaled_unit(unit: str, kind: MetricKind) -> tuple[str, float]:
+    """Scale display denominators; domain values retain their source units."""
+    if kind not in {"specific", "water_specific", "intensity"}:
+        return unit, 1.0
+    numerator, separator, denominator = unit.partition("/")
+    if separator and (denominator == "kg" or denominator.startswith("kg ")):
+        return numerator + "/t" + denominator[2:], 1000.0
+    if separator and denominator == "lei":
+        return numerator + "/mil lei", 1_000_000.0
+    if separator and denominator == "1000 lei":
+        return numerator + "/mil lei", 1000.0
+    return unit, 1.0
+
 
 MONTHS = (
     "Ianuarie",

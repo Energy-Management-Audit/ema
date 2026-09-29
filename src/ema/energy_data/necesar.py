@@ -69,6 +69,8 @@ def _series(values: YearValues, unit: str) -> CarrierSeries:
     annual = (
         Reading(float(cast(int | float, values.total.value)), unit)
         if values.total is not None
+        else Reading(None, unit)
+        if not months and values.total_inputs_blank
         else None
     )
     return CarrierSeries(months, annual)
@@ -123,22 +125,29 @@ def to_dataset(info: NecesarInfo) -> EnergyDataset:
     carriers: dict[Carrier, dict[int, CarrierSeries]] = {}
     production: dict[str, dict[int, CarrierSeries]] = {}
     production_unit: dict[str, str] = {}
+    production_name: dict[str, str] = {}
     years: set[int] = set()
     for carrier, block in (*info.carriers.items(), *info.water.items()):
         carriers[carrier] = {}
         for year, values in block.years.items():
-            unit = next((v.unit for v in (*values.months, values.total) if v and v.unit), None)
+            unit = next(
+                (v.unit for v in (*values.months, values.total) if v and v.unit),
+                values.unit if values.total_inputs_blank else None,
+            )
             if unit is None:
                 continue
             field_key("carrier", carrier.value, year)
             carriers[carrier][year] = _series(values, unit)
             years.add(year)
+        if not carriers[carrier]:
+            del carriers[carrier]
     for item in info.production:
         key = _production_key(str(item.name.value))
         if not key:
             continue
         unit = str(item.unit.value)
         production_unit[key] = unit
+        production_name[key] = str(item.name.value)
         production.setdefault(key, {})
         for year, values in item.years.items():
             field_key("production", key, year)
@@ -155,4 +164,5 @@ def to_dataset(info: NecesarInfo) -> EnergyDataset:
         turnover,
         energy_costs,
         _filed_tep(info, years),
+        production_name=production_name,
     )

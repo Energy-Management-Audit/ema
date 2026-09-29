@@ -71,6 +71,7 @@ class EnergyDataset:
     energy_costs_lei: dict[int, Reading] = field(default_factory=_money)
     filed_indicators: dict[str, dict[int, FiledValue]] = field(default_factory=_filed)
     energy_inventory_complete: bool = True
+    production_name: dict[str, str] = field(default_factory=_units)
 
     def __post_init__(self) -> None:
         if self.years != tuple(sorted(set(self.years))):

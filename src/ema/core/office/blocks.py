@@ -19,6 +19,7 @@ from ema.core.office.chart_blocks import build_column_chart_detached, clone_char
 from ema.core.office.chart_ids import refresh_unique_ids
 from ema.core.office.chart_series import Series
 from ema.core.office.errors import OfficeError
+from ema.core.office.missing_text import MISSING_TEXT
 from ema.core.office.numbers_ro import format_number
 from ema.core.office.package import encoded, read_parts, write_parts
 from ema.core.office.pictures import replace_picture
@@ -64,6 +65,7 @@ class Table:
     rows: list[list[list[Segment]]]
     header_rows: int = 1
     header: list[list[str]] | None = None
+    missing_text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -125,7 +127,7 @@ class ElementLocator:
 class Prototypes:
     elements: dict[str, etree._Element]
     chapter: int
-    missing_text: str = "date indisponibile"
+    missing_text: str = MISSING_TEXT
 
 
 @dataclass(frozen=True)
@@ -283,7 +285,9 @@ def _table_rows(  # noqa: PLR0913
         if len(data) != len(cells):
             raise OfficeError("block_prototype", "Table row width differs from prototype")
         for cell, segments in zip(cells, data, strict=True):
-            text, missing, pieces = _segments(segments, lookup, values, block_index, missing_text)
+            text, missing, pieces = _segments(
+                segments, lookup, values, block_index, block.missing_text or missing_text
+            )
             set_text(cell, text, missing=missing, pieces=pieces)
         node.append(clone)
         _fresh(clone, owner)

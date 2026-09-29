@@ -74,5 +74,7 @@ def place_chart_groups(blocks: list[Block], groups: dict[str, list[ChartGroup]])
             result.append(block)
             result.extend(after.get(i, []))
         result.extend(before.get(len(body), []))
+        if not body:
+            result.extend(after.get(-1, []))
         index = end
     return result

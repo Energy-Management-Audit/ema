@@ -14,6 +14,8 @@ class YearValues:
     total: Located | None
     tep_months: tuple[Located | None, ...] = (None,) * 12
     tep_total: Located | None = None
+    unit: str | None = None
+    total_inputs_blank: bool = False
 
 
 @dataclass

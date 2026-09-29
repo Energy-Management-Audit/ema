@@ -21,6 +21,7 @@ from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four_blocks import chapter_four_blocks
 from ema.audit.chapter_four_chart_placement import place_chart_groups
 from ema.audit.chapter_four_charts import STYLE_PART, chapter_chart_groups
+from ema.audit.chapter_four_format import format_chapter_four
 from ema.audit.heading_titles import heading_blocks
 from ema.core.errors import EmaError
 from ema.core.office.block_text import set_text
@@ -152,7 +153,9 @@ def render_chapter_four(  # noqa: PLR0913
         raise ValueError("base identity denylist is required")
     chapter, following, positions, body = _located(base)
     groups, skipped = chapter_chart_groups(dataset, factors, client)
-    blocks = place_chart_groups(chapter_four_blocks(dataset, factors, texts=texts), groups)
+    blocks = place_chart_groups(
+        chapter_four_blocks(dataset, factors, texts=texts, client=client), groups
+    )
     prototypes = _prototypes(positions, body, chapter, following)
     blocks = heading_blocks(blocks, prototypes)
     with TemporaryDirectory() as directory:
@@ -187,6 +190,7 @@ def render_chapter_four(  # noqa: PLR0913
             prototypes,
         )
     document = Document(str(output))
+    format_chapter_four(document, missing_text=prototypes.missing_text)
     refresh_toc(document)
     document.save(str(output))
     issues = package_issues(output, base_identity)

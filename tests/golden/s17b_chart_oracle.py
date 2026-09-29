@@ -10,6 +10,11 @@ from zipfile import ZipFile
 
 from lxml import etree
 from openpyxl import load_workbook
+from tests.golden.s17c_chart_layout_oracle import (
+    assert_chapter_tables,
+    assert_chart_layout,
+    expected_unit,
+)
 
 from ema.audit.chapter_four import MONTHS
 from ema.consumption_analysis.analysis import Metric, value
@@ -112,6 +117,8 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
     )
     product = next(iter(dataset.production))
 
+    number = 0
+
     def group(
         metrics: list[tuple[str, Metric]],
         years: tuple[int, ...],
@@ -122,7 +129,10 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
         production: bool = False,
         specific: bool = False,
     ) -> None:
+        nonlocal number
+        number += 1
         charts: list[tuple[int | None, list[Series]]] = []
+        unit, scale = expected_unit(unit, specific)
         if monthly_subject is not None:
             for year in years:
                 series = [
@@ -136,7 +146,9 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
                     )
                     for name, metric in metrics
                 ]
-                if any(point is not None for item in series for point in item.values):
+                if any(
+                    point is not None and point != 0 for item in series for point in item.values
+                ):
                     charts.append((year, series))
         annual = [
             Series(
@@ -146,13 +158,17 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
             )
             for name, metric in metrics
         ]
-        if any(point is not None for item in annual for point in item.values):
+        annual = [
+            replace(item, values=[p * scale if p is not None else None for p in item.values])
+            for item in annual
+        ]
+        if any(point is not None and point != 0 for item in annual for point in item.values):
             charts.append((None, annual))
         if not charts:
             return
-        number = len({item.caption.split(" ", 3)[2] for item in found}) + 1
-        for index, (year, series) in enumerate(charts):
-            letter = f"{chr(ord('a') + index)}) " if any(y is not None for y, _ in charts) else ""
+        for year, series in charts:
+            index = years.index(year) if year is not None else len(years)
+            letter = f"{chr(ord('a') + index)}) " if monthly_subject is not None else ""
             prefix = f"Fig. nr. 4.{number} {letter}"
             if year is not None:
                 assert monthly_subject is not None
@@ -173,7 +189,12 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
             found.append(Expected(caption, series, axis))
 
     group(
-        [(product.replace("_", " "), Metric("production", product=product))],
+        [
+            (
+                dataset.production_name.get(product, ""),
+                Metric("production", product=product),
+            )
+        ],
         tuple(year for year in dataset.years if year in dataset.production[product]),
         dataset.production_unit[product],
         "production",
@@ -287,6 +308,7 @@ def _cell_values(book: object, formula: str) -> list[object]:
 
 
 def assert_final_charts(docx: Path, expected: list[Expected]) -> None:
+    assert_chapter_tables(docx)
     package = inspect(docx)
     assert len(package.charts) == len(expected)
     parts = read_parts(docx)
@@ -302,12 +324,15 @@ def assert_final_charts(docx: Path, expected: list[Expected]) -> None:
         for chart in paragraph.iter(f"{{{C}}}chart"):
             following = paragraph.getnext()
             assert following is not None and following.tag == W + "p"
+            assert paragraph.find(W + "pPr/" + W + "keepNext") is not None
+            assert following.find(W + "pPr/" + W + "keepLines") is not None
             actual.append((rels[chart.get(f"{{{R}}}id")], _text(following)))
     assert len(actual) == len(expected)
     with ZipFile(docx) as archive:
         for index, ((part, caption), wanted) in enumerate(zip(actual, expected, strict=True)):
             assert caption == wanted.caption, f"chart {index + 1}: caption"
             root = xml(parts, part)
+            assert_chart_layout(root, wanted.series, wanted.axis)
             axis = root.xpath("string(.//c:valAx/c:title)", namespaces={"c": C})
             axis_text = "".join(
                 root.xpath(

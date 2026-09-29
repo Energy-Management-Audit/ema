@@ -6,8 +6,19 @@ from collections.abc import Mapping
 from dataclasses import replace
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.chapter_four_chart_text import is_turnover_unit, scaled_unit
 from ema.consumption_analysis.analysis import Metric, SectionPlan, TablePlan, analyze, value
-from ema.core.office.blocks import Block, Caption, Missing, Num, Paragraph, Ref
+from ema.core.office.blocks import (
+    Block,
+    Caption,
+    Missing,
+    Num,
+    Paragraph,
+    Ref,
+    Segment,
+    Table,
+)
+from ema.core.office.missing_text import MISSING_TEXT, TABLE_MISSING_NOTE, TABLE_MISSING_TEXT
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
 from ema.energy_data.factors import FactorTable
 from ema.energy_data.model import EnergyDataset
@@ -39,18 +50,41 @@ GAS = frozenset({Carrier.natural_gas})
 FUEL = frozenset({Carrier.diesel, Carrier.petrol, Carrier.lpg, Carrier.fuel_oil, Carrier.clu})
 
 
-def _annual(
+def _annual(  # noqa: PLR0913
     dataset: EnergyDataset,
     factors: FactorTable,
     metric: Metric,
     years: tuple[int, ...],
     unit: str,
     label: str,
+    *,
+    product_name: str | None = None,
 ) -> list[Block]:
     result: list[Block] = []
     for year in years:
         number, fact = value(dataset, factors, metric, year)
-        result.append(Paragraph("body", [f"{label} {year}: ", Num(number, 2, unit, fact), "."]))
+        if metric.kind in {"specific", "water_specific", "intensity"}:
+            display_unit, scale = scaled_unit(unit, metric.kind)
+            if number is None:
+                product = f"{product_name or MISSING_TEXT}: " if product_name is not None else ""
+                result.append(Missing("body", f"{product}pentru anul {year}: {MISSING_TEXT};"))
+                continue
+            prefix: list[Segment] = (
+                [product_name or Num(None, 0), ": "] if product_name is not None else []
+            )
+            result.append(
+                Paragraph(
+                    "body",
+                    [
+                        *prefix,
+                        f"pentru anul {year} s-a înregistrat o valoare de ",
+                        Num(number * scale, 2, display_unit, fact),
+                        ";",
+                    ],
+                )
+            )
+        else:
+            result.append(Paragraph("body", [f"{label} {year}: ", Num(number, 2, unit, fact), "."]))
     return result
 
 
@@ -60,7 +94,7 @@ def _monthly(  # noqa: PLR0913
     section: str,
     metric: Metric,
     years: tuple[int, ...],
-    label: str,
+    label: str | list[Segment],
     *,
     unit: str,
 ) -> list[Block]:
@@ -74,8 +108,10 @@ def _monthly(  # noqa: PLR0913
     )
     for first, proto in ((1, "months_first"), (7, "months_second")):
         metrics = tuple(replace(metric, month=month) for month in range(first, first + 6))
-        plan = TablePlan(proto, metrics, years)
+        plan = TablePlan(proto, metrics, years, grouping=True)
         table = analyze(dataset, factors, (SectionPlan(section, stage, (plan,)),))[0].blocks[0]
+        assert isinstance(table, Table)
+        table = replace(table, missing_text=TABLE_MISSING_TEXT)
         caption_id = f"{section}:{metric.carriers}:{metric.product}:{first}"
         result.append(
             Caption(
@@ -86,11 +122,18 @@ def _monthly(  # noqa: PLR0913
                     "Tabelul ",
                     Ref("tab", caption_id),
                     ". ",
-                    label,
+                    *([label] if isinstance(label, str) else label),
                 ],
             )
         )
         result.append(table)
+        if any(
+            isinstance(segment, Num) and segment.value is None
+            for row in table.rows
+            for cell in row
+            for segment in cell
+        ):
+            result.append(Missing("body", TABLE_MISSING_NOTE))
     result.extend(_annual(dataset, factors, metric, years, unit, "Total anual"))
     return result
 
@@ -120,14 +163,25 @@ def _carriers(
     return result or [Missing("body", "[de completat]")]
 
 
-def _production(dataset: EnergyDataset, factors: FactorTable) -> list[Block]:
+def _production(dataset: EnergyDataset, factors: FactorTable, client: str) -> list[Block]:
     result: list[Block] = []
     for product, series in dataset.production.items():
         years = tuple(year for year in dataset.years if year in series)
         if not years:
             continue
-        label = product.replace("_", " ")
-        result.append(Paragraph("body", [label]))
+        label = dataset.production_name.get(product, "")
+        unit = dataset.production_unit.get(product, "")
+        title: list[Segment] = [
+            "Centralizator al "
+            + ("cifrei lunare de afaceri" if is_turnover_unit(unit) else "producției lunare")
+            + " înregistrate de către ",
+            client or Num(None, 0),
+        ]
+        title.extend(
+            [f" – {unit}/lună"]
+            if is_turnover_unit(unit)
+            else [" – ", label or Num(None, 0), "/lună"]
+        )
         result.extend(
             _monthly(
                 dataset,
@@ -135,8 +189,8 @@ def _production(dataset: EnergyDataset, factors: FactorTable) -> list[Block]:
                 "ch4.productie",
                 Metric("production", product=product),
                 years,
-                label,
-                unit=dataset.production_unit.get(product, ""),
+                title,
+                unit=unit,
             )
         )
     return result or [Missing("body", "[de completat]")]
@@ -151,7 +205,6 @@ def _specific(
 ) -> list[Block]:
     result: list[Block] = []
     for product in dataset.production:
-        name = product.replace("_", " ")
         chosen = (
             [carrier for carrier in dataset.carriers if carrier in allowed]
             if allowed is not None
@@ -174,7 +227,16 @@ def _specific(
             label = TITLES[carrier] if carrier is not None else "Consum total"
             result.append(Paragraph("body", [label]))
             unit = ("m³" if water else "tep") + "/" + dataset.production_unit[product]
-            result.extend(_annual(dataset, factors, metric, years, unit, name))
+            products = [
+                key
+                for key, series in dataset.production.items()
+                if any(
+                    year in series and (carrier is None or year in dataset.carriers[carrier])
+                    for year in dataset.years
+                )
+            ]
+            name = dataset.production_name.get(product, "") if len(products) > 1 else None
+            result.extend(_annual(dataset, factors, metric, years, unit, label, product_name=name))
     return result or [Missing("body", "[de completat]")]
 
 
@@ -190,6 +252,7 @@ def chapter_four_blocks(  # noqa: C901
     factors: FactorTable,
     *,
     texts: Mapping[str, str] | None = None,
+    client: str = "",
 ) -> list[Block]:
     blocks: list[Block] = []
     raw = {
@@ -215,7 +278,7 @@ def chapter_four_blocks(  # noqa: C901
     for section in (item for item in CATALOGUE if item.id.startswith("ch4.")):
         blocks.append(Paragraph("heading:" + section.id, [section.title]))
         if section.id == "ch4.productie":
-            blocks.extend(_production(dataset, factors))
+            blocks.extend(_production(dataset, factors, client))
         elif section.id in raw:
             blocks.extend(_carriers(dataset, factors, section.id, raw[section.id]))
         elif section.id in equivalent:
