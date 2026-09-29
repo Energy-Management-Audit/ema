@@ -1,4 +1,4 @@
-"""Add sourced carrier figures absent from the approved approved PIEE base."""
+"""Add sourced carrier figures absent from the approved PIEE base."""
 
 from __future__ import annotations
 

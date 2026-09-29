@@ -59,6 +59,6 @@ export function readingLabel(field: Field): string {
     energy_active: 'Energia activă',
     energy_reactive: 'Energia reactivă',
   }
-  if (quantity === 'display') return 'Ecranul report_client_bşat'
+  if (quantity === 'display') return 'Ecranul afişat'
   return `${names[quantity] ?? field.label} · ${phase.toUpperCase()}`
 }

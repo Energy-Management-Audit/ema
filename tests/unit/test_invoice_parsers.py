@@ -146,7 +146,7 @@ def test_engie_companion_recognition_uses_supplier_and_document_structure() -> N
     )
 
     assert parser.recognizes(document)
-    assert parser.recognizes(without_client)
+    assert not parser.recognizes(without_client)
     assert not parser.recognizes(other_supplier)
 
 

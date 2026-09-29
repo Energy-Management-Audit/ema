@@ -10,6 +10,7 @@ from ema.invoices.models import (
     IssueSeverity,
     ValidationIssue,
 )
+from ema.invoices.parsers.client_identity import extract_client_identity_fields
 
 
 class MetNaturalGasInvoiceParser:
@@ -72,9 +73,12 @@ class EngieEInvoiceCompanionParser:
     def recognizes(self, document: InputDocument) -> bool:
         text = _plain_text("\n".join(page.text for page in document.pages))
         supplier_matches = "engie" in text or "ro13093222" in text
+        client_matches = any(
+            field.value for field in extract_client_identity_fields(document).values()
+        )
         invoice_matches = "efactura" in text or "factura" in text
         is_annex = "anexa" in document.path.name.casefold()
-        return supplier_matches and invoice_matches and not is_annex
+        return supplier_matches and client_matches and invoice_matches and not is_annex
 
     def parse(self, document: InputDocument) -> list[InvoiceDraft]:
         return [

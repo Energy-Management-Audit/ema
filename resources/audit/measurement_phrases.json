@@ -10,7 +10,7 @@
   {"id": "power", "template": "Valorile puterii", "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Conform informațiilor oferite", "adapted": true},
   {"id": "power_factor", "template": "Valorile factorului de putere", "source": "audit-03 audit ¶ factorul de putere", "adapted": true},
   {"id": "energy", "template": "Valorile energiei", "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Conform informațiilor oferite", "adapted": true},
-  {"id": "overview", "template": "Valorile report_client_bșate", "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Conform informațiilor oferite", "adapted": true},
+  {"id": "overview", "template": "Valorile afișate", "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Conform informațiilor oferite", "adapted": true},
   {"id": "thermal_intro", "template": "Imaginile termografice au fost realizate la data {date} pe platforma societății {client}.", "source": "audit-03 audit ¶ Imaginile termografice", "adapted": true},
   {"id": "thermal_intro_second", "template": "Fișa de măsurători termoenergetice prezintă imaginile componentelor verificate.", "source": "audit-03 audit ¶ Fișa de măsurători termoenergetice", "adapted": true},
   {"id": "results_intro", "template": "Pe baza măsurătorilor electroenergetice efectuate, rezultă:", "source": "audit-03 audit ¶ Rezultatele măsurătorilor electroenergetice", "adapted": true},

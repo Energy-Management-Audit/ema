@@ -290,6 +290,7 @@ def select_profile(mapping: HeadingMap, source: Path) -> str:
         sum(section.startswith("ch6") for section in sections),
         len(mapping.old_template_only),
     )
+    # Weights and the -15 cutoff were calibrated on the six reviewed finished outlines.
     weights = (1, 3, 4, 2, 3, 5)
     scores = {
         profile: -sum(
