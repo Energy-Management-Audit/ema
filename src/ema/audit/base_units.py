@@ -11,6 +11,7 @@ from typing import Any
 from docx import Document
 from docx.oxml.ns import qn
 
+from ema.audit.base_numbering import insert_chapter_numbering
 from ema.audit.base_prototypes import import_formatting
 from ema.audit.headings import MappedHeading, map_headings
 from ema.audit.inventory import BaseUnit, inventory
@@ -138,13 +139,16 @@ def _insert_measurements(document: Any, prototype: Path, needed: bool) -> None:
     )
     assert span[1] == chapter_six
     # AUDIT-01's catalogue ch6 is printed as chapter 5; insert before that heading.
-    destination = next(
-        start for item, start, _ in heading_spans_document(document) if item.section_id == "ch6"
-    )
-    before = _body(document)[destination]
+    following = [
+        _body(document)[start]
+        for item, start, _ in heading_spans_document(document)
+        if item.section_id == "ch6" or item.section_id.startswith("ch6.")
+    ]
+    before = following[0]
     cloned = [deepcopy(element) for element in _body(source)[span[0] : span[1]]]
     _remap_unique_ids(document, cloned)
     import_formatting(document, source, cloned)
+    insert_chapter_numbering(document, cloned[0], following)
     for element in cloned:
         before.addprevious(element)
 

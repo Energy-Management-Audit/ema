@@ -12,6 +12,7 @@ from typing import Literal
 from ema.audit import base_entry
 from ema.audit.applicability import applies, condition_source, fact_fields
 from ema.audit.catalogue import CATALOGUE, MaterialKind, Section
+from ema.audit.chapter_readiness import empty_chapters
 from ema.audit.staleness import base_changed, capture_inputs, current_inputs, snapshot_inputs
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
@@ -333,6 +334,7 @@ def audit_readiness(ws: Workspace, job: str, db: sqlite3.Connection | None = Non
                             message=f"Rezolvaţi conflictul: {section.title} / {field.label}",
                         )
                     )
+    issues.extend(empty_chapters(states))
     return Readiness(
         draft_ok=True,
         final_ok=not issues,

@@ -334,3 +334,34 @@ test('over a stale final X1 offers the new final even though the old one blocks 
     },
   )
 })
+
+test('an empty chapter is visible in the existing sections check and blocks the final', async () => {
+  const message = 'DESCRIEREA ŞI ISTORICUL SOCIETĂŢII: capitolul nu are conținut'
+  await withHarness(
+    {
+      path,
+      routes: {
+        ...reportRoutes,
+        [`GET ${J}/export/checks`]: {
+          status: 200,
+          body: {
+            ...READY_CHECKS,
+            readiness: {
+              draft_ok: true,
+              final_ok: false,
+              blocking: [{ code: 'chapter_empty', message }],
+            },
+          },
+        },
+      },
+    },
+    async ({ page }) => {
+      assert.equal((await checkRows(page))[0][1], 'err')
+      await page.getByText(message, { exact: true }).waitFor()
+      assert.equal(
+        await page.getByRole('button', { name: 'Generează versiunea finală' }).isDisabled(),
+        true,
+      )
+    },
+  )
+})

@@ -7,10 +7,10 @@ from dataclasses import replace
 from pathlib import Path
 
 from docx import Document
-from docx.enum.style import WD_STYLE_TYPE
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from PIL import Image
+from tests.audit_structure import add_audit_toc, number_audit_headings
 
 import ema.audit.chapter_five_render as render_module
 from ema.audit.catalogue import CATALOGUE
@@ -33,10 +33,7 @@ def _outline(paragraph, level: int) -> None:  # type: ignore[no-untyped-def]
 
 def _base(path: Path) -> None:
     document = Document()
-    document.styles.add_style("TOC1", WD_STYLE_TYPE.PARAGRAPH)
-    document.styles.add_style("TOC2", WD_STYLE_TYPE.PARAGRAPH)
-    document.add_paragraph("BILANȚURILE ENERGETICE\t1", style="TOC1")
-    document.add_paragraph("FIȘA DE MĂSURATORI\t2", style="TOC2")
+    add_audit_toc(document)
     titles = {section.id: section.title for section in CATALOGUE}
     for section_id in (
         "ch5",
@@ -59,6 +56,7 @@ def _base(path: Path) -> None:
             document.add_paragraph("Fixed harmonics text")
         elif section_id == "ch5.termic":
             document.add_paragraph("Fixed thermal method")
+    number_audit_headings(document)
     document.save(path)
 
 

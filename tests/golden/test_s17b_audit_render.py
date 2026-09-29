@@ -241,7 +241,11 @@ def _toc_pages(docx: Path) -> list[str]:
     results = []
     for paragraph in body.iter(qn("w:p")):
         style = paragraph.find(f"./{qn('w:pPr')}/{qn('w:pStyle')}")
-        if style is not None and (style.get(qn("w:val")) or "").startswith("TOC"):
+        if (
+            style is not None
+            and (style.get(qn("w:val")) or "").startswith("TOC")
+            and paragraph.find(qn("w:hyperlink")) is not None
+        ):
             texts = [node.text or "" for node in paragraph.iter(qn("w:t"))]
             results.append(texts[-1] if texts else "")
     return results

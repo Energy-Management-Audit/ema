@@ -21,6 +21,8 @@ from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four_blocks import chapter_four_blocks
 from ema.audit.chapter_four_chart_placement import place_chart_groups
 from ema.audit.chapter_four_charts import STYLE_PART, chapter_chart_groups
+from ema.audit.heading_titles import heading_blocks
+from ema.core.errors import EmaError
 from ema.core.office.block_text import set_text
 from ema.core.office.blocks import ElementLocator, NativeChart, Prototypes, RenderReport
 from ema.core.office.chart_blocks import chart_caption_prototype, import_chart_style
@@ -80,7 +82,11 @@ def _prototypes(
 ) -> Prototypes:
     electric = positions.get("ch4.electricitate")
     if electric is None:
-        raise ValueError("audit base lacks a chapter-four heading prototype")
+        raise EmaError(
+            "heading_prototype_missing",
+            "Prototipul titlului secţiunii lipseşte.",
+            "ch4.electricitate",
+        )
     table = next(
         (body[index] for index in range(electric + 1, following) if body[index].tag == W + "tbl"),
         None,
@@ -108,10 +114,23 @@ def _prototypes(
         "months_first": _table_proto(table, 1),
         "months_second": _table_proto(table, 7),
     }
+    siblings = {
+        "ch4.electricitate_pv": "ch4.electricitate",
+        "ch4.echiv_pv": "ch4.echiv_electric",
+        "ch4.specific_pv": "ch4.specific_electric",
+        "ch4.bilant_real": "ch4.mediu",
+    }
     for section in CATALOGUE:
         if not section.id.startswith("ch4."):
             continue
-        elements["heading:" + section.id] = body[positions.get(section.id, electric)]
+        prototype = positions.get(section.id, positions.get(siblings.get(section.id, "")))
+        if prototype is None:
+            raise EmaError(
+                "heading_prototype_missing",
+                "Prototipul titlului secţiunii lipseşte.",
+                siblings.get(section.id, section.id),
+            )
+        elements["heading:" + section.id] = body[prototype]
     return Prototypes(elements, 4)
 
 
@@ -135,6 +154,7 @@ def render_chapter_four(  # noqa: PLR0913
     groups, skipped = chapter_chart_groups(dataset, factors, client)
     blocks = place_chart_groups(chapter_four_blocks(dataset, factors, texts=texts), groups)
     prototypes = _prototypes(positions, body, chapter, following)
+    blocks = heading_blocks(blocks, prototypes)
     with TemporaryDirectory() as directory:
         working = base
         end = following + 1

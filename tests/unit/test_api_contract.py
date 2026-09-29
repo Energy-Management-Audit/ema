@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from jsonschema import validate
 from openapi_spec_validator import validate as validate_openapi
 from pypdfium2 import PdfDocument
+from tests.audit_structure import RETAINED_CONTENT, confirm_retained_content
 
 from ema.api import create_app
 from ema.api.mock import preview_pdf, seed
@@ -317,6 +318,8 @@ def test_http_rerun_undo_and_synthetic_final_export(tmp_path: Path) -> None:
         == 409
     )
     for section in CATALOGUE:
+        if section.id in RETAINED_CONTENT:
+            continue
         current_revision = next(
             state["revision"]
             for state in client.get(f"/jobs/{job}/sections").json()
@@ -351,8 +354,9 @@ def test_http_rerun_undo_and_synthetic_final_export(tmp_path: Path) -> None:
         ).status_code
         == 200
     )
+    confirm_retained_content(ws, job)
     checks = client.get(f"/jobs/{job}/export/checks").json()
-    assert checks["readiness"]["final_ok"] is True
+    assert checks["readiness"]["final_ok"] is True, checks["readiness"]
 
     def save(ctx):  # type: ignore[no-untyped-def]
         path = ctx.artifact_dir() / "synthetic.pdf"

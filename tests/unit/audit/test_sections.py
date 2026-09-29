@@ -173,7 +173,7 @@ def test_readiness_lists_unknown_stale_conflict_and_complete(tmp_path: Path) -> 
     assert any("așteaptă preluarea dosarului" in item for item in initial.next)
     for section in CATALOGUE:
         set_status(ws, job, section.id, Status.NA, "user")
-    assert audit_readiness(ws, job).final_ok
+    assert {issue.code for issue in audit_readiness(ws, job).blocking} == {"chapter_empty"}
     propose(ws, job, AuditFact.COMPANY_NAME.value, "A", [], state="extracted")
     propose(ws, job, AuditFact.COMPANY_NAME.value, "B", [], state="extracted")
     assert any(issue.code == "conflict" for issue in audit_readiness(ws, job).blocking)
@@ -224,7 +224,7 @@ def test_new_material_requires_human_recheck_of_prior_na(tmp_path: Path) -> None
     ws, job = _job(tmp_path)
     for section in CATALOGUE:
         set_status(ws, job, section.id, Status.NA, "user")
-    assert audit_readiness(ws, job).final_ok
+    assert {issue.code for issue in audit_readiness(ws, job).blocking} == {"chapter_empty"}
     record_material(ws, job, MaterialKind.METER, True, "received")
     assert any(issue.code == "na_recheck" for issue in audit_readiness(ws, job).blocking)
     set_status(ws, job, "ch5.electric", Status.NA, "user", "not used for this job")
@@ -240,7 +240,7 @@ def test_corrected_fact_stales_done_and_refuses_final_export(tmp_path: Path) -> 
             set_status(ws, job, section.id, Status.NA, "user")
     mark_drafted(ws, job, "ch2.date_generale", "agent", ())
     set_status(ws, job, "ch2.date_generale", Status.DONE, "user")
-    assert audit_readiness(ws, job).final_ok
+    assert {issue.code for issue in audit_readiness(ws, job).blocking} == {"chapter_empty"}
     decide(ws, job, field.id, "correct", field.revision, "user", value="New")
     readiness = audit_readiness(ws, job)
     assert not readiness.final_ok and any(issue.code == "stale" for issue in readiness.blocking)
@@ -337,3 +337,22 @@ def test_cli_done_confirmation_and_noninteractive_refusal(
     assert accepted.exit_code == 0, accepted.output
     assert accepted.output.count("[y/N]") == 1
     assert get_status(ws, job, "ch1").status == Status.DONE
+
+
+def test_empty_chapter_refuses_final_but_allows_draft(tmp_path: Path) -> None:
+    ws, job = _job(tmp_path)
+    recompute_ready(ws, job)
+    mark_drafted(ws, job, "ch2", "ema", ())
+    set_status(ws, job, "ch2", Status.DONE, "user")
+    for section in CATALOGUE:
+        if section.id != "ch2":
+            set_status(ws, job, section.id, Status.NA, "user")
+    readiness = audit_readiness(ws, job)
+    assert readiness.draft_ok and not readiness.final_ok
+    chapter = next(section for section in CATALOGUE if section.id == "ch2")
+    assert any(
+        issue.code == "chapter_empty"
+        and issue.message == f"{chapter.title}: capitolul nu are conținut"
+        for issue in readiness.blocking
+    )
+    _code(lambda: AuditWorkflow().start_final(ws, job), "not_ready")

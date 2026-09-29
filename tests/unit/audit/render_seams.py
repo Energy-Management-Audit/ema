@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 from docx import Document
-from docx.enum.style import WD_STYLE_TYPE
 from docx.oxml.ns import qn
+from tests.audit_structure import add_audit_toc, number_audit_headings
 
 from ema.audit import render
 from ema.audit.catalogue import CATALOGUE
@@ -25,12 +25,9 @@ MARKER = "[de completat]"
 
 def _base(path: Path) -> None:
     document = Document()
-    document.styles.add_style("TOC 1", WD_STYLE_TYPE.PARAGRAPH)
-    document.styles.add_style("TOC 2", WD_STYLE_TYPE.PARAGRAPH)
-    document.add_paragraph("TOC one", style="TOC 1")
-    document.add_paragraph("TOC two", style="TOC 2")
+    add_audit_toc(document)
     for chapter, children in (
-        ("ch1", ()),
+        ("ch1", ("ch1.obiective",)),
         ("ch2", ("ch2.date_generale",)),
         ("ch3", ("ch3.flux",)),
         ("ch4", ("ch4.concluzii", "ch4.bilant_real")),
@@ -42,8 +39,9 @@ def _base(path: Path) -> None:
         document.add_paragraph(f"Text fix {chapter}")
         for child in children:
             document.add_paragraph(TITLES[child], style="Heading 2")
-            document.add_paragraph(MARKER)
+            document.add_paragraph("Text fix" if child == "ch1.obiective" else MARKER)
     document.add_table(rows=1, cols=1)
+    number_audit_headings(document)
     document.save(str(path))
 
 

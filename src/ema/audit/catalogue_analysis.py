@@ -16,12 +16,12 @@ ANALYSIS: tuple[Section, ...] = (
         ),
     ),
     section(
-        "ch4.productie", 4, "ANALIZA PRODUCȚIEI", "ch4", "data_blocks", ("consumption_analysis",)
+        "ch4.productie", 4, "Analiza producției", "ch4", "data_blocks", ("consumption_analysis",)
     ),
     section(
         "ch4.consum",
         4,
-        "ANALIZA CONSUMULUI DE ENERGIE ȘI DE APĂ",
+        "Analiza consumului de energie și de apă",
         "ch4",
         "data_blocks",
         ("consumption_analysis",),
@@ -75,7 +75,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch4.echivalent",
         4,
-        "ANALIZA CONSUMULUI ECHIVALENT DE ENERGIE",
+        "Analiza consumului echivalent de energie",
         "ch4",
         "data_blocks",
         ("consumption_analysis",),
@@ -130,7 +130,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch4.concluzii",
         4,
-        "concluziile privind analiza consumului echivalent de energie",
+        "Concluziile privind analiza consumului echivalent de energie",
         "ch4",
         "narrative",
         ("consumption_analysis",),
@@ -138,7 +138,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch4.eficienta",
         4,
-        "analiza eficienței utilizării energiei",
+        "Analiza eficienței utilizării energiei",
         "ch4",
         "data_blocks",
         ("consumption_analysis",),
@@ -208,7 +208,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch4.mediu",
         4,
-        "analiza impactului de mediu",
+        "Analiza impactului de mediu",
         "ch4",
         "data_blocks",
         ("consumption_analysis",),
@@ -217,7 +217,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch4.bilant_real",
         4,
-        "analiza bilanțului energetic real",
+        "Analiza bilanțului energetic real",
         "ch4",
         "data_blocks",
         ("consumption_analysis",),
@@ -249,7 +249,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch5.electric_fisa",
         5,
-        "FIȘA DE MĂSURATORI ELECTROENERGETICE",
+        "Fișa de măsurători electroenergetice",
         "ch5",
         "measurements",
         ("measurements",),
@@ -259,7 +259,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch5.electric_rezultate",
         5,
-        "Rezultatele măsuratorilor electroenergetice",
+        "Rezultatele măsurătorilor electroenergetice",
         "ch5",
         "measurements",
         ("measurements",),
@@ -279,7 +279,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch5.termic",
         5,
-        "BILANŢUL TERMIC ȘI DESCRIEREA ECHIPAMENTELOR UTILIZATE PENTRU MĂSURĂTORI",
+        "Bilanţul termic și descrierea echipamentelor utilizate pentru măsurători",
         "ch5",
         "measurements",
         ("measurements",),
@@ -289,7 +289,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch5.termic_fisa",
         5,
-        "FIȘA DE MĂSURATORI TERMOENERGETICE",
+        "Fișa de măsurători termoenergetice",
         "ch5",
         "measurements",
         ("measurements",),
@@ -299,7 +299,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch5.termic_rezultate",
         5,
-        "Rezultatele măsuratorilor termoenergetice",
+        "Rezultatele măsurătorilor termoenergetice",
         "ch5",
         "measurements",
         ("measurements",),
@@ -319,7 +319,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch6.indicatori",
         6,
-        "INDICATORI DE PERFORMANȚĂ FINANCIARĂ",
+        "Indicatori de performanță financiară",
         "ch6",
         "calc",
         ("template", "calculation"),
@@ -327,7 +327,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch6.generale",
         6,
-        "MĂSURI GENERALE DE ORGANIZARE PENTRU CREŞTEREA EFICIENŢEI ENERGETICE",
+        "Măsuri generale de organizare pentru creşterea eficienţei energetice",
         "ch6",
         "fixed",
         ("template",),
@@ -336,7 +336,7 @@ ANALYSIS: tuple[Section, ...] = (
     section(
         "ch6.specifice",
         6,
-        "MĂSURI SPECIFICE PENTRU CREŞTEREA EFICIENŢEI ENERGETICE",
+        "Măsuri specifice pentru creşterea eficienţei energetice",
         "ch6",
         "narrative",
         ("auditor", "calculation"),

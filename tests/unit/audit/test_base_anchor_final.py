@@ -183,7 +183,7 @@ def test_heading_slots_take_the_client_her_reviewed_period_or_a_marker() -> None
     headings = [p.text for p in document.paragraphs if p.style.name.startswith("Heading")]  # type: ignore[attr-defined]
     assert headings == [
         "3. DESCRIEREA SITUAŢIEI EXISTENTE",
-        "3.1. DESCRIEREA UTILITĂȚILOR DIN CADRUL Atelier Exemplu SRL",
+        "3.1. DESCRIEREA UTILITĂȚILOR DIN CADRUL ATELIER EXEMPLU SRL",
         "3.2. DESCRIEREA FLUXULUI TEHNOLOGIC",
         f"3.2.1. DESCRIEREA SECȚIEI {MARKER}",
         "6. MĂSURI DE CREȘTERE A EFICIENŢEI ENERGETICE PERIOADA 2021-2023",

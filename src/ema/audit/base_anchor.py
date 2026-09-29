@@ -23,10 +23,10 @@ from ema.audit.base_parts import (
 from ema.audit.base_units import heading_spans_document
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four import MONTHS
+from ema.audit.heading_titles import MARKER, body_title
 from ema.audit.headings import MappedHeading, slot_values
 from ema.core.office.anchors import stamp
 
-MARKER = "[de completat]"
 _TITLES = {section.id: section.title for section in CATALOGUE}
 _CAPTION = re.compile(r"^\s*(Fig\.|Figura|Tabelul|Tabel|Graficul|Grafic)\s*(?:nr\.?\s*)?\d+", re.I)
 _EXTENT = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}extent"
@@ -300,6 +300,12 @@ def anchor_document(  # noqa: C901, PLR0912, PLR0915
                             ),
                             text,
                         )
+                    level = (
+                        len(prefix.group().strip().rstrip(".").split("."))
+                        if prefix
+                        else item.heading.level + 1
+                    )
+                    text = body_title(text, level, current)
                     _set_text(paragraph, (prefix.group() if prefix else "") + text)
                     if MARKER in text:
                         classification = "variable"

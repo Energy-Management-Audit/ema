@@ -154,7 +154,10 @@ test('rejected decisions stay in Acceptate and can be undone without a false all
       await page.getByRole('heading', { name: 'Nu mai e nimic de confirmat.' }).waitFor()
       assert.equal(await page.getByText('Câmpul este acceptat').count(), 0)
       await page.getByRole('button', { name: 'Acceptate 1' }).click()
-      await page.getByText(/respins acum/).waitFor()
+      await page
+        .locator('.ema-review-row')
+        .getByText(/^respins /)
+        .waitFor()
       const undoing = page.waitForResponse((response) =>
         response.url().endsWith(`/log/${decision.id}/undo`),
       )

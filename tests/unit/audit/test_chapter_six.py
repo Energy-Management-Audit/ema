@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from docx import Document
-from docx.enum.style import WD_STYLE_TYPE
+from tests.audit_structure import add_audit_toc, number_audit_headings
 
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_six import (
@@ -19,10 +19,7 @@ TITLES = {section.id: section.title for section in CATALOGUE}
 
 def _base(path: Path, *, chapter_five: bool) -> Path:
     doc = Document()
-    doc.styles.add_style("TOC 1", WD_STYLE_TYPE.PARAGRAPH)
-    doc.styles.add_style("TOC 2", WD_STYLE_TYPE.PARAGRAPH)
-    doc.add_paragraph("TOC one", style="TOC 1")
-    doc.add_paragraph("TOC two", style="TOC 2")
+    add_audit_toc(doc)
     if chapter_five:
         doc.add_paragraph(TITLES["ch5"], style="Heading 1")
     for key, style in (
@@ -57,6 +54,7 @@ def _base(path: Path, *, chapter_five: bool) -> Path:
     doc.add_paragraph("Retained closing paragraph")
     doc.add_paragraph(TITLES["ch7"], style="Heading 1")
     doc.add_paragraph("Financing preserved")
+    number_audit_headings(doc)
     doc.save(path)
     return path
 

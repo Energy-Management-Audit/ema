@@ -140,6 +140,23 @@ test('the five checks derive from the blocking codes', () => {
   )
 })
 
+test('an empty chapter marks the existing sections check as an error', () => {
+  const checks = {
+    readiness: {
+      draft_ok: true,
+      final_ok: false,
+      blocking: [{ code: 'chapter_empty', message: 'Capitolul: capitolul nu are conținut' }],
+    },
+    readiness_hash: 'h',
+  }
+  assert.equal(canGenerateFinal(checks), false)
+  assert.deepEqual(auditChecks(checks, undefined, false)[0], {
+    label: 'Toate secţiunile au răspuns',
+    tone: 'err',
+    detail: '1',
+  })
+})
+
 function files(dir) {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name)

@@ -34,6 +34,7 @@ _ALLOWED: dict[str, frozenset[str]] = {
     ),
     "legislation": frozenset(
         {
+            "62206578454bd09214bc8446b198a8144a99f6a6485536b9a717912c6250ab07",
             "6652b4f3ba8162e81558a6d6f551de1d7cc26b3e9f46cbc20675caded81e2cde",
             "cc340442fc7400673242e4bb290c886a77c8f89450d083ca9fa2db696eae28a8",
             "55aa9d42116a6f3a4e194f47472ea56d3003d172887ba4f606797c6c13d69d99",

@@ -21,8 +21,10 @@ from docx.oxml.ns import qn
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from PIL import Image
+from tests.audit_replay import CH2_DRAFT, draft_recording, support_recording
 from tests.conftest import artifacts_path
 from tests.golden.s17b_chart_oracle import assert_final_charts, expected_charts
+from tests.golden.s17c_structure_oracle import assert_final_structure
 from tests.golden.test_s17b_audit_render import (
     _outputs,
     _package_checks,
@@ -41,6 +43,7 @@ from ema.audit.base_units import heading_spans_document
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four import MONTHS
 from ema.audit.chapter_six import MEASURE_HEADER, SYNTHESIS_HEADER
+from ema.audit.draft_stage import draft_section
 from ema.audit.measures_form import write_measures_form
 from ema.audit.render import RenderSummary, start_audit_render
 from ema.audit.render_bindings import COVER_SLOT
@@ -161,6 +164,18 @@ def _draft_marks(ws: Workspace, job: str) -> tuple[list[str], set[str]]:
     after = {state.section_id: state.status for state in statuses(ws, job)}
     marked = [key for key in RENDER_DRAFTED if key in present and before[key] == Status.READY]
     assert marked and all(after[key] == Status.DRAFTED for key in marked)
+    # Review changes recorded inputs; replay CH2 against the current facts before confirmation.
+    directory = ws.root / "final-recordings"
+    directory.mkdir(exist_ok=True)
+    draft_section(
+        ws,
+        job,
+        CH2_DRAFT.section,
+        draft_recording=draft_recording(ws, job, CH2_DRAFT, directory / "ch2.json"),
+        support_recording=support_recording(
+            ws, job, CH2_DRAFT, directory / "ch2-support.json", None
+        ),
+    )
     return marked, present
 
 
@@ -189,7 +204,7 @@ def _document_checks(
     spans = heading_spans_document(document)
     flux = next(start for item, start, _ in spans if item.section_id == "ch3.flux")
     title = re.sub(r"^\s*[\d.]+\s*", "", _text(document.element.body[flux]))
-    assert title == "DESCRIEREA FLUXULUI TEHNOLOGIC"
+    assert title == next(section.title for section in CATALOGUE if section.id == "ch3.flux").upper()
     measure = next(item for item in _region(document, "ch6.measure") if item.tag == W + "tbl")
     synthesis = next(item for item in _region(document, "ch6.sinteza") if item.tag == W + "tbl")
     assert _header(measure, 2) == [list(row) for row in MEASURE_HEADER]
@@ -242,6 +257,7 @@ def test_CLIENT-A1_final_approved_and_exported(
     assert not na & kept, sorted(na & kept)
 
     readiness = AuditWorkflow().readiness(ws, job)  # 5. the final
+    assert states[CH2_DRAFT.section] == Status.DONE
     assert readiness.final_ok, [issue.message for issue in readiness.blocking]
     final = _wait(ws, job, AuditWorkflow().start_final(ws, job))
     assert final["state"] == "ready", final["error"]
@@ -253,8 +269,10 @@ def test_CLIENT-A1_final_approved_and_exported(
     docx, pdf = outputs["Audit-final.docx"], outputs["Audit-final.pdf"]
     assert body_counts(docx).markers == []
     _package_checks(docx, identity, summary)
-    pages = _toc_pages(docx)
-    assert summary.toc_pages_set and pages and all(text.strip().isdigit() for text in pages)
+    toc_pages = _toc_pages(docx)
+    assert summary.toc_pages_set and toc_pages and all(text.strip().isdigit() for text in toc_pages)
+    pages, toc_entries = assert_final_structure(docx, pdf)
+    assert pages > 0 and toc_entries == len(toc_pages)
     _document_checks(ws, job, docx, folder / "base.anchors.json", reviewed)
     _images_are_reviewed_or_uploaded(docx, photo)
     copy = _export(ws, job)  # 6.
@@ -263,6 +281,11 @@ def test_CLIENT-A1_final_approved_and_exported(
     out.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(docx, out / "Audit-final.docx")
     shutil.copyfile(pdf, out / "Audit-final.pdf")
+    review = artifacts_path("s17c", "structure")
+    review.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(pdf, review / "Audit-final.pdf")
+    shutil.copyfile(docx, review / "Audit-final.docx")
+    shutil.copyfile(folder / "digest-changes.txt", review.parent / "digest-changes.txt")
     done = sum(value == Status.DONE for value in states.values())
     evidence = {
         "chapters": len(summary.chapters),
@@ -271,7 +294,8 @@ def test_CLIENT-A1_final_approved_and_exported(
         "markers": len(summary.markers),
         "done": done,
         "na": len(na),
-        "pages": len(pages),
+        "pages": pages,
+        "toc_entries": toc_entries,
         "exported": True,
         "render_drafted": len(marked),
         "reviewed_keys": reviewed,
@@ -279,7 +303,8 @@ def test_CLIENT-A1_final_approved_and_exported(
     (out / "final-checks.json").write_text(json.dumps(evidence, indent=2), "utf-8")
     print(
         f"S17b audit final: chapters={len(summary.chapters)} tables={summary.tables} "
-        f"charts={summary.charts} markers=0 done={done} na={len(na)} pages={len(pages)} "
+        f"charts={summary.charts} markers=0 done={done} na={len(na)} "
+        f"pages={pages} toc_entries={toc_entries} "
         f"exported={copy.name}"
     )
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PIL import Image
+from tests.audit_structure import RETAINED_CONTENT, confirm_retained_content
 
 from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import CATALOGUE
@@ -21,8 +22,10 @@ from ema.core.workspace import Workspace
 def _job(tmp_path: Path) -> tuple[Workspace, str]:
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "audit", "synthetic", 2026)
+    confirm_retained_content(ws, job)
     for section in CATALOGUE:
-        set_status(ws, job, section.id, Status.NA, "user")
+        if section.id not in RETAINED_CONTENT:
+            set_status(ws, job, section.id, Status.NA, "user")
     return ws, job
 
 

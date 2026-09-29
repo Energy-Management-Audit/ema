@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.audit_structure import RETAINED_CONTENT, confirm_retained_content
 from tests.unit.audit.render_seams import (
     FakeWord,
     fill_writer,
@@ -39,8 +40,9 @@ def approved(
 ) -> tuple[Workspace, str, TestClient, dict[str, str], str]:
     """A final rendered while ch4.concluzii is done and written; every other section n/a."""
     ws, job, _ = synthetic_render(tmp_path, monkeypatch)
+    confirm_retained_content(ws, job)
     for section in CATALOGUE:
-        if section.id != KEPT:
+        if section.id not in {KEPT, *RETAINED_CONTENT}:
             set_status(ws, job, section.id, Status.NA, "user")
     _done(ws, job, KEPT)
     write_narrative(ws, job, KEPT, "Consumul a scăzut după modernizare.")

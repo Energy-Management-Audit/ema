@@ -11,12 +11,13 @@ GENERAL: tuple[Section, ...] = (
         "fixed",
         ("template",),
         aliases=("CAPITOLUL 1 - DESCRIEREA ȘI SCOPUL AUDITULUI",),
+        has_intro_content=True,
     ),
-    section("ch1.scop", 1, "SCOPUL AUDITULUI", "ch1", "fixed", ("template",), prototype="pcm"),
-    section("ch1.obiective", 1, "OBIECTIVE URMĂRITE", "ch1", "fixed", ("template",)),
-    section("ch1.continut", 1, "CONŢINUTUL AUDITULUI", "ch1", "fixed", ("template",)),
-    section("ch1.intocmire", 1, "ÎNTOCMIREA AUDITULUI ENERGETIC", "ch1", "fixed", ("template",)),
-    section("ch1.legislatie", 1, "SPECIFICAȚII LEGISLATIVE", "ch1", "fixed", ("template",)),
+    section("ch1.scop", 1, "Scopul auditului", "ch1", "fixed", ("template",), prototype="pcm"),
+    section("ch1.obiective", 1, "Obiective urmărite", "ch1", "fixed", ("template",)),
+    section("ch1.continut", 1, "Conţinutul auditului", "ch1", "fixed", ("template",)),
+    section("ch1.intocmire", 1, "Întocmirea auditului energetic", "ch1", "fixed", ("template",)),
+    section("ch1.legislatie", 1, "Specificații legislative", "ch1", "fixed", ("template",)),
     section(
         "ch2",
         2,
@@ -29,7 +30,7 @@ GENERAL: tuple[Section, ...] = (
     section(
         "ch2.date_generale",
         2,
-        "DATE GENERALE",
+        "Date generale",
         "ch2",
         "data",
         ("clients", "anexa", "questionnaire"),
@@ -48,7 +49,7 @@ GENERAL: tuple[Section, ...] = (
     section(
         "ch2.activitate",
         2,
-        "DATE PRIVIND ACTIVITATEA DESFĂȘURATĂ ÎN CADRUL UNITĂȚII ECONOMICE",
+        "Date privind activitatea desfășurată în cadrul unității economice",
         "ch2",
         "data",
         ("questionnaire",),
@@ -57,7 +58,7 @@ GENERAL: tuple[Section, ...] = (
     section(
         "ch2.localizare",
         2,
-        "LOCALIZAREA COMPANIEI",
+        "Localizarea companiei",
         "ch2",
         "narrative",
         ("online", "clients"),
@@ -66,7 +67,7 @@ GENERAL: tuple[Section, ...] = (
     section(
         "ch2.istorie",
         2,
-        "ISTORIA COMPANIEI",
+        "Istoria companiei",
         "ch2",
         "narrative",
         ("online", "clients"),
@@ -85,7 +86,7 @@ GENERAL: tuple[Section, ...] = (
     section(
         "ch3.flux",
         3,
-        "DESCRIEREA FLUXULUI TEHNOLOGIC",
+        "Descrierea fluxului tehnologic",
         "ch3",
         "narrative",
         ("dossier", "visit"),
@@ -99,7 +100,7 @@ GENERAL: tuple[Section, ...] = (
     section(
         "ch3.process",
         3,
-        "DESCRIEREA SECȚIEI",
+        "Descrierea secției",
         "ch3",
         "narrative",
         ("dossier", "visit"),
@@ -114,7 +115,7 @@ GENERAL: tuple[Section, ...] = (
     section(
         "ch3.utilitati",
         3,
-        "SITUAŢIA EXISTENTĂ LA NIVELUL ALIMENTĂRII CU UTILITĂȚI",
+        "Situaţia existentă la nivelul alimentării cu utilități",
         "ch3",
         "narrative",
         ("dossier", "questionnaire", "visit"),
@@ -231,7 +232,7 @@ GENERAL: tuple[Section, ...] = (
     section(
         "ch3.contorizare",
         3,
-        "SITUAŢIA CONTORIZĂRII CONSUMATORILOR DE ENERGIE",
+        "Situaţia contorizării consumatorilor de energie",
         "ch3",
         "data",
         ("questionnaire", "visit"),
@@ -244,7 +245,7 @@ GENERAL: tuple[Section, ...] = (
     section(
         "ch3.automatizare",
         3,
-        "SITUAŢIA AUTOMATIZĂRILOR",
+        "Situaţia automatizărilor",
         "ch3",
         "data",
         ("questionnaire", "visit"),

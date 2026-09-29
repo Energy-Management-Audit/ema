@@ -16,7 +16,9 @@ from lxml import etree
 
 from ema.audit.base import build_base, build_configured_base
 from ema.audit.base_anchor import MARKER, _paragraph_text
+from ema.audit.base_cleanup import clean_base
 from ema.audit.base_identity import derive_identity as _identity
+from ema.audit.base_numbering import printed_numbers
 from ema.audit.base_numeric import approved_fixed_text, has_number
 from ema.audit.base_package import package_issues
 from ema.audit.base_units import UnitPlan, select_units
@@ -68,6 +70,7 @@ def _CLIENT-A2_plan(root: Path) -> UnitPlan:
 
 def _section_paragraphs(path: Path, section: str) -> list[object]:
     document = Document(path)
+    clean_base(document)
     mapping = map_headings(path, "AUDIT-01")
     heading = next(item.heading for item in mapping.mapped if item.section_id == section)
     later = [
@@ -193,6 +196,12 @@ def test_audit_base_for_case(reference_library: Path, tmp_path: Path, case: str)
     assert sum(item.section_id == "ch3.process" for item in mapping.mapped) == plan.processes
     assert sum(item.section_id == "ch5" for item in mapping.mapped) == 1
     document = Document(output)
+    numbers = printed_numbers(document)
+    assert [
+        numbers[document.paragraphs[item.heading.index]._p]
+        for item in mapping.mapped
+        if "." not in item.section_id
+    ] == [f"{chapter}." for chapter in range(1, 8)]
     assert all(
         MARKER in document.paragraphs[item.heading.index].text
         for item in mapping.mapped
@@ -202,7 +211,7 @@ def test_audit_base_for_case(reference_library: Path, tmp_path: Path, case: str)
         paragraph.text for paragraph in document.paragraphs if paragraph.style.style_id == "TOC1"
     ]
     assert all(
-        any(title.startswith(f"{chapter}. ") for title in toc_roots) for chapter in (5, 6, 7)
+        any(title.startswith(f"{chapter}.\t") for title in toc_roots) for chapter in (5, 6, 7)
     )
     assert not package_issues(output, identity)
     _prototype_format(base, prototype, output)
@@ -243,7 +252,7 @@ def test_absent_measurements_shift_printed_chapters(
     toc_roots = [
         paragraph.text for paragraph in document.paragraphs if paragraph.style.style_id == "TOC1"
     ]
-    assert any(title.startswith("5. ") for title in toc_roots)
-    assert any(title.startswith("6. ") for title in toc_roots)
-    assert not any(title.startswith("7. ") for title in toc_roots)
+    assert any(title.startswith("5.\t") for title in toc_roots)
+    assert any(title.startswith("6.\t") for title in toc_roots)
+    assert not any(title.startswith("7.\t") for title in toc_roots)
     _toc_in_step(output)

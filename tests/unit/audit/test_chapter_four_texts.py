@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from docx import Document
-from docx.enum.style import WD_STYLE_TYPE
+from tests.audit_structure import add_audit_toc, number_audit_headings
 
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four_blocks import chapter_four_blocks
@@ -80,10 +80,7 @@ def test_na_section_text_never_blocks_the_final(tmp_path: Path) -> None:
 
 def _base(path: Path) -> Path:
     document = Document()
-    document.styles.add_style("TOC 1", WD_STYLE_TYPE.PARAGRAPH)
-    document.styles.add_style("TOC 2", WD_STYLE_TYPE.PARAGRAPH)
-    document.add_paragraph("TOC one", style="TOC 1")
-    document.add_paragraph("TOC two", style="TOC 2")
+    add_audit_toc(document)
     document.add_paragraph(TITLES["ch4"], style="Heading 1")
     document.add_paragraph(TITLES["ch4.concluzii"], style="Heading 2")
     document.add_paragraph("Concluzii scrise")
@@ -92,6 +89,7 @@ def _base(path: Path) -> Path:
     document.add_table(rows=1, cols=1).cell(0, 0).text = "Tabel de eliminat"
     document.add_paragraph(TITLES["ch7"], style="Heading 1")
     document.add_paragraph("Finanţare")
+    number_audit_headings(document)
     document.save(str(path))
     return path
 
@@ -129,10 +127,7 @@ def test_droppable_keeps_fixed_sections_and_parents_of_kept_children() -> None:
 
 def test_drafted_child_inside_an_na_parent_survives(tmp_path: Path) -> None:
     document = Document()
-    document.styles.add_style("TOC 1", WD_STYLE_TYPE.PARAGRAPH)
-    document.styles.add_style("TOC 2", WD_STYLE_TYPE.PARAGRAPH)
-    document.add_paragraph("TOC one", style="TOC 1")
-    document.add_paragraph("TOC two", style="TOC 2")
+    add_audit_toc(document)
     document.add_paragraph(TITLES["ch3"], style="Heading 1")
     document.add_paragraph("Introducere capitol")
     document.add_paragraph(TITLES["ch3.flux"], style="Heading 2")
@@ -141,6 +136,7 @@ def test_drafted_child_inside_an_na_parent_survives(tmp_path: Path) -> None:
     document.add_paragraph("Proces de eliminat")
     document.add_paragraph(TITLES["ch7"], style="Heading 1")
     docx = tmp_path / "base.docx"
+    number_audit_headings(document)
     document.save(str(docx))
     chapter_three = [section.id for section in CATALOGUE if section.id.startswith("ch3")]
     na = [section for section in chapter_three if section != "ch3.flux"]

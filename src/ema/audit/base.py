@@ -13,9 +13,11 @@ from ema.audit.base_anchor import (
     numeric_variable_texts,
     save_anchor_map,
 )
+from ema.audit.base_cleanup import clean_base
 from ema.audit.base_package import package_issues, scrub_package
 from ema.audit.base_toc import refresh_toc
-from ema.audit.base_units import UnitPlan, select_units
+from ema.audit.base_units import UnitPlan, heading_spans_document, select_units
+from ema.audit.heading_titles import heading_snapshot, title_changes
 from ema.core.config import Settings
 
 
@@ -37,9 +39,12 @@ def build_base(
     output.parent.mkdir(parents=True, exist_ok=True)
     document = Document(str(base_document))
     select_units(document, base_document, measurement_prototype, unit_plan)
+    titles_before = heading_snapshot(document, heading_spans_document(document))
+    digest_changes = clean_base(document)
     numeric_leftovers = numeric_variable_texts(document, base_identity)
     anchors = anchor_document(document, unit_plan.client_name, base_identity)
     refresh_toc(document)
+    digest_changes.extend(title_changes(titles_before))
     assert_markers(document, anchors)
     document.save(str(output))
     scrub_package(output)
@@ -49,6 +54,7 @@ def build_base(
         raise ValueError("audit base validation failed: " + "; ".join(issues[:8]))
     source_hash = hashlib.sha256(base_document.read_bytes()).hexdigest()
     save_anchor_map(output.with_suffix(".anchors.json"), source_hash, anchors)
+    (output.parent / "digest-changes.txt").write_text("\n".join(digest_changes) + "\n", "utf-8")
     return output
 
 

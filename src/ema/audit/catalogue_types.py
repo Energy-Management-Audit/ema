@@ -125,6 +125,7 @@ class Section:
     facts: tuple[FactRef, ...] = ()
     templates: tuple[str, ...] = ()
     awaits: tuple[MaterialKind, ...] = ()
+    has_intro_content: bool = False
 
 
 def section(  # noqa: PLR0913
@@ -140,6 +141,7 @@ def section(  # noqa: PLR0913
     prototype: str = "AUDIT-01",
     facts: tuple[FactRef, ...] = (),
     templates: tuple[str, ...] = (),
+    has_intro_content: bool = False,
 ) -> Section:
     return Section(
         id,
@@ -153,4 +155,5 @@ def section(  # noqa: PLR0913
         PrototypeRef(prototype, (title,)),
         facts,
         templates,
+        has_intro_content=has_intro_content,
     )

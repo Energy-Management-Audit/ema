@@ -16,6 +16,8 @@ FROM_DEV = {
     "Generarea PIEE a eșuat.",
     "Ciorna PIEE lipsește.",
 }
+# S17c requires this new copy verbatim, pending the auditor's copy review.
+PLAN_LITERALS = {": capitolul nu are conținut"}
 
 
 def _messages(tree: ast.AST) -> list[ast.expr]:
@@ -47,7 +49,7 @@ def test_user_messages_use_cedilla_diacritics() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for expr in _messages(tree):
             for text in _strings(expr):
-                if COMMA_BELOW & set(text) and text not in FROM_DEV:
+                if COMMA_BELOW & set(text) and text not in FROM_DEV | PLAN_LITERALS:
                     offenders.append(f"{path}:{expr.lineno}: {text}")
     assert offenders == []
 

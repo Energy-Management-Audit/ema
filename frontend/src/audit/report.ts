@@ -89,7 +89,7 @@ export function pageIndex(page: number | null, pages: number): number | null {
 export type AuditCheck = { label: string; tone: 'ok' | 'err'; detail: string }
 
 const CHECKS: ReadonlyArray<{ label: string; codes: string[]; photos?: true }> = [
-  { label: 'Toate secţiunile au răspuns', codes: ['section_open', 'na_recheck'] },
+  { label: 'Toate secţiunile au răspuns', codes: ['section_open', 'na_recheck', 'chapter_empty'] },
   { label: 'Nicio ciornă nu e veche', codes: ['stale', 'final_stale', 'cover_photo_changed'] },
   { label: 'Toate diferenţele dintre surse sunt decise', codes: ['conflict'] },
   {

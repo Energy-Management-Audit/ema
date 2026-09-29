@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.audit_structure import RETAINED_CONTENT, confirm_retained_content
 from tests.unit.audit.render_seams import (
     FakeWord,
     fill_writer,
@@ -40,11 +41,13 @@ def _start(client: TestClient, headers: dict[str, str], job: str, stage: str) ->
 
 @pytest.fixture
 def ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Workspace, str]:
-    """Every section n/a for readiness, the report's markers written, Word present."""
+    """Retained chapters have content, other sections are n/a, and Word is present."""
     ws, job, _ = synthetic_render(tmp_path, monkeypatch)
     write_intros(ws, job)
+    confirm_retained_content(ws, job)
     for section in CATALOGUE:
-        set_status(ws, job, section.id, Status.NA, "user")
+        if section.id not in RETAINED_CONTENT:
+            set_status(ws, job, section.id, Status.NA, "user")
     monkeypatch.setattr(render, "_statuses", lambda ws, job: {"ch4.bilant_real": Status.NA})
     monkeypatch.setattr(render, "write_draft", fill_writer("ch2.date_generale", "ch3.flux"))
     monkeypatch.setattr(render, "word_available", lambda settings: True)
@@ -109,8 +112,10 @@ def test_final_is_refused_before_readiness_and_without_word(
     refused = _start(client, headers, job, "audit_final")
     assert refused.status_code == 409
     assert refused.json()["type"] == "urn:ema:error:not_ready"
+    confirm_retained_content(ws, job)
     for section in CATALOGUE:
-        set_status(ws, job, section.id, Status.NA, "user")
+        if section.id not in RETAINED_CONTENT:
+            set_status(ws, job, section.id, Status.NA, "user")
     no_word = _start(client, headers, job, "audit_final")
     assert no_word.status_code == 424
     assert no_word.json() == {

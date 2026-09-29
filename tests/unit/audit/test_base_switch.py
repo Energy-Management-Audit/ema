@@ -18,7 +18,7 @@ from tests.unit.audit.section_marks_seams import (
 
 from ema.audit import base_entry, workflow
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.sections import Status, refresh_staleness, set_status
+from ema.audit.sections import Status, mark_drafted, refresh_staleness, set_status
 from ema.audit.sections_bulk import patch_sections
 from ema.audit.workflow import AuditWorkflow
 from ema.core.config import Settings
@@ -33,6 +33,13 @@ def _ready_for_final(ws: Workspace, job: str) -> list[str]:
     """Every render-drafted section confirmed by the user, the rest n/a: the final is ready."""
     set_status(ws, job, "ch4.bilant_real", Status.NA, "user", "golden")  # its writer is not seamed
     draft(ws, job)
+    state = by_id(ws, job)["ch2.date_generale"]
+    if state.status in {Status.MISSING, Status.READY}:
+        set_status(ws, job, state.section_id, Status.READY, "ema")
+        fingerprint = tuple(
+            value for value in by_id(ws, job)["ch2"].fingerprint if value.startswith("base:")
+        )
+        mark_drafted(ws, job, state.section_id, "agent", fingerprint)
     drafted = [s for s in by_id(ws, job).values() if s.status == Status.DRAFTED and not s.stale]
     patch_sections(
         ws,
