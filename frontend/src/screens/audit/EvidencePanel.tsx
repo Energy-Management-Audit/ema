@@ -127,7 +127,7 @@ export function EvidencePanel({
       {evidence.provenance === 'calculated' && (
         <Paper className="audit-evidence__paper">
           <strong>
-            {formatNumber(value, field.unit)} {field.unit}
+            {formatNumber(value)} {field.unit}
           </strong>
           <small>
             formula {field.derivation?.formula_id} · factori {field.derivation?.factor_version}
@@ -145,7 +145,9 @@ export function EvidencePanel({
         {evidence.provenance === 'calculated' ? (
           inputFields.map((item) => (
             <p key={item.id}>
-              {item.label} · {scalar(item.value)} {item.unit}
+              {item.label} ·{' '}
+              {item.value_type === 'number' ? formatNumber(scalar(item.value)) : scalar(item.value)}{' '}
+              {item.unit}
             </p>
           ))
         ) : (
@@ -188,7 +190,10 @@ export function EvidencePanel({
               )
             }}
           >
-            Foloseşte {String(candidate.value)}
+            Foloseşte{' '}
+            {field.value_type === 'number'
+              ? formatNumber(scalar(candidate.value))
+              : scalar(candidate.value)}
           </Button>
         ))}
         {problem && <span role="alert">{problem}</span>}

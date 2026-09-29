@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { roCount } from '../src/clients/plural.ts'
+import { plural as roCount } from '../src/lib/plural.ts'
 
 test('Romanian counts use singular, plural and de plural at their boundaries', () => {
   assert.equal(roCount(0, 'fişier', 'fişiere'), '0 fişiere')

@@ -10,6 +10,7 @@ import { TextField } from '../../ui/Field.tsx'
 import { FailureNotice } from '../../ui/Feedback.tsx'
 import { GroupBox, GroupRow } from '../../ui/Surface.tsx'
 
+/** 3i: design handoff screen component. */
 export function FilesPage({ settings }: { settings: SettingsView }) {
   const [folder, setFolder] = useState(settings.backup.dir ?? '')
   const [folderError, setFolderError] = useState<string | null>(null)

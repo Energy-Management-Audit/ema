@@ -26,6 +26,7 @@ const ROWS = [
   ],
 ] as const
 
+/** 3i: design handoff screen component. */
 export function ExtractionPage({ settings }: { settings: SettingsView }) {
   const [problem, setProblem] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)

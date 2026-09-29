@@ -1,43 +1,14 @@
-const WEEKDAYS = ['Duminică', 'Luni', 'Marţi', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă']
-const MONTHS = [
-  'ianuarie',
-  'februarie',
-  'martie',
-  'aprilie',
-  'mai',
-  'iunie',
-  'iulie',
-  'august',
-  'septembrie',
-  'octombrie',
-  'noiembrie',
-  'decembrie',
-]
-const SHORT_MONTHS = [
-  'ian',
-  'feb',
-  'mar',
-  'apr',
-  'mai',
-  'iun',
-  'iul',
-  'aug',
-  'sep',
-  'oct',
-  'noi',
-  'dec',
-]
+import { formatDate } from '../lib/format.ts'
 
 export function formatDay(date: Date): string {
-  return `${WEEKDAYS[date.getDay()]}, ${String(date.getDate())} ${MONTHS[date.getMonth()]}`
+  return formatDate(date, { year: false, long: true, weekday: true })
 }
 
 export function formatShortDate(iso: string, year = false): string {
-  const date = new Date(iso)
-  return `${String(date.getDate())} ${SHORT_MONTHS[date.getMonth()]}${year ? ` ${String(date.getFullYear())}` : ''}`
+  return formatDate(iso, { year })
 }
 
 export function formatBackupTime(iso: string): string {
   const date = new Date(iso)
-  return `${formatShortDate(iso, true)}, ${date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}`
+  return `${formatDate(iso)}, ${date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}`
 }

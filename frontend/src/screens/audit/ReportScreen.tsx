@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { auditReport, runFailure } from '../../api/audit-report.ts'
 import { api } from '../../api/endpoints.ts'
 import { AppSidebar } from '../../app/AppSidebar.tsx'
@@ -13,7 +13,6 @@ import { FailureNotice, ProgressBar } from '../../ui/Feedback'
 import { Content, Window } from '../../ui/Shell'
 import { ProblemNotice, download, useAction } from '../actions.tsx'
 import { clientName } from '../JobScreen.tsx'
-import { RegenerateDialog } from '../RegenerateDialog.tsx'
 import { problemTitle } from '../States.tsx'
 import { PdfPages, usePdfDocument, type PdfPagesHandle } from './PdfPages.tsx'
 import { ReportPanel } from './ReportPanel.tsx'
@@ -24,6 +23,7 @@ export type ReportScreenProps = { jobId: string }
 
 const RENDER_STAGES = new Set(['audit_render', 'audit_final'])
 
+/** 3d: design handoff screen component. */
 export function ReportScreen({ jobId }: ReportScreenProps) {
   return (
     <JobProvider jobId={jobId}>
@@ -58,7 +58,6 @@ function ReportView() {
   const report = useResource(jobKey(jobId, 'report'), () => auditReport.report(jobId))
   const start = useAction()
   const save = useAction()
-  const [confirming, setConfirming] = useState(false)
   const pagesRef = useRef<PdfPagesHandle>(null)
   const markersRef = useRef<HTMLDivElement>(null)
   useRenderEnd(jobId)
@@ -82,7 +81,6 @@ function ReportView() {
 
   const generate = () => {
     if (!job) return
-    setConfirming(false)
     void start.run(async () => {
       const started = await auditReport.startRender(jobId, job.revision)
       ctx.follow(started.run_id, started.stage)
@@ -108,8 +106,7 @@ function ReportView() {
           disabled={!job || start.pending}
           loading={start.pending}
           onClick={() => {
-            if (docx?.edited_externally) setConfirming(true)
-            else generate()
+            generate()
           }}
         >
           Generează ciorna
@@ -268,15 +265,6 @@ function ReportView() {
           navigate(auditHref(jobId, 'revizuire'))
         }}
       />
-      {confirming && docx && (
-        <RegenerateDialog
-          name={docx.name}
-          onClose={() => {
-            setConfirming(false)
-          }}
-          onConfirm={generate}
-        />
-      )}
     </Window>
   )
 }

@@ -1,5 +1,5 @@
 import type { OutlineNode } from '../api/audit-types.ts'
-import { plural } from './plural.ts'
+import { plural } from '../lib/plural.ts'
 
 export function displayTitle(title: string): string {
   return /[a-zăâîşţ]/.test(title)

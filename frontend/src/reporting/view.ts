@@ -1,5 +1,5 @@
 import type { ReportException, ReportingPreview } from '../api/reporting-types.ts'
-import { roCount } from '../clients/plural.ts'
+import { plural as roCount } from '../lib/plural.ts'
 import { formatNumber } from '../lib/format.ts'
 
 export function severityLabel(code: string): 'EROARE' | 'ATENŢIE' | 'INFORMARE' {

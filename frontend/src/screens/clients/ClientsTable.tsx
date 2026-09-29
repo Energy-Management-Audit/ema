@@ -13,6 +13,7 @@ function jobsFor(id: string, overview: JobOverview[]): JobOverview[] {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 }
 
+/** M1: design handoff screen component. */
 export function ClientsTable({
   clients,
   jobs,

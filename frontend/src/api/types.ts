@@ -133,10 +133,13 @@ export type Readiness = {
 export type ExportChecks = {
   readiness: Readiness
   readiness_hash: string
+  final: { output_id: string; created_at: string; files: string[] } | null
 }
 
-export type ExportResult = {
-  output_id: string
+export type ExportResponse = {
+  approved_at: string
+  files: { name: string; path: string }[]
+  folder: string
 }
 
 export type Output = {
@@ -145,7 +148,6 @@ export type Output = {
   kind: 'draft' | 'final'
   media_type: string
   size_bytes: number
-  edited_externally: boolean
   name: string
   created_at: string | null
   run_id: string

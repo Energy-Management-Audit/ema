@@ -296,7 +296,9 @@ try {
   await page.getByRole('button', { name: 'Previzualizare' }).click()
   const pdfPath = new URL((await pdfRequest).url()).pathname
   const finals = (await api(page, 'GET', `/jobs/${job}/outputs`)).body
-  const final = finals.at(-1)
+  const selected = (await api(page, 'GET', `/jobs/${job}/export/checks`)).body.final
+  const final = finals.find((item) => item.id === selected?.output_id)
+  check(Boolean(final), 'checks selects the final output')
   const pdf = finals.find((item) => pdfPath.endsWith(`/${item.id}`))
   check(
     pdf?.media_type === 'application/pdf' && pdf.run_id === final.run_id,
@@ -310,10 +312,23 @@ try {
   await page.goto(page.url().replace(/\/date$/, '/predare'))
   const response = page.waitForResponse((item) => item.url().endsWith(`/jobs/${job}/export`))
   await page.getByRole('button', { name: 'Aprobă şi exportă' }).click()
-  check((await response).status() === 200, 'Aprobă şi exportă answers 200')
-  await page.getByText('Copia finală e în dosarul de exporturi al lucrării.').waitFor()
+  const exportResponse = await response
+  check(exportResponse.status() === 200, 'Aprobă şi exportă answers 200')
+  const receipt = await exportResponse.json()
+  await page.getByText(`Fişierele finale sunt în ${receipt.folder}`, { exact: true }).waitFor()
+  const packageOutputs = finals.filter((item) => item.run_id === final.run_id)
+  check(receipt.files.length === packageOutputs.length, 'every final run file is exported')
+  for (const file of receipt.files) {
+    check(
+      packageOutputs.some((item) => item.name === file.name),
+      'exported file belongs to the final run',
+    )
+    await page.getByText(`${file.name} · ${file.path}`, { exact: true }).waitFor()
+  }
   await shot(page, 'approved')
-  const exported = readFileSync(join(workspace, 'exports', `${job}-${final.id}.docx`))
+  const exportedFile = receipt.files.find((file) => file.name === final.name)
+  check(Boolean(exportedFile), 'the final docx is exported')
+  const exported = readFileSync(exportedFile.path)
   const served = await page.evaluate(async (path) => {
     return Array.from(new Uint8Array(await (await fetch(path)).arrayBuffer()))
   }, `/jobs/${job}/outputs/${final.id}`)

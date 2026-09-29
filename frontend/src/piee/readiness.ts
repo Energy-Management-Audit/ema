@@ -2,6 +2,7 @@
 // All of it is read from the readiness the API computes; nothing is re-derived here.
 
 import type { ExportChecks, Field, Issue, Output, PieeSummary } from '../api/types.ts'
+import { plural } from '../lib/plural.ts'
 import { formatNumber } from '../lib/format.ts'
 import { fieldLabel } from './labels.ts'
 
@@ -87,9 +88,7 @@ export function blockingItems(
 export function blockingFooter(checks: ExportChecks | undefined): string {
   const count = blockingIssues(checks).length
   if (count === 0) return 'Nimic nu blochează exportul final.'
-  return count === 1
-    ? 'Exportul final se poate face după 1 decizie.'
-    : `Exportul final se poate face după ${String(count)} decizii.`
+  return `Exportul final se poate face după ${plural(count, 'decizie', 'decizii')}.`
 }
 
 const DOCUMENT_CODES = new Set([
@@ -124,13 +123,16 @@ export function exportChecks(
   return [
     {
       tone: complete === total ? 'ok' : 'warn',
-      label: `Toate cele ${String(total)} măsuri au termen, investiţie, economie şi recuperare`,
+      label:
+        total === 1
+          ? 'Măsura are termen, investiţie, economie şi recuperare'
+          : `Toate cele ${plural(total, 'măsură', 'măsuri')} au termen, investiţie, economie şi recuperare`,
       detail: `${String(complete)} / ${String(total)}`,
     },
     {
       tone: onAnnual.length > 0 ? 'err' : 'ok',
       label: 'Totalul anual coincide cu „Date anuale” din Anexa 2–3',
-      detail: totalTep ? `${formatNumber(totalTep, 'tep')} tep` : '—',
+      detail: totalTep ? `${formatNumber(totalTep, 'tep', true)} tep` : '—',
     },
     {
       tone: open.length > 0 ? 'err' : 'ok',
@@ -161,17 +163,16 @@ export function latestOutput(outputs: Output[]): Output | null {
   return [...outputs].sort(byVersion).at(-1) ?? null
 }
 
-/** The current final package: the latest output when it is a piee_word final docx. */
-export function currentFinal(outputs: Output[]): Output | null {
-  const latest = latestOutput(outputs)
-  return latest && latest.kind === 'final' && latest.stage === 'piee_word' && isDocx(latest)
-    ? latest
+/** The workflow selects the current final once; newer outputs never change it in the UI. */
+export function currentFinal(outputs: Output[], checks: ExportChecks | undefined): Output | null {
+  return checks?.final
+    ? (outputs.find((item) => item.id === checks.final?.output_id) ?? null)
     : null
 }
 
 /** The PDF rendered in the same run as the current final; the only thing Previzualizare opens. */
-export function previewPdf(outputs: Output[]): Output | null {
-  const final = currentFinal(outputs)
+export function previewPdf(outputs: Output[], checks: ExportChecks | undefined): Output | null {
+  const final = currentFinal(outputs, checks)
   if (!final) return null
   return (
     outputs.find((item) => item.media_type === 'application/pdf' && item.run_id === final.run_id) ??

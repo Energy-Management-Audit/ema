@@ -18,7 +18,7 @@ function Bare({ children, sidebar = true }: { children: ReactNode; sidebar?: boo
   )
 }
 
-/** E0: no PIEE job yet. */
+/** 7b / E0: no PIEE job yet. */
 export function NoJob() {
   return (
     <Bare>
@@ -29,7 +29,7 @@ export function NoJob() {
   )
 }
 
-/** E3: the session cookie is gone; only a new launch helps. */
+/** 7b / E3: the session cookie is gone; only a new launch helps. */
 export function SessionClosed() {
   return (
     <Bare sidebar={false}>
@@ -40,7 +40,7 @@ export function SessionClosed() {
   )
 }
 
-/** E2 outside a job: the first reads failed. */
+/** 7b / E2 outside a job: the first reads failed. */
 export function BootFailure({ problem }: { problem: unknown }) {
   return (
     <Bare sidebar={false}>

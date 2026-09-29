@@ -79,10 +79,6 @@
   color: var(--ink);
   text-decoration: none;
 }
-.home-screen__update-link:focus-visible {
-  outline: 2px solid var(--olive);
-  outline-offset: 2px;
-}
 .home-screen__muted {
   color: var(--ink-muted);
   font-size: 12.5px;

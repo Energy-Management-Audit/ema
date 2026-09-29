@@ -10,7 +10,7 @@ import type {
   DeleteResult,
   Evidence,
   ExportChecks,
-  ExportResult,
+  ExportResponse,
   Field,
   FileVersion,
   Job,
@@ -113,12 +113,12 @@ export const api = {
   generatePackage: (id: string, revision: number) =>
     request<RunStart>('POST', `${job(id)}/stages/piee_word`, { on_revision: revision }),
   cancel: (id: string) => request<CancelResult>('POST', `${job(id)}/cancel`),
-  exportFinal: (id: string, outputId: string, readinessHash: string) =>
-    request<ExportResult>('POST', `${job(id)}/export`, {
-      final: true,
+  exportFinal: (id: string, outputId: string, readinessHash: string, destDir: string | null) =>
+    request<ExportResponse>('POST', `${job(id)}/export`, {
       output_id: outputId,
       readiness_hash: readinessHash,
       confirm: true,
+      dest_dir: destDir,
     }),
 }
 

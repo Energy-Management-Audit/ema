@@ -1,5 +1,6 @@
+import { formatDate } from '../lib/format.ts'
 import type { Evidence } from '../api/types.ts'
-import { plural } from './plural.ts'
+import { plural } from '../lib/plural.ts'
 
 export function sourceLabel(evidence: Evidence, fileName?: string): string {
   const locator = evidence.locator
@@ -17,7 +18,7 @@ export function sourceLabel(evidence: Evidence, fileName?: string): string {
     } catch {
       /* An invalid source stays visible without a navigable link. */
     }
-    const date = new Date(evidence.retrieved_at).toLocaleDateString('ro-RO')
+    const date = formatDate(evidence.retrieved_at)
     return `${hostname} · ${date}`
   }
   if (evidence.provenance === 'calculated')

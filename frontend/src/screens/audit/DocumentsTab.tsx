@@ -4,7 +4,7 @@ import { api } from '../../api/endpoints.ts'
 import { auditApi } from '../../api/audit.ts'
 import type { AuditDocuments } from '../../api/audit-types.ts'
 import { nextStage } from '../../audit/stages.ts'
-import { plural } from '../../audit/plural.ts'
+import { plural } from '../../lib/plural.ts'
 import { useJob } from '../../state/job.tsx'
 import { useResource } from '../../state/resource.ts'
 import { Button } from '../../ui/Button.tsx'
@@ -16,6 +16,7 @@ import { RerunDialog } from './RerunDialog.tsx'
 
 export type DocumentFilter = 'all' | 'missing' | 'verify'
 
+/** 3b: design handoff screen component. */
 export function DocumentsTab({
   documents,
   filter,
@@ -167,7 +168,12 @@ export function DocumentsTab({
       )}
       <SectionKey>Dosarul clientului</SectionKey>
       {files.map((file) => (
-        <DocumentRow key={file.slot} file={file} ocr={settings.data?.extraction.ocr === true} />
+        <DocumentRow
+          key={file.slot}
+          label={file.slot === 'cover/photo' ? 'Fotografia sediului' : undefined}
+          file={file}
+          ocr={settings.data?.extraction.ocr === true}
+        />
       ))}
       {filter === 'missing' &&
         documents.checklist

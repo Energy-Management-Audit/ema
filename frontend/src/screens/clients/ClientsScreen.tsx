@@ -6,7 +6,7 @@ import type { ClientOverview } from '../../api/clients-types.ts'
 import { api } from '../../api/endpoints.ts'
 import { AppSidebar } from '../../app/AppSidebar.tsx'
 import { matchesClient } from '../../clients/search.ts'
-import { roCount } from '../../clients/plural.ts'
+import { plural as roCount } from '../../lib/plural.ts'
 import { invalidate, useResource } from '../../state/resource.ts'
 import { Button } from '../../ui/Button.tsx'
 import { EmptyState, FailureNotice } from '../../ui/Feedback.tsx'
@@ -20,6 +20,7 @@ const NOW = Date.now()
 
 type Filter = 'all' | 'working' | 'missing' | 'old'
 
+/** M1: design handoff screen component. */
 export function ClientsScreen() {
   const clients = useResource('clientsOverview', clientsApi.clientsOverview)
   const overview = useResource('overview', api.overview)

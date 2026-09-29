@@ -1,8 +1,9 @@
+import { formatDate } from '../../lib/format.ts'
 import { useState } from 'react'
 import type { AuditOutline } from '../../api/audit-types.ts'
 import { auditApi } from '../../api/audit.ts'
 import { byWeek, weekRange } from '../../audit/journal.ts'
-import { plural } from '../../audit/plural.ts'
+import { plural } from '../../lib/plural.ts'
 import { countdown, nodeState } from '../../audit/outline.ts'
 import { useJob } from '../../state/job.tsx'
 import { Button } from '../../ui/Button.tsx'
@@ -92,11 +93,7 @@ export function StructureActivity({ outline }: { outline: AuditOutline }) {
       {futureVisit && visitChapters.length > 0 && (
         <div className="audit-week">
           <SectionKey>Urmează</SectionKey>
-          <strong>
-            {new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short' }).format(
-              futureVisit,
-            )}
-          </strong>
+          <strong>{formatDate(futureVisit, { year: false })}</strong>
           <small>vizita în teren · deblochează cap. {visitChapters.join(', ')}</small>
         </div>
       )}

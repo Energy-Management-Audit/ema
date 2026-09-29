@@ -1,3 +1,5 @@
+import { noun } from '../lib/plural.ts'
+
 const WORDS = [
   'zero',
   'una',
@@ -19,6 +21,8 @@ export function countWords(count: number): string {
 export function attentionLine(count: number, blocking: number): string {
   if (count === 0) return ''
   if (blocking === 1) return 'o lucrare aşteaptă o decizie de la tine'
-  if (blocking > 1) return `${String(blocking)} lucrări aşteaptă o decizie de la tine`
-  return `toate cele ${countWords(count)} lucrări sunt la zi`
+  if (blocking > 1)
+    return `${String(blocking)} ${noun(blocking, 'lucrare', 'lucrări')} aşteaptă o decizie de la tine`
+  if (count === 1) return 'lucrarea este la zi'
+  return `toate cele ${countWords(count)} ${noun(count, 'lucrare', 'lucrări')} sunt la zi`
 }

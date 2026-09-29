@@ -76,6 +76,7 @@
 .export__blocked,
 .export__done {
   margin: -14px 0 0;
+  overflow-wrap: anywhere;
   color: var(--ink-muted);
   font-size: 12px;
 }

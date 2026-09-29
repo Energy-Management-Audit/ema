@@ -48,16 +48,6 @@ export function statusSingular(status: string): string {
   )
 }
 
-export function romanianForm(count: number, singular: string, plural: string): string {
-  if (count === 1) return singular
-  const lastHundred = count % 100
-  return `${count !== 0 && (lastHundred === 0 || lastHundred >= 20) ? 'de ' : ''}${plural}`
-}
-
-export function romanianCount(count: number, singular: string, plural: string): string {
-  return `${String(count)} ${romanianForm(count, singular, plural)}`
-}
-
 export function outlierPercent(ratio: string): number {
   return Math.round((Number(ratio) - 1) * 100)
 }

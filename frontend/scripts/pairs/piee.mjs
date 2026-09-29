@@ -1,8 +1,7 @@
 import {
   FINAL_OUTPUTS,
+  FINAL_CHECKS,
   JOB,
-  OUTPUTS,
-  READY_CHECKS,
   eventStream,
 } from '../../tests/fixtures/piee/default.mjs'
 const J = `/jobs/${JOB}`
@@ -36,12 +35,9 @@ const failedStatus = {
   revision: 9,
   runs: [{ id: 'run-gen-9', stage: 'piee_generate', state: 'failed', error: 'Etapa a eşuat.' }],
 }
-const editedOutputs = OUTPUTS.map((item) =>
-  item.id === 'out-draft-1' ? { ...item, edited_externally: true } : item,
-)
 const exportRoutes = {
   [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS },
-  [`GET ${J}/export/checks`]: { status: 200, body: READY_CHECKS },
+  [`GET ${J}/export/checks`]: { status: 200, body: FINAL_CHECKS },
 }
 
 // Each pair: the reference per theme (null where the handoff draws only one theme) and our state.
@@ -109,16 +105,5 @@ export const PAIRS = [
     path: `/app/piee/${JOB}/date`,
     activity: true,
     routes: { [`GET ${J}/status`]: { status: 200, body: failedStatus } },
-  },
-  {
-    id: '7c-DG1',
-    refs: { light: ['system', option('7c')] },
-    path: `/app/piee/${JOB}/date`,
-    activity: true,
-    routes: { [`GET ${J}/outputs`]: { status: 200, body: editedOutputs } },
-    async act(page) {
-      await page.getByRole('button', { name: 'Generează programul' }).click()
-      await page.getByRole('dialog').waitFor()
-    },
   },
 ]

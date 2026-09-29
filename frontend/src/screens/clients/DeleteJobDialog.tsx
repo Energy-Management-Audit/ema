@@ -3,12 +3,13 @@ import type { JobOverview } from '../../api/types.ts'
 import { ApiProblem } from '../../api/client.ts'
 import { api } from '../../api/endpoints.ts'
 import { jobLabel } from '../../app/sidebar.ts'
-import { roCount } from '../../clients/plural.ts'
+import { plural as roCount } from '../../lib/plural.ts'
 import { invalidate } from '../../state/resource.ts'
 import { Button } from '../../ui/Button.tsx'
 import { Dialog } from '../../ui/Dialog.tsx'
 import { FailureNotice } from '../../ui/Feedback.tsx'
 
+/** 7c: design handoff screen component. */
 export function DeleteJobDialog({
   job,
   clientName,

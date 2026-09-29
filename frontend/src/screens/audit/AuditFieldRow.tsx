@@ -15,6 +15,7 @@ import { FieldReviewRow, ReviewValue, SourceButton } from '../../ui/Review.tsx'
 import { ValueEditor } from '../ValueEditor.tsx'
 import { EvidencePanel } from './EvidencePanel.tsx'
 
+/** 3c: design handoff screen component. */
 export function AuditFieldRow({
   field,
   open,
@@ -87,7 +88,11 @@ export function AuditFieldRow({
     field.value === null || field.value === undefined
       ? '—'
       : field.value_type === 'number'
-        ? formatNumber(scalar(field.value), field.unit)
+        ? formatNumber(
+            scalar(field.value),
+            field.unit,
+            field.state === 'calculated' && field.review !== 'pending' && !field.needs_confirmation,
+          )
         : scalar(field.value)
   const previous =
     last && field.review === 'corrected' && last.before.value != null

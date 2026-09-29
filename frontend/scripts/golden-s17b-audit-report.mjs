@@ -13,7 +13,7 @@ import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
-import { countRo } from '../src/audit/report.ts'
+import { plural as countRo } from '../src/lib/plural.ts'
 
 const reference = process.env.EMA_REFERENCE
 if (!reference) throw new Error('EMA_REFERENCE is not set.')
@@ -232,8 +232,22 @@ try {
   const approve = page.getByRole('button', { name: 'Aprobă şi exportă' })
   await approve.waitFor({ timeout: 900_000 })
   check(await approve.isEnabled(), 'the final document is ready for approval')
+  const copying = page.waitForResponse((response) => response.url().endsWith(`/jobs/${job}/export`))
   await approve.click()
-  await page.getByText('Copia finală e în dosarul de exporturi al lucrării.').waitFor()
+  const receipt = await (await copying).json()
+  await page.getByText(`Fişierele finale sunt în ${receipt.folder}`, { exact: true }).waitFor()
+  const selected = (await api(page, `/jobs/${job}/export/checks`)).final
+  check(Boolean(selected), 'checks selects the approved final')
+  check(
+    receipt.files.some((file) => file.name.endsWith('.docx')) &&
+      receipt.files.some((file) => file.name.endsWith('.pdf')),
+    'docx and pdf are exported',
+  )
+  for (const file of receipt.files)
+    await page.getByText(`${file.name} · ${file.path}`, { exact: true }).waitFor()
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Descarcă doar Word' }).click()
+  check((await downloading).suggestedFilename().endsWith('.docx'), 'the final Word is downloadable')
   const finals = (await api(page, `/jobs/${job}/audit/report`)).final
   check(finals?.state === 'ready', 'the approved final is ready')
   await page.screenshot({ path: join(out, 'ui-08-final-exported.png') })

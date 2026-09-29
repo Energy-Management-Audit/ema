@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react'
 import { ApiProblem } from '../api/client.ts'
 import { api } from '../api/endpoints.ts'
-import type { Output } from '../api/types.ts'
-import { desktopApi } from '../lib/desktop.ts'
+import type { ExportResponse, Output } from '../api/types.ts'
+import { chooseExportFolder, desktopApi } from '../lib/desktop.ts'
 import { FailureNotice } from '../ui/Feedback'
 
 /** Problems that mean the page is out of date: refetch what it shows, never retry (D4). */
@@ -98,4 +98,18 @@ export async function openPreview(jobId: string, output: Output): Promise<void> 
   window.setTimeout(() => {
     URL.revokeObjectURL(url)
   }, 60_000)
+}
+
+export type ExportReceipt = { outputId: string; hash: string; response: ExportResponse }
+
+/** Both Predare screens approve and copy through the same API flow. */
+export async function exportPackage(
+  jobId: string,
+  outputId: string,
+  hash: string,
+): Promise<ExportReceipt | null> {
+  const chosen = await chooseExportFolder()
+  if (!chosen) return null
+  const response = await api.exportFinal(jobId, outputId, hash, chosen.path)
+  return { outputId, hash, response }
 }

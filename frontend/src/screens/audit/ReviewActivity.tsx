@@ -4,8 +4,7 @@ import type { AuditOutline } from '../../api/audit-types.ts'
 import type { Decision, Field } from '../../api/types.ts'
 import { scalar } from '../../audit/review.ts'
 import { decisionLabel } from '../../audit/journal.ts'
-import { plural } from '../../audit/plural.ts'
-import { rel } from '../../lib/format.ts'
+import { formatNumber, rel } from '../../lib/format.ts'
 import { useJob } from '../../state/job.tsx'
 import { invalidate } from '../../state/resource.ts'
 import { ActivityEntry } from '../../ui/Activity.tsx'
@@ -62,12 +61,17 @@ export function ReviewActivity({ fields, outline }: { fields: Field[]; outline: 
         const chapter = fields
           .find((field) => field.id === decision.field_id)
           ?.chapter?.match(/ch(\d+)/)?.[1]
-        const before = decision.before.value
-        const after = decision.after.value
+        const field = fields.find((item) => item.id === decision.field_id)
+        const shown = (snapshot: Decision['before']) =>
+          (snapshot.value_type ?? field?.value_type) === 'number'
+            ? formatNumber(scalar(snapshot.value))
+            : scalar(snapshot.value)
+        const before = shown(decision.before)
+        const after = shown(decision.after)
         const detail = decision.batch_id
           ? `acceptate toate deodată${chapter ? ` · cap. ${chapter}` : ''}`
           : decision.action === 'correct'
-            ? `${scalar(before)} → ${scalar(after)}, scris de tine`
+            ? `${before} → ${after}, scris de tine`
             : decision.action === 'accept'
               ? `acceptat${chapter ? `, scris la ${chapter}` : ''}`
               : decision.action === 'reject'
@@ -101,7 +105,7 @@ export function ReviewActivity({ fields, outline }: { fields: Field[]; outline: 
         <ProgressBar value={fields.length ? Math.round((accepted / fields.length) * 100) : 0} />
         <small>
           {waiting
-            ? `Raportul se poate genera după ${plural(waiting, 'ultimul câmp', 'ultimele câmpuri')}.`
+            ? `Raportul se poate genera după ${waiting === 1 ? 'ultimul' : 'ultimele'} ${String(waiting)}.`
             : 'Nimic nu mai aşteaptă revizuirea.'}
         </small>
       </div>

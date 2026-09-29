@@ -63,11 +63,6 @@
   color: var(--ink);
   font-weight: 500;
 }
-.clients-screen__tabs button:focus-visible,
-.clients-table__row:focus-visible {
-  outline: 2px solid var(--olive);
-  outline-offset: 2px;
-}
 .clients-table {
   min-width: 890px;
 }
@@ -182,11 +177,6 @@
   border-bottom-color: var(--olive);
   color: var(--ink);
   font-weight: 500;
-}
-.client-screen__tabs button:focus-visible,
-.client-crumb:focus-visible {
-  outline: 2px solid var(--olive);
-  outline-offset: 2px;
 }
 .client-section {
   display: grid;
@@ -345,4 +335,8 @@
   .client-screen__tabs button {
     font-size: 11px;
   }
+}
+
+.clients-screen__search:focus-within {
+  box-shadow: var(--focus-ring-input);
 }

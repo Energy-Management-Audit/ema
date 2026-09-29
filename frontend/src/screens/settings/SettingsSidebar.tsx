@@ -38,6 +38,7 @@ function openingPath(): string {
   return (document.referrer && appPath(document.referrer)) || '/app/'
 }
 
+/** 3i: design handoff screen component. */
 export function SettingsSidebar({ group }: { group: SettingsGroup }) {
   const returnTo = useRef(openingPath())
   const back = () => {

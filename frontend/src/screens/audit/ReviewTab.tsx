@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { auditApi } from '../../api/audit.ts'
 import type { AuditOutline } from '../../api/audit-types.ts'
 import { auditHref } from '../../app/route.ts'
-import { plural } from '../../audit/plural.ts'
+import { plural } from '../../lib/plural.ts'
 import { navigate } from '../../app/navigate.ts'
 import {
   exactBatch,
@@ -21,6 +21,7 @@ import { EmaWidget, EmptyState, FailureNotice } from '../../ui/Feedback.tsx'
 import { SectionKey } from '../../ui/Surface.tsx'
 import { AuditFieldRow } from './AuditFieldRow.tsx'
 
+/** 3c: design handoff screen component. */
 export function ReviewTab({ field, outline }: { field: string | null; outline: AuditOutline }) {
   const ctx = useJob()
   const [filter, setFilter] = useState<ReviewFilter>('pending')
@@ -96,9 +97,10 @@ export function ReviewTab({ field, outline }: { field: string | null; outline: A
             </>
           }
         >
-          {unsafe.length
-            ? `Restul de ${plural(exact.length, 'câmp', 'câmpuri')} ${exact.length === 1 ? 'are' : 'au'} potrivire exactă în document — le poţi accepta pe toate deodată.`
-            : 'Le poţi accepta pe toate deodată.'}
+          {exact.length > 0 &&
+            (unsafe.length
+              ? `Restul ${String(exact.length)} ${exact.length === 1 ? 'are' : 'au'} potrivire exactă în document — ${exact.length === 1 ? 'îl poţi accepta' : 'le poţi accepta pe toate deodată'}.`
+              : 'Le poţi accepta pe toate deodată.')}
         </EmaWidget>
       ) : (
         <EmptyState

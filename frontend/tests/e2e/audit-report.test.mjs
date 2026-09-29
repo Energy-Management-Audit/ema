@@ -181,7 +181,7 @@ test('without Word the draft is offered for download instead of a preview', asyn
   )
 })
 
-test('an edited draft asks first (7c) and saves a new version', async () => {
+test('an existing draft generates directly without an external-edit dialog', async () => {
   await withHarness(
     {
       path,
@@ -189,7 +189,7 @@ test('an edited draft asks first (7c) and saves a new version', async () => {
         ...reportRoutes,
         [`GET ${J}/outputs`]: {
           status: 200,
-          body: [OUTPUTS[0], { ...OUTPUTS[1], edited_externally: true }],
+          body: OUTPUTS,
         },
         [`POST ${J}/stages/audit_render`]: started,
         [`GET ${J}/events`]: {
@@ -202,11 +202,7 @@ test('an edited draft asks first (7c) and saves a new version', async () => {
     async ({ page, requests }) => {
       await page.getByTestId('pdf-pages').waitFor()
       await page.getByRole('button', { name: 'Generează ciorna' }).click()
-      const dialog = page.getByRole('dialog', { name: 'Raportul Word există deja' })
-      await dialog.waitFor()
-      assert.equal(await dialog.getByRole('button', { name: 'Suprascrie' }).count(), 0)
-      assert.equal(count(requests, 'POST', `${J}/stages/audit_render`), 0)
-      await dialog.getByRole('button', { name: 'Salvează ca versiune nouă' }).click()
+      assert.equal(await page.getByRole('dialog').count(), 0)
       await page.getByTestId('report-progress').waitFor()
       assert.equal(count(requests, 'POST', `${J}/stages/audit_render`), 1)
     },

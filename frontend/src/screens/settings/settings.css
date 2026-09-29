@@ -102,10 +102,6 @@
   color: var(--ink);
   text-decoration: none;
 }
-.settings-screen__update-link:focus-visible {
-  outline: 2px solid var(--olive);
-  outline-offset: 2px;
-}
 .settings-sidebar__back:focus-visible {
   box-shadow:
     0 0 0 2px var(--surface),

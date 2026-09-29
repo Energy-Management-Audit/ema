@@ -10,6 +10,7 @@ import { Dialog } from '../../ui/Dialog.tsx'
 import { TextField } from '../../ui/Field.tsx'
 import { FailureNotice } from '../../ui/Feedback.tsx'
 
+/** M2: design handoff screen component. */
 export function NewClientDialog({
   clients,
   onClose,

@@ -96,7 +96,6 @@ const output = (id, name, kind, runId, stage, size) => ({
     ? 'application/pdf'
     : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   size_bytes: size,
-  edited_externally: false,
   name,
   created_at: at,
   run_id: runId,
@@ -144,6 +143,25 @@ export const CHECKS = {
 export const READY_CHECKS = {
   readiness: { draft_ok: true, final_ok: true, blocking: [], warnings: [], next: [] },
   readiness_hash: 'hash-ready',
+  final: null,
+}
+
+export const FINAL_CHECKS = {
+  ...READY_CHECKS,
+  final: {
+    output_id: 'out-final-docx',
+    created_at: at,
+    files: FINAL_OUTPUTS.filter((item) => item.run_id === FINAL_RUN.run_id).map((item) => item.id),
+  },
+}
+
+export const EXPORTED = {
+  approved_at: at,
+  folder: '/Ema/exports/Synthetic 2026',
+  files: FINAL_OUTPUTS.filter((item) => item.run_id === FINAL_RUN.run_id).map((item) => ({
+    name: item.name,
+    path: `/Ema/exports/Synthetic 2026/${item.name}`,
+  })),
 }
 
 export const SECTIONS = [

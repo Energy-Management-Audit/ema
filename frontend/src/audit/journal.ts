@@ -1,3 +1,4 @@
+import { formatDate } from '../lib/format.ts'
 import type { Decision } from '../api/types.ts'
 import { sectionStateLabel } from './outline.ts'
 
@@ -36,7 +37,5 @@ export function weekRange(week: string): string {
   monday.setUTCDate(fourth.getUTCDate() - (fourth.getUTCDay() || 7) + 1 + (number - 1) * 7)
   const sunday = new Date(monday)
   sunday.setUTCDate(monday.getUTCDate() + 6)
-  const month = (date: Date) =>
-    new Intl.DateTimeFormat('ro-RO', { month: 'short', timeZone: 'UTC' }).format(date)
-  return `${String(monday.getUTCDate())} ${month(monday)}–${String(sunday.getUTCDate())} ${month(sunday)}`
+  return `${formatDate(monday, { year: false, utc: true })}–${formatDate(sunday, { year: false, utc: true })}`
 }

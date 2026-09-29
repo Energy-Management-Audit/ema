@@ -21,28 +21,35 @@ function roundDecimal(value: string, places: number): string {
   return `${negative ? '-' : ''}${head}.${tail}`
 }
 
-export function formatNumber(value: string | number, unit?: string | null): string {
+export function formatNumber(
+  value: string | number,
+  unit?: string | null,
+  calculated = false,
+): string {
   const text = typeof value === 'number' ? String(value) : value.trim()
   if (!/^-?\d+(\.\d+)?$/.test(text)) return text
   const places = unit === 'ani' ? 1 : 2
   const [integer = '0', fraction = ''] = text.split('.')
-  if (/^0*$/.test(fraction)) return groupThousands(integer)
-  const rounded = roundDecimal(text, places)
+  if (fraction === '' || (calculated && /^0*$/.test(fraction))) return groupThousands(integer)
+  const rounded = calculated ? roundDecimal(text, places) : text
   const [head = '0', tail = ''] = rounded.split('.')
   const negative = head.startsWith('-')
   const grouped = groupThousands(negative ? head.slice(1) : head)
-  return `${negative ? '-' : ''}${grouped},${tail.padEnd(places, '0')}`
+  return `${negative ? '-' : ''}${grouped},${calculated ? tail.padEnd(places, '0') : tail}`
 }
 
 export function withUnit(value: string, unit?: string | null): string {
   return unit ? `${formatNumber(value, unit)} ${unit}` : formatNumber(value, unit)
 }
 
+export const AMBIGUOUS_NUMBER = 'Scrie 12500 sau 12,5'
+
 export const NOT_A_NUMBER = 'Valoarea nu este un număr.'
 
 /** Accepts `22 164,05`, `22164,05` or `22164.05`; returns the dot-decimal string the API takes. */
 export function parseNumber(input: string): { value: string } | { error: string } {
   const compact = input.trim().replace(/[\s  ]/g, '')
+  if (!compact.includes(',') && /\.\d{3}$/.test(compact)) return { error: AMBIGUOUS_NUMBER }
   const normal = compact.includes(',') ? compact.replace(/\./g, '').replace(',', '.') : compact
   if (!/^-?\d+(\.\d+)?$/.test(normal)) return { error: NOT_A_NUMBER }
   return { value: normal }
@@ -71,13 +78,36 @@ export function rel(iso: string, now: Date = new Date()): string {
   const days = Math.round((startOfToday - startOfThen) / 86_400_000)
   if (days <= 1) return 'ieri'
   if (days < 7) return `acum ${String(days)} zile`
-  const date = `${String(then.getDate()).padStart(2, '0')} ${MONTHS[then.getMonth()] ?? ''}`
-  return then.getFullYear() === now.getFullYear() ? date : `${date} ${String(then.getFullYear())}`
+  return formatDate(then, { year: then.getFullYear() !== now.getFullYear(), padDay: true })
 }
 
-export function formatDate(iso: string): string {
-  const date = new Date(iso)
-  return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getFullYear())}`
+const LONG_MONTHS = [
+  'ianuarie',
+  'februarie',
+  'martie',
+  'aprilie',
+  'mai',
+  'iunie',
+  'iulie',
+  'august',
+  'septembrie',
+  'octombrie',
+  'noiembrie',
+  'decembrie',
+]
+const WEEKDAYS = ['Duminică', 'Luni', 'Marţi', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă']
+
+/** Handoff month forms, shared by calendar dates, source dates and activity ranges. */
+export function formatDate(
+  iso: string | Date,
+  { year = true, long = false, weekday = false, utc = false, padDay = false } = {},
+): string {
+  const date = typeof iso === 'string' ? new Date(iso) : iso
+  const day = String(utc ? date.getUTCDate() : date.getDate())
+  const month = utc ? date.getUTCMonth() : date.getMonth()
+  const dayOfWeek = utc ? date.getUTCDay() : date.getDay()
+  const dateYear = utc ? date.getUTCFullYear() : date.getFullYear()
+  return `${weekday ? `${WEEKDAYS[dayOfWeek]}, ` : ''}${padDay ? day.padStart(2, '0') : day} ${(long ? LONG_MONTHS : MONTHS)[month]}${year ? ` ${String(dateYear)}` : ''}`
 }
 
 export function elapsed(seconds: number): string {

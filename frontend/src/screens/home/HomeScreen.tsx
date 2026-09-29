@@ -17,6 +17,7 @@ import { HomeJobRow } from './HomeJobRow.tsx'
 import { BackupWidget } from './BackupWidget.tsx'
 import './home.css'
 
+/** 3e: design handoff screen component. */
 export function HomeScreen() {
   const overview = useResource('overview', api.overview)
   const settings = useResource('settings', settingsApi.settings)

@@ -7,10 +7,11 @@ import { Button } from '../../ui/Button.tsx'
 import { Choice, Dialog } from '../../ui/Dialog.tsx'
 import { FailureNotice } from '../../ui/Feedback.tsx'
 
-type Target = 'dossier' | 'anexa' | 'measures' | 'meter' | 'thermal'
+type Target = 'dossier' | 'anexa' | 'measures' | 'meter' | 'thermal' | 'cover'
 
 function slotFor(file: File, target: Target): string {
   if (target === 'anexa' || target === 'measures') return target
+  if (target === 'cover') return 'cover/photo'
   if (target === 'thermal') return `visit/thermal/${file.name}`
   if (target === 'meter') {
     const parts = file.webkitRelativePath.split('/')
@@ -34,8 +35,19 @@ export function AuditUploadDialog({
   const [busy, setBusy] = useState(false)
   const upload = async () => {
     if (!ctx.job.data || files.length === 0) return
-    if ((target === 'anexa' || target === 'measures') && files.length > 1) {
+    if ((target === 'anexa' || target === 'measures' || target === 'cover') && files.length > 1) {
       setErrors(['Alege un singur fişier pentru acest formular.'])
+      return
+    }
+    if (
+      target === 'cover' &&
+      files.some(
+        (file) =>
+          !/\.(jpe?g|png)$/i.test(file.name) ||
+          (file.type !== '' && !['image/jpeg', 'image/png'].includes(file.type)),
+      )
+    ) {
+      setErrors(['Un fişier JPEG sau PNG'])
       return
     }
     setBusy(true)
@@ -91,6 +103,15 @@ export function AuditUploadDialog({
           />
           <Choice
             name="audit-upload"
+            checked={target === 'cover'}
+            onSelect={() => {
+              setTarget('cover')
+            }}
+            title="Fotografia sediului"
+            detail="Un fişier JPEG sau PNG"
+          />
+          <Choice
+            name="audit-upload"
             checked={target === 'meter' || target === 'thermal'}
             onSelect={() => {
               setTarget('meter')
@@ -127,7 +148,8 @@ export function AuditUploadDialog({
             ref: picker,
             hidden: true,
             type: 'file',
-            multiple: target !== 'anexa' && target !== 'measures',
+            multiple: target !== 'anexa' && target !== 'measures' && target !== 'cover',
+            accept: target === 'cover' ? '.jpg,.jpeg,.png' : undefined,
             webkitdirectory: target === 'meter' || target === 'thermal' ? '' : undefined,
             onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
               setFiles(Array.from(event.target.files ?? []))

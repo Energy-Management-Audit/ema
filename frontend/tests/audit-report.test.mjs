@@ -1,3 +1,4 @@
+import { plural as countRo } from '../src/lib/plural.ts'
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -6,7 +7,6 @@ import {
   CHAPTERS,
   auditChecks,
   canGenerateFinal,
-  countRo,
   draftSummary,
   fieldsLine,
   markerLabels,

@@ -3,12 +3,11 @@
 
 import {
   FINAL_OUTPUTS,
+  FINAL_CHECKS,
   FINAL_RUN,
   J,
   JOB,
-  OUTPUTS,
   ANSWERED,
-  READY_CHECKS,
   REPORT,
   eventStream,
   reportRoutes,
@@ -68,30 +67,12 @@ export const PAIRS = [
     routes: {
       ...reportRoutes,
       [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS },
-      [`GET ${J}/export/checks`]: { status: 200, body: READY_CHECKS },
+      [`GET ${J}/export/checks`]: { status: 200, body: FINAL_CHECKS },
       [`GET ${J}/sections`]: { status: 200, body: ANSWERED },
       [`GET ${J}/audit/report`]: { status: 200, body: { ...REPORT, final: FINAL_RUN } },
     },
     async act(page) {
       await page.getByRole('button', { name: 'Aprobă şi exportă' }).waitFor()
-    },
-  },
-  {
-    id: '7c',
-    refs: { light: ['system', '[id="7c"] > div:nth-of-type(2)'] },
-    path: `/app/audit/${JOB}/raport`,
-    routes: {
-      ...reportRoutes,
-      [`GET ${J}/outputs`]: {
-        status: 200,
-        body: [OUTPUTS[0], { ...OUTPUTS[1], edited_externally: true }],
-      },
-    },
-    ours: '.ema-dialog',
-    async act(page) {
-      await page.getByTestId('pdf-pages').waitFor()
-      await page.getByRole('button', { name: 'Generează ciorna' }).click()
-      await page.getByRole('dialog').waitFor()
     },
   },
 ]
@@ -122,16 +103,6 @@ export async function checks(page, label, pair, theme, viewport) {
         ),
       )
     }
-  }
-  if (pair.id === '7c' && theme === 'light' && viewport.width === 1400) {
-    await page.getByRole('dialog').getByRole('button', { name: 'Renunţă' }).click()
-    results.push(
-      await focusCheck(
-        page,
-        `${label} Generează ciorna`,
-        page.getByRole('button', { name: 'Generează ciorna' }),
-      ),
-    )
   }
   if (pair.id === '7a-audit' && theme === 'light' && viewport.width === 1400) {
     results.push(

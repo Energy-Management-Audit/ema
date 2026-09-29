@@ -1,3 +1,4 @@
+import { formatDate } from '../lib/format.ts'
 import type { JobOverview } from '../api/types.ts'
 
 export function formatCui(cui: string | number | null | undefined, vatPayer = false): string {
@@ -16,7 +17,5 @@ export function jobTag(job: Pick<JobOverview, 'type' | 'year'>): string {
 export function statusLine(job: Pick<JobOverview, 'type' | 'finalized' | 'approved_at'>): string {
   if (!job.finalized) return 'în lucru'
   if (job.type === 'invoices') return 'finalizat'
-  return job.approved_at
-    ? `exportat ${new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(job.approved_at))}`
-    : 'finalizat'
+  return job.approved_at ? `exportat ${formatDate(job.approved_at)}` : 'finalizat'
 }

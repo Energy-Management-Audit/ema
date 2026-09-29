@@ -1,5 +1,6 @@
+import { plural as countRo } from '../../lib/plural.ts'
 import { Check } from 'lucide-react'
-import { countRo, type TocItem } from '../../audit/report.ts'
+import { type TocItem } from '../../audit/report.ts'
 import { Icon } from '../../ui/Icon'
 import { SectionKey } from '../../ui/Surface'
 

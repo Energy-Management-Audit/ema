@@ -5,6 +5,8 @@ import test from 'node:test'
 import {
   DRAFT_RUN,
   FINAL_OUTPUTS,
+  FINAL_CHECKS,
+  EXPORTED,
   FINAL_RUN,
   J,
   JOB,
@@ -21,7 +23,7 @@ const path = `/app/audit/${JOB}/predare`
 const withFinal = {
   ...reportRoutes,
   [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS },
-  [`GET ${J}/export/checks`]: { status: 200, body: READY_CHECKS },
+  [`GET ${J}/export/checks`]: { status: 200, body: FINAL_CHECKS },
   [`GET ${J}/sections`]: { status: 200, body: ANSWERED },
   [`GET ${J}/audit/report`]: { status: 200, body: { ...REPORT, final: FINAL_RUN } },
 }
@@ -107,7 +109,7 @@ test('X3: approving posts exactly the listed final and the readiness shown', asy
       path,
       routes: {
         ...withFinal,
-        [`POST ${J}/export`]: { status: 200, body: { output_id: 'out-final-docx' } },
+        [`POST ${J}/export`]: { status: 200, body: EXPORTED },
       },
     },
     async ({ page, requests, setRoute }) => {
@@ -130,12 +132,12 @@ test('X3: approving posts exactly the listed final and the readiness shown', asy
         ],
       })
       await page.getByRole('button', { name: 'Aprobă şi exportă' }).click()
-      await page.getByText('Copia finală e în dosarul de exporturi al lucrării.').waitFor()
+      await page.getByText(`Fişierele finale sunt în ${EXPORTED.folder}`).waitFor()
       const after = requests.slice(before)
       assert.equal(after[0].method, 'POST')
       assert.equal(after[0].path, `${J}/export`)
       assert.deepEqual(after[0].body, {
-        final: true,
+        dest_dir: null,
         output_id: 'out-final-docx',
         readiness_hash: 'hash-ready',
         confirm: true,
@@ -170,11 +172,8 @@ test('X4 after a reload, and a hash mismatch refetches instead of retrying', asy
     },
     async ({ page }) => {
       await page.getByText(/^Aprobat /).waitFor()
-      assert.equal(await page.getByRole('button', { name: 'Aprobă şi exportă' }).count(), 0)
-      assert.equal(
-        await page.getByText('Copia finală e în dosarul de exporturi al lucrării.').count(),
-        0,
-      )
+      assert.equal(await page.getByRole('button', { name: 'Aprobă şi exportă' }).isEnabled(), true)
+      assert.equal(await page.getByText(`Fişierele finale sunt în ${EXPORTED.folder}`).count(), 0)
     },
   )
   await withHarness(
@@ -300,6 +299,7 @@ test('over a stale final X1 offers the new final even though the old one blocks 
       next: [],
     },
     readiness_hash: 'hash-stale',
+    final: FINAL_CHECKS.final,
   }
   await withHarness(
     {
@@ -320,7 +320,7 @@ test('over a stale final X1 offers the new final even though the old one blocks 
       await page
         .getByText('Versiunea finală nu mai corespunde datelor. Generează-o din nou.')
         .waitFor()
-      await page.getByText('Audit-ciorna.docx').waitFor()
+      await page.getByText('Audit-final.docx').waitFor()
       const button = page.getByRole('button', { name: 'Generează versiunea finală' })
       await page.waitForFunction(() =>
         [...document.querySelectorAll('button')].some(

@@ -15,6 +15,7 @@ import { TextField } from '../../ui/Field.tsx'
 import { SectionKey } from '../../ui/Surface.tsx'
 import { DeleteJobDialog } from './DeleteJobDialog.tsx'
 
+/** M2: design handoff screen component. */
 export function MemoryTable({ profile, jobs }: { profile: ClientProfile; jobs: JobOverview[] }) {
   return (
     <section className="client-section">
@@ -53,6 +54,7 @@ export function MemoryTable({ profile, jobs }: { profile: ClientProfile; jobs: J
   )
 }
 
+/** M2: design handoff screen component. */
 export function SitesTab({ profile }: { profile: ClientProfile }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
@@ -155,6 +157,7 @@ export function SitesTab({ profile }: { profile: ClientProfile }) {
   )
 }
 
+/** M2: design handoff screen component. */
 export function ClientJobsTab({ jobs, clientName }: { jobs: JobOverview[]; clientName: string }) {
   const [deleting, setDeleting] = useState<JobOverview | null>(null)
   return (

@@ -9,7 +9,6 @@ import { useJob } from '../state/job.tsx'
 import { jobKey, useResource } from '../state/resource.ts'
 import { Button } from '../ui/Button'
 import { ProblemNotice, STALE_CODES, openPreview, useAction } from './actions.tsx'
-import { RegenerateDialog } from './RegenerateDialog.tsx'
 import { UploadDialog } from './UploadDialog.tsx'
 
 export const PIEE_SLOTS = ['anexa', 'prelucrare', 'questionnaire', 'previous_piee'] as const
@@ -58,12 +57,10 @@ export function JobActions({ tab }: { tab: Tab }) {
   const ctx = useJob()
   const generate = useGenerate()
   const preview = useAction()
-  const [dialog, setDialog] = useState<'regenerate' | null>(null)
   const [upload, setUpload] = useState<File | null>(null)
   const picker = useRef<HTMLInputElement>(null)
   const outputs = ctx.outputs.data ?? []
-  const pdf = previewPdf(outputs)
-  const latestDraft = draftDocuments(outputs).at(-1)
+  const pdf = previewPdf(outputs, ctx.checks.data)
   const running = ctx.run?.state === 'running' || ctx.job.data?.state === 'running'
   const unread = hasIssue(ctx.checks.data, 'import_required') || ctx.fields.data?.length === 0
   let primary
@@ -89,8 +86,7 @@ export function JobActions({ tab }: { tab: Tab }) {
         disabled={running || generate.pending || unread}
         title={unread ? 'Citeşte întâi documentele.' : undefined}
         onClick={() => {
-          if (latestDraft?.edited_externally) setDialog('regenerate')
-          else void generate.start()
+          void generate.start()
         }}
       >
         Generează programul
@@ -134,18 +130,6 @@ export function JobActions({ tab }: { tab: Tab }) {
         <div className="job-header-problem">
           <ProblemNotice problem={generate.problem ?? preview.problem} />
         </div>
-      )}
-      {dialog === 'regenerate' && latestDraft && (
-        <RegenerateDialog
-          name={latestDraft.name}
-          onClose={() => {
-            setDialog(null)
-          }}
-          onConfirm={() => {
-            setDialog(null)
-            void generate.start()
-          }}
-        />
       )}
       <input
         ref={picker}
