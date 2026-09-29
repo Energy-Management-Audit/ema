@@ -277,10 +277,10 @@ export type StageInput = {
 }
 
 export type ExportInput = {
-  final: true
   output_id: string
   readiness_hash: string
-  confirm?: boolean
+  confirm: true
+  dest_dir: string | null
 }
 
 export type SlotInput = {

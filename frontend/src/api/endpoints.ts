@@ -10,6 +10,7 @@ import type {
   DeleteResult,
   Evidence,
   ExportChecks,
+  ExportInput,
   ExportResponse,
   Field,
   FileVersion,
@@ -119,7 +120,7 @@ export const api = {
       readiness_hash: readinessHash,
       confirm: true,
       dest_dir: destDir,
-    }),
+    } satisfies ExportInput),
 }
 
 export const eventsPath = (id: string) => `${job(id)}/events`
