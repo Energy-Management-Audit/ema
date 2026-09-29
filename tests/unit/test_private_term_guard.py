@@ -1,5 +1,6 @@
 """The privacy gates catch variants in text, paths, and compressed documents."""
 
+import os
 import subprocess
 import zlib
 from io import BytesIO
@@ -74,6 +75,10 @@ def test_scans_office_members_and_deflated_pdf_streams() -> None:
 def test_outgoing_commits_include_messages_and_tracked_blobs(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    for name in tuple(os.environ):
+        if name.startswith("GIT_"):
+            monkeypatch.delenv(name)
+
     def git(*args: str) -> str:
         return subprocess.check_output(("git", *args), text=True).strip()
 
