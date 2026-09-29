@@ -3,54 +3,36 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
-import unicodedata
 import uuid
+from contextlib import ExitStack
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from ema.clients.registry import get_client
+from ema.core.config import load_settings
 from ema.core.errors import EmaError
-from ema.core.jobs import StageContext, StageOutcome, create_job, run_stage
+from ema.core.jobs import StageContext, StageOutcome, create_job, run_stage, subscribe
 from ema.core.workspace import Workspace
-from ema.energy_data.annex_index import indexed
-from ema.reporting import generate
+from ema.energy_data.annex_index import import_annexes
+from ema.reporting import ReportException, generate
+from ema.reporting.sources import select_sources
 from ema.reporting.writer import write_report
 
 
-def start_run(ws: Workspace, years: list[int], client_ids: list[str]) -> dict[str, Any]:  # noqa: C901, PLR0915
+def start_run(
+    ws: Workspace,
+    years: list[int],
+    client_ids: list[str],
+    *,
+    source_exceptions: tuple[ReportException, ...] = (),
+) -> dict[str, Any]:
     if not years or any(year < 1 for year in years) or years != sorted(set(years)):
         raise EmaError("invalid_year", "Anii raportării sunt invalizi.", "")
     if not client_ids or len(client_ids) != len(set(client_ids)):
         raise EmaError("invalid_id", "Lista clienţilor este invalidă.", "")
-    sources: list[tuple[str, str, Path, Path]] = []
-    absent: list[dict[str, Any]] = []
-    annexes = indexed(ws)
-    for client_id in client_ids:
-        get_client(ws, client_id)
-        records = annexes.get(client_id, [])
-        if not records:
-            absent.append(
-                {"client_id": client_id, "code": "annex_missing", "detail": "Anexa lipseşte."}
-            )
-            continue
-        seen: set[tuple[int, str]] = set()
-        for record in records:
-            beneficiary = " ".join(str(record.data.get("name") or "").casefold().split())
-            key = (record.year, beneficiary)
-            if key in seen:
-                continue
-            seen.add(key)
-            raw_name = str(record.data.get("file_name") or f"{record.sha}.xlsx")
-            display_name = unicodedata.normalize("NFC", raw_name)
-            sources.append(
-                (
-                    client_id,
-                    record.sha,
-                    ws.file_path(client_id, record.sha),
-                    Path(client_id, display_name),
-                )
-            )
+    sources, absent = select_sources(ws, client_ids)
     job = create_job(ws, "reporting", "reporting", max(years))
     run_id = uuid.uuid4().hex
     with ws.connect() as db:
@@ -81,6 +63,7 @@ def start_run(ws: Workspace, years: list[int], client_ids: list[str]) -> dict[st
             tuple(years),
             {path: logical for _, _, path, logical in sources},
         )
+        result = replace(result, exceptions=(*source_exceptions, *result.exceptions))
         exceptions = list(absent)
         source_clients = {
             logical: (client_id, logical.name) for client_id, _, _, logical in sources
@@ -135,7 +118,7 @@ def start_run(ws: Workspace, years: list[int], client_ids: list[str]) -> dict[st
             json.dumps(preview, ensure_ascii=False), encoding="utf-8"
         )
         output = ctx.artifact_dir() / "Raportare.xlsx"
-        write_report(result, output)
+        write_report(result, output, firm_name=load_settings(ws).firm_name)
         ctx.save_output(output, "Raportare.xlsx", kind="final")
         with ws.connect() as db:
             db.execute(
@@ -159,44 +142,43 @@ def start_run(ws: Workspace, years: list[int], client_ids: list[str]) -> dict[st
     return get_run(ws, run_id)
 
 
-def get_run(ws: Workspace, run_id: str) -> dict[str, Any]:
-    with ws.connect() as db:
-        db.execute("BEGIN IMMEDIATE")
-        row = db.execute("SELECT * FROM reporting_runs WHERE id=?", (run_id,)).fetchone()
-        if row is None:
-            raise EmaError("run_missing", "Raportarea nu există.", "")
-        if row["state"] == "running":
-            job = db.execute("SELECT state FROM jobs WHERE id=?", (row["job_id"],)).fetchone()
-            if job is not None and job["state"] in {"failed", "cancelled"}:
-                db.execute(
-                    "UPDATE reporting_runs SET state=? WHERE id=?",
-                    (job["state"], run_id),
-                )
-                row = db.execute("SELECT * FROM reporting_runs WHERE id=?", (run_id,)).fetchone()
-                assert row is not None
+def _get_run(db: sqlite3.Connection, run_id: str) -> dict[str, Any]:
+    row = db.execute(
+        "SELECT r.*,j.created_at,j.state AS job_state FROM reporting_runs r "
+        "JOIN jobs j ON j.id=r.job_id WHERE r.id=?",
+        (run_id,),
+    ).fetchone()
+    if row is None:
+        raise EmaError("run_missing", "Raportarea nu există.", run_id)
+    state = str(row["state"])
+    if state == "running" and row["job_state"] in {"failed", "cancelled"}:
+        state = str(row["job_state"])
+        db.execute("UPDATE reporting_runs SET state=? WHERE id=?", (state, run_id))
     return {
         "id": str(row["id"]),
         "job_id": str(row["job_id"]),
-        "created_at": _created_at(ws, str(row["job_id"])),
+        "created_at": str(row["created_at"]),
         "years": json.loads(str(row["years_json"])),
         "client_ids": json.loads(str(row["client_ids_json"])),
-        "state": str(row["state"]),
+        "state": state,
         "exceptions": json.loads(str(row["exceptions_json"])),
         "output_id": row["output_id"],
     }
 
 
-def _created_at(ws: Workspace, job_id: str) -> str:
+def get_run(ws: Workspace, run_id: str) -> dict[str, Any]:
     with ws.connect() as db:
-        row = db.execute("SELECT created_at FROM jobs WHERE id=?", (job_id,)).fetchone()
-    assert row is not None
-    return str(row["created_at"])
+        db.execute("BEGIN IMMEDIATE")
+        return _get_run(db, run_id)
 
 
 def list_runs(ws: Workspace) -> list[dict[str, Any]]:
     with ws.connect() as db:
-        rows = db.execute("SELECT id FROM reporting_runs ORDER BY rowid DESC").fetchall()
-    return [get_run(ws, str(row["id"])) for row in rows]
+        db.execute("BEGIN IMMEDIATE")
+        rows = db.execute(
+            "SELECT r.id FROM reporting_runs r JOIN jobs j ON j.id=r.job_id ORDER BY r.rowid DESC"
+        ).fetchall()
+        return [_get_run(db, str(row["id"])) for row in rows]
 
 
 def preview(ws: Workspace, run_id: str) -> dict[str, Any]:
@@ -212,3 +194,33 @@ def preview(ws: Workspace, run_id: str) -> dict[str, Any]:
         assert row is not None
         artifact = ws.artifact_dir(db, str(run["job_id"]), "reporting", str(row["id"]))
     return json.loads((artifact / "report.json").read_text(encoding="utf-8"))
+
+
+def generate_from_sources(ws: Workspace, paths: list[Path], years: list[int], output: Path) -> Path:
+    """Import folder sources and wait for the same indexed reporting run as the UI."""
+    with ExitStack() as stack:
+        imported = import_annexes(
+            ws, [(path.name, stack.enter_context(path.open("rb"))) for path in paths]
+        )
+    if not imported.imported:
+        details = "; ".join(f"{item.file_name}: {item.reason}" for item in imported.ignored)
+        raise EmaError("not_ready", "Unele anexe nu pot fi citite.", details)
+    client_ids = list(dict.fromkeys(item.client_id for item in imported.imported))
+    rejected = tuple(
+        ReportException("EROARE", Path(item.file_name), None, item.reason, "Sursa a fost exclusă.")
+        for item in imported.ignored
+    )
+    started = start_run(ws, years, client_ids, source_exceptions=rejected)
+    for _ in subscribe(ws, str(started["job_id"])):
+        pass
+    run = get_run(ws, str(started["id"]))
+    if run["state"] != "ready":
+        raise EmaError("run_not_ready", "Raportul nu este gata.", str(run["state"]))
+    with ws.connect() as db:
+        row = db.execute(
+            "SELECT relative_path FROM outputs WHERE id=?", (run["output_id"],)
+        ).fetchone()
+        assert row is not None
+    output.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ws.path(str(row["relative_path"])), output)
+    return output

@@ -60,11 +60,11 @@ class ChapterSixPlan(BaseModel):
 
 # Her column labels, read from the base's first chapter-six tables.
 MEASURE_HEADER = (
-    ("Măsuri propuse", "Efect", "Economie de energie", "Investiţie", "Durată recuperare"),
+    ("Măsuri propuse", "Efect", "Economie de energie", "Investiție", "Durată recuperare"),
     ("", "", "tep/an", "t CO2", "mii lei", "ani"),
 )
 SYNTHESIS_HEADER = (
-    ("Măsuri propuse", "Economie de energie", "Investiţie", "Durată recuperare"),
+    ("Măsuri propuse", "Economie de energie", "Investiție", "Durată recuperare"),
     ("", "tep/an", "t CO2", "mii lei", "ani"),
 )
 
@@ -176,6 +176,11 @@ def _synthesis_row(item: PlannedMeasure) -> list[list[Segment]]:
     return [row[0], *row[2:]]
 
 
+def _bullet_title(title: str) -> str:
+    words = title.split()
+    return title if words and words[0].isupper() else title[:1].lower() + title[1:]
+
+
 def _blocks(plan: ChapterSixPlan, closing: list[Block]) -> list[Block]:
     company: list[str | Num] = [plan.company_name] if plan.company_name else [Num(None, 0)]
     blocks: list[Block] = [
@@ -191,11 +196,7 @@ def _blocks(plan: ChapterSixPlan, closing: list[Block]) -> list[Block]:
         BulletList(
             "bullet",
             [
-                [
-                    item.title[:1].lower()
-                    + item.title[1:]
-                    + ("." if index == len(plan.measures) - 1 else ";")
-                ]
+                [_bullet_title(item.title) + ("." if index == len(plan.measures) - 1 else ";")]
                 for index, item in enumerate(plan.measures)
             ],
         ),

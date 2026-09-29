@@ -6,11 +6,14 @@ from __future__ import annotations
 
 import io
 import re
+from pathlib import Path
+from zipfile import ZipFile
 
 from lxml import etree
 from openpyxl import Workbook
 from openpyxl.utils import column_index_from_string, get_column_letter
 
+from ema.core.config import Settings
 from ema.core.office.errors import OfficeError
 from ema.core.office.package import C
 
@@ -148,5 +151,29 @@ def build_workbook(root: etree._Element) -> bytes:
             if numeric and number_format:
                 cell.number_format = number_format
     buffer = io.BytesIO()
-    book.save(buffer)
+    save_workbook(book, buffer)
     return buffer.getvalue()
+
+
+def save_workbook(
+    book: Workbook, destination: Path | io.BytesIO, *, firm_name: str | None = None
+) -> None:
+    """Set firm provenance and replace the application property written by openpyxl."""
+    firm = Settings().firm_name if firm_name is None else firm_name
+    book.properties.creator = firm
+    book.properties.lastModifiedBy = firm
+    buffer = io.BytesIO()
+    book.save(buffer)
+    with ZipFile(buffer) as source, ZipFile(destination, "w") as output:
+        for entry in source.infolist():
+            content = source.read(entry)
+            if entry.filename == "docProps/app.xml":
+                root = etree.fromstring(content)
+                namespace = (
+                    "{http://schemas.openxmlformats.org/officeDocument/2006/extended-properties}"
+                )
+                application = root.find(namespace + "Application")
+                assert application is not None
+                application.text = "Ema"
+                content = etree.tostring(root)
+            output.writestr(entry, content)

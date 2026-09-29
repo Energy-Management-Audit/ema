@@ -20,6 +20,7 @@ from ema.core.review.models import Field, FieldSpec, Issue, Readiness
 from ema.core.workspace import Workspace
 from ema.piee.annual_check import months_check
 from ema.piee.compose import load_approved_base
+from ema.piee.identity import percent_text
 from ema.piee.workflow import base_directory, current_import
 
 
@@ -74,6 +75,38 @@ def _months_issues(job_fields: list[Field]) -> list[Issue]:
     ]
 
 
+def _ownership_issues(job_fields: list[Field]) -> list[Issue]:
+    return [
+        Issue(code="missing", field_id=field.id, message=f"Lipseşte: {field.label}")
+        for field in job_fields
+        if field.key in {"identity.ownership_state", "identity.ownership_private"}
+        and (field.review == "rejected" or percent_text(str(field.value)) is None)
+    ]
+
+
+def _payback_issues(job_fields: list[Field]) -> list[Issue]:
+    by_key = {field.key: field for field in job_fields}
+    issues: list[Issue] = []
+    for field in job_fields:
+        if (
+            field.key.startswith("measure.")
+            and field.key.endswith(".payback_years")
+            and field.state == "calculated"
+            and field.review == "pending"
+            and field.presence == "found"
+        ):
+            description = by_key.get(field.key.removesuffix("payback_years") + "description")
+            measure = str(description.value) if description and description.value else field.label
+            issues.append(
+                Issue(
+                    code="calculated_unconfirmed",
+                    field_id=field.id,
+                    message=f"Confirmaţi durata de recuperare calculată: {measure}",
+                )
+            )
+    return issues
+
+
 def _wait_for_output(ws: Workspace, job: str, run: str) -> str:
     for _ in subscribe(ws, job):
         pass
@@ -109,7 +142,13 @@ class PieeWorkflow:
                 ),
             ],
         )
-        issues = [*base.blocking, *_months_issues(fields(ws, job))]
+        job_fields = fields(ws, job)
+        issues = [
+            *base.blocking,
+            *_months_issues(job_fields),
+            *_payback_issues(job_fields),
+            *_ownership_issues(job_fields),
+        ]
         if current_import(ws, job) is None:
             issues.append(
                 Issue(code="import_required", message="Documentele trebuie citite din nou.")
@@ -186,7 +225,7 @@ def start_word_render(ws: Workspace, job: str, *, on_revision: int | None = None
         office.render_pdf(original, pdf)
         office.open_check(original)
         issues = check_standalone(original)
-        denylist = tuple(json.loads((base_dir / "base-identity.json").read_text()))
+        denylist = tuple(json.loads((base_dir / "base-identity.json").read_text(encoding="utf-8")))
         leftovers = leftover_issues(original, denylist)
         if issues or leftovers or not pdf.is_file() or not pdf.stat().st_size:
             raise EmaError("piee_package", "Pachetul PIEE final este invalid.", job)

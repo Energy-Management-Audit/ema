@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -9,6 +10,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+from ema.core.office.workbook import save_workbook
 from ema.reporting import ReportResult
 
 HEADERS = (
@@ -29,20 +31,20 @@ CONTROL_HEADERS = (
     "CUI",
     "CAEN / activitate",
     "Sursa consumului",
-    "Date lunare M3",
-    "Date anuale G3",
+    "Date lunare",
+    "Date anuale",
     "Diferență",
     "Valoare utilizată",
     "Structură măsuri",
-    "Măsuri 2023",
-    "Măsuri 2024",
-    "Măsuri 2025",
-    "Status",
-    "Observații",
 )
 
 
-def write_report(result: ReportResult, path: Path) -> Path:
+def _complete_total(values: Iterable[float | None]) -> float | None:
+    items = list(values)
+    return None if any(item is None for item in items) else sum(item or 0 for item in items)
+
+
+def write_report(result: ReportResult, path: Path, *, firm_name: str | None = None) -> Path:
     book = Workbook()
     active = book.active
     assert active is not None
@@ -91,13 +93,13 @@ def write_report(result: ReportResult, path: Path) -> Path:
                     if company.measures.get(year)
                 ),
                 "Total măsuri",
-                sum(
-                    measure.saving_tep or 0
+                _complete_total(
+                    measure.saving_tep
                     for company in result.companies
                     for measure in company.measures.get(year, ())
                 ),
-                sum(
-                    measure.cost_thousand_lei or 0
+                _complete_total(
+                    measure.cost_thousand_lei
                     for company in result.companies
                     for measure in company.measures.get(year, ())
                 ),
@@ -107,12 +109,12 @@ def write_report(result: ReportResult, path: Path) -> Path:
     _control(book, result)
     _exceptions(book, result)
     path.parent.mkdir(parents=True, exist_ok=True)
-    book.save(path)
+    save_workbook(book, path, firm_name=firm_name)
     return path
 
 
 def _format_year(sheet: Worksheet) -> None:
-    widths = (9, 38, 35, 22, 64, 18)
+    widths = (9, 38, 35, 22, 64, 18, 18)
     for col, width in enumerate(widths, 1):
         sheet.column_dimensions[get_column_letter(col)].width = width
     thin = Side(style="thin", color="B7C6D6")
@@ -150,7 +152,7 @@ def _format_year(sheet: Worksheet) -> None:
 
 def _control(book: Workbook, result: ReportResult) -> None:
     sheet = book.create_sheet("Control")
-    sheet.append([f"Registru de control — {len(result.companies)} surse Annex 2–3"])
+    sheet.append([f"Registru de control — {len(result.companies)} surse Anexa 2–3"])
     counts = {
         year: sum(len(company.measures.get(year, ())) for company in result.companies)
         for year in result.years
@@ -164,7 +166,9 @@ def _control(book: Workbook, result: ReportResult) -> None:
         ]
     )
     sheet.append([])
-    sheet.append(CONTROL_HEADERS)
+    sheet.append(
+        [*CONTROL_HEADERS, *(f"Măsuri {year}" for year in result.years), "Status", "Observații"]
+    )
     for index, company in enumerate(result.companies, 1):
         sheet.append(
             [
@@ -183,12 +187,12 @@ def _control(book: Workbook, result: ReportResult) -> None:
                 else None,
                 company.consumption_tep,
                 company.measure_sheet,
-                *(len(company.measures.get(year, ())) for year in (2023, 2024, 2025)),
+                *(len(company.measures.get(year, ())) for year in result.years),
                 company.status,
                 company.observations,
             ]
         )
-    widths = (6, 38, 20, 9, 34, 16, 38, 32, 17, 13, 15, 17, 38, 12, 13, 13, 13, 70)
+    widths = (6, 38, 20, 9, 34, 16, 38, 32, 17, 13, 15, 17, 38, *(13 for _ in result.years), 13, 70)
     for col, width in enumerate(widths, 1):
         sheet.column_dimensions[get_column_letter(col)].width = width
     sheet.row_dimensions[1].height = 30

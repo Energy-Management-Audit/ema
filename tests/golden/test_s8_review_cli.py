@@ -62,6 +62,19 @@ def test_review_decision_and_final_gate(
             candidate for candidate in item.alternatives if candidate.value == item.value
         )
         decide(ws, job, item.id, "choose", item.revision, "user", alternative=selected.id)
+    calculated = [
+        item
+        for item in fields(ws, job)
+        if item.key.endswith(".payback_years")
+        and item.state == "calculated"
+        and item.review == "pending"
+    ]
+    assert calculated
+    assert any(
+        issue.code == "calculated_unconfirmed" for issue in workflow.readiness(ws, job).blocking
+    )
+    for item in calculated:
+        decide(ws, job, item.id, "accept", item.revision, "user")
     assert any(issue.code == "stale" for issue in workflow.readiness(ws, job).blocking)
     regenerated = start_generate_for_job(ws, job)
     for _ in subscribe(ws, job):

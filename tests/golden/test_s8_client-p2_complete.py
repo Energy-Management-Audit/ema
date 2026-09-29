@@ -121,9 +121,12 @@ def test_CLIENT-P2_figure_inventory_and_numbers_match_or_have_pinned_reason(
     assert len(produced) == len(authored) == 35
     assert len(set(produced)) == 35
     assert _caption_slots(output) == _caption_slots(final)
+    # F16 keeps the base's fuel a/b/c/d group together, then adds the annual breakdown.
+    assert produced[15] == "word/charts/chart20.xml"
+    comparison_order = [*produced[:15], produced[16], produced[15], *produced[17:]]
     assert len(EXCEPTIONS) == 14
     for ordinal, (actual_part, reference_part) in enumerate(
-        zip(produced, authored, strict=True), 1
+        zip(comparison_order, authored, strict=True), 1
     ):
         actual, expected = read_series(output, actual_part), read_series(final, reference_part)
         if ordinal in {13, 14, 15}:

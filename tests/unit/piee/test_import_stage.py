@@ -82,7 +82,7 @@ def fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Fakes:
     monkeypatch.setattr(Composed, "base_sha", "synthetic-base", raising=False)
     monkeypatch.setattr(workflow, "compose_draft", fake_compose)
     monkeypatch.setattr(
-        workflow, "write_prelucrare", lambda *args: Path(args[2]).write_bytes(b"PK")
+        workflow, "write_prelucrare", lambda *args, **kwargs: Path(args[2]).write_bytes(b"PK")
     )
     return state
 

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from ema.core.office.sheets import Book, CellRef, Sheet
+import re
+from decimal import Decimal
+
+from ema.core.office.sheets import Book, CellRef, CellValue, Sheet
 from ema.energy_data.anexa_cells import AnexaData
 from ema.energy_data.source import Located, ReaderIssue, cell_at, filled, normal, right_of_label
 
@@ -107,15 +110,37 @@ def _ownership(sheet: Sheet, result: AnexaData) -> None:
         anchor = _label(sheet, (label,), result.issues)
         if anchor is None:
             continue
-        value = _following(sheet, anchor, result.issues)
-        if value is None:
+        candidate = None
+        for col in range(anchor.col + 1, min(sheet.max_col, anchor.col + 3) + 1):
+            cell = cell_at(sheet, anchor.row, col, result.issues)
+            if cell.value is None or (isinstance(cell.value, str) and not cell.value.strip()):
+                continue
+            candidate = cell
+            break
+        if candidate is None:
+            result.issues.append(ReaderIssue("ownership_flag", key, anchor))
             continue
-        raw = value.value
-        if isinstance(raw, str) and "%" in raw:
-            result.identity[key] = Located(raw, value.ref, "%")
+        percent = _percentage(candidate)
+        if percent is None:
+            result.issues.append(ReaderIssue("ownership_flag", key, candidate.ref))
         else:
-            result.identity[key] = value
-            result.issues.append(ReaderIssue("ownership_flag", key, value.ref))
+            result.identity[key] = Located(percent, candidate.ref, "%")
+
+
+def _percentage(cell: CellValue) -> str | None:
+    raw = cell.value
+    percent = None
+    if isinstance(raw, str):
+        match = re.fullmatch(r"\s*(\d+(?:[.,]\d+)?)\s*%\s*", raw)
+        if match:
+            percent = Decimal(match.group(1).replace(",", "."))
+    elif isinstance(raw, int | float) and not isinstance(raw, bool):
+        number_format = re.sub(r'"[^"]*"|\\.|\[[^]]*\]', "", cell.number_format or "")
+        if "%" in number_format:
+            percent = Decimal(str(raw)) * 100
+    if percent is None or not percent.is_finite() or not 0 <= percent <= 100:
+        return None
+    return str(percent).replace(".", ",") + "%"
 
 
 def _contact_person(sheet: Sheet, result: AnexaData) -> None:

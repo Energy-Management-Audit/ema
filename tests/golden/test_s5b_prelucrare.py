@@ -17,7 +17,8 @@ from ema.energy_data.prelucrare_factors import factors_for_output
 from ema.energy_data.prelucrare_merge import merge_prelucrare
 from ema.energy_data.prelucrare_writer import write_prelucrare
 
-from .s3_workbooks import load_case
+from .s3_book import Workbook
+from .s3_workbooks import _factor_after_equals, load_case
 
 pytestmark = pytest.mark.golden
 CASES = (
@@ -67,9 +68,28 @@ def test_reader_matches_auditor(
             for month, reading in series.months.items():
                 assert actual.months[month].value == pytest.approx(reading.value)
                 assert actual.months[month].unit == reading.unit
-    assert {(factor.carrier, factor.unit, factor.per_unit) for factor in imported.factors.tep} == {
-        (factor.carrier, factor.unit, factor.per_unit) for factor in factors.tep
-    }
+    expected_factors = {(factor.carrier, factor.unit, factor.per_unit) for factor in factors.tep}
+    if case == "CLIENT-A3":
+        # B1 preserves labeled, all-missing carriers; their filed factors remain traceable.
+        book = Workbook.open(reference_library / relative)
+        for carrier, sheet, label, unit in (
+            (Carrier.ctl, "Consum Carburanti", "1 t (CTL", "t"),
+            (Carrier.purchased_heat, "Consum Energie termica terti", "1 Gcal", "Gcal"),
+        ):
+            series = imported.dataset.carriers[carrier]
+            assert set(series) == set(years)
+            assert all(
+                item.annual is None
+                and len(item.months) == 12
+                and all(reading.value is None for reading in item.months.values())
+                for item in series.values()
+            )
+            factor = _factor_after_equals(book.sheet(sheet), label)
+            assert factor is not None
+            expected_factors.add((carrier, unit, factor))
+    assert {
+        (factor.carrier, factor.unit, factor.per_unit) for factor in imported.factors.tep
+    } == expected_factors
     assert all(
         relative.rsplit("/", 1)[-1] in factor.source and "!" in factor.source
         for factor in (*imported.factors.tep, *imported.factors.co2)
@@ -156,7 +176,9 @@ def test_CLIENT-P1_generator_and_writer(  # noqa: C901
                 continue
             first = years[year]
             second = rebuilt.dataset.carriers[carrier][year]
-            assert first.months.keys() == second.months.keys()
+            # B1 retains the writer's labeled row even for an annual-only source.
+            assert set(second.months) == (set(first.months) or set(range(1, 13)))
+            assert first.months or all(reading.value is None for reading in second.months.values())
             for month, reading in first.months.items():
                 assert second.months[month].value == pytest.approx(reading.value)
                 assert second.months[month].unit == reading.unit

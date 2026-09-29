@@ -75,24 +75,23 @@ def _tep(data: PieeData, carrier: Carrier, year: int) -> float | None:
     return value(data.dataset, data.factors, Metric("tep", (carrier,)), year)[0]
 
 
-def _sum_present(values: tuple[float | None, ...]) -> float | None:
+def _group_tep(data: PieeData, carriers: tuple[Carrier, ...], year: int) -> float | None:
+    values = [
+        _tep(data, carrier, year)
+        for carrier in carriers
+        if year in data.dataset.carriers.get(carrier, {})
+    ]
     return (
         sum(item for item in values if item is not None)
-        if any(item is not None for item in values)
+        if values and all(item is not None for item in values)
         else None
     )
 
 
 def _equivalent(data: PieeData, year: int) -> tuple[float | None, ...]:
-    electricity = _sum_present(
-        (_tep(data, Carrier.electricity_grid, year), _tep(data, Carrier.electricity_pv, year))
-    )
+    electricity = _group_tep(data, (Carrier.electricity_grid, Carrier.electricity_pv), year)
     gas = _tep(data, Carrier.natural_gas, year)
-    fuel = _sum_present(
-        tuple(
-            _tep(data, carrier, year) for carrier in (Carrier.diesel, Carrier.petrol, Carrier.lpg)
-        )
-    )
+    fuel = _group_tep(data, (Carrier.diesel, Carrier.petrol, Carrier.lpg), year)
     filed = data.prelucrare.filed.get(f"tep.total.{year}") if data.prelucrare is not None else None
     total = (
         float(filed.value)

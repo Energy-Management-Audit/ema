@@ -10,6 +10,7 @@ import json
 import math
 import re
 import unicodedata
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -80,13 +81,13 @@ _CASES = {
         (18, 11),
     ),
     "CLIENT-X1": (
-        _COMMON_IDENTITY | {"ownership_state", "ownership_private"},
+        _COMMON_IDENTITY,
         (_COMMON_ANNUAL - {"purchased_heat_gcal"}) | {"clu_raw", "clu_tep"},
         _COMMON_MONTHLY | {"purchased_heat", "clu", "water_potable"},
         (23, 15),
     ),
     "CLIENT-X2": (
-        _COMMON_IDENTITY | {"contact_person", "ownership_state", "ownership_private"},
+        _COMMON_IDENTITY | {"contact_person", "ownership_private"},
         _COMMON_ANNUAL | {"purchased_heat_gcal", "clu_raw", "clu_tep", "lpg_raw", "lpg_tep"},
         _COMMON_MONTHLY | {"purchased_heat", "clu", "lpg", "water_industrial"},
         (10, 5),
@@ -100,7 +101,7 @@ def _case(reference_library: Path, fragment: str) -> Path:
 
 def _dump(reference_library: Path, path: Path) -> dict[str, list[list[str]]]:
     source = reference_library / "_analysis" / "anexa_dump.json"
-    return json.loads(source.read_text())[str(path.relative_to(reference_library))]
+    return json.loads(source.read_text(encoding="utf-8"))[str(path.relative_to(reference_library))]
 
 
 def _source(sheets: dict[str, list[list[str]]], item: Located) -> str:
@@ -121,6 +122,38 @@ def _same_source(sheets: dict[str, list[list[str]]], item: Located) -> None:
         else:
             matches = math.isclose(float(item.value), expected, rel_tol=1e-12, abs_tol=1e-12)
             assert matches, item.ref.a1
+
+
+def _ownership_source(sheets: dict[str, list[list[str]]], item: Located, path: Path) -> None:
+    raw = _source(sheets, item)
+    if raw.strip().endswith("%"):
+        expected = Decimal(raw.strip().removesuffix("%").strip().replace(",", "."))
+    else:
+        book = open_book(path)
+        try:
+            cell = book.sheet(item.ref.sheet).value(item.ref.row, item.ref.col)
+            assert cell.number_format == "0%"
+            expected = Decimal(raw) * 100
+        finally:
+            book.close()
+    assert item.unit == "%" and str(item.value).endswith("%")
+    assert Decimal(str(item.value).removesuffix("%").replace(",", ".")) == expected
+
+
+def _ownership_flags(
+    sheets: dict[str, list[list[str]]], issues: list[ReaderIssue], fragment: str
+) -> None:
+    # F2 rejects the filed flags/neighboring label rather than inventing percentages.
+    rejected = {
+        "CLIENT-X1": {"ownership_state", "ownership_private"},
+        "CLIENT-X2": {"ownership_state"},
+    }.get(fragment, set())
+    flags = [issue for issue in issues if issue.code == "ownership_flag"]
+    assert {issue.detail for issue in flags} == rejected
+    for issue in flags:
+        assert issue.ref is not None
+        raw = sheets[issue.ref.sheet][issue.ref.row - 1][issue.ref.col - 1]
+        assert raw.strip() and "%" not in raw
 
 
 def _measure_rows(sheets: dict[str, list[list[str]]], name: str, description_col: int) -> set[int]:
@@ -231,6 +264,7 @@ def test_complete_fields_match_source_dump(reference_library: Path, fragment: st
     assert set(parsed.annual) == annual
     assert set(parsed.monthly) == monthly
     assert (len(parsed.existing_measures), len(parsed.planned_measures)) == counts
+    _ownership_flags(sheets, parsed.issues, fragment)
     assert parsed.year is not None
     _same_source(sheets, parsed.year)
     _field_location(sheets, "year", parsed.year)
@@ -245,6 +279,8 @@ def test_complete_fields_match_source_dump(reference_library: Path, fragment: st
                 )
             finally:
                 book.close()
+        elif key.startswith("ownership_"):
+            _ownership_source(sheets, item, path)
         else:
             _same_source(sheets, item)
         _field_location(sheets, key, item)

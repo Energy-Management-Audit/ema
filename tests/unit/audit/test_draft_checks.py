@@ -37,7 +37,11 @@ def test_rejects_literal_number_name_ai_and_unknown_fact() -> None:
             "literal_number",
         ),
         ("Societatea Inventata are sediul aici.", [], "literal_name"),
-        ("Societatea {{f:audit.company_name}} folosește AI.", ["audit.company_name"], "ai_mention"),
+        (
+            "Societatea {{f:audit.company_name}} folosește un algoritm AI.",
+            ["audit.company_name"],
+            "ai_mention",
+        ),
         ("Societatea {{f:audit.cui}} este aici.", ["audit.cui"], "fact_missing"),
     ):
         assert code in {

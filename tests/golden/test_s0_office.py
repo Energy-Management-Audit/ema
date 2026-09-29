@@ -76,7 +76,7 @@ def _formatting(paragraph):
     )
 
 
-def _visual_xml(docx, part, normalize_axis_title=False):
+def _visual_xml(docx, part, normalize_axis_title=False, generated=False):
     root = etree.fromstring(read_parts(docx)[part])
     for node in root.xpath("//*[local-name()='uniqueId']"):
         node.set("val", "{new-id}")
@@ -87,6 +87,17 @@ def _visual_xml(docx, part, normalize_axis_title=False):
             "//*[local-name()='valAx']/*[local-name()='title']//*[local-name()='t']"
         ):
             text.text = "axis title"
+    if generated:
+        for node in root.xpath(
+            "//*[local-name()='plotArea']/*[local-name()='layout']/"
+            "*[local-name()='manualLayout'] | "
+            "//*[local-name()='plotArea']/*/*[local-name()='title']/"
+            "*[local-name()='layout']/*[local-name()='manualLayout'] | "
+            "//*[local-name()='catAx']/*[local-name()='tickLblSkip']"
+        ):
+            node.getparent().remove(node)
+        for node in root.xpath("//*[local-name()='valAx']/*[local-name()='numFmt']"):
+            node.set("formatCode", "value precision")
     return etree.tostring(root, method="c14n")
 
 
@@ -155,9 +166,17 @@ def test_audit_embed_clone_and_build(references):
     assert read_series(built_file, built_part)[0].values == pv[0].values
     assert check_standalone(built_file) == []
     assert _visual_xml(embedded, "word/charts/chart11.xml") == _visual_xml(built_file, clone_part)
+    # #56 deliberately changes these three properties of generated monthly charts.
+    # Everything else, and the unmodified clone above, still matches her visual XML.
     assert _visual_xml(
-        embedded, "word/charts/chart11.xml", normalize_axis_title=True
-    ) == _visual_xml(built_file, built_part, normalize_axis_title=True)
+        embedded, "word/charts/chart11.xml", normalize_axis_title=True, generated=True
+    ) == _visual_xml(built_file, built_part, normalize_axis_title=True, generated=True)
+    built_root = etree.fromstring(read_parts(built_file)[built_part])
+    assert built_root.xpath("//*[local-name()='catAx']/*[local-name()='tickLblSkip']/@val") == ["1"]
+    assert built_root.xpath("//*[local-name()='valAx']/*[local-name()='numFmt']/@formatCode") == [
+        "#,##0.00"
+    ]
+    assert not built_root.xpath("//*[local-name()='manualLayout']")
     report = inspect(built_file)
     with ZipFile(built_file) as archive:
         for part in (clone_part, built_part):

@@ -37,6 +37,14 @@ CLIENT_WORDS = (
     "CLIENT-P2",
     "CLIENT-P1",
 )
+ALLOWED_CAPITAL_WORDS = frozenset({"Conform", "În", "Curba", "Consumul", "Valoarea", "MWh", "SEN"})
+CAPITAL_WORD = re.compile(r"(?<!\w)[A-ZĂÂÎȘȚŞŢ][\w-]*")
+
+
+def safe_pattern(text: str) -> bool:
+    return all(word in ALLOWED_CAPITAL_WORDS for word in CAPITAL_WORD.findall(text))
+
+
 NUMBER = re.compile(r"(?<!\w)\d+(?:[.,]\d+)*(?!\w)")
 FIGURE_NUMBER = re.compile(r"(?i)(Conform figurii numărul\s+)\d+(?:\.\d+)?")
 YEAR = re.compile(r"(?<!\d)20\d{2}(?!\d)")
@@ -82,12 +90,15 @@ def extract(root: Path) -> list[dict[str, str | int]]:
                 continue
             if len(text) > 420:
                 continue
+            pattern = _pattern(text) + (" " if paragraph.text.endswith(" ") else "")
+            if not safe_pattern(pattern):
+                continue
             patterns.append(
                 {
                     "source_document": source,
                     "paragraph": index,
                     "direction": "value" if VALUE_BULLET.match(text) else _category(text),
-                    "pattern": _pattern(text) + (" " if paragraph.text.endswith(" ") else ""),
+                    "pattern": pattern,
                 }
             )
     if {item["source_document"] for item in patterns} != set(SOURCES):

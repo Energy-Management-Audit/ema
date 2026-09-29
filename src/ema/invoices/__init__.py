@@ -178,7 +178,7 @@ def render(
         raise EmaError("invoices_no_export", "Nicio factură nu poate fi exportată.", job)
     with tempfile.TemporaryDirectory(dir=artifact.parent) as temporary_dir:
         temporary = Path(temporary_dir) / "workbook.xlsx"
-        OpenpyxlWorkbookExporter().export(drafts, temporary)
+        OpenpyxlWorkbookExporter(firm_name=load_settings(ws).firm_name).export(drafts, temporary)
         if ctx is not None:
             ctx.save_output(temporary, name, kind=kind)
             return None

@@ -34,7 +34,7 @@ def test_identity_values_include_sourced_address_and_contact() -> None:
             "name": _located("Synthetic Company"),
             "address": _located("Strada Test nr. 12, 123456, Oraș Test, jud. Test"),
             "cui": _located("RO 12345678"),
-            "ownership_state": _located("0"),
+            "ownership_state": _located("0%"),
             "ownership_private": _located("100,00 %"),
             "phone": _located("0712345678"),
             "website": _located("example.test"),
@@ -59,3 +59,14 @@ def test_incomplete_address_stays_missing() -> None:
         AnexaData(identity={"address": _located("Strada Test, Oraș Test")}), date(2026, 1, 2)
     )
     assert values["footer_address"] is None
+
+
+@pytest.mark.parametrize("raw", ["0", "1", "DA", "<label>", "Privat", "Stat", "20% text"])
+def test_non_percentage_ownership_is_missing(raw: str) -> None:
+    anexa = AnexaData(
+        identity={
+            "ownership_state": _located(raw),
+            "ownership_private": _located("100%"),
+        }
+    )
+    assert identity_values(anexa, date(2026, 1, 2))["ownership"] is None

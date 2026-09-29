@@ -107,14 +107,12 @@ def _physical(
             readings[month] = Reading(value, unit)
             if value is not None:
                 out.located[f"carrier.{key}.{year}.{month:02d}"] = located(cell, value, unit)
-        has_month = any(reading.value is not None for reading in readings.values())
         total = cell_or_blank(sheet, row, max(months.values()) + 1)
         annual_value = numeric(total.value)
-        if has_month or annual_value is not None:
-            annual = Reading(annual_value, unit) if annual_value is not None else None
-            found[year] = CarrierSeries(readings if has_month else {}, annual)
-            if annual_value is not None:
-                out.located[f"carrier.{key}.{year}"] = located(total, annual_value, unit)
+        annual = Reading(annual_value, unit) if annual_value is not None else None
+        found[year] = CarrierSeries(readings, annual)
+        if annual_value is not None:
+            out.located[f"carrier.{key}.{year}"] = located(total, annual_value, unit)
     return found
 
 

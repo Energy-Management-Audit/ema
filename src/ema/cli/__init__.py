@@ -49,8 +49,8 @@ from ema.invoices import (
     readiness as invoice_readiness,
 )
 from ema.mcp.server import serve as serve_mcp
-from ema.reporting import collect_annexes, write_report
-from ema.reporting import generate as generate_report
+from ema.reporting import collect_annexes
+from ema.reporting.runs import generate_from_sources
 
 _app = typer.Typer(no_args_is_help=True, invoke_without_command=True)
 workspace_app = typer.Typer()
@@ -83,7 +83,7 @@ def reporting_generate(
     paths = collect_annexes(sources)
     if not paths:
         raise typer.BadParameter("No annex workbooks found")
-    write_report(generate_report(paths, tuple(range(first, last + 1))), out)
+    generate_from_sources(_workspace(), paths, list(range(first, last + 1)), out)
     typer.echo(str(out))
 
 

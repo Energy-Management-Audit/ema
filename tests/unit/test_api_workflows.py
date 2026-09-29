@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
@@ -110,16 +109,6 @@ def test_client_anaf_settings_and_reporting_persistence(
     )
     assert indexed.status_code == 200
     assert len(indexed.json()["imported"]) == 1
-    monkeypatch.setattr(
-        "ema.reporting.runs.generate",
-        lambda _paths, _years, _names: SimpleNamespace(
-            exceptions=[], companies=[], consumption_year=2025
-        ),
-    )
-    monkeypatch.setattr(
-        "ema.reporting.runs.write_report",
-        lambda _result, path: path.write_bytes(b"synthetic workbook"),
-    )
     started = client.post(
         "/reporting/runs",
         json={"years": [2025], "client_ids": [client_id]},

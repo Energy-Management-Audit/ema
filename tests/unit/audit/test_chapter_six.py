@@ -139,3 +139,20 @@ def test_headers_are_her_labels_and_the_closing_is_the_reviewed_text(tmp_path: P
     closing = paragraphs.index(TITLES["ch7"]) - 1
     assert paragraphs[closing] == "[de completat]"
     assert "Retained closing paragraph" not in paragraphs
+
+
+def test_acronym_titles_keep_their_capitals_in_measure_bullets(tmp_path: Path) -> None:
+    base = _base(tmp_path / "base.docx", chapter_five=True)
+    plan = _plan()
+    measures = tuple(
+        plan.measures[0].model_copy(update={"title": title})
+        for title in ("LED – corpuri", "BMS pentru clădire", "Izolare termică")
+    )
+    output = tmp_path / "out.docx"
+    render_chapter_six(
+        base, output, plan.model_copy(update={"measures": measures}), ("Old measure",)
+    )
+    texts = [paragraph.text for paragraph in Document(output).paragraphs]
+    assert "LED – corpuri;" in texts
+    assert "BMS pentru clădire;" in texts
+    assert "izolare termică." in texts

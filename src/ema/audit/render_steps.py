@@ -241,6 +241,4 @@ def ai_wording_hits(docx: Path, job_fields: Iterable[Field]) -> list[str]:
                     else name.removeprefix("word/").removesuffix(".xml")
                 )
                 hits.append(where)
-    if not hits:
-        return []
     return list(dict.fromkeys([*texts, *hits]))

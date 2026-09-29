@@ -10,6 +10,8 @@ def delete_job_rows(db: sqlite3.Connection, job_id: str) -> None:
             (job_id,),
         )
     for table in (
+        "reporting_runs",
+        "job_events",
         "approvals",
         "client_memory",
         "decisions",

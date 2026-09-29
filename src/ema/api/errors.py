@@ -7,6 +7,8 @@ from fastapi.routing import APIRoute
 from ema.core.errors import EmaError
 
 STATUS = {
+    "piee_annex_year": 422,
+    "piee_sources_incomplete": 422,
     "job_missing": 404,
     "client_missing": 404,
     "output_missing": 404,

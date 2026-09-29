@@ -1,4 +1,4 @@
-"""A computed payback stays marked in the draft and review."""
+"""Calculated provenance stays in review while the draft prints only the number."""
 
 import json
 
@@ -12,7 +12,7 @@ from ema.piee.measure_tables import _solution_row
 from ema.piee.payback_review import record_payback_check
 
 
-def test_missing_filed_payback_is_marked_calculated_in_draft_and_review(tmp_path) -> None:
+def test_missing_filed_payback_keeps_provenance_in_review_only(tmp_path) -> None:
     def value(content: str | float | int) -> Located:
         return Located(content, CellRef("Measures", 1, 1))
 
@@ -26,7 +26,7 @@ def test_missing_filed_payback_is_marked_calculated_in_draft_and_review(tmp_path
         },
     )
 
-    assert _solution_row(row)[2] == "4,00 (calculat)"
+    assert _solution_row(row)[2] == "4,00"
 
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "piee", "synthetic", 2026)

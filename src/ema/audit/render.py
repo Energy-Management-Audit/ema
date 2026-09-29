@@ -310,10 +310,8 @@ def _render(  # noqa: C901, PLR0912, PLR0915
         raise EmaError(
             "audit_package", "Pachetul Word al auditului este invalid.", "; ".join(issues[:3])
         )
-    if kind == "final" and (hits := ai_wording_hits(docx, job_fields)):
-        raise EmaError(
-            "audit_ai_wording", "Raportul final conţine formulări despre AI.", "; ".join(hits)
-        )
+    if hits := ai_wording_hits(docx, job_fields):
+        raise EmaError("audit_ai_wording", "Raportul conţine formulări despre AI.", "; ".join(hits))
     counts = body_counts(docx, cover_labels(anchors))
     if kind == "final" and counts.markers:
         sections = dict.fromkeys(section_id for section_id, _ in counts.markers)

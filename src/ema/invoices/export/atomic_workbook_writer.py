@@ -7,6 +7,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
+from ema.core.office.workbook import save_workbook
 from ema.invoices.export.errors import (
     WorkbookCleanupError,
     WorkbookCommitError,
@@ -22,12 +23,14 @@ def save_workbook_atomically(
     workbook: Workbook,
     destination: Path,
     verify: WorkbookVerifier,
+    *,
+    firm_name: str | None = None,
 ) -> Path:
     """Write, verify, and atomically replace a workbook destination."""
     temporary_path = _create_temporary_sibling(destination)
     primary_error: WorkbookExportError | None = None
     try:
-        _write_and_close(workbook, temporary_path)
+        _write_and_close(workbook, temporary_path, firm_name)
         try:
             verify(temporary_path)
         except WorkbookVerificationError:
@@ -82,10 +85,10 @@ def _create_temporary_sibling(destination: Path) -> Path:
     return temporary_path
 
 
-def _write_and_close(workbook: Workbook, temporary_path: Path) -> None:
+def _write_and_close(workbook: Workbook, temporary_path: Path, firm_name: str | None) -> None:
     write_error: WorkbookWriteError | None = None
     try:
-        workbook.save(temporary_path)
+        save_workbook(workbook, temporary_path, firm_name=firm_name)
     except Exception as error:
         write_error = WorkbookWriteError("The workbook could not be written.")
         write_error.__cause__ = error

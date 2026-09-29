@@ -37,7 +37,7 @@ def _payback(row: Measure) -> str | None:
     if filed is not None:
         return filed
     calculated = calculated_payback(row)
-    return f"{prototype_number(calculated, 2)} (calculat)" if calculated is not None else None
+    return prototype_number(calculated, 2) if calculated is not None else None
 
 
 def _audit_row(row: Measure) -> tuple[str | None, ...]:

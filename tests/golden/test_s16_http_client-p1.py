@@ -128,6 +128,21 @@ def _journey(  # noqa: PLR0915
         )
         assert chosen.status_code == 200
     assert client.get(f"/jobs/{job}/conflicts").json() == []
+    calculated = [
+        item
+        for item in client.get(f"/jobs/{job}/fields").json()
+        if item["key"].endswith(".payback_years")
+        and item["state"] == "calculated"
+        and item["review"] == "pending"
+    ]
+    assert calculated
+    for field in calculated:
+        accepted = client.post(
+            f"/jobs/{job}/fields/{field['id']}/decide",
+            json={"action": "accept", "on_revision": field["revision"]},
+            headers=headers,
+        )
+        assert accepted.status_code == 200
     refreshed = client.post(
         f"/jobs/{job}/piee/generate",
         json={"kind": "draft", "on_revision": _revision(client, job)},

@@ -65,7 +65,7 @@ def test_solution_row_follows_authored_payback_cost_and_saving_columns() -> None
     assert _solution_row(source) == (
         "measure",
         "2027",
-        "4,00 (calculat)",
+        "4,00",
         "12,00",
         "20,00",
         "1,72",

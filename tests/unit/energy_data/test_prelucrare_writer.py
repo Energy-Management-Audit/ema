@@ -7,6 +7,7 @@ from openpyxl import load_workbook
 
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
+from ema.energy_data.prelucrare import import_prelucrare
 from ema.energy_data.prelucrare_writer import write_prelucrare
 
 
@@ -140,3 +141,26 @@ def test_writer_rejects_invalid_year_selection(tmp_path: Path, years: tuple[int,
     with pytest.raises(ValueError, match="years must be present"):
         write_prelucrare(_dataset(), years, tmp_path / "invalid.xlsx")
     assert not (tmp_path / "invalid.xlsx").exists()
+
+
+def test_explicit_water_with_missing_readings_survives_round_trip(tmp_path: Path) -> None:
+    months = {month: Reading(None, "m3") for month in range(1, 13)}
+    dataset = EnergyDataset((2025,), {Carrier.water_potable: {2025: CarrierSeries(months)}})
+    path = tmp_path / "water.xlsx"
+    write_prelucrare(dataset, (2025,), path)
+    rebuilt = import_prelucrare(path)
+    assert rebuilt.dataset.carriers[Carrier.water_potable][2025].months == months
+    assert rebuilt.dataset.carriers[Carrier.water_potable][2025].annual is None
+
+
+@pytest.mark.parametrize("carrier,unit", [(Carrier.diesel, "t"), (Carrier.natural_gas, "MWh")])
+def test_explicit_energy_carrier_with_missing_readings_survives_round_trip(
+    tmp_path: Path, carrier: Carrier, unit: str
+) -> None:
+    months = {month: Reading(None, unit) for month in range(1, 13)}
+    dataset = EnergyDataset((2025,), {carrier: {2025: CarrierSeries(months)}})
+    path = tmp_path / "missing.xlsx"
+    write_prelucrare(dataset, (2025,), path)
+    rebuilt = import_prelucrare(path)
+    assert rebuilt.dataset.carriers[carrier][2025].months == months
+    assert rebuilt.dataset.carriers[carrier][2025].annual is None
