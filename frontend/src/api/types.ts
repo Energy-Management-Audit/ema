@@ -161,6 +161,7 @@ export type Approval = {
   readiness_hash: string
   on_decision: string | null
   at: string
+  exported_at: string | null
   actor: 'ema' | 'user' | 'agent'
 }
 

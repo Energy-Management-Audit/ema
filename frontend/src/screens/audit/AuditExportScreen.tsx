@@ -114,7 +114,13 @@ function AuditExportView() {
         {final ? 'Aprobă şi exportă' : 'Generează versiunea finală'}
       </Button>
     )
-  } else if (final && !finalStale && !receipt) {
+  } else if (
+    final &&
+    !finalStale &&
+    !receipt &&
+    approvals.data &&
+    (!approval || approval.exported_at === null)
+  ) {
     primary = (
       <Button
         height={38}

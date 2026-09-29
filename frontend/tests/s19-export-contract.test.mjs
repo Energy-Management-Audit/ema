@@ -76,6 +76,31 @@ test('P3 checks carries the authoritative final output_id, created_at and file i
   }
 })
 
+test('P3 Approval exported_at is null until the copy succeeds', async () => {
+  for (const exportedAt of [null, '2026-09-29T10:01:00Z']) {
+    const approval = {
+      id: 'approval-1',
+      job_id: 'job-1',
+      output_id: 'final-1',
+      readiness_hash: 'hash-1',
+      on_decision: null,
+      at: response.approved_at,
+      exported_at: exportedAt,
+      actor: 'user',
+    }
+    await withFetch(
+      async (url, options) => {
+        assert.equal(url, '/jobs/job-1/approvals')
+        assert.equal(options.method, 'GET')
+        return Response.json([approval])
+      },
+      async () => {
+        assert.deepEqual(await api.approvals('job-1'), [approval])
+      },
+    )
+  }
+})
+
 for (const code of ['output_stale', 'approval_required']) {
   test(`P3 export preserves ${code} 409`, async () => {
     await withFetch(

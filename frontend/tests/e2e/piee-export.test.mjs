@@ -71,6 +71,7 @@ test('B19 B20 B21 S6 X3/X4: approving binds the listed final and the readiness s
             readiness_hash: 'hash-ready',
             on_decision: null,
             at: new Date().toISOString(),
+            exported_at: new Date().toISOString(),
             actor: 'user',
           },
         ],

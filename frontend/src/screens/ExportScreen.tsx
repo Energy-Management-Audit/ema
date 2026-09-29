@@ -79,7 +79,7 @@ export function ExportScreen() {
         {final ? 'Aprobă şi exportă' : 'Generează pachetul'}
       </Button>
     )
-  } else if (final && !receipt) {
+  } else if (final && !receipt && approvals.data && (!approval || approval.exported_at === null)) {
     primary = (
       <Button
         height={38}

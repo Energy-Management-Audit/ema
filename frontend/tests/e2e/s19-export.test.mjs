@@ -142,6 +142,7 @@ for (const item of cases) {
       output_id: item.checks.final.output_id,
       readiness_hash: item.checks.readiness_hash,
       at: item.response.approved_at,
+      exported_at: null,
     }
     await withHarness(
       {
@@ -170,6 +171,43 @@ for (const item of cases) {
         )
         assert.equal(posts.length, 2)
         assert.deepEqual(posts[0].body, posts[1].body)
+      },
+    )
+  })
+
+  test(`O2 ${item.path}: a completed copy stays exported after reload`, async () => {
+    let exportedAt = null
+    const approval = {
+      id: 'approved-1',
+      output_id: item.checks.final.output_id,
+      readiness_hash: item.checks.readiness_hash,
+      at: item.response.approved_at,
+    }
+    await withHarness(
+      {
+        path: item.path,
+        routes: {
+          ...routes,
+          [`GET ${item.J}/approvals`]: () => ({
+            body: [{ ...approval, exported_at: exportedAt }],
+          }),
+          [`POST ${item.J}/export`]: () => {
+            exportedAt = '2026-09-29T10:01:00Z'
+            return { body: item.response }
+          },
+        },
+      },
+      async ({ page, requests }) => {
+        await page.getByRole('button', { name: 'Aprobă şi exportă', exact: true }).click()
+        await page.getByText(`Fişierele finale sunt în ${item.response.folder}`).waitFor()
+        await page.reload()
+        await page.getByText(/^Aprobat /).waitFor()
+        assert.equal(
+          await page.getByRole('button', { name: 'Aprobă şi exportă', exact: true }).count(),
+          0,
+        )
+        await page.getByRole('button', { name: 'Descarcă doar Word' }).waitFor()
+        assert.equal(count(requests, 'POST', `${item.J}/export`), 1)
       },
     )
   })
