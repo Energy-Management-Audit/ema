@@ -2,7 +2,14 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { FINAL_OUTPUTS, JOB, READY_CHECKS, eventStream } from '../fixtures/piee/default.mjs'
+import {
+  FINAL_CHECKS,
+  EXPORTED,
+  FINAL_OUTPUTS,
+  JOB,
+  READY_CHECKS,
+  eventStream,
+} from '../fixtures/piee/default.mjs'
 import { problem } from './harness.mjs'
 import { count, settle, withHarness } from './helpers.mjs'
 
@@ -44,8 +51,8 @@ test('B18 S6 X1: the package waits for final_ok; then it starts piee_word', asyn
 test('B19 B20 B21 S6 X3/X4: approving binds the listed final and the readiness shown', async () => {
   const routes = {
     [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS },
-    [`GET ${J}/export/checks`]: { status: 200, body: READY_CHECKS },
-    [`POST ${J}/export`]: { status: 200, body: { output_id: 'out-final-1' } },
+    [`GET ${J}/export/checks`]: { status: 200, body: FINAL_CHECKS },
+    [`POST ${J}/export`]: { status: 200, body: EXPORTED },
   }
   await withHarness(
     { path: `/app/piee/${JOB}/predare`, routes },
@@ -64,15 +71,16 @@ test('B19 B20 B21 S6 X3/X4: approving binds the listed final and the readiness s
             readiness_hash: 'hash-ready',
             on_decision: null,
             at: new Date().toISOString(),
+            exported_at: new Date().toISOString(),
             actor: 'user',
           },
         ],
       })
       await page.getByRole('button', { name: 'Aprobă şi exportă' }).click()
-      await page.getByText('Copia finală e în dosarul de exporturi al lucrării.').waitFor()
+      await page.getByText(`Fişierele finale sunt în ${EXPORTED.folder}`).waitFor()
       assert.deepEqual(requests[before].method + ' ' + requests[before].path, `POST ${J}/export`)
       assert.deepEqual(requests[before].body, {
-        final: true,
+        dest_dir: null,
         output_id: 'out-final-1',
         readiness_hash: 'hash-ready',
         confirm: true,
@@ -115,7 +123,10 @@ test('B23 the preview opens only the same-run PDF, as a blob', async () => {
   await withHarness(
     {
       path: `/app/piee/${JOB}/date`,
-      routes: { [`GET ${J}/outputs`]: { status: 200, body: noPdf } },
+      routes: {
+        [`GET ${J}/outputs`]: { status: 200, body: noPdf },
+        [`GET ${J}/export/checks`]: { body: FINAL_CHECKS },
+      },
     },
     async ({ page }) => {
       await page.getByTestId('carrier-table-electricity_grid').waitFor()
@@ -126,7 +137,10 @@ test('B23 the preview opens only the same-run PDF, as a blob', async () => {
   await withHarness(
     {
       path: `/app/piee/${JOB}/date`,
-      routes: { [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS } },
+      routes: {
+        [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS },
+        [`GET ${J}/export/checks`]: { body: FINAL_CHECKS },
+      },
     },
     async ({ page, requests }) => {
       await page.getByTestId('carrier-table-electricity_grid').waitFor()
@@ -167,7 +181,10 @@ test('B25 B26 no horizontal page scroll at 1280×800; no image evidence requests
     {
       path: `/app/piee/${JOB}/date`,
       viewport: { width: 1280, height: 800 },
-      routes: { [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS } },
+      routes: {
+        [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS },
+        [`GET ${J}/export/checks`]: { body: FINAL_CHECKS },
+      },
     },
     async ({ page, requests }) => {
       for (const tab of ['documente', 'date', 'masuri', 'jurnal', 'predare']) {

@@ -50,6 +50,7 @@ class ProcessInvoiceFiles:
         progress: ProgressCallback | None = None,
         document_finished: OutcomeCallback | None = None,
         source_names: Sequence[str] | None = None,
+        cancelled: Callable[[], bool] | None = None,
     ) -> BatchProcessingResult:
         source_paths = tuple(paths)
         if source_names is not None and len(source_names) != len(source_paths):
@@ -57,6 +58,8 @@ class ProcessInvoiceFiles:
         outcomes: list[DocumentOutcome] = []
         seen_digests: dict[str, Path] = {}
         for index, path in enumerate(source_paths, start=1):
+            if cancelled is not None and cancelled():
+                break
             source = Path(source_names[index - 1]) if source_names is not None else path
             if progress is not None:
                 progress(index, len(source_paths), path)

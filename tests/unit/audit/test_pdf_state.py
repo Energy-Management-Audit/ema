@@ -8,10 +8,11 @@ from pathlib import Path
 import pypdfium2
 from openpyxl import Workbook
 from tests.unit.test_invoice_pdf import _pdf
+from tests.workspace_jobs import create_job
 
 from ema.audit.intake import audit_intake
 from ema.audit.pdf_state import pdf_state
-from ema.core.jobs import create_job, run_stage, subscribe
+from ema.core.jobs import run_stage, subscribe
 from ema.core.workspace import Workspace
 
 

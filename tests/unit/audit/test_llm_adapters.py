@@ -8,6 +8,7 @@ import pytest
 from google.genai import types
 
 from ema.core.errors import EmaError
+from ema.core.llm.models import curated_models
 from ema.core.llm.providers import GeminiProvider, OpenAIProvider
 from ema.core.llm.types import ToolSpec
 
@@ -28,7 +29,7 @@ def test_gemini_keeps_signed_function_history_and_call_id() -> None:
     provider = GeminiProvider.__new__(GeminiProvider)
     provider._client = SimpleNamespace(models=Models())
     result = provider.respond(
-        "synthetic-model",
+        next(model.id for model in curated_models() if model.provider == "openai"),
         [
             {"role": "system", "content": "Read files"},
             {
@@ -66,7 +67,7 @@ def test_openai_rebuilds_function_messages_for_sdk() -> None:
     provider = OpenAIProvider.__new__(OpenAIProvider)
     provider._client = SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
     provider.respond(
-        "synthetic-model",
+        next(model.id for model in curated_models() if model.provider == "openai"),
         [
             {
                 "role": "assistant",

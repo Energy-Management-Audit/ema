@@ -264,6 +264,7 @@ class FieldSpec(BaseModel):
 
 
 class Approval(BaseModel):
+    exported_at: str | None = None
     id: str
     job_id: str
     output_id: str

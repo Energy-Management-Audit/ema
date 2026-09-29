@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ema.core.jobs import StageOutcome, create_job, run_stage, subscribe
+from tests.workspace_jobs import create_job
+
+from ema.core.jobs import StageOutcome, run_stage, subscribe
 from ema.core.workspace import Workspace
 from ema.invoices.artifact import encode
 from ema.invoices.identity_review import confirm_client, readiness, resolved_outcomes

@@ -9,6 +9,7 @@ from ema.core.workspace import schema as workspace_schema
 def test_schema_three_preserves_decision_order(tmp_path: Path) -> None:
     database = tmp_path / "old.sqlite"
     with sqlite3.connect(database) as db:
+        db.execute("CREATE TABLE approvals (id TEXT PRIMARY KEY)")
         db.execute("CREATE TABLE outputs (id TEXT PRIMARY KEY)")
         db.execute("CREATE TABLE decisions (id TEXT PRIMARY KEY, data TEXT)")
         db.execute("INSERT INTO outputs VALUES ('old-output')")

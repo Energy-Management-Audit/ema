@@ -25,10 +25,12 @@ def fill_section_replay(  # noqa: PLR0913
     replay: ReplayProvider,
     limits: Limits,
     *,
-    model_id: str = "gemini-3.6-flash",
+    model_id: str | None = None,
 ) -> tuple[AgentState, FillTools]:
     """Run only on a synthetic dossier; S11 persists the resumable transcript."""
     record_applicability(ws, job, section)
     tools = FillTools(ws, job, section, documents)
-    context = AgentContext(ws, job, section, replay, model_id, PROMPT_VERSION, synthetic=True)
+    context = AgentContext(
+        ws, job, section, replay, model_id or replay.model_id, PROMPT_VERSION, synthetic=True
+    )
     return run_agent(context, INSTRUCTIONS, tools.tools(), limits), tools

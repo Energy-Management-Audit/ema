@@ -7,7 +7,14 @@ import {
   exportChecks,
   previewPdf,
 } from '../src/piee/readiness.ts'
-import { CHECKS, FIELDS, FINAL_OUTPUTS, OUTPUTS, SUMMARY } from './fixtures/piee/default.mjs'
+import {
+  CHECKS,
+  FIELDS,
+  FINAL_CHECKS,
+  FINAL_OUTPUTS,
+  OUTPUTS,
+  SUMMARY,
+} from './fixtures/piee/default.mjs'
 
 const missing = FIELDS.filter((field) => field.value === null)
 
@@ -72,12 +79,12 @@ test('the four checks of 7a', () => {
 })
 
 test('preview only for a final docx with a PDF of the same run', () => {
-  assert.equal(currentFinal(OUTPUTS), null)
-  assert.equal(previewPdf(OUTPUTS), null)
-  assert.equal(currentFinal(FINAL_OUTPUTS)?.id, 'out-final-1')
-  assert.equal(previewPdf(FINAL_OUTPUTS)?.id, 'out-pdf-1')
+  assert.equal(currentFinal(OUTPUTS, CHECKS), null)
+  assert.equal(previewPdf(OUTPUTS, CHECKS), null)
+  assert.equal(currentFinal(FINAL_OUTPUTS, FINAL_CHECKS)?.id, 'out-final-1')
+  assert.equal(previewPdf(FINAL_OUTPUTS, FINAL_CHECKS)?.id, 'out-pdf-1')
   const noPdf = FINAL_OUTPUTS.filter((item) => item.id !== 'out-pdf-1')
-  assert.equal(previewPdf(noPdf), null)
+  assert.equal(previewPdf(noPdf, FINAL_CHECKS), null)
 })
 
 test('months_annual_mismatch blocks with the annual field and fails the annual check', () => {
@@ -102,4 +109,27 @@ test('months_annual_mismatch blocks with the annual field and fails the annual c
     ['err', 'de corectat', 'suma lunilor diferă de totalul anual', annual.id],
   )
   assert.equal(exportChecks(checks, SUMMARY)[1].tone, 'err')
+})
+
+test('F18 readiness counts use singular and de from twenty', () => {
+  const checks = {
+    readiness: { blocking: Array.from({ length: 21 }, () => ({ code: 'missing' })) },
+  }
+  assert.equal(blockingFooter(checks), 'Exportul final se poate face după 21 de decizii.')
+  assert.equal(
+    exportChecks(undefined, {
+      measures_total: 1,
+      measures_complete: 1,
+      total_tep: { field_ids: [] },
+    })[0].label,
+    'Măsura are termen, investiţie, economie şi recuperare',
+  )
+  assert.equal(
+    exportChecks(undefined, {
+      measures_total: 20,
+      measures_complete: 20,
+      total_tep: { field_ids: [] },
+    })[0].label,
+    'Toate cele 20 de măsuri au termen, investiţie, economie şi recuperare',
+  )
 })

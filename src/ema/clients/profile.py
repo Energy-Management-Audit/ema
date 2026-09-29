@@ -80,8 +80,8 @@ def profile(ws: Workspace, client_id: str) -> dict[str, Any]:
         if row is None:
             raise EmaError("client_missing", "Clientul nu există.", "")
         client = dict(row)
-        client["sites"] = json.loads(client.pop("sites_json"))
-        client["contacts"] = json.loads(client.pop("contacts_json"))
+        client["sites"] = json.loads(client.pop("sites_json")) or []
+        client["contacts"] = json.loads(client.pop("contacts_json")) or []
         annexes = db.execute(
             "SELECT a.sha,a.year,a.data,a.read_at,u.original_name FROM client_annexes a "
             "LEFT JOIN client_uploads u ON u.client_id=a.client_id AND u.sha=a.sha "

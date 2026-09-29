@@ -8,8 +8,8 @@ from types import SimpleNamespace
 from typing import Any
 
 from pydantic import BaseModel
+from tests.workspace_jobs import create_job
 
-from ema.core.jobs import create_job
 from ema.core.llm.agent import AgentContext
 from ema.core.llm.models import curated_models
 from ema.core.llm.providers import GeminiProvider, _openai_messages

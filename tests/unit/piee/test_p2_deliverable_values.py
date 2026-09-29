@@ -10,9 +10,10 @@ from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from tests.unit.energy_data.test_annex_index import annex
 from tests.unit.piee.synthetic_piee import YEAR, piee_data
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.core.jobs import create_job, status
+from ema.core.jobs import status
 from ema.core.review import decide, fields, propose
 from ema.core.review.models import Cell, Evidence, FieldSpec
 from ema.core.workspace import Workspace

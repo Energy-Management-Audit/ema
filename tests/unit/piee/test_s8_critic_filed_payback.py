@@ -2,7 +2,8 @@
 
 import json
 
-from ema.core.jobs import create_job
+from tests.workspace_jobs import create_job
+
 from ema.core.office.sheets import CellRef
 from ema.core.review.fields import fields
 from ema.core.workspace import Workspace

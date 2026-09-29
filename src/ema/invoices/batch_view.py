@@ -11,7 +11,8 @@ from typing import Any, cast
 from ema.core.workspace import Workspace
 from ema.invoices.artifact import decode_draft
 from ema.invoices.export.workbook_contract import summary_net_value
-from ema.invoices.identity_review import batch_snapshot, identity_from_snapshot, resolve_snapshot
+from ema.invoices.identity_review import batch_snapshot, resolve_snapshot
+from ema.invoices.identity_view import identity_from_snapshot
 from ema.invoices.months import invoice_month, missing_months
 from ema.invoices.outliers import outliers
 

@@ -104,7 +104,7 @@ def test_t7_switching_the_base_refuses_every_final_path_and_the_marks_persist(
     exported = client.post(
         f"/jobs/{job}/export",
         json={
-            "final": True,
+            "dest_dir": None,
             "output_id": final_id,
             "readiness_hash": checks["readiness_hash"],
             "confirm": True,

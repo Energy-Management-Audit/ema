@@ -4,11 +4,11 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit.fill_agent import fill_section_replay
 from ema.audit.fill_tools import FillDocument
 from ema.audit.read import read_dossier
-from ema.core.jobs import create_job
 from ema.core.llm import Limits, ReplayProvider
 from ema.core.review.fields import fields
 from ema.core.workspace import Workspace

@@ -28,6 +28,7 @@ from ema.core.intake import ItemOutcome, intake_legacy
 from ema.core.jobs import (
     StageContext,
     StageOutcome,
+    get_job,
     list_jobs,
     recover,
     run_stage,
@@ -178,17 +179,14 @@ def invoices_confirm(job: str, confirm: bool = typer.Option(False, "--confirm"))
 @invoices_app.command("export")
 def invoices_export(job: str) -> None:
     ws = _workspace()
-    with ws.connect() as db:
-        dest = ws.job_path(db, job) / "outputs" / "Facturi.xlsx"
-    checks = invoice_readiness(ws, job)
-    if checks.omitted:
-        typer.echo(f"Omise din Excel ({len(checks.omitted)}): {', '.join(checks.omitted)}")
-    typer.echo(str(export_invoices(ws, job, dest)))
+    typer.echo(str(export_invoices(ws, job)))
 
 
 @_app.command("intake")
 def intake_command(job: str, collection: str) -> None:
     ws = _workspace()
+    if get_job(ws, job)["type"] == "audit":
+        raise EmaError("use_audit_intake", "Folosiţi ema audit add şi ema audit run intake.", job)
     results: list[ItemOutcome] = []
 
     def stage(ctx: StageContext) -> StageOutcome:

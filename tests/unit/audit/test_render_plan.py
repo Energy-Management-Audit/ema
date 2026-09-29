@@ -8,10 +8,10 @@ from pathlib import Path
 import pytest
 from docx import Document
 from openpyxl import Workbook
+from tests.workspace_jobs import create_job
 
 from ema.audit.render_plan import JobUnitPlan, process_count, unit_plan
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.review import decide, mark_absent, propose
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace

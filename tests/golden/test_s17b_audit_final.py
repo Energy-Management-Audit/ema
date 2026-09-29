@@ -57,7 +57,7 @@ from ema.core.review import fields
 from ema.core.workspace import Workspace
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 FIXED = {section.id for section in CATALOGUE if section.kind == "fixed"}
 ADDRESS = "Str. Exemplu nr. 1, Localitatea Exemplu"
@@ -227,7 +227,7 @@ def _export(ws: Workspace, job: str) -> Path:
     checks = client.get(f"/jobs/{job}/export/checks").json()
     assert checks["readiness"]["final_ok"], checks["readiness"]["blocking"]
     body = {
-        "final": True,
+        "dest_dir": None,
         "output_id": output_id,
         "readiness_hash": checks["readiness_hash"],
         "confirm": True,
@@ -235,7 +235,9 @@ def _export(ws: Workspace, job: str) -> Path:
     exported = client.post(f"/jobs/{job}/export", json=body, headers=headers)
     assert exported.status_code == 200, exported.json()
     assert len(client.get(f"/jobs/{job}/approvals").json()) == 1
-    copy = ws.root / "exports" / f"{job}-{output_id}.docx"
+    copy = Path(
+        next(file["path"] for file in exported.json()["files"] if file["name"].endswith(".docx"))
+    )
     assert copy.read_bytes() == client.get(f"/jobs/{job}/outputs/{output_id}").content
     return copy
 

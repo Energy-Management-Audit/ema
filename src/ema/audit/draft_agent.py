@@ -17,7 +17,6 @@ from ema.core.review.models import Field
 from ema.core.workspace import Workspace
 
 PROMPT_VERSION = "audit-draft-v1"
-REPLAY_MODEL = "gemini-3.6-flash"
 INSTRUCTIONS = (
     "Draft only the requested section from recorded facts. Read facts and the style guide first. "
     "Use {{f:fact_id}} for every number and client-specific name; list supporting fact ids on "
@@ -104,7 +103,7 @@ def draft_section_replay(  # noqa: PLR0913
     support_recording: Path,
     limits: Limits,
     *,
-    model_id: str = REPLAY_MODEL,
+    model_id: str | None = None,
     facts: dict[str, Field] | None = None,
 ) -> tuple[AgentState, SectionDraft, DraftCheck, tuple[DraftReview, ...]]:
     """Run request-bound Draft and support replay; real client use is disabled."""
@@ -114,7 +113,7 @@ def draft_section_replay(  # noqa: PLR0913
         job,
         f"draft:{section}",
         ReplayProvider(draft_recording),
-        model_id,
+        model_id or ReplayProvider(draft_recording).model_id,
         PROMPT_VERSION,
         synthetic=True,
     )
@@ -141,7 +140,7 @@ def draft_section_replay(  # noqa: PLR0913
         job,
         f"support:{section}",
         ReplayProvider(support_recording),
-        model_id,
+        model_id or ReplayProvider(support_recording).model_id,
         PROMPT_VERSION + "-support",
         synthetic=True,
     )

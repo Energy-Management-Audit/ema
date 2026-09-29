@@ -106,9 +106,7 @@ def create_app(  # noqa: C901, PLR0915
     @app.exception_handler(HTTPException)
     async def http_error(_request: Request, exc: HTTPException) -> JSONResponse:
         code = (
-            exc.detail
-            if exc.detail in ("human_required", "provisional_contract", "audit_render_unavailable")
-            else "validation_error"
+            "validation_error"
             if exc.status_code == 422
             else "not_found"
             if exc.status_code == 404

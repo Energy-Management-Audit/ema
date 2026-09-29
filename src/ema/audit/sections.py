@@ -88,7 +88,7 @@ def _save(  # noqa: PLR0913
             "revision=excluded.revision,data=excluded.data",
             (job, after.section_id, after.revision, json.dumps(after.payload())),
         )
-        if actor == "user" or detail is not None:
+        if actor in {"user", "agent"} or detail is not None:
             save_decision(
                 db,
                 job,
@@ -214,7 +214,7 @@ def set_status(  # noqa: PLR0913
             "se aplică"
             if before.status == Status.NA_PROPOSED and actor == "user" and to == computed
             else reason
-            if actor == "ema"
+            if actor in {"ema", "agent"}
             else None
         )
         return _save(ws, job, before, after, actor, detail, db=db)

@@ -31,7 +31,7 @@ from ema.core.office.anchors import find
 from ema.core.office.word_api import word_automation, word_available
 from ema.energy_data.necesar import parse_necesar_info
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 def _references(root: Path) -> tuple[Path, Path]:

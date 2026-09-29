@@ -10,16 +10,16 @@ from typing import Any
 
 import pytest
 from tests.conftest import artifacts_path
+from tests.workspace_jobs import create_job
 
 from ema.audit.chapter_five import run_measurements
 from ema.audit.readings import run_readings
 from ema.audit.visit import run_visit, slug
-from ema.core.jobs import create_job
 from ema.core.review import decide, fields
 from ema.core.review.models import Field
 from ema.core.workspace import Workspace
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 def _tuple(entry: dict[str, Any]) -> tuple[str, str, str, str | None]:
@@ -132,8 +132,7 @@ def test_recorded_panel_readings_match_human_key(reference_library: Path, tmp_pa
     output = artifacts_path("s15a", "answer-key-counts.json")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    assert all(row["missing"] == 0 for row in report), (
-        "panel-level answer key mismatch; see local count report"
-    )
+    message = "panel-level answer key mismatch; see local count report"
+    assert all(row["missing"] == 0 for row in report), message
     measurements = run_measurements(ws, job)
     assert measurements.figures == 36

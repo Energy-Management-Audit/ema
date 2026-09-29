@@ -111,15 +111,12 @@ test('B12 B13 generating: progress, terminal refetch, other runs ignored, stop, 
   )
 })
 
-test('B14 an edited draft asks before generating a new version', async () => {
-  const edited = OUTPUTS.map((item) =>
-    item.id === 'out-draft-1' ? { ...item, edited_externally: true } : item,
-  )
+test('B14 an existing draft generates directly without an external-edit dialog', async () => {
   await withHarness(
     {
       path: `/app/piee/${JOB}/date`,
       routes: {
-        [`GET ${J}/outputs`]: { status: 200, body: edited },
+        [`GET ${J}/outputs`]: { status: 200, body: OUTPUTS },
         [`POST ${J}/piee/generate`]: {
           status: 202,
           body: { run_id: 'run-gen-4', stage: 'piee_generate', state: 'running' },
@@ -134,13 +131,7 @@ test('B14 an edited draft asks before generating a new version', async () => {
     async ({ page, requests }) => {
       await page.getByTestId('carrier-table-electricity_grid').waitFor()
       await page.getByRole('button', { name: 'Generează programul' }).click()
-      const dialog = page.getByRole('dialog')
-      await dialog.getByText('Raportul Word există deja').waitFor()
-      assert.equal(await dialog.getByRole('button', { name: 'Suprascrie' }).count(), 0)
-      await dialog.getByRole('button', { name: 'Renunţă' }).click()
-      assert.equal(count(requests, 'POST', `${J}/piee/generate`), 0)
-      await page.getByRole('button', { name: 'Generează programul' }).click()
-      await page.getByRole('button', { name: 'Salvează ca versiune nouă' }).click()
+      assert.equal(await page.getByRole('dialog').count(), 0)
       await settle(page)
       assert.equal(count(requests, 'POST', `${J}/piee/generate`), 1)
     },

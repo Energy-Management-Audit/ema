@@ -6,11 +6,13 @@ import json
 from pathlib import Path
 
 import pytest
+from tests.invoice_helpers import undo_client
+from tests.workspace_jobs import create_job
 
 from ema.clients import find_by_pod
 from ema.core.config import Settings
 from ema.core.errors import EmaError
-from ema.core.jobs import StageOutcome, create_job, run_stage, subscribe
+from ema.core.jobs import StageOutcome, run_stage, subscribe
 from ema.core.workspace import Workspace
 from ema.invoices.composition import build_invoice_processor
 from ema.invoices.identity_review import (
@@ -18,7 +20,6 @@ from ema.invoices.identity_review import (
     confirm_client,
     readiness,
     resolved_outcomes,
-    undo_client,
 )
 from ema.invoices.models import DocumentPage, InputDocument, IssueCode, TextBlock
 from ema.invoices.parsers.alive_identity import buyer_fields
@@ -92,7 +93,7 @@ def _job(ws: Workspace, tmp_path: Path, rows: list[dict]) -> str:
 
     def stage(ctx):  # type: ignore[no-untyped-def]
         ctx.read_slots("invoices")
-        (ctx.artifact_dir() / "outcomes.json").write_text(json.dumps(rows))
+        (ctx.artifact_dir() / "outcomes.json").write_text(json.dumps(rows), encoding="utf-8")
         return StageOutcome()
 
     run_stage(ws, job, "invoices", stage)
@@ -194,7 +195,8 @@ def test_new_extraction_requires_new_batch_confirmation(tmp_path: Path) -> None:
                         },
                     }
                 ]
-            )
+            ),
+            encoding="utf-8",
         )
         return StageOutcome()
 

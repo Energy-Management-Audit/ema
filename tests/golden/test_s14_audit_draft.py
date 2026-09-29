@@ -11,6 +11,7 @@ from docx.oxml.ns import qn
 from tests.audit_replay import draft_recording, support_recording
 from tests.golden.s14_structure import auditor_structure
 from tests.golden.test_s10b_audit_base import _identity, _references
+from tests.workspace_jobs import create_job
 
 from ema.audit.base import build_base
 from ema.audit.base_units import UnitPlan
@@ -23,14 +24,13 @@ from ema.audit.draft_agent import (
 from ema.audit.draft_render import render_draft_section, render_section
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.sections import get_status, refresh_staleness
-from ema.core.jobs import create_job
 from ema.core.llm import Limits
 from ema.core.office.anchors import find
 from ema.core.review.fields import propose
 from ema.core.review.models import Evidence, Field, Manual
 from ema.core.workspace import Workspace
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 TITLES = {section.id: section.title for section in CATALOGUE}
 
 
@@ -143,7 +143,7 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
             facts=recorded_facts(ws, job, draft.section),
             flags=flags,
         )
-        review = json.loads(output.with_suffix(".draft-review.json").read_text())
+        review = json.loads(output.with_suffix(".draft-review.json").read_text(encoding="utf-8"))
         assert review["coverage"] == 1.0
         assert len(review["review"]) == (1 if index == 0 else 0)
         rendered = output
@@ -197,7 +197,7 @@ def test_synthetic_paragraph_in_auditor_base(tmp_path: Path) -> None:
         base_identity=_identity(source),
     )
     anchors = base.with_suffix(".anchors.json")
-    mapping = json.loads(anchors.read_text())
+    mapping = json.loads(anchors.read_text(encoding="utf-8"))
     other_slot = next(
         item["slot"]
         for item in mapping["anchors"]

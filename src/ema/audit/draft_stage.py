@@ -9,7 +9,6 @@ from typing import Literal
 
 from ema.audit.draft_agent import (
     PROMPT_VERSION,
-    REPLAY_MODEL,
     draft_section_live,
     draft_section_replay,
     recorded_facts,
@@ -78,7 +77,7 @@ def draft_section(
         composition_facts = recorded_facts(ws, job, section)
         for field in composition_facts.values():
             ctx.record_read("fields", field.id, field.revision)
-        ctx.record_input(prompt=PROMPT_VERSION, model=REPLAY_MODEL)
+        ctx.record_input(prompt=PROMPT_VERSION, model=ReplayProvider(draft_recording).model_id)
         _, draft, check, flags = draft_section_replay(
             ws,
             job,

@@ -11,6 +11,7 @@ import pytest
 from docx import Document
 from docx.oxml.ns import qn
 from tests.conftest import artifacts_path
+from tests.workspace_jobs import create_job
 
 from ema.audit.base import build_base
 from ema.audit.base_package import package_issues
@@ -20,7 +21,6 @@ from ema.audit.headings import map_headings
 from ema.audit.read import read_dossier
 from ema.audit.sections import get_status
 from ema.consumption_analysis.analysis import Metric, value
-from ema.core.jobs import create_job
 from ema.core.office.missing_text import TABLE_MISSING_TEXT
 from ema.core.review.models import Cell, Evidence
 from ema.core.workspace import Workspace

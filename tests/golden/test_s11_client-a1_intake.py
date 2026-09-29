@@ -7,12 +7,13 @@ import os
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit.intake import audit_intake
-from ema.core.jobs import create_job, run_stage, status, subscribe
+from ema.core.jobs import run_stage, status, subscribe
 from ema.core.workspace import Workspace
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 def test_CLIENT-A1_intake_is_complete_and_uses_no_ai(tmp_path: Path) -> None:

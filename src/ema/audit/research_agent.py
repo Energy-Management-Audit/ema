@@ -28,7 +28,7 @@ def research_section_replay(  # noqa: PLR0913
     replay: ReplayProvider,
     search: ReplaySearch,
     limits: Limits,
-    model_id: str = "gemini-3.6-flash",
+    model_id: str | None = None,
 ) -> tuple[AgentState, ResearchTools]:
     guard = OutboundGuard(ws, job, tuple(doc.text for doc in documents.values()))
     research = ResearchTools(ws, job, section, guard, search)
@@ -36,5 +36,7 @@ def research_section_replay(  # noqa: PLR0913
     safe_read = {
         name: tool for name, tool in fill.tools().items() if name in {"read_dataset", "mark_later"}
     }
-    context = AgentContext(ws, job, section, replay, model_id, PROMPT_VERSION, synthetic=True)
+    context = AgentContext(
+        ws, job, section, replay, model_id or replay.model_id, PROMPT_VERSION, synthetic=True
+    )
     return run_agent(context, INSTRUCTIONS, {**safe_read, **research.tools()}, limits), research

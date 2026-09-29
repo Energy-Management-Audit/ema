@@ -19,10 +19,12 @@ from mcp.client.stdio import stdio_client
 from tests.mcp_client import structured
 
 from conftest import artifacts_path
+from ema.clients.registry import create_client
 from ema.core.workspace import Workspace
-from ema.piee.workflow import GenerateRequest, generate_draft
+from ema.piee.workflow import GenerateRequest
+from ema.workflows_registry import generate_draft
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 EMA = Path(sys.executable).with_name("ema.exe" if os.name == "nt" else "ema")
 
 
@@ -44,6 +46,8 @@ def test_agent_generates_and_reviews_CLIENT-P1_over_stdio(
     anexa = next(received.glob("Anexa*.xlsx"))
     necesar = next(received.glob("Necesar*.xls"))
     prelucrare = next(received.glob("*Prelucrare*.xls*"))
+    ws = Workspace(tmp_path / "workspace")
+    create_client(ws, "Synthetic", "12345678")
     parameters = StdioServerParameters(
         command=str(EMA), args=["mcp", "--import-root", str(received)], env=dict(os.environ)
     )
@@ -56,7 +60,7 @@ def test_agent_generates_and_reviews_CLIENT-P1_over_stdio(
         ):
             await client.initialize()
             arguments = {
-                "client": "s19-CLIENT-P1",
+                "client": "12345678",
                 "year": 2025,
                 "anexa": str(anexa),
                 "necesar": str(necesar),
@@ -86,9 +90,7 @@ def test_agent_generates_and_reviews_CLIENT-P1_over_stdio(
     assert any(item["code"] == "conflict" for item in seen["checks"]["blocking"])
     assert seen["decision"]["actor"] == "agent"
     ws = Workspace(tmp_path / "workspace")
-    direct = generate_draft(
-        ws, GenerateRequest("s19-CLIENT-P1", 2025, anexa, necesar, prelucrare, None)
-    )
+    direct = generate_draft(ws, GenerateRequest("12345678", 2025, anexa, necesar, prelucrare, None))
     mcp_paragraphs, mcp_cells = _texts(mcp_draft)
     direct_paragraphs, direct_cells = _texts(direct.draft)
     assert mcp_paragraphs == direct_paragraphs

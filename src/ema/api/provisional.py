@@ -7,7 +7,6 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
 
 from ema.api.errors import problem
 from ema.core.workspace import Workspace
@@ -54,8 +53,6 @@ def example_schema(value: Any) -> dict[str, Any]:
 def install_provisional_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None:
     def provisional_handler(route: str) -> Callable[[Request], Response]:
         def handler(request: Request) -> Response:
-            if mock:
-                return JSONResponse(_EXAMPLES[route])
             return problem("provisional_contract", 501)
 
         return handler

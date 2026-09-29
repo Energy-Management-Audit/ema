@@ -18,7 +18,7 @@ from ema.core.jobs import get_job
 from ema.core.pdf import render_invoice_crop_png, render_page_png
 from ema.core.workspace import Workspace
 from ema.core.workspace.conversion import active_version
-from ema.invoices import identity_review
+from ema.invoices import identity_review, identity_view
 from ema.invoices.batch_view import batch_view
 from ema.invoices.uploads import add_invoice_files
 
@@ -101,7 +101,7 @@ def install_invoice_routes(app: FastAPI, ws: Workspace) -> None:
     @app.get("/jobs/{job_id}/invoices/identity", tags=["invoices"], response_model=InvoiceIdentity)
     def identity(job_id: str) -> dict[str, object]:
         _invoice_job(ws, job_id)
-        return identity_review.identity_view(ws, job_id)
+        return identity_view.identity_view(ws, job_id)
 
     @app.post("/jobs/{job_id}/invoices/identity", tags=["invoices"], response_model=InvoiceIdentity)
     def confirm(job_id: str, body: InvoiceIdentityInput, request: Request) -> dict[str, object]:
@@ -111,4 +111,4 @@ def install_invoice_routes(app: FastAPI, ws: Workspace) -> None:
         identity_review.confirm_client(
             ws, job_id, client_id=body.client_id, on_revision=body.on_revision
         )
-        return identity_review.identity_view(ws, job_id)
+        return identity_view.identity_view(ws, job_id)

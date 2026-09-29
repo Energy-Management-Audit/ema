@@ -62,14 +62,14 @@ def input_file(roots: tuple[Path, ...], value: str) -> Path:
     path = Path(value)
     if not path.is_absolute():
         raise EmaError(
-            "path_outside_roots", "Fișierul este în afara directoarelor de import.", value
+            "path_outside_roots", "Fişierul este în afara directoarelor de import.", value
         )
     if not path.is_file():
-        raise EmaError("file_missing", "Fișierul nu există.", value)
+        raise EmaError("file_missing", "Fişierul nu există.", value)
     resolved = path.resolve(strict=True)
     if not any(resolved.is_relative_to(root) for root in roots):
         raise EmaError(
-            "path_outside_roots", "Fișierul este în afara directoarelor de import.", value
+            "path_outside_roots", "Fişierul este în afara directoarelor de import.", value
         )
     return resolved
 

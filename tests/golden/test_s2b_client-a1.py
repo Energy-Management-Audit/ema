@@ -8,17 +8,18 @@ from pathlib import Path
 
 import pytest
 from docx import Document
+from tests.workspace_jobs import create_job
 
 from ema.core.config import Settings
 from ema.core.intake import ItemOutcome, intake_legacy
-from ema.core.jobs import StageContext, StageOutcome, create_job, run_stage, status, subscribe
+from ema.core.jobs import StageContext, StageOutcome, run_stage, status, subscribe
 from ema.core.office.convert import stored_file
 from ema.core.office.sheets import open_book
 from ema.core.office.sniff import FileKind, sniff
 from ema.core.office.word_api import word_available
 from ema.core.workspace import Workspace
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 def _sources() -> list[Path]:

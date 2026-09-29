@@ -199,7 +199,12 @@ def compose_measures(ctx: StageContext) -> StageOutcome:
         or field.key == "audit.company_name"
     )
     queue_sections(
-        ctx, ("ch6.specifice", "ch6.measure", "ch6.sinteza"), "ema", keys, facts=composition_facts
+        ctx,
+        ("ch6.specifice", "ch6.measure", "ch6.sinteza"),
+        "ema",
+        keys,
+        facts=composition_facts,
+        detail="Măsurile propuse au fost prelucrate din formularul încărcat.",
     )
     return StageOutcome(item_failures=[issue.detail for issue in form.issues])
 

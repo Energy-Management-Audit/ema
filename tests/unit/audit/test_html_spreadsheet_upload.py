@@ -9,12 +9,13 @@ from pathlib import Path
 import pytest
 from openpyxl import Workbook
 from tests.unit.test_api_files import preview_pdf
+from tests.workspace_jobs import create_job
 
 from ema.audit.intake import audit_intake
 from ema.clients.files import store_upload
 from ema.clients.registry import create_client
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job, run_stage, status, subscribe
+from ema.core.jobs import run_stage, status, subscribe
 from ema.core.workspace import Workspace
 
 

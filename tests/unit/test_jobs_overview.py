@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
-from ema.api import create_app, overview_routes
-from ema.core.jobs import activity, create_job
+from ema.api import create_app
+from ema.core.jobs import activity
+from ema.core.review import overview
 from ema.core.workspace import Workspace
 
 
@@ -83,14 +85,14 @@ def test_overview_keeps_one_snapshot_when_a_job_is_created_between_reads(
     ws = Workspace(tmp_path)
     existing = create_job(ws, "piee", "client-exemplu", 2025)
     created: list[str] = []
-    original_activity = overview_routes.activity
+    original_activity = overview.activity
 
     def activity_then_create(db: sqlite3.Connection) -> dict[str, str]:
         updated = original_activity(db)
         created.append(create_job(ws, "piee", "client-exemplu", 2026))
         return updated
 
-    monkeypatch.setattr(overview_routes, "activity", activity_then_create)
+    monkeypatch.setattr(overview, "activity", activity_then_create)
     client = TestClient(
         create_app(ws, 8767, launch_code="synthetic-code"), base_url="http://127.0.0.1:8767"
     )
@@ -106,7 +108,7 @@ def test_overview_uses_created_at_when_activity_is_missing(
 ) -> None:
     ws = Workspace(tmp_path)
     job = create_job(ws, "piee", "client-exemplu", 2025)
-    monkeypatch.setattr(overview_routes, "activity", lambda _db: {})
+    monkeypatch.setattr(overview, "activity", lambda _db: {})
     client = TestClient(
         create_app(ws, 8768, launch_code="synthetic-code"), base_url="http://127.0.0.1:8768"
     )

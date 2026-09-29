@@ -137,10 +137,6 @@ def check_draft(  # noqa: C901, PLR0912
                 DraftReview("figure_fact_missing", f"figure:{figure_index}", figure.fact_id)
             )
     review.extend(
-        DraftReview("unrendered_table", f"table:{index}", "S8 table slots required")
-        for index in range(len(draft.tables))
-    )
-    review.extend(
         DraftReview("unrendered_figure", f"figure:{index}", "S8 figure slots required")
         for index in range(len(draft.figures))
     )

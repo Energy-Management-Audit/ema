@@ -10,18 +10,20 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
 from ema.api.invoice_models import InvoiceRow
 from ema.api.mock import preview_pdf
 from ema.core.errors import EmaError
-from ema.core.jobs import StageOutcome, create_job, run_stage, subscribe
+from ema.core.jobs import StageOutcome, run_stage, subscribe
 from ema.core.review.evidence import get_evidence
 from ema.core.workspace import Workspace
 from ema.invoices.artifact import decode_draft
 from ema.invoices.batch_view import batch_view
 from ema.invoices.export.workbook_contract import summary_net_value, summary_value_formula
-from ema.invoices.identity_review import batch_client, identity_view
+from ema.invoices.identity_review import batch_client
+from ema.invoices.identity_view import identity_view
 
 
 def _field(value: str | None, label: str) -> dict[str, object]:
@@ -112,7 +114,7 @@ def _synthetic_batch(tmp_path: Path) -> tuple[Workspace, str, list[str]]:
 
     def stage(ctx):  # type: ignore[no-untyped-def]
         ctx.read_slots("invoices")
-        (ctx.artifact_dir() / "outcomes.json").write_text(json.dumps(rows))
+        (ctx.artifact_dir() / "outcomes.json").write_text(json.dumps(rows), encoding="utf-8")
         return StageOutcome()
 
     run_stage(ws, job, "invoices", stage)

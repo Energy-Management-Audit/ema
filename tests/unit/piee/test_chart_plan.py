@@ -5,6 +5,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import register_client
 
 from ema.core.office.sheets import CellRef
 from ema.core.review import fields
@@ -164,6 +165,7 @@ def test_intake_records_located_sources_and_flags_unlocated_values(
     for path in (anexa, necesar, prelucrare):
         path.write_bytes(b"synthetic source")
     workspace = Workspace(tmp_path / "workspace")
+    register_client(workspace, "synthetic")
     job = import_piee(workspace, "synthetic", 2025, anexa, necesar, prelucrare)
     found = {field.key: field for field in fields(workspace, job.id)}
     assert found["identity.name"].value == "Synthetic Client"

@@ -11,9 +11,11 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from tests.unit.piee.synthetic_piee import YEAR, piee_data
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.core.jobs import create_job, status, subscribe
+from ema.clients.registry import create_client
+from ema.core.jobs import status, subscribe
 from ema.core.review import conflicts, decide, fields, log, propose
 from ema.core.review.models import Cell, Evidence, FieldSpec
 from ema.core.workspace import Workspace
@@ -230,7 +232,10 @@ def test_cli_start_generate_imports_then_drafts(fakes: Fakes, tmp_path: Path) ->
     ws = Workspace(tmp_path / "workspace")
     anexa = tmp_path / "anexa.xlsx"
     anexa.write_bytes(b"anexa")
-    job, run = workflow.start_generate(ws, workflow.GenerateRequest("synthetic", YEAR, anexa))
+    registered = create_client(ws, "Synthetic", "12345678")
+    job, run = workflow.start_generate(
+        ws, workflow.GenerateRequest(str(registered["id"]), YEAR, anexa)
+    )
     record = _wait(ws, job, run)
     assert record["state"] == "ready", record["error"]
     assert fakes.imports == 1

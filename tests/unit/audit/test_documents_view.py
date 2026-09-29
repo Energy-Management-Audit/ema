@@ -6,10 +6,11 @@ import json
 from pathlib import Path
 
 from openpyxl import Workbook
+from tests.workspace_jobs import create_job
 
 from ema.audit.documents import documents
 from ema.audit.intake import audit_intake
-from ema.core.jobs import StageContext, StageOutcome, create_job, run_stage, subscribe
+from ema.core.jobs import StageContext, StageOutcome, run_stage, subscribe
 from ema.core.workspace import Workspace
 
 
@@ -149,3 +150,19 @@ def test_form_status_tracks_the_slot_read_by_each_stage(tmp_path: Path) -> None:
         )
     view = documents(ws, job)
     assert view.measures is not None and view.measures.status == "reading"
+
+
+def test_cover_photo_is_exposed_as_a_documents_slot(tmp_path: Path) -> None:
+    ws = Workspace(tmp_path / "workspace")
+    job = create_job(ws, "audit", "synthetic", 2026)
+    assert not any(file.slot == "cover/photo" for file in documents(ws, job).files)
+    source = tmp_path / "photo.png"
+    source.write_bytes(b"synthetic photo")
+    sha = ws.add_file("synthetic", source)
+    ws.set_slot(job, "cover/photo", sha, origin=source.name)
+    photo = next((file for file in documents(ws, job).files if file.slot == "cover/photo"), None)
+    assert photo is not None
+    assert photo.slot == "cover/photo" and photo.sha == sha
+    assert photo.name == source.name and photo.kind == "png"
+    assert photo.size_bytes == source.stat().st_size
+    assert photo.version == 1 and photo.slot_revision > 0

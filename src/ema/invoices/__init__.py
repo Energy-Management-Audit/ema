@@ -9,6 +9,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
+from ema.clients.registry import find_by_cui
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
 from ema.core.jobs import (
@@ -26,6 +27,7 @@ from ema.core.jobs.reads import run_current
 from ema.core.logging import write_event
 from ema.core.review.models import Issue, Readiness
 from ema.core.workspace import Workspace
+from ema.core.workspace.export import copy_output
 from ema.invoices.artifact import encode, exportable_drafts
 from ema.invoices.batch_identity import KEY as BATCH_CLIENT_KEY
 from ema.invoices.composition import build_invoice_processor
@@ -36,7 +38,6 @@ from ema.invoices.identity_review import (
     raw_outcomes,
     readiness,
     resolved_outcomes,
-    undo_client,
 )
 from ema.invoices.models import IssueCode
 from ema.invoices.outcomes import DocumentOutcome
@@ -54,7 +55,6 @@ __all__ = (
     "resolved_outcomes",
     "run_batch",
     "start_workbook",
-    "undo_client",
 )
 
 
@@ -72,6 +72,7 @@ class BatchResult:
 def run_batch(ws: Workspace, client: str, sources: list[Path]) -> BatchResult:
     if not sources:
         raise EmaError("invoices_empty", "Dosarul nu conţine facturi PDF.", "")
+    client = str(find_by_cui(ws, client)["id"])
     job = create_job(ws, "invoices", client, None)
     preflight_failures: list[tuple[int, DocumentOutcome]] = []
     for index, source in enumerate(sources, 1):
@@ -123,7 +124,7 @@ def extract_batch(
     paths = [ctx.ws.file_path(client, version.file_sha) for version in versions]
     source_names = [version.origin for version in versions]
     processor = build_invoice_processor(load_settings(ctx.ws))
-    result = processor.execute(paths, source_names=source_names)
+    result = processor.execute(paths, source_names=source_names, cancelled=ctx.cancelled)
     outcomes = list(result.outcomes)
     sources: list[tuple[str | None, str | None]] = [
         (version.slot, version.file_sha) for version in versions
@@ -216,8 +217,15 @@ def render(
 
 
 def start_workbook(ws: Workspace, job: JobId, *, on_revision: int | None = None) -> str:
-    if not readiness(ws, job).final_ok:
-        raise EmaError("not_ready", "Lotul nu este pregătit pentru export.", "")
+    run = latest_ready_run(ws, job, "invoices")
+    if run is None:
+        raise EmaError("invoices_missing", "Extracţia facturilor lipseşte.", job)
+    with ws.connect() as db:
+        if not run_current(db, run):
+            raise EmaError("invoices_stale", "Extracţia facturilor nu mai este actuală.", job)
+    checks = readiness(ws, job)
+    if not checks.final_ok:
+        raise EmaError("invoices_unconfirmed_client", checks.blocking[0], job)
 
     def stage(ctx: StageContext) -> StageOutcome:
         render(ws, job, "final", ctx=ctx)
@@ -226,17 +234,35 @@ def start_workbook(ws: Workspace, job: JobId, *, on_revision: int | None = None)
     return run_stage(ws, job, "invoices_workbook", stage, on_revision=on_revision)
 
 
-def export(ws: Workspace, job: JobId, dest: Path) -> Path:
+def start_extract(ws: Workspace, job: str, *, on_revision: int | None = None) -> str:
+    if not ws.list_slots(job, "invoices"):
+        raise EmaError("not_ready", "Facturile lipsesc.", job)
+    return run_stage(ws, job, "invoices", extract_batch, on_revision=on_revision)
+
+
+def export(ws: Workspace, job: JobId, dest: Path | None = None) -> Path:
+    run = start_workbook(ws, job)
+    for _ in subscribe(ws, job):
+        pass
+    record = next(item for item in status(ws, job).runs if item["id"] == run)
+    if record["state"] != "ready":
+        raise EmaError("invoices_failed", "Generarea registrului a eşuat.", str(record["error"]))
     with ws.connect() as db:
-        output_dir = ws.job_path(db, job) / "outputs"
-    if dest.parent.resolve() != output_dir.resolve():
-        raise EmaError("output_path", "Exportul trebuie salvat în lucrare.", str(dest))
-    output_id = render(ws, job, "draft", name=dest.name)
-    assert output_id is not None
-    with ws.connect() as db:
-        row = db.execute("SELECT relative_path FROM outputs WHERE id=?", (output_id,)).fetchone()
-    assert row is not None
-    return ws.path(str(row["relative_path"]))
+        row = db.execute(
+            "SELECT relative_path FROM outputs WHERE job_id=? AND run_id=? "
+            "AND kind='final' ORDER BY seq DESC LIMIT 1",
+            (job, run),
+        ).fetchone()
+    if row is None:
+        raise EmaError("output_missing", "Documentul lipseşte.", job)
+    source = ws.path(str(row["relative_path"]))
+    if dest is not None and dest != source:
+        with ws.connect() as db:
+            sha = db.execute(
+                "SELECT sha FROM outputs WHERE relative_path=?", (row["relative_path"],)
+            ).fetchone()[0]
+        return copy_output(ws, str(row["relative_path"]), str(sha), dest)
+    return source
 
 
 class InvoiceWorkflow:

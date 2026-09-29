@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ema.core.errors import EmaError
 from ema.core.resources import resource_path
@@ -21,6 +21,7 @@ class Model:
     long_input_usd: float | None = None
     long_cached_input_usd: float | None = None
     long_output_usd: float | None = None
+    request_options: dict[str, str] = field(default_factory=dict[str, str])
 
     def cost(self, input_tokens: int, output_tokens: int, cached_input_tokens: int = 0) -> float:
         if not 0 <= cached_input_tokens <= input_tokens:

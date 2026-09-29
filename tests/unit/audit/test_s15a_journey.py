@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from tests.unit.audit.test_chapter_five_render import _base, _model
 from tests.unit.audit.test_readings import _record
+from tests.workspace_jobs import create_job
 from typer.testing import CliRunner
 
 from ema.api import create_app
@@ -26,7 +27,7 @@ from ema.audit.readings_schema import MeterReadout, ThermalReadout
 from ema.audit.visit import run_visit
 from ema.cli import _app
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job, get_job
+from ema.core.jobs import get_job
 from ema.core.review import accept_batch, decide, fields, mark_absent
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace

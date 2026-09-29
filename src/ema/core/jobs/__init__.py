@@ -71,10 +71,11 @@ def create_job(ws: Workspace, type: JobType, client_slug: str, year: int | None)
         raise EmaError("invalid_client", "Identificatorul clientului este invalid.", client_slug)
     job = uuid.uuid4().hex
     relative = f"clients/{client_slug}/jobs/{year or 'none'}-{type}-{job[:8]}"
-    ws.make_job_folders(relative)
     with ws.connect() as db:
-        if type != "reporting":
-            db.execute("INSERT OR IGNORE INTO clients(id) VALUES (?)", (client_slug,))
+        registered = db.execute("SELECT 1 FROM clients WHERE id=?", (client_slug,)).fetchone()
+        if type != "reporting" and registered is None:
+            raise EmaError("client_unknown", "Clientul nu există.", client_slug)
+        ws.make_job_folders(relative)
         db.execute(
             "INSERT INTO jobs (id,type,client_slug,year,relative_path,state,created_at) "
             "VALUES (?,?,?,?,?,?,?)",

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ema.core.jobs import create_job
+from tests.workspace_jobs import create_job
+
 from ema.core.office.sheets import CellRef
 from ema.core.review import decide, fields
 from ema.core.workspace import Workspace

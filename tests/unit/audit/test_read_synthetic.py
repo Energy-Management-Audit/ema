@@ -4,9 +4,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from openpyxl import Workbook
+from tests.workspace_jobs import create_job
 
 from ema.audit.read import read_dossier
-from ema.core.jobs import create_job
 from ema.core.review import fields
 from ema.core.workspace import Workspace
 

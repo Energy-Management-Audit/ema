@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
+from tests.workspace_jobs import create_job
 
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.llm import AgentContext, ReplayProvider, complete_json
 from ema.core.llm.replay import request_hashes
 from ema.core.workspace import Workspace

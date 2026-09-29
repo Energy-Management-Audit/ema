@@ -58,7 +58,7 @@ def intake_file(ctx: StageContext, slot: str) -> ItemOutcome:
             )
         if converted is None:
             warning = (
-                "Fișierul a fost înlocuit în timpul conversiei; rulați din nou preluarea "
+                "Fişierul a fost înlocuit în timpul conversiei; rulaţi din nou preluarea "
                 "pentru noua versiune (R21)."
             )
             return ItemOutcome(
@@ -164,13 +164,3 @@ def intake_legacy(
         if on_result is not None:
             on_result(result)
     return _summary(results)
-
-
-def intake_stage(
-    ctx: StageContext, slot: str, on_result: Callable[[ItemOutcome], None] | None = None
-) -> StageOutcome:
-    result = intake_file(ctx, slot)
-    _record_result(ctx, result)
-    if on_result is not None:
-        on_result(result)
-    return _summary([result])

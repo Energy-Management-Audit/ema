@@ -1410,7 +1410,7 @@ SectionNode { id, number, title, status: ready|missing|later|na|drafted|done, st
 JobDocument { id, name, kind, slot, pages?, sizeBytes, versions[],
               intake: read|reading|failed|needs_ocr|protected,
               failure?: {cause, threshold?, exits[]}, found?: string[] }
-Report      { id, version, kind: draft|final, generatedAt, template, editedExternally }
+Report      { id, version, kind: draft|final, generatedAt, template }
 Package     { files: {name, sizeBytes, kind}[], checks: {label, ok, detail}[] }
 Settings    { theme, providers: {gemini, openai} each {present, maskedKey?, verifiedAt?},
               defaultProvider, extraction: {ocr, flagUncertain, autoAcceptExact} }
@@ -1427,14 +1427,11 @@ Settled in review round 1 (2026-09-23):
 - `missing[]` on a measure drives the per-row „lipseşte" markers for any optional column.
 - Artifacts are addressed by id, never by path. **Outputs are immutable:** the 7c „report
   already exists" dialog creates a new version.
-- „Deschide în Word" opens a **working copy** in the job's `edits/`, never the output itself.
-  `editedExternally` = the working copy's hash differs from its output's. The UI then offers to
-  take the edits in (new copy, marked provisional), which creates a new output revision with
-  origin `manual_edit`.
-- Final export uses the revision the human approves (§5.9), the newest by default. Regenerating
-  after a manual edit makes a new generated revision and says plainly that the manual edits are
-  not in it. Copies exported elsewhere are not tracked, and the UI does not claim to know about
-  them. S17b tests the 7c flow against an edited working copy.
+- In v1, „Deschide în Word" opens a disposable preview copy outside the workspace. There is
+  no tracked working copy in `edits/`, external-edit import or `manual_edit` revision.
+- Final export delivers every file of the approved final run to the selected folder. Outputs
+  remain immutable; edits to exported copies are not tracked. A newer audit draft does not
+  replace the current audit final.
 
 **Stack:** React + TypeScript strict + Vite; pdf.js for the paged preview; Geist + Geist Mono
 bundled (not from Google Fonts); the same format/lint/type gates as the backend.

@@ -17,7 +17,6 @@ from tests.unit.audit.render_seams import TITLES, outputs, run_render, summary_o
 from tests.unit.audit.section_marks_seams import by_id, draft, marked_job, session
 from tests.unit.audit.test_base_switch import _ready_for_final
 
-from ema.api.job_routes import validate_slot
 from ema.audit import render
 from ema.audit.base_package import package_issues
 from ema.audit.render_bindings import COVER_PHOTO_MISSING, COVER_SLOT
@@ -42,6 +41,7 @@ from ema.core.office.package import (
 )
 from ema.core.review import fields, propose
 from ema.core.workspace import Workspace
+from ema.core.workspace.slots import validate_slot
 
 BOX = (3_520_440, 2_640_330)
 WP = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}"

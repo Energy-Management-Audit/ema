@@ -15,7 +15,7 @@ from tests.mcp_client import refusal, structured, text
 from ema import __version__
 
 EMA = Path(sys.executable).with_name("ema.exe" if os.name == "nt" else "ema")
-OUTSIDE = "Fișierul este în afara directoarelor de import."
+OUTSIDE = "Fişierul este în afara directoarelor de import."
 
 
 def _environment(workspace: Path) -> dict[str, str]:
@@ -34,7 +34,7 @@ def test_stdio_session_lists_and_calls_tools(tmp_path: Path) -> None:
             stray.append(message)
 
     async def session() -> dict[str, Any]:
-        with (tmp_path / "stderr.txt").open("w") as errlog:
+        with (tmp_path / "stderr.txt").open("w", encoding="utf-8") as errlog:
             async with (
                 stdio_client(parameters, errlog=errlog) as (read, write),
                 ClientSession(read, write, message_handler=record) as client,
@@ -54,7 +54,7 @@ def test_stdio_session_lists_and_calls_tools(tmp_path: Path) -> None:
     assert seen["info"]["workspace"] == str(workspace.resolve())
     assert seen["refused"] == refusal("piee_generate", "path_outside_roots", OUTSIDE)
     assert stray == []
-    assert "Traceback" not in (tmp_path / "stderr.txt").read_text()
+    assert "Traceback" not in (tmp_path / "stderr.txt").read_text(encoding="utf-8")
 
 
 def test_stdio_stream_is_pure_json_rpc_and_closes_cleanly(tmp_path: Path) -> None:

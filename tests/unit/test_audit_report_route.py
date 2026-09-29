@@ -7,10 +7,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from tests.unit.audit.render_seams import FakeWord, synthetic_render
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
 from ema.audit import render
-from ema.core.jobs import create_job, subscribe
+from ema.core.jobs import subscribe
 from ema.core.workspace import Workspace
 
 BASE = "http://127.0.0.1:8766"

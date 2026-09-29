@@ -8,11 +8,11 @@ from typing import Literal, get_args, get_origin
 
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
 from ema.api import models as wire_models
 from ema.api.provisional import REASONS
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 
 BASE = "http://127.0.0.1:8766"
@@ -40,8 +40,10 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
         (method, path) for method, path in (("POST", "/jobs/{job_id}/sections/{section_id}/draft"),)
     }
     assert all(new[key]["x-provisional"] == REASONS[key[1]] for key in new_provisional)
-    assert len(old_provisional - new_provisional - (old.keys() - new.keys())) == 30
+    assert len(old_provisional - new_provisional - (old.keys() - new.keys())) == 28
     assert old.keys() - new.keys() == {
+        ("POST", "/jobs/{job_id}/export/draft"),
+        ("POST", "/jobs/{job_id}/sections/{section_id}/na-proposal"),
         ("GET", "/jobs/{job_id}/facts"),
         ("PATCH", "/jobs/{job_id}/facts"),
         ("PATCH", "/jobs/{job_id}/deadline"),
@@ -138,8 +140,8 @@ def test_unavailable_audit_agents_create_no_run_or_event(tmp_path: Path) -> None
     draft = client.post(
         f"/jobs/{job}/export/draft", json={"on_revision": revision}, headers=headers
     )
-    assert draft.status_code == 501
-    assert draft.json()["type"] == "urn:ema:error:audit_render_unavailable"
+    assert draft.status_code == 404
+    assert draft.json()["type"] == "urn:ema:error:not_found"
     with ws.connect() as db:
         assert db.execute("SELECT COUNT(*) FROM runs WHERE job_id=?", (job,)).fetchone()[0] == 0
         assert (

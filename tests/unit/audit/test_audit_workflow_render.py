@@ -87,7 +87,7 @@ def test_final_through_the_stage_route_and_export(ready: tuple[Workspace, str]) 
     exported = client.post(
         f"/jobs/{job}/export",
         json={
-            "final": True,
+            "dest_dir": None,
             "output_id": final_id,
             "readiness_hash": checks["readiness_hash"],
             "confirm": True,
@@ -99,7 +99,9 @@ def test_final_through_the_stage_route_and_export(ready: tuple[Workspace, str]) 
     assert [(item["output_id"], item["readiness_hash"]) for item in approvals] == [
         (final_id, checks["readiness_hash"])
     ]
-    copy = ws.root / "exports" / f"{job}-{final_id}.docx"
+    copy = Path(
+        next(file["path"] for file in exported.json()["files"] if file["name"].endswith(".docx"))
+    )
     final_bytes = client.get(f"/jobs/{job}/outputs/{final_id}").content
     assert copy.read_bytes() == final_bytes
 

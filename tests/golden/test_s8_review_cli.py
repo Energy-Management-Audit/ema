@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from conftest import artifacts_path
 from ema.cli import _app
+from ema.clients.registry import create_client
 from ema.core.errors import EmaError
 from ema.core.jobs import status, subscribe
 from ema.core.review import decide, fields
@@ -17,7 +18,7 @@ from ema.core.workspace import Workspace
 from ema.piee.review_workflow import PieeWorkflow
 from ema.piee.workflow import GenerateRequest, start_generate, start_generate_for_job
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 @pytest.mark.parametrize("case_name", ["piee-case-a", "piee-case-b"])
@@ -33,8 +34,9 @@ def test_review_decision_and_final_gate(
     prelucrare = next(case.rglob("*Prelucrare*.xls*"))
     previous_piee = next((case / "final").glob("*.docx")) if case_name == "piee-case-b" else None
     ws = Workspace(tmp_path / "workspace")
+    registered = create_client(ws, "Synthetic", "12345678")
     job, run = start_generate(
-        ws, GenerateRequest("synthetic-client", 2025, anexa, necesar, prelucrare, previous_piee)
+        ws, GenerateRequest(str(registered["id"]), 2025, anexa, necesar, prelucrare, previous_piee)
     )
     for _ in subscribe(ws, job):
         pass
@@ -123,6 +125,7 @@ def test_cli_generate_review_and_refuse_unresolved_final(
     case = reference_library / "piee/cases/piee-case-b"
     anexa = next(case.rglob("Anexa*.xlsx"))
     prelucrare = next(case.rglob("*Prelucrare*.xls*"))
+    create_client(Workspace(tmp_path / "workspace"), "Synthetic", "12345678")
     runner = CliRunner()
     generated = runner.invoke(
         _app,
@@ -130,7 +133,7 @@ def test_cli_generate_review_and_refuse_unresolved_final(
             "piee",
             "generate",
             "--client",
-            "synthetic-client",
+            "12345678",
             "--year",
             "2025",
             "--anexa",

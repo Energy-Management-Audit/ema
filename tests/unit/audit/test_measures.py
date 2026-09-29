@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from openpyxl import load_workbook
+from tests.workspace_jobs import create_job
 
 from ema.audit.chapter_six import ChapterSixPlan
 from ema.audit.measures import run_measures
@@ -12,8 +13,7 @@ from ema.audit.measures_form import write_measures_form
 from ema.audit.sections import get_status
 from ema.audit.workflow import AuditWorkflow
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
-from ema.core.review import decide, fields, propose
+from ema.core.review import decide, fields, log, propose
 from ema.core.review.models import Cell, Evidence, FieldSpec
 from ema.core.workspace import Workspace
 
@@ -44,6 +44,9 @@ def test_stage_facts_evidence_narrative_and_rerun(tmp_path: Path) -> None:
         ],
     )
     result = run_measures(ws, job)
+    assert any(
+        item.actor == "ema" and item.detail and "formularul" in item.detail for item in log(ws, job)
+    )
     assert (
         result.measures,
         result.payback_missing,

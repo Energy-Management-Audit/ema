@@ -74,13 +74,14 @@ def documents(ws: Workspace, job: str) -> AuditDocuments:  # noqa: C901
             raise EmaError("wrong_job_type", "Lucrarea nu este un audit.", job)
         slots = db.execute(
             "SELECT v.*,s.revision AS slot_revision,u.original_name,u.kind,"
-            "u.size_bytes FROM slots s "
+            "COALESCE(u.size_bytes,f.size) AS size_bytes FROM slots s "
             "JOIN slot_versions v ON v.job_id=s.job_id AND v.slot=s.name "
             "AND v.version=s.active_version "
+            "LEFT JOIN files f ON f.sha=v.file_sha AND f.client_slug=? "
             "LEFT JOIN client_uploads u ON u.client_id=? "
             "AND u.sha=COALESCE(v.converted_from,v.file_sha) "
             "WHERE s.job_id=? ORDER BY s.name",
-            (job_row["client_slug"], job),
+            (job_row["client_slug"], job_row["client_slug"], job),
         ).fetchall()
         run_rows = db.execute(
             "SELECT id,stage,state FROM runs WHERE job_id=? AND stage IN "
@@ -152,13 +153,16 @@ def documents(ws: Workspace, job: str) -> AuditDocuments:  # noqa: C901
     def make_file(row: sqlite3.Row) -> DocFile:
         slot = str(row["slot"])
         sha = str(row["file_sha"])
+        photo = slot == "cover/photo"
         record = records.get(slot)
         if record is not None and record.get("file_sha") != sha:
             record = None
         status: Literal[
             "read", "reading", "needs_conversion", "scanned", "protected", "failed", "unread"
         ] = "unread"
-        if (slot == "measures" and measures_running) or (slot != "measures" and running):
+        if not photo and (
+            (slot == "measures" and measures_running) or (slot != "measures" and running)
+        ):
             status = "reading"
         elif form_reads.get(slot):
             status = "read"
@@ -174,8 +178,12 @@ def documents(ws: Workspace, job: str) -> AuditDocuments:  # noqa: C901
         code = str(record["error_code"]) if record and record.get("error_code") else None
         return DocFile(
             slot=slot,
-            name=str(row["original_name"] or Path(slot).name),
-            kind=str(row["kind"] or (record.get("kind") if record else None) or "unknown"),
+            name=str(row["original_name"] or (row["origin"] if photo else Path(slot).name)),
+            kind=str(
+                row["kind"]
+                or (record.get("kind") if record else None)
+                or (Path(str(row["origin"])).suffix.lstrip(".") if photo else "unknown")
+            ),
             size_bytes=int(row["size_bytes"] or 0),
             version=int(row["version"]),
             slot_revision=int(row["slot_revision"]),
@@ -187,7 +195,11 @@ def documents(ws: Workspace, job: str) -> AuditDocuments:  # noqa: C901
             reason=_REASONS.get(code, "Fişierul nu a putut fi citit.") if code else None,
         )
 
-    result = [make_file(row) for row in slots if str(row["slot"]).startswith("dossier/")]
+    result = [
+        make_file(row)
+        for row in slots
+        if str(row["slot"]).startswith("dossier/") or row["slot"] == "cover/photo"
+    ]
     result.sort(key=lambda file: (file.item is None, file.item or 0, file.name.casefold()))
     anexa = next((make_file(row) for row in slots if row["slot"] == "anexa"), None)
     measures = next((make_file(row) for row in slots if row["slot"] == "measures"), None)

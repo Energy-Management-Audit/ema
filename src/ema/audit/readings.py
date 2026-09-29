@@ -32,8 +32,6 @@ from ema.core.review import fields, mark_absent, propose
 from ema.core.review.models import Evidence, Field, FieldSpec, Photo
 from ema.core.workspace import Workspace
 
-REPLAY_MODEL = "gemini-3.6-flash"
-
 
 @dataclass(frozen=True)
 class ReadingsResult:
@@ -246,7 +244,9 @@ def _failed(ctx: StageContext, photo: VisitPhoto, key: str, reason: str) -> None
 
 
 def read_photos(ctx: StageContext, *, provider: Provider, model_id: str) -> StageOutcome:  # noqa: C901
-    model = selected_model("gemini" if provider.name == "replay" else provider.name, model_id)
+    model = selected_model(
+        provider.provider_name if isinstance(provider, ReplayProvider) else provider.name, model_id
+    )
     if not model.vision:
         raise EmaError("model_no_vision", "Modelul ales nu citeşte imagini.", model_id)
     client = str(get_job(ctx.ws, ctx.job)["client_slug"])
@@ -292,7 +292,7 @@ def run_readings(ws: Workspace, job: str, *, recording: Path | None) -> Readings
 
     def stage(ctx: StageContext) -> StageOutcome:
         try:
-            return read_photos(ctx, provider=provider, model_id=REPLAY_MODEL)
+            return read_photos(ctx, provider=provider, model_id=provider.model_id)
         except Exception as exc:
             failure.append(exc)
             raise

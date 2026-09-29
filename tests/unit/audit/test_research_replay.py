@@ -6,12 +6,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from tests.workspace_jobs import create_job
+
 from ema.audit import research_tools
 from ema.audit.research_agent import INSTRUCTIONS, PROMPT_VERSION
 from ema.audit.research_tools import ReplaySearch, ResearchTools
 from ema.audit.research_web import OutboundGuard, Snapshot
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.llm import AgentContext, Limits, ReplayProvider, run_agent
 from ema.core.llm.replay import request_hashes
 from ema.core.review.fields import fields
@@ -36,7 +37,8 @@ def test_synthetic_research_replay(tmp_path: Path, monkeypatch: Any) -> None:
                     ]
                 },
             }
-        )
+        ),
+        encoding="utf-8",
     )
     search = ReplaySearch(search_file)
     snapshot = Snapshot(
@@ -123,7 +125,8 @@ def test_synthetic_research_replay(tmp_path: Path, monkeypatch: Any) -> None:
     recording.write_text(
         json.dumps(
             {"source": "hand-authored", "format": "openai-chat-completions", "responses": rows}
-        )
+        ),
+        encoding="utf-8",
     )
     # The production entry point also exposes read tools, so its request hashes differ.
     # This fixture calls the exact research tool set to assert the replay boundary.
@@ -168,7 +171,8 @@ def test_synthetic_equipment_replay(tmp_path: Path, monkeypatch: Any) -> None:
                     ]
                 },
             }
-        )
+        ),
+        encoding="utf-8",
     )
     snapshot = Snapshot(
         "https://example.org/motor",
@@ -245,7 +249,8 @@ def test_synthetic_equipment_replay(tmp_path: Path, monkeypatch: Any) -> None:
     recording.write_text(
         json.dumps(
             {"source": "hand-authored", "format": "openai-chat-completions", "responses": rows}
-        )
+        ),
+        encoding="utf-8",
     )
     state = run_agent(
         AgentContext(

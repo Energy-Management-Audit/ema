@@ -29,7 +29,6 @@ export const OUTPUTS = [
     kind: 'draft',
     media_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     size_bytes: 98_304,
-    edited_externally: false,
     name: 'Prelucrare-date.xlsx',
     created_at: at,
     run_id: 'run-gen-1',
@@ -41,7 +40,6 @@ export const OUTPUTS = [
     kind: 'draft',
     media_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     size_bytes: 4_299_161,
-    edited_externally: false,
     name: 'PIEE-draft.docx',
     created_at: at,
     run_id: 'run-gen-1',
@@ -58,7 +56,6 @@ export const FINAL_OUTPUTS = [
     kind: 'draft',
     media_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     size_bytes: 98_304,
-    edited_externally: false,
     name: 'Prelucrare-date.xlsx',
     created_at: at,
     run_id: 'run-word-1',
@@ -70,7 +67,6 @@ export const FINAL_OUTPUTS = [
     kind: 'draft',
     media_type: 'application/pdf',
     size_bytes: 1_887_436,
-    edited_externally: false,
     name: 'PIEE-final.pdf',
     created_at: at,
     run_id: 'run-word-1',
@@ -82,7 +78,6 @@ export const FINAL_OUTPUTS = [
     kind: 'final',
     media_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     size_bytes: 4_311_040,
-    edited_externally: false,
     name: 'PIEE-final.docx',
     created_at: at,
     run_id: 'run-word-1',
@@ -93,6 +88,25 @@ export const FINAL_OUTPUTS = [
 export const READY_CHECKS = {
   readiness: { draft_ok: true, final_ok: true, blocking: [], warnings: [], next: [] },
   readiness_hash: 'hash-ready',
+  final: null,
+}
+
+export const FINAL_CHECKS = {
+  ...READY_CHECKS,
+  final: {
+    output_id: 'out-final-1',
+    created_at: at,
+    files: FINAL_OUTPUTS.filter((item) => item.run_id === 'run-word-1').map((item) => item.id),
+  },
+}
+
+export const EXPORTED = {
+  approved_at: at,
+  folder: '/Ema/exports/Synthetic 2026',
+  files: FINAL_OUTPUTS.filter((item) => item.run_id === 'run-word-1').map((item) => ({
+    name: item.name,
+    path: `/Ema/exports/Synthetic 2026/${item.name}`,
+  })),
 }
 
 export const SUMMARY = {

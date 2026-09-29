@@ -5,7 +5,6 @@ from __future__ import annotations
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from ema.api.job_routes import start_named_stage
 from ema.api.models import (
     Measure,
     PieeDataView,
@@ -19,10 +18,9 @@ from ema.api.models import (
 from ema.core.errors import EmaError
 from ema.core.jobs import get_job
 from ema.core.workspace import Workspace
-from ema.invoices import render as render_invoice
 from ema.piee import views
-from ema.piee.review_workflow import PieeWorkflow
 from ema.piee.workflow import set_prelucrare
+from ema.workflows_registry import start_named_stage
 
 
 class DraftInput(BaseModel):
@@ -34,7 +32,7 @@ class DraftOutput(BaseModel):
     kind: str
 
 
-def install_piee_routes(app: FastAPI, ws: Workspace) -> None:  # noqa: C901
+def install_piee_routes(app: FastAPI, ws: Workspace) -> None:
     def piee_only(job_id: str) -> None:
         if get_job(ws, job_id)["type"] != "piee":
             raise EmaError("wrong_job_type", "Lucrarea nu este PIEE.", "")
@@ -72,22 +70,3 @@ def install_piee_routes(app: FastAPI, ws: Workspace) -> None:  # noqa: C901
     @app.post("/jobs/{job_id}/prelucrare", tags=["piee"], response_model=PrelucrareState)
     def bind_prelucrare(job_id: str, body: PrelucrareInput) -> dict[str, object]:
         return set_prelucrare(ws, job_id, body.file_id, body.role)
-
-    @app.post("/jobs/{job_id}/export/draft", tags=["export"], response_model=DraftOutput)
-    def draft(job_id: str, body: DraftInput) -> dict[str, str]:
-        record = get_job(ws, job_id)
-        if record["type"] == "audit":
-            raise EmaError("audit_render_unavailable", "Redarea auditului nu este disponibilă.", "")
-        if record["type"] not in {"piee", "invoices"}:
-            raise EmaError("wrong_job_type", "Lucrarea este invalidă.", "")
-        with ws.connect() as db:
-            row = db.execute("SELECT revision FROM jobs WHERE id=?", (job_id,)).fetchone()
-        if row is None or row["revision"] != body.on_revision:
-            raise EmaError("stale_revision", "Lucrarea s-a modificat.", "")
-        output = (
-            PieeWorkflow().render(ws, job_id, "draft")
-            if record["type"] == "piee"
-            else render_invoice(ws, job_id, "draft")
-        )
-        assert output is not None
-        return {"output_id": output, "kind": "draft"}

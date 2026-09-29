@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 
 from ema.core.errors import EmaError
 from ema.core.llm.models import Model, selected_model
+from ema.core.llm.replay import ReplayProvider
 from ema.core.llm.types import Exchange, Provider, ToolSpec
 from ema.core.workspace import Workspace
 
@@ -158,7 +159,10 @@ def run_agent(  # noqa: C901
 ) -> AgentState:
     _validate(context, limits)
     model = selected_model(
-        context.provider.name if context.provider.name != "replay" else "gemini", context.model_id
+        context.provider.provider_name
+        if isinstance(context.provider, ReplayProvider)
+        else context.provider.name,
+        context.model_id,
     )
     state = agent_state(context.ws, context.job, context.section) or AgentState(
         messages=[{"role": "system", "content": instructions}],

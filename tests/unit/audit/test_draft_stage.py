@@ -12,6 +12,7 @@ from tests.audit_replay import (
     draft_recording,
     support_recording,
 )
+from tests.workspace_jobs import create_job
 from typer.testing import CliRunner
 
 from ema.audit.catalogue import CATALOGUE
@@ -21,7 +22,8 @@ from ema.audit.draft_stage import draft_section
 from ema.audit.sections import get_status
 from ema.cli import _app, app
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job, get_job
+from ema.core.jobs import get_job
+from ema.core.review import log
 from ema.core.workspace import Workspace
 
 SECTION = "ch2.date_generale"
@@ -49,6 +51,7 @@ def test_replay_draft_is_a_ready_run_with_artifacts_and_reads(tmp_path: Path) ->
     drafts, support = _recordings(ws, job, tmp_path / "rec")
 
     result = draft_section(ws, job, SECTION, draft_recording=drafts, support_recording=support)
+    assert any(item.actor == "agent" and item.field_id == SECTION for item in log(ws, job))
 
     assert (result.draft_status, result.section_status, result.coverage) == (
         "drafted",
@@ -109,16 +112,21 @@ def test_wrong_job_unknown_section_and_invalid_recording_start_no_run(tmp_path: 
     job = audit_job_with_facts(ws)
     piee = create_job(ws, "piee", "synthetic", 2026)
     invalid = tmp_path / "invalid.json"
-    invalid.write_text(json.dumps({"source": "live", "format": "openai-chat-completions"}))
+    invalid.write_text(
+        json.dumps({"source": "live", "format": "openai-chat-completions"}), encoding="utf-8"
+    )
     not_json = tmp_path / "not-json.json"
-    not_json.write_text("{ not json")
+    not_json.write_text("{ not json", encoding="utf-8")
     no_responses = tmp_path / "no-responses.json"
-    no_responses.write_text(json.dumps({"source": "recorded", "format": "openai-chat-completions"}))
+    no_responses.write_text(
+        json.dumps({"source": "recorded", "format": "openai-chat-completions"}), encoding="utf-8"
+    )
     listed = tmp_path / "listed.json"
-    listed.write_text(json.dumps([{"source": "recorded"}]))
+    listed.write_text(json.dumps([{"source": "recorded"}]), encoding="utf-8")
     scalar_responses = tmp_path / "scalar-responses.json"
     scalar_responses.write_text(
-        json.dumps({"source": "recorded", "format": "openai-chat-completions", "responses": 3})
+        json.dumps({"source": "recorded", "format": "openai-chat-completions", "responses": 3}),
+        encoding="utf-8",
     )
     cases = (
         (piee, SECTION, invalid, "wrong_job_type"),
@@ -146,7 +154,7 @@ def test_mismatched_recording_fails_the_run_and_keeps_the_section(tmp_path: Path
     drafts, support = _recordings(ws, job, tmp_path / "rec")
     recording = json.loads(drafts.read_text(encoding="utf-8"))
     recording["responses"][0]["request_hashes"] = {"messages": "0" * 64}
-    drafts.write_text(json.dumps(recording))
+    drafts.write_text(json.dumps(recording), encoding="utf-8")
     before = get_status(ws, job, SECTION)
 
     with pytest.raises(EmaError) as failed:

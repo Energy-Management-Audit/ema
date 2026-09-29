@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Barrier
 
 import pytest
+from tests.workspace_jobs import create_job
 from typer.testing import CliRunner
 
 from ema.audit.applicability import applies
@@ -27,7 +28,6 @@ from ema.audit.workflow import AuditWorkflow
 from ema.cli import _app
 from ema.cli import review as cli_review
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.review import decide, export, log, propose, undo
 from ema.core.review.models import Field
 from ema.core.workspace import Workspace
@@ -163,7 +163,8 @@ def test_mark_stale_is_idempotent_and_logs_once(tmp_path: Path) -> None:
     second = mark_stale(ws, job, "ch1", "fact:load")
 
     assert first.stale and second.stale
-    assert len(log(ws, job)) == entries_after_first == 1
+    assert len(log(ws, job)) == entries_after_first == 2
+    assert [entry.actor for entry in log(ws, job)] == ["agent", "ema"]
 
 
 def test_readiness_lists_unknown_stale_conflict_and_complete(tmp_path: Path) -> None:
@@ -259,6 +260,11 @@ def test_corrected_fact_stales_done_and_refuses_final_export(tmp_path: Path) -> 
     decide(ws, job, field.id, "correct", corrected.revision, "user", value="Newest")
     with ws.connect() as db:
         db.execute(
+            "INSERT INTO runs(id,job_id,stage,owner,state,started_at,ended_at) "
+            "VALUES ('unused',?,'audit_final','synthetic','ready','2026-01-01','2026-01-01')",
+            (job,),
+        )
+        db.execute(
             "INSERT INTO outputs (id,job_id,run_id,relative_path,sha,size,kind,seq) "
             "VALUES (?,?,?,?,?,?,?,?)",
             ("final", job, "unused", "outputs/final.docx", "unused", 0, "final", 1),
@@ -319,7 +325,7 @@ def test_cli_done_confirmation_and_noninteractive_refusal(
     monkeypatch.setenv("EMA_WORKSPACE", str(ws.root))
     runner = CliRunner()
     listing = runner.invoke(_app, ["job", "sections", job])
-    assert listing.exit_code == 0 and "ID | Stare | Secțiune | Motiv" in listing.output
+    assert listing.exit_code == 0 and "ID | Stare | Secţiune | Motiv" in listing.output
     assert "ch1 | missing |" in listing.output
     monkeypatch.setattr(cli_review, "_terminal", lambda: False)
     refused = runner.invoke(_app, ["job", "section", job, "ch1", "done"])

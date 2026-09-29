@@ -49,6 +49,11 @@ def seed(ws: Workspace) -> None:
     """Populate a disposable mock workspace with no reference-library values."""
     if ws.root.joinpath(".mock-seeded").exists():
         return
+    with ws.connect() as db:
+        db.execute(
+            "INSERT OR IGNORE INTO clients(id,name,cui) VALUES (?,?,?)",
+            ("exemplu", "Exemplu", "12345678"),
+        )
     for kind in ("audit", "piee", "invoices", "reporting"):
         job = create_job(ws, kind, "exemplu", 2026)
         source = Evidence(

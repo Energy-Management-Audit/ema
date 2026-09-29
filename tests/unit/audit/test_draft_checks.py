@@ -79,7 +79,6 @@ def test_uncited_and_nonrenderable_items_are_reviewed() -> None:
     )
     assert not check_draft(rich, facts, "synthetic").fatal
     assert {item.code for item in check_draft(rich, facts, "synthetic").review} == {
-        "unrendered_table",
         "unrendered_figure",
     }
     assert len(unrendered_items(rich)) == 2

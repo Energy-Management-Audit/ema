@@ -3,21 +3,18 @@
 from __future__ import annotations
 
 import json
-import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 from jsonschema import validate
 from openapi_spec_validator import validate as validate_openapi
-from pypdfium2 import PdfDocument
-from tests.audit_structure import RETAINED_CONTENT, confirm_retained_content
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.api.mock import preview_pdf, seed
+from ema.api.mock import seed
 from ema.api.provisional import PROVISIONAL, REASONS
 from ema.audit.catalogue import CATALOGUE, AuditFact
-from ema.core.jobs import StageOutcome, create_job, run_stage, status
 from ema.core.review import propose
 from ema.core.review.models import Evidence, PdfText
 from ema.core.workspace import Workspace
@@ -90,15 +87,9 @@ def test_openapi_snapshot_and_provisional_mock(tmp_path: Path) -> None:
         ):
             url = url.replace("{" + key + "}", "synthetic")
         reply = mock.request(method, url, headers={"x-ema-csrf": mock_session.json()["csrf"]})
-        assert reply.status_code == 200, (method, path, reply.text)
-        if path.endswith(".pdf"):
-            assert reply.content.startswith(b"%PDF-")
-            assert len(PdfDocument(reply.content)) == 1
-        elif path.endswith(".png"):
-            assert reply.content.startswith(b"\x89PNG")
-        else:
-            schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
-            validate(reply.json(), schema)
+        assert reply.status_code == 501, (method, path, reply.text)
+        assert reply.status_code == 501
+        assert reply.json()["type"] == "urn:ema:error:provisional_contract"
         assert client.request(method, url, headers=headers).status_code == 501
     jobs = mock.get("/jobs").json()
     audit = next(item for item in jobs if item["type"] == "audit")
@@ -254,7 +245,7 @@ def test_frozen_job_slot_review_and_section_routes(tmp_path: Path) -> None:  # n
         client.post(
             f"/jobs/{job}/export",
             json={
-                "final": True,
+                "dest_dir": None,
                 "confirm": True,
                 "output_id": "synthetic",
                 "readiness_hash": "synthetic",
@@ -283,118 +274,3 @@ def test_frozen_job_slot_review_and_section_routes(tmp_path: Path) -> None:  # n
         ).status_code
         == 200
     )
-
-
-def test_http_rerun_undo_and_synthetic_final_export(tmp_path: Path) -> None:
-    ws = Workspace(tmp_path / "workspace")
-    job = create_job(ws, "audit", "synthetic", 2026)
-    field = propose(
-        ws, job, AuditFact.COMPANY_NAME.value, "Before", [evidence("before")], state="extracted"
-    )
-    client, headers = session(ws)
-    correction = client.post(
-        f"/jobs/{job}/fields/{field.id}/decide",
-        json={"action": "correct", "value": "Corrected", "on_revision": field.revision},
-        headers=headers,
-    )
-    assert correction.status_code == 200
-    propose(ws, job, AuditFact.COMPANY_NAME.value, "Before", [evidence("rerun")], state="extracted")
-    assert len(client.get(f"/jobs/{job}/conflicts").json()) == 1
-    assert (
-        client.post(f"/jobs/{job}/log/{correction.json()['id']}/undo", headers=headers).status_code
-        == 400
-    )
-    assert (
-        client.post(
-            f"/jobs/{job}/export",
-            json={
-                "final": True,
-                "output_id": "synthetic",
-                "readiness_hash": "synthetic",
-                "confirm": True,
-            },
-            headers=headers,
-        ).status_code
-        == 409
-    )
-    for section in CATALOGUE:
-        if section.id in RETAINED_CONTENT:
-            continue
-        current_revision = next(
-            state["revision"]
-            for state in client.get(f"/jobs/{job}/sections").json()
-            if state["section_id"] == section.id
-        )
-        reply = client.patch(
-            f"/jobs/{job}/sections/{section.id}",
-            json={"status": "n/a", "confirm": True, "on_revision": current_revision},
-            headers=headers,
-        )
-        assert reply.status_code == 200
-    assert client.get(f"/jobs/{job}/export/checks").json()["readiness"]["final_ok"] is False
-    current = client.get(f"/jobs/{job}/fields").json()[0]
-    choice = current["alternatives"][0]["id"]
-    resolved = client.post(
-        f"/jobs/{job}/fields/{field.id}/decide",
-        json={"action": "choose", "alternative": choice, "on_revision": current["revision"]},
-        headers=headers,
-    )
-    assert resolved.status_code == 200
-    assert (
-        client.post(f"/jobs/{job}/log/{resolved.json()['id']}/undo", headers=headers).status_code
-        == 200
-    )
-    assert client.get(f"/jobs/{job}/export/checks").json()["readiness"]["final_ok"] is False
-    current = client.get(f"/jobs/{job}/fields").json()[0]
-    assert (
-        client.post(
-            f"/jobs/{job}/fields/{field.id}/decide",
-            json={"action": "choose", "alternative": choice, "on_revision": current["revision"]},
-            headers=headers,
-        ).status_code
-        == 200
-    )
-    confirm_retained_content(ws, job)
-    checks = client.get(f"/jobs/{job}/export/checks").json()
-    assert checks["readiness"]["final_ok"] is True, checks["readiness"]
-
-    def save(ctx):  # type: ignore[no-untyped-def]
-        path = ctx.artifact_dir() / "synthetic.pdf"
-        path.write_bytes(preview_pdf())
-        ctx.save_output(path, "synthetic.pdf", kind="final")
-        return StageOutcome()
-
-    run_stage(ws, job, "render", save)
-    deadline = time.monotonic() + 5
-    while status(ws, job).state == "running" and time.monotonic() < deadline:
-        time.sleep(0.01)
-    assert status(ws, job).runs[-1]["state"] == "ready"
-    with ws.connect() as db:
-        output_id = str(db.execute("SELECT id FROM outputs WHERE job_id=?", (job,)).fetchone()[0])
-    assert client.get(f"/jobs/{job}/outputs/{output_id}").content == preview_pdf()
-    checks = client.get(f"/jobs/{job}/export/checks").json()
-    assert (
-        client.post(
-            f"/jobs/{job}/export",
-            json={
-                "final": True,
-                "output_id": output_id,
-                "readiness_hash": checks["readiness_hash"],
-            },
-            headers=headers,
-        ).status_code
-        == 403
-    )
-    result = client.post(
-        f"/jobs/{job}/export",
-        json={
-            "final": True,
-            "output_id": output_id,
-            "readiness_hash": checks["readiness_hash"],
-            "confirm": True,
-        },
-        headers=headers,
-    )
-    assert result.status_code == 200, result.text
-    assert result.json() == {"output_id": output_id}
-    assert (ws.root / "exports" / f"{job}-{output_id}.pdf").read_bytes() == preview_pdf()

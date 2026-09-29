@@ -9,12 +9,13 @@ import pytest
 from docx import Document
 from docx.oxml.ns import qn
 from tests.audit_structure import add_audit_toc, number_audit_headings
+from tests.workspace_jobs import create_job
 
 from ema.audit import render
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.render import RenderSummary, start_audit_render
 from ema.audit.render_plan import JobUnitPlan
-from ema.core.jobs import create_job, status, subscribe
+from ema.core.jobs import status, subscribe
 from ema.core.review import decide, mark_absent
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace

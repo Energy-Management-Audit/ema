@@ -37,7 +37,7 @@ test('each action reads as the 3c activity entry', () => {
       { ...base, action: 'correct', before: number('22164.05'), after: number('22163.5') },
       2026,
     ).detail,
-    '22 164,05 → 22 163,50, scris de tine',
+    '22 164,05 → 22 163,5, scris de tine',
   )
   assert.equal(
     journalLine({ ...base, action: 'accept', before: number('1'), after: number('1') }, 2026)

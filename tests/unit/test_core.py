@@ -12,13 +12,14 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema import __version__
 from ema.api import create_app
 from ema.core import config
 from ema.core.backup import backup, restore
 from ema.core.errors import EmaError
-from ema.core.jobs import StageOutcome, cancel, create_job, list_jobs, recover, run_stage, status
+from ema.core.jobs import StageOutcome, cancel, list_jobs, recover, run_stage, status
 from ema.core.logging import capture_child
 from ema.core.resources import resource_path
 from ema.core.workspace import Workspace
@@ -40,7 +41,7 @@ def ws(tmp_path: Path) -> Workspace:
 
 def file(ws: Workspace, tmp_path: Path, content: str) -> str:
     source = tmp_path / f"{content}.txt"
-    source.write_text(content)
+    source.write_text(content, encoding="utf-8")
     return ws.add_file("client", source)
 
 
@@ -55,7 +56,7 @@ def test_job_round_trip_and_backup(ws: Workspace, tmp_path: Path) -> None:
     def stage(ctx):  # type: ignore[no-untyped-def]
         assert ctx.read_slot("invoices").file_sha == second
         artifact = ctx.artifact_dir() / "result.json"
-        artifact.write_text('{"ok":true}')
+        artifact.write_text('{"ok":true}', encoding="utf-8")
         ctx.save_output(artifact, "result.json")
         return StageOutcome()
 
@@ -95,7 +96,7 @@ def test_publish_detects_slot_and_setting_changes(ws: Workspace, tmp_path: Path)
         ctx.read_setting("provider")
         read.set()
         assert release.wait(2)
-        (ctx.artifact_dir() / "result").write_text("result")
+        (ctx.artifact_dir() / "result").write_text("result", encoding="utf-8")
         return StageOutcome()
 
     run_stage(ws, job, "extract", stage)
@@ -114,7 +115,7 @@ def test_stage_failure_and_item_failure(ws: Workspace) -> None:
 
     run_stage(ws, job, "extract", broken)
     assert wait_run(ws, job)["state"] == "failed"
-    log = next(ws.root.glob("clients/client/jobs/*/log.jsonl")).read_text()
+    log = next(ws.root.glob("clients/client/jobs/*/log.jsonl")).read_text(encoding="utf-8")
     assert "Traceback" in log
 
     def partial(ctx):  # type: ignore[no-untyped-def]
@@ -200,7 +201,7 @@ def test_child_stderr(ws: Workspace) -> None:
     with ws.app_log() as handle:
         capture_child(process, handle)
     process.wait()
-    assert "child error" in (ws.root / "logs" / "ema.jsonl").read_text()
+    assert "child error" in (ws.root / "logs" / "ema.jsonl").read_text(encoding="utf-8")
 
 
 def test_resource_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -299,7 +300,9 @@ def test_publish_failure_does_not_leave_run_running(ws: Workspace) -> None:
 
     run_stage(ws, job, "extract", invalid)
     assert wait_run(ws, job)["state"] == "failed"
-    assert "Traceback" in next(ws.root.glob("clients/client/jobs/*/log.jsonl")).read_text()
+    assert "Traceback" in next(ws.root.glob("clients/client/jobs/*/log.jsonl")).read_text(
+        encoding="utf-8"
+    )
 
 
 def test_recovery_preserves_live_runner(ws: Workspace) -> None:
@@ -334,7 +337,9 @@ def test_interface_errors_hide_detail(ws: Workspace, monkeypatch: pytest.MonkeyP
     assert response.status_code == 400
     assert response.headers["content-type"] == "application/problem+json"
     assert "private diagnostic detail" not in response.text
-    assert "private diagnostic detail" not in (ws.root / "logs" / "ema.jsonl").read_text()
+    assert "private diagnostic detail" not in (ws.root / "logs" / "ema.jsonl").read_text(
+        encoding="utf-8"
+    )
     monkeypatch.setenv("EMA_WORKSPACE", str(ws.root))
     executable = Path(sys.executable).parent / "ema"
     result = subprocess.run(
@@ -384,7 +389,7 @@ def test_workspace_discovery_precedence(tmp_path: Path, monkeypatch: pytest.Monk
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "config.toml").write_text(
-        f"workspace = {json.dumps(str(tmp_path / 'configured'))}\n"
+        f"workspace = {json.dumps(str(tmp_path / 'configured'))}\n", encoding="utf-8"
     )
     monkeypatch.setattr(config, "user_config_dir", lambda _name, **_kwargs: str(config_dir))
     monkeypatch.delenv("EMA_WORKSPACE", raising=False)

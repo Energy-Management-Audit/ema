@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PIL import Image
 from tests.audit_structure import RETAINED_CONTENT, confirm_retained_content
+from tests.workspace_jobs import create_job
 
 from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import CATALOGUE
@@ -13,7 +14,6 @@ from ema.audit.catalogue_types import PrefixPattern
 from ema.audit.content_checks import content_issues
 from ema.audit.sections import Status, set_status
 from ema.audit.workflow import AuditWorkflow
-from ema.core.jobs import create_job
 from ema.core.review import decide, mark_absent, propose
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace

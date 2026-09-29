@@ -6,6 +6,7 @@ import pytest
 from docx import Document
 from openpyxl import load_workbook
 from tests.conftest import artifacts_path
+from tests.workspace_jobs import create_job
 
 from ema.audit.base import build_base
 from ema.audit.base_units import UnitPlan, heading_spans_document
@@ -13,7 +14,6 @@ from ema.audit.chapter_six import ChapterSixPlan, render_chapter_six
 from ema.audit.inventory import inventory
 from ema.audit.measures import run_measures
 from ema.audit.measures_form import write_measures_form
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 
 pytestmark = pytest.mark.golden

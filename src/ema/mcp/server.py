@@ -19,17 +19,13 @@ from ema.audit.measures import run_measures
 from ema.audit.readings import run_readings
 from ema.audit.sections import statuses
 from ema.audit.visit import run_visit
-from ema.audit.workflow import AuditWorkflow
 from ema.core.config import workspace_path
-from ema.core.errors import EmaError
 from ema.core.jobs import get_job, list_jobs, recover
 from ema.core.jobs import status as read_status
 from ema.core.logging import write_event
 from ema.core.review import decide, fields, log
 from ema.core.review.models import Decision, Readiness
-from ema.core.review.readiness import Workflow
 from ema.core.workspace import Workspace
-from ema.invoices import InvoiceWorkflow
 from ema.mcp.boundary import call, input_file, optional_file, resolve_roots
 from ema.mcp.models import (
     AuditDraft,
@@ -47,8 +43,9 @@ from ema.mcp.models import (
     SectionView,
     WorkspaceInfo,
 )
-from ema.piee.review_workflow import PieeWorkflow
-from ema.piee.workflow import GenerateRequest, generate_draft
+from ema.piee.workflow import GenerateRequest
+from ema.workflows_registry import generate_draft
+from ema.workflows_registry import workflow_for as _workflow
 
 INSTRUCTIONS = (
     "Ema prepares energy-audit paperwork. Through these tools an agent can generate a PIEE draft, "
@@ -57,13 +54,6 @@ INSTRUCTIONS = (
     "Ema app and are not available here. Input files must be inside one of the folders listed by "
     "workspace_info."
 )
-
-# The same dispatch the HTTP API holds; ema.mcp does not import the other interfaces.
-WORKFLOWS: dict[str, Workflow] = {
-    "audit": AuditWorkflow(),
-    "piee": PieeWorkflow(),
-    "invoices": InvoiceWorkflow(),
-}
 
 READ = ToolAnnotations(readOnlyHint=True)
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
@@ -77,14 +67,6 @@ FieldStatus = Literal[
     "missing",
     "needs_confirmation",
 ]
-
-
-def _workflow(ws: Workspace, job: str) -> Workflow:
-    job_type = str(get_job(ws, job)["type"])
-    workflow = WORKFLOWS.get(job_type)
-    if workflow is None:
-        raise EmaError("workflow_unavailable", "Fluxul de lucru nu este disponibil.", job_type)
-    return workflow
 
 
 def _in_job[T](ws: Workspace, job: str, fn: Callable[[], T]) -> T:

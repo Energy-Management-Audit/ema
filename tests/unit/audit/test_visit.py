@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 from PIL import Image
+from tests.workspace_jobs import create_job
 
 from ema.audit.visit import run_visit, slug, visit_view
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.review import decide, fields, propose
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace

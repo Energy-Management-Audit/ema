@@ -8,8 +8,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from tests.workspace_jobs import create_job
 
-from ema.core.jobs import StageContext, StageOutcome, create_job, run_stage, subscribe
+from ema.core.jobs import StageContext, StageOutcome, run_stage, subscribe
 from ema.core.jobs.outputs import get_output, list_outputs
 from ema.core.workspace import Workspace
 from ema.windows import shell
@@ -53,7 +54,11 @@ def test_bridge_saves_cancels_and_checks_output_freshness(
     assert destination.read_bytes() == b"PK synthetic"
     assert dialogs[0][1] == "PIEE-draft.docx"
     assert api.save_output(job, output_id) == {"ok": True, "result": "cancelled"}
-    assert {name for name in dir(api) if not name.startswith("_")} == {"open_output", "save_output"}
+    assert {name for name in dir(api) if not name.startswith("_")} == {
+        "open_output",
+        "save_output",
+        "choose_folder",
+    }
     assert api.save_output(job, "missing") == {
         "ok": False,
         "code": "output_missing",
@@ -175,7 +180,7 @@ def test_window_start_failure_is_logged(tmp_path: Path, monkeypatch: pytest.Monk
     monkeypatch.setattr(desktop, "_free_port", lambda: 8799)
     monkeypatch.setattr(desktop, "create_app", lambda *_args, **_kwargs: object())
     assert desktop.run_desktop() == 1
-    log = (tmp_path / "workspace" / "logs" / "ema.jsonl").read_text()
+    log = (tmp_path / "workspace" / "logs" / "ema.jsonl").read_text(encoding="utf-8")
     assert '"event": "desktop_start_failed"' in log
 
 
@@ -198,3 +203,20 @@ def test_non_windows_shell_functions_are_safe(monkeypatch: pytest.MonkeyPatch) -
     assert shell.single_instance("Ema.Desktop") is True
     assert shell.webview2_version() is None
     shell.message_box("synthetic")
+
+
+def test_choose_folder_returns_contract_path_or_null(tmp_path: Path) -> None:
+    api = desktop.DesktopApi(Workspace(tmp_path / "workspace"))
+    with pytest.raises(RuntimeError, match="window is not ready"):
+        api.choose_folder()
+    choices = [[str(tmp_path / "delivery")], None]
+    dialogs = []
+
+    def choose(kind):
+        dialogs.append(kind)
+        return choices.pop(0)
+
+    api._window = SimpleNamespace(create_file_dialog=choose)
+    assert api.choose_folder() == {"path": str(tmp_path / "delivery")}
+    assert api.choose_folder() is None
+    assert dialogs == [desktop.webview.FileDialog.FOLDER] * 2

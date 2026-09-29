@@ -14,6 +14,7 @@ from openai.types.chat import ChatCompletion
 from pydantic import SecretStr
 
 from ema.core.errors import EmaError
+from ema.core.llm.models import selected_model
 from ema.core.llm.types import Exchange, ToolCall, ToolSpec
 
 
@@ -101,8 +102,7 @@ class OpenAIProvider:
             "messages": _openai_messages(messages, attachments),
             "max_completion_tokens": max_output_tokens,
         }
-        if model == "gpt-6-luna":
-            request["reasoning_effort"] = "none"
+        request.update(selected_model("openai", model).request_options)
         if tools:
             request["tools"] = [
                 {

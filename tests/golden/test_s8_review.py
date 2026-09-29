@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import register_client
 
 from ema.core.review import base_readiness, decide, fields
 from ema.core.review.models import FieldSpec
@@ -25,6 +26,7 @@ def test_CLIENT-P2_conflicts_require_shared_review_decisions(
 ) -> None:
     folder = reference_library / "piee/cases/piee-case-b"
     ws = Workspace(tmp_path / "workspace")
+    register_client(ws, "golden-client")
     job = import_piee(
         ws,
         "golden-client",
@@ -61,6 +63,7 @@ def test_CLIENT-P1_unit_disagreements_are_review_conflicts(
 ) -> None:
     folder = reference_library / "piee/cases/piee-case-a"
     ws = Workspace(tmp_path / "workspace")
+    register_client(ws, "golden-client")
     job = import_piee(
         ws,
         "golden-client",

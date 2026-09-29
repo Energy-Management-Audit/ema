@@ -8,10 +8,11 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
 from ema.core.errors import EmaError
-from ema.core.jobs import StageOutcome, create_job, run_stage, status, subscribe
+from ema.core.jobs import StageOutcome, run_stage, status, subscribe
 from ema.core.jobs.events import replay
 from ema.core.workspace import Workspace
 

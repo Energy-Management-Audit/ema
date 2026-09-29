@@ -3,10 +3,10 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema.api import backup_routes, create_app
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.settings import write_settings_values
 from ema.core.workspace import Workspace
 
@@ -59,12 +59,12 @@ def test_key_input_rejects_extra_and_malformed_json(tmp_path: Path) -> None:
         assert reply.json()["type"] == "urn:ema:error:validation_error"
 
 
-def test_malformed_backup_timestamp_is_a_400(tmp_path: Path) -> None:
+def test_malformed_persisted_backup_timestamp_is_a_500(tmp_path: Path) -> None:
     ws = Workspace(tmp_path)
     write_settings_values(ws, {"last_backup_at": "not-a-date"})
     client, _headers = _client(ws)
     response = client.get("/settings")
-    assert response.status_code == 400
+    assert response.status_code == 500
     assert response.json()["type"] == "urn:ema:error:settings_invalid"
 
 

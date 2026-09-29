@@ -44,6 +44,7 @@ class RecordingProvider:
             attachments=attachments,
         )
         row = self._row(response)
+        row["model"] = model
         row["request_hashes"] = request_hashes(
             model, messages, tools, schema, max_output_tokens, prompt_version
         )

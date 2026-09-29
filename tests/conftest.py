@@ -8,9 +8,13 @@ EMA_ARTIFACTS overrides local artifacts (default: ~/Code/projects/ema/artifacts)
 from __future__ import annotations
 
 import os
+from functools import wraps
 from pathlib import Path
 
 import pytest
+
+from ema.core.office.word import WordMac
+from ema.core.office.word_child import WordChild
 
 
 @pytest.fixture(autouse=True)
@@ -35,3 +39,27 @@ def artifacts_path(*parts: str) -> Path:
     """Return a path under the local Ema artifacts directory."""
     root = Path(os.environ.get("EMA_ARTIFACTS", "~/Code/projects/ema/artifacts")).expanduser()
     return root.joinpath(*parts)
+
+
+@pytest.fixture(autouse=True)
+def require_word_marker(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch):
+    """Fail even when a workflow catches an unmarked attempt in a worker thread."""
+    attempts: list[str] = []
+
+    def guard(original):
+        @wraps(original)
+        def checked(*args, **kwargs):
+            if request.node.get_closest_marker("golden") and not request.node.get_closest_marker(
+                "word"
+            ):
+                attempts.append(request.node.nodeid)
+                raise AssertionError("Golden reaches Word without pytest.mark.word")
+            return original(*args, **kwargs)
+
+        return checked
+
+    monkeypatch.setattr(WordMac, "_perform", guard(WordMac._perform))
+    monkeypatch.setattr(WordChild, "_perform", guard(WordChild._perform))
+    yield
+    if attempts:
+        pytest.fail("Golden reaches Word without pytest.mark.word: " + attempts[0])

@@ -43,11 +43,18 @@ def _lookup(cui: str) -> tuple[str, bytes, dict[str, Any]]:
         raise EmaError("anaf_unavailable", "Răspunsul ANAF este invalid.", "") from exc
 
 
-def _save_snapshot(ws: Workspace, client_id: str, url: str, body: bytes) -> dict[str, Any]:
+def _save_snapshot(ws: Workspace, client: dict[str, Any], url: str, body: bytes) -> dict[str, Any]:
+    client_id = str(client["id"])
     retrieved_at = datetime.now(UTC).isoformat()
     sha = hashlib.sha256(body).hexdigest()
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
+        current = db.execute("SELECT cui,revision FROM clients WHERE id=?", (client_id,)).fetchone()
+        if current is None or (current["cui"], current["revision"]) != (
+            client["cui"],
+            client["revision"],
+        ):
+            raise EmaError("stale_revision", "Clientul a fost modificat.", client_id)
         db.execute(
             "INSERT INTO anaf_snapshots(client_id,status,retrieved_at,source_url,payload_json,sha) "
             "VALUES (?,?,?,?,?,?) ON CONFLICT(client_id) DO UPDATE SET "
@@ -71,7 +78,7 @@ def refresh(ws: Workspace, client_id: str) -> dict[str, Any]:
     if not cui.isdecimal() or not 2 <= len(cui) <= 10:
         raise EmaError("anaf_unavailable", "Codul fiscal nu poate fi verificat.", "")
     url, body, _ = _lookup(cui)
-    return _save_snapshot(ws, client_id, url, body)
+    return _save_snapshot(ws, client, url, body)
 
 
 def create_from_anaf(ws: Workspace, cui: str) -> dict[str, Any]:
@@ -92,5 +99,5 @@ def create_from_anaf(ws: Workspace, cui: str) -> dict[str, Any]:
         client = update_client(
             ws, str(client["id"]), {"caen": str(general["cod_CAEN"])}, int(client["revision"])
         )
-    _save_snapshot(ws, str(client["id"]), url, body)
+    _save_snapshot(ws, client, url, body)
     return get_client(ws, str(client["id"]))

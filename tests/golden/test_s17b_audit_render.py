@@ -21,6 +21,7 @@ from tests.conftest import artifacts_path
 from tests.golden.s17b_audit_ui_fixture import prepare_all_but
 from tests.golden.test_s10b_audit_base import _references
 from tests.golden.test_s15b_chapter_six_base import _synthetic_form
+from tests.workspace_jobs import create_job
 
 from ema.audit.base_identity import derive_identity
 from ema.audit.base_package import package_issues
@@ -37,12 +38,12 @@ from ema.audit.render_steps import ai_wording_hits
 from ema.audit.sections import Status, refresh_staleness, set_status, statuses
 from ema.audit.sections_bulk import patch_sections
 from ema.audit.workflow import AuditWorkflow
-from ema.core.jobs import create_job, run_stage, status, subscribe
+from ema.core.jobs import run_stage, status, subscribe
 from ema.core.review import decide, fields, propose
 from ema.core.review.models import Evidence, Manual
 from ema.core.workspace import Workspace
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 CH3_DRAFT = SectionDraft(
     section="ch3.flux",

@@ -1,10 +1,11 @@
+import { plural as countRo } from '../../lib/plural.ts'
 import { useState } from 'react'
 import { auditReport } from '../../api/audit-report.ts'
 import { api } from '../../api/endpoints.ts'
 import type { Output } from '../../api/types.ts'
 import { AppSidebar } from '../../app/AppSidebar.tsx'
 import { auditHref } from '../../app/route.ts'
-import { EXPORT_STALE, auditChecks, canGenerateFinal, countRo } from '../../audit/report.ts'
+import { EXPORT_STALE, auditChecks, canGenerateFinal } from '../../audit/report.ts'
 import { formatBytes, rel } from '../../lib/format.ts'
 import { JobProvider, useJob } from '../../state/job.tsx'
 import { jobKey, useResource } from '../../state/resource.ts'
@@ -14,7 +15,13 @@ import { FailureNotice } from '../../ui/Feedback'
 import { DocThumb, ExportCheck, PackageFile } from '../../ui/Package'
 import { Window } from '../../ui/Shell'
 import { SectionKey } from '../../ui/Surface'
-import { ProblemNotice, download, useAction } from '../actions.tsx'
+import {
+  ProblemNotice,
+  download,
+  exportPackage,
+  type ExportReceipt,
+  useAction,
+} from '../actions.tsx'
 import { clientName } from '../JobScreen.tsx'
 import { RunPanel } from '../RunPanel.tsx'
 import { problemTitle } from '../States.tsx'
@@ -50,25 +57,36 @@ function AuditExportView() {
   const generate = useAction()
   const approve = useAction()
   const save = useAction()
-  const [exported, setExported] = useState(false)
+  const [exported, setExported] = useState<ExportReceipt | null>(null)
   useRenderEnd(jobId)
 
   const checks = ctx.checks.data
   const outputs = ctx.outputs.data ?? []
   const year = ctx.job.data?.year ?? ''
   const finalOk = checks?.readiness.final_ok ?? false
+  const finalStale =
+    checks?.readiness.blocking?.some((issue) => issue.code === 'final_stale') ?? false
   const firstBlocking = checks?.readiness.blocking?.[0]?.message
   const running = ctx.run?.state === 'running' || ctx.job.data?.state === 'running'
   const finalRun = report.data?.final ?? null
-  const final =
-    finalRun?.state === 'ready' && finalRun.current
-      ? (outputs.find((item) => item.id === finalRun.docx_output_id) ?? null)
-      : null
+  const final = checks?.final
+    ? (outputs.find((item) => item.id === checks.final?.output_id) ?? null)
+    : null
   const draftRun = report.data?.draft ?? null
   const shownRun = final ? finalRun : draftRun?.state === 'ready' ? draftRun : null
-  const files = shownRun ? outputs.filter((item) => item.run_id === shownRun.run_id) : []
+  const files = final
+    ? outputs.filter((item) => item.run_id === final.run_id)
+    : shownRun
+      ? outputs.filter((item) => item.run_id === shownRun.run_id)
+      : []
   const draftDocx = outputs.find((item) => item.id === draftRun?.docx_output_id) ?? null
-  const pdf = usePdfDocument(jobId, shownRun?.pdf_output_id ?? null)
+  const wordFile = final ?? draftDocx
+  const pdf = usePdfDocument(
+    jobId,
+    final
+      ? (files.find((item) => item.media_type === 'application/pdf')?.id ?? null)
+      : (shownRun?.pdf_output_id ?? null),
+  )
   const chapters = shownRun?.summary?.chapters.length ?? 0
   const photos = visit.data
     ? visit.data.thermal.length + visit.data.panels.reduce((sum, p) => sum + p.photos.length, 0)
@@ -84,6 +102,11 @@ function AuditExportView() {
     ctx.refresh('checks', 'outputs', 'job', 'report', 'approvals', 'sections')
   }
 
+  const receipt =
+    exported && exported.outputId === final?.id && exported.hash === checks?.readiness_hash
+      ? exported.response
+      : null
+  const approvedAt = receipt?.approved_at ?? approval?.at
   let primary = null
   if (running) {
     primary = (
@@ -91,7 +114,13 @@ function AuditExportView() {
         {final ? 'Aprobă şi exportă' : 'Generează versiunea finală'}
       </Button>
     )
-  } else if (final && !approval) {
+  } else if (
+    final &&
+    !finalStale &&
+    !receipt &&
+    approvals.data &&
+    (!approval || approval.exported_at === null)
+  ) {
     primary = (
       <Button
         height={38}
@@ -101,8 +130,9 @@ function AuditExportView() {
           if (!checks) return
           void approve.run(
             async () => {
-              await api.exportFinal(jobId, final.id, checks.readiness_hash)
-              setExported(true)
+              const receipt = await exportPackage(jobId, final.id, checks.readiness_hash)
+              if (!receipt) return
+              setExported(receipt)
               refreshAll()
             },
             (problem) => {
@@ -114,7 +144,7 @@ function AuditExportView() {
         Aprobă şi exportă
       </Button>
     )
-  } else if (!final) {
+  } else if (!final || finalStale) {
     primary = (
       <Button
         height={38}
@@ -216,31 +246,39 @@ function AuditExportView() {
                 {running && <RunPanel lines />}
               </div>
               <div className="export__actions">
-                {approval ? (
+                {approvedAt ? (
                   <Status tone="ok" mark="accepted">
-                    {`Aprobat ${rel(approval.at)}`}
+                    {`Aprobat ${rel(approvedAt)}`}
                   </Status>
-                ) : (
-                  primary
-                )}
-                {!final && draftDocx && (
+                ) : null}
+                {primary}
+                {wordFile && (
                   <Button
                     variant="secondary"
                     height={38}
                     loading={save.pending}
                     onClick={() => {
-                      void save.run(() => download(jobId, draftDocx))
+                      void save.run(() => download(jobId, wordFile))
                     }}
                   >
-                    Descarcă ciorna
+                    {final ? 'Descarcă doar Word' : 'Descarcă ciorna'}
                   </Button>
                 )}
               </div>
               {!finalOk && !approval && firstBlocking && (
                 <p className="export__blocked">{firstBlocking}</p>
               )}
-              {approval && exported && (
-                <p className="export__done">Copia finală e în dosarul de exporturi al lucrării.</p>
+              {receipt && (
+                <div className="export__done">
+                  <p>{`Fişierele finale sunt în ${receipt.folder}`}</p>
+                  <ul>
+                    {receipt.files.map((file) => (
+                      <li key={file.path}>
+                        {file.name} · {file.path}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
               {staleProblem && (
                 <FailureNotice title={staleProblem.title} actions={null}>

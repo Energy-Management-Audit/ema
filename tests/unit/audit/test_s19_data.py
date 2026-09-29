@@ -9,6 +9,7 @@ import pytest
 from docx import Document
 from tests.unit.audit.test_measures import _form
 from tests.unit.audit.test_read_synthetic import _necesar
+from tests.workspace_jobs import create_job
 
 from ema.audit.base_cleanup import clean_base
 from ema.audit.catalogue import CATALOGUE, FACT_LABELS, AuditFact, fact_spec, field_label
@@ -23,7 +24,7 @@ from ema.audit.readings import _proof
 from ema.audit.readings_schema import Phase, Quantity
 from ema.audit.visit import VisitPhoto
 from ema.core.errors import EmaError
-from ema.core.jobs import StageContext, create_job
+from ema.core.jobs import StageContext
 from ema.core.office.sheets import CellRef
 from ema.core.review import fields, propose
 from ema.core.review.models import Field, Photo

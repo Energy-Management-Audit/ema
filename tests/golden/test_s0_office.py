@@ -25,7 +25,7 @@ from ema.core.office.package import check_standalone, inspect, read_parts, write
 from ema.core.office.word_api import word_automation
 from ema.core.office.workbook import formula_cells
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 OUTPUT = artifacts_path("s0")
 

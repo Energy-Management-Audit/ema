@@ -9,16 +9,14 @@ from collections.abc import AsyncIterator
 from dataclasses import asdict
 from typing import Any, Literal
 
-from fastapi import FastAPI, Header, Query, Request, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, Header, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from ema.api.job_routes import validate_slot
+from ema.api.export_routes import install_export_routes
 from ema.api.models import (
     CancelResult,
     DeleteResult,
-    ExportChecks,
-    ExportResult,
     Job,
     JobStatus,
     NewJobResult,
@@ -26,36 +24,29 @@ from ema.api.models import (
     SlotVersion,
 )
 from ema.api.provisional import install_provisional_routes
-from ema.api.workflows import workflow_for
 from ema.audit.render_bindings import COVER_SLOT, checked_photo
 from ema.audit.sections import Status, set_status, statuses
 from ema.clients.registry import get_client
 from ema.core.errors import EmaError
 from ema.core.jobs import cancel, create_job, get_job, list_jobs, status
 from ema.core.jobs.events import replay
-from ema.core.jobs.outputs import MEDIA
-from ema.core.jobs.outputs import get_output as stored_output
 from ema.core.review import (
     accept_batch,
-    approve_final,
     conflicts,
     decide,
-    export,
     fields,
     log,
-    output_path,
-    readiness_hash,
     undo,
 )
 from ema.core.review.evidence import get_evidence
-from ema.core.review.models import Approval, Decision, Evidence, Field
-from ema.core.review.readiness import approvals, readiness_hash_in_tx
+from ema.core.review.models import Decision, Evidence, Field
 from ema.core.workspace import Workspace
+from ema.core.workspace.slots import slot_versions, validate_slot
 
 
 class NewJob(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    type: Literal["invoices", "piee", "audit", "reporting"]
+    type: Literal["invoices", "piee", "audit"]
     client: str
     year: int | None = None
 
@@ -92,14 +83,6 @@ class DeleteInput(BaseModel):
     on_revision: int
 
 
-class ExportInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    final: Literal[True]
-    output_id: str
-    readiness_hash: str
-    confirm: bool = False
-
-
 async def _poll_events() -> None:
     await asyncio.sleep(1)
 
@@ -115,8 +98,7 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
 
     @app.post("/jobs", tags=["jobs"], response_model=NewJobResult)
     def new_job(body: NewJob) -> dict[str, str]:
-        if body.type != "reporting":
-            get_client(ws, body.client)
+        get_client(ws, body.client)
         return {"id": create_job(ws, body.type, body.client, body.year)}
 
     @app.get("/jobs/{job_id}", tags=["jobs"], response_model=Job)
@@ -202,15 +184,7 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
         response_model=list[SlotVersion],
     )
     def versions(job_id: str, slot: str) -> list[dict[str, object]]:
-        get_job(ws, job_id)
-        with ws.connect() as db:
-            rows = db.execute(
-                "SELECT v.*,s.revision AS slot_revision FROM slot_versions v "
-                "JOIN slots s ON s.job_id=v.job_id AND s.name=v.slot "
-                "WHERE v.job_id=? AND v.slot=? ORDER BY v.version",
-                (job_id, slot),
-            ).fetchall()
-        return [dict(row) for row in rows]
+        return slot_versions(ws, job_id, slot)
 
     @app.put("/jobs/{job_id}/slots/{slot:path}", tags=["documents"], response_model=SlotVersion)
     def put_slot(job_id: str, slot: str, body: SlotInput) -> dict[str, object]:
@@ -310,88 +284,6 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
             on_revision=body.on_revision,
         ).payload()
 
-    @app.get("/jobs/{job_id}/export/checks", tags=["export"], response_model=ExportChecks)
-    def checks(job_id: str) -> dict[str, Any]:
-        workflow = workflow_for(ws, job_id)
-        readiness = workflow.readiness(ws, job_id)
-        return {
-            "readiness": readiness.model_dump(mode="json"),
-            "readiness_hash": readiness_hash(ws, job_id, readiness, workflow),
-        }
-
-    @app.get(
-        "/jobs/{job_id}/outputs/{output_id}",
-        tags=["export"],
-        response_class=Response,
-        responses={
-            200: {
-                "content": {
-                    media: {"schema": {"type": "string", "format": "binary"}}
-                    for media in MEDIA.values()
-                },
-            }
-        },
-    )
-    def get_output(job_id: str, output_id: str) -> Response:
-        if mock:
-            get_job(ws, job_id)
-            return Response(
-                b"Synthetic output",
-                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                headers={"X-Content-Type-Options": "nosniff"},
-            )
-        metadata, relative = stored_output(ws, job_id, output_id)
-        path = ws.path(relative)
-        return FileResponse(
-            path,
-            filename=str(metadata["download_name"]),
-            media_type=str(metadata["media_type"]),
-            headers={"X-Content-Type-Options": "nosniff"},
-        )
-
-    @app.get("/jobs/{job_id}/approvals", tags=["export"], response_model=list[Approval])
-    def job_approvals(job_id: str) -> list[dict[str, Any]]:
-        return [item.model_dump(mode="json") for item in approvals(ws, job_id)]
-
-    @app.post("/jobs/{job_id}/export", tags=["export"], response_model=ExportResult)
-    def do_export(job_id: str, body: ExportInput, request: Request) -> dict[str, str]:
-        if not body.confirm or not getattr(request.state, "human_session", False):
-            raise EmaError("human_required", "Confirmarea umană este necesară.", "")
-        workflow = workflow_for(ws, job_id)
-        with ws.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            job_row = db.execute(
-                "SELECT state FROM jobs WHERE id=? AND deleted=0", (job_id,)
-            ).fetchone()
-            if job_row is None:
-                raise EmaError("job_missing", "Lucrarea nu există.", "")
-            if job_row["state"] == "running":
-                raise EmaError("job_running", "Lucrarea rulează deja.", "")
-            readiness_reader = getattr(workflow, "readiness_in_tx", None)
-            readiness = (
-                readiness_reader(ws, job_id, db)
-                if readiness_reader is not None
-                else workflow.readiness(ws, job_id)
-            )
-            if not readiness.final_ok:
-                db.commit()  # Persist audit staleness before refusing the export.
-                raise EmaError("not_ready", "Lucrarea nu este pregătită.", "")
-            current_hash = readiness_hash_in_tx(ws, db, job_id, readiness, workflow)
-            if body.readiness_hash != current_hash:
-                raise EmaError("hash_mismatch", "Datele de pregătire nu corespund.", "")
-            approve_final(ws, job_id, body.output_id, current_hash, "user", db=db)
-        source = output_path(ws, job_id, body.output_id)
-        destination = ws.root / "exports" / f"{job_id}-{body.output_id}{source.suffix}"
-        destination.parent.mkdir(exist_ok=True)
-        export(
-            ws,
-            job_id,
-            workflow,
-            final=True,
-            dest=destination,
-            actor="user",
-            expected_output_id=body.output_id,
-        )
-        return {"output_id": body.output_id}
+    install_export_routes(app, ws)
 
     install_provisional_routes(app, ws, mock=mock)

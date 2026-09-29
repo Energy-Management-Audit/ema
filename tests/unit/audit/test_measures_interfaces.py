@@ -7,13 +7,14 @@ from fastapi.testclient import TestClient
 from mcp import ClientSession
 from openpyxl import load_workbook
 from tests.mcp_client import structured, with_client
+from tests.workspace_jobs import create_job
 from typer.testing import CliRunner
 
 from ema.api import create_app
 from ema.audit.measures_form import write_measures_form
 from ema.cli import _app
 from ema.cli import audit as cli_audit
-from ema.core.jobs import create_job, get_job, status, subscribe
+from ema.core.jobs import get_job, status, subscribe
 from ema.core.review import fields
 from ema.core.workspace import Workspace
 

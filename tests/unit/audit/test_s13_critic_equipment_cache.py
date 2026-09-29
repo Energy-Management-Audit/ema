@@ -4,9 +4,10 @@ import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
 
+from tests.workspace_jobs import create_job
+
 from ema.audit.research_equipment import cached_equipment, record_equipment
 from ema.audit.research_web import OutboundGuard, Snapshot, load_snapshot
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 
 
@@ -21,7 +22,8 @@ def test_reused_equipment_snapshot_is_available_in_next_job(tmp_path: Path) -> N
     (root / sha).write_bytes(body)
     (root / f"{sha}.json").write_text(
         '{"url":"https://example.org/motor","retrieved_at":"2026-01-01T00:00:00+00:00",'
-        '"content_type":"text/plain"}'
+        '"content_type":"text/plain"}',
+        encoding="utf-8",
     )
     snapshot = Snapshot("https://example.org/motor", sha, datetime.now(UTC), "text/plain", body)
     record_equipment(

@@ -17,7 +17,7 @@ from ema.core.workspace import Workspace
 from ema.mcp.boundary import input_file
 from ema.mcp.server import serve
 
-OUTSIDE = "Fișierul este în afara directoarelor de import."
+OUTSIDE = "Fişierul este în afara directoarelor de import."
 
 
 def _events(ws: Workspace) -> list[dict[str, Any]]:
@@ -139,8 +139,8 @@ def test_unreadable_recording_is_replay_invalid_with_no_run(tmp_path: Path) -> N
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
     root = imports_root(ws)
-    (root / "not-json.json").write_text("{ not json")
-    (root / "listed.json").write_text("[]")
+    (root / "not-json.json").write_text("{ not json", encoding="utf-8")
+    (root / "listed.json").write_text("[]", encoding="utf-8")
 
     for name in ("not-json.json", "listed.json"):
         recording = str(root / name)

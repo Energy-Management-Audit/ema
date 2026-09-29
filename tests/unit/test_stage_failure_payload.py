@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from tests.workspace_jobs import create_job
+
 from ema.core.errors import EmaError
-from ema.core.jobs import StageContext, StageOutcome, create_job, run_stage, status, subscribe
+from ema.core.jobs import StageContext, StageOutcome, run_stage, status, subscribe
 from ema.core.workspace import Workspace
 
 

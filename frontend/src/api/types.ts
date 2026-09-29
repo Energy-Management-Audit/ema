@@ -135,10 +135,13 @@ export type Readiness = {
 export type ExportChecks = {
   readiness: Readiness
   readiness_hash: string
+  final: { output_id: string; created_at: string; files: string[] } | null
 }
 
-export type ExportResult = {
-  output_id: string
+export type ExportResponse = {
+  approved_at: string
+  files: { name: string; path: string }[]
+  folder: string
 }
 
 export type Output = {
@@ -147,7 +150,6 @@ export type Output = {
   kind: 'draft' | 'final'
   media_type: string
   size_bytes: number
-  edited_externally: boolean
   name: string
   created_at: string | null
   run_id: string
@@ -161,6 +163,7 @@ export type Approval = {
   readiness_hash: string
   on_decision: string | null
   at: string
+  exported_at: string | null
   actor: 'ema' | 'user' | 'agent'
 }
 
@@ -277,10 +280,10 @@ export type StageInput = {
 }
 
 export type ExportInput = {
-  final: true
   output_id: string
   readiness_hash: string
-  confirm?: boolean
+  confirm: true
+  dest_dir: string | null
 }
 
 export type SlotInput = {

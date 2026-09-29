@@ -15,7 +15,7 @@ const reading = {
   label: 'voltage_ln l1',
   value_type: 'number',
   unit: 'V',
-  value: '230.00',
+  value: '0.9948',
   revision: 3,
   state: 'extracted',
   presence: 'found',
@@ -107,7 +107,7 @@ test('3c reading row confirms one value, shows its photo and undoes the decision
     },
     async ({ page, requests }) => {
       await page.getByText('Panel 1').waitFor()
-      await page.getByText('230 V').waitFor()
+      await page.getByText('0,9948 V').waitFor()
       assert.equal(requests.filter((item) => item.path.endsWith('/piee/summary')).length, 0)
       assert.equal(await page.getByText('Acceptă tot').count(), 0)
       await page.evaluate(() => {

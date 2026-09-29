@@ -6,10 +6,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 from tests.unit.energy_data.test_annex_index import annex
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
 from ema.clients.registry import create_client
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 
 

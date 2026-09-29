@@ -14,6 +14,7 @@ from tests.audit_replay import (
 from tests.mcp_client import imports_root, refusal, structured, text, with_client
 from tests.piee_seams import stub_piee_seams, synthetic_inputs
 
+from ema.clients.registry import create_client
 from ema.core.workspace import Workspace
 
 EXPORTS = {"export", "approve", "final", "undo", "delete", "done"}
@@ -22,13 +23,14 @@ EXPORTS = {"export", "approve", "final", "undo", "delete", "done"}
 def test_piee_draft_journey(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     stub_piee_seams(monkeypatch, tmp_path)
     ws = Workspace(tmp_path / "ws")
+    create_client(ws, "Synthetic", "12345678")
     anexa, necesar, prelucrare = synthetic_inputs(imports_root(ws))
 
     async def journey(client: ClientSession) -> dict[str, Any]:
         seen: dict[str, Any] = {}
         seen["info"] = structured(await client.call_tool("workspace_info", {}))
         arguments = {
-            "client": "synthetic",
+            "client": "12345678",
             "year": 2025,
             "anexa": str(anexa),
             "necesar": str(necesar),

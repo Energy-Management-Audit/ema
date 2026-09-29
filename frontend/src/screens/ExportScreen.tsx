@@ -3,7 +3,7 @@ import { api } from '../api/endpoints.ts'
 import type { Output } from '../api/types.ts'
 import { jobHref } from '../app/route.ts'
 import { formatBytes, rel } from '../lib/format.ts'
-import { blockingIssues, currentFinal, draftDocuments, exportChecks } from '../piee/readiness.ts'
+import { blockingIssues, draftDocuments, exportChecks } from '../piee/readiness.ts'
 import { useJob } from '../state/job.tsx'
 import { jobKey, useResource } from '../state/resource.ts'
 import { Button } from '../ui/Button'
@@ -11,7 +11,14 @@ import { Status } from '../ui/Chip'
 import { FailureNotice } from '../ui/Feedback'
 import { DocThumb, ExportCheck, PackageFile } from '../ui/Package'
 import { SectionKey } from '../ui/Surface'
-import { ProblemNotice, STALE_CODES, download, useAction } from './actions.tsx'
+import {
+  ProblemNotice,
+  STALE_CODES,
+  download,
+  exportPackage,
+  type ExportReceipt,
+  useAction,
+} from './actions.tsx'
 import { useGeneratePackage } from './JobHeader.tsx'
 import { clientName } from './JobScreen.tsx'
 import { RunPanel } from './RunPanel.tsx'
@@ -32,7 +39,7 @@ export function ExportScreen() {
   const packager = useGeneratePackage()
   const approve = useAction()
   const word = useAction()
-  const [exported, setExported] = useState(false)
+  const [exported, setExported] = useState<ExportReceipt | null>(null)
   const checks = ctx.checks.data
   const summary = ctx.summary.data
   const outputs = ctx.outputs.data ?? []
@@ -40,7 +47,9 @@ export function ExportScreen() {
   const finalOk = checks?.readiness.final_ok ?? false
   const firstBlocking = blockingIssues(checks)[0]?.message
   const running = ctx.run?.state === 'running' || ctx.job.data?.state === 'running'
-  const final = currentFinal(outputs)
+  const final = checks?.final
+    ? (outputs.find((item) => item.id === checks.final?.output_id) ?? null)
+    : null
   const draft = draftDocuments(outputs).at(-1)
   const shown = final ?? draft
   const files = final
@@ -58,6 +67,11 @@ export function ExportScreen() {
     ctx.refresh('approvals')
   }
   const wordFile = final ?? draft
+  const receipt =
+    exported && exported.outputId === final?.id && exported.hash === checks?.readiness_hash
+      ? exported.response
+      : null
+  const approvedAt = receipt?.approved_at ?? approval?.at
   let primary = null
   if (running) {
     primary = (
@@ -65,7 +79,7 @@ export function ExportScreen() {
         {final ? 'Aprobă şi exportă' : 'Generează pachetul'}
       </Button>
     )
-  } else if (final && !approval) {
+  } else if (final && !receipt && approvals.data && (!approval || approval.exported_at === null)) {
     primary = (
       <Button
         height={38}
@@ -75,8 +89,9 @@ export function ExportScreen() {
           if (!checks) return
           void approve.run(
             async () => {
-              await api.exportFinal(ctx.jobId, final.id, checks.readiness_hash)
-              setExported(true)
+              const receipt = await exportPackage(ctx.jobId, final.id, checks.readiness_hash)
+              if (!receipt) return
+              setExported(receipt)
               refreshAfterApprove()
             },
             (problem) => {
@@ -149,13 +164,12 @@ export function ExportScreen() {
               {running && <RunPanel lines />}
             </div>
             <div className="export__actions">
-              {approval ? (
+              {approvedAt ? (
                 <Status tone="ok" mark="accepted">
-                  {`Aprobat ${rel(approval.at)}`}
+                  {`Aprobat ${rel(approvedAt)}`}
                 </Status>
-              ) : (
-                primary
-              )}
+              ) : null}
+              {primary}
               {wordFile && (
                 <Button
                   variant="secondary"
@@ -177,8 +191,17 @@ export function ExportScreen() {
             {!finalOk && !approval && firstBlocking && (
               <p className="export__blocked">{firstBlocking}</p>
             )}
-            {approval && exported && (
-              <p className="export__done">Copia finală e în dosarul de exporturi al lucrării.</p>
+            {receipt && (
+              <div className="export__done">
+                <p>{`Fişierele finale sunt în ${receipt.folder}`}</p>
+                <ul>
+                  {receipt.files.map((file) => (
+                    <li key={file.path}>
+                      {file.name} · {file.path}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
             {approve.problem &&
               (APPROVE_STALE.has(approve.problem.code) ? (

@@ -5,17 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit.applicability import applies
 from ema.audit.catalogue import CATALOGUE, MaterialKind
 from ema.audit.readings import run_readings
 from ema.audit.visit import run_visit
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.review import fields
 from ema.core.workspace import Workspace
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 def test_CLIENT-A2_visit_inventory_and_disabled_vision(

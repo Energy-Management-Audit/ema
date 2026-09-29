@@ -6,13 +6,12 @@ import copy
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from ema.clients import remember
 from ema.clients.registry import validate_id
 from ema.core.errors import EmaError
 from ema.core.jobs import JobId, latest_ready_run
-from ema.core.review import fields, undo
 from ema.core.review.fields import decide_in_connection
 from ema.core.review.models import Decision, Field
 from ema.core.workspace import Workspace
@@ -166,7 +165,7 @@ def _admissible_pods(rows: list[dict[str, Any]], client: BatchClient) -> set[str
         for draft in row["drafts"]:
             name_field = draft["fields"].get("client_name")
             tax_field = draft["fields"].get("client_tax_id")
-            if name_field is None or not _matches_name(name_field, client.name):
+            if name_field is None or not matches_name(name_field, client.name):
                 continue
             if (
                 client.tax_id
@@ -182,23 +181,7 @@ def _admissible_pods(rows: list[dict[str, Any]], client: BatchClient) -> set[str
     return pods
 
 
-def undo_client(ws: Workspace, job: JobId, decision_id: str) -> Decision:
-    field = next((item for item in fields(ws, job) if item.key == KEY), None)
-    if field is None:
-        raise EmaError("client_missing", "Clientul lotului nu a fost identificat.", job)
-    with ws.connect() as db:
-        row = db.execute(
-            "SELECT 1 FROM decisions WHERE id=? AND job_id=? AND field_id=?",
-            (decision_id, job, field.id),
-        ).fetchone()
-    if row is None:
-        raise EmaError(
-            "client_decision_missing", "Decizia clientului lotului lipseşte.", decision_id
-        )
-    return undo(ws, job, decision_id, "user")
-
-
-def _matches_name(field: dict[str, Any], name: str) -> bool:
+def matches_name(field: dict[str, Any], name: str) -> bool:
     if field.get("status") in {"missing", "not_provided"}:
         return True
     expected = normalize_client_name(name)
@@ -252,7 +235,7 @@ def _resolve(
             tax_field = values.get("client_tax_id")
             if name_field is None:
                 continue
-            if not _matches_name(name_field, client.name) or (
+            if not matches_name(name_field, client.name) or (
                 client.tax_id
                 and tax_field
                 and tax_field.get("value")
@@ -338,63 +321,3 @@ def readiness(ws: Workspace, job: JobId) -> InvoiceReadiness:
         exportable,
         omitted,
     )
-
-
-def identity_view(ws: Workspace, job: JobId) -> dict[str, Any]:
-    return identity_from_snapshot(batch_snapshot(ws, job))
-
-
-def identity_from_snapshot(snapshot: BatchSnapshot) -> dict[str, Any]:
-    field, client, outcomes = snapshot.field, snapshot.client, snapshot.rows
-    printed = 0
-    other_client = 0
-    if client is not None:
-        for outcome in outcomes:
-            for draft in outcome["drafts"]:
-                values = cast("dict[str, Any]", draft["fields"])
-                name = cast("dict[str, Any]", values.get("client_name") or {})
-                tax = cast("dict[str, Any]", values.get("client_tax_id") or {})
-                if name.get("value") and _matches_name(name, client.name):
-                    printed += 1
-                if (name.get("value") and not _matches_name(name, client.name)) or (
-                    client.tax_id
-                    and tax.get("value")
-                    and normalize_client_tax_id(str(tax["value"]))
-                    != normalize_client_tax_id(client.tax_id)
-                ):
-                    other_client += 1
-    candidate = (
-        {
-            "client_id": snapshot.client_slug,
-            "cui": client.tax_id,
-            "pod": client.pods[0] if client.pods else None,
-        }
-        if client is not None
-        else None
-    )
-    return {
-        "batch_id": snapshot.run_id,
-        "candidate": candidate,
-        "confirmed": field.review in {"accepted", "corrected"},
-        "evidence_ids": field.evidence,
-        "revision": field.revision,
-        "name": client.name if client else None,
-        "reasons": {
-            "printed": printed,
-            "pods": list(client.pods) if client else [],
-            "other_client": other_client,
-        },
-        "pod_fill": [
-            {
-                "pod": str(item["pod"]),
-                "files": list(item["files"]),
-                "source_count": len(
-                    {source.get("sha") or source["file"] for source in item["sources"]}
-                ),
-            }
-            for item in (client.pod_fill if client is not None else ())
-        ],
-        "memory": list(client.memory) if client else [],
-        "files_total": len(outcomes),
-        "client_cui": snapshot.client_cui,
-    }

@@ -3,7 +3,7 @@
 import sqlite3
 import time
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 
 def migrate(db: sqlite3.Connection) -> None:  # noqa: C901
@@ -184,6 +184,14 @@ def migrate(db: sqlite3.Connection) -> None:  # noqa: C901
                 PRIMARY KEY (job_id, key), FOREIGN KEY (job_id) REFERENCES jobs(id)
             );
             PRAGMA user_version = 10;
+            COMMIT;
+        """)
+        version = 10
+    if version == 10:
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            ALTER TABLE approvals ADD COLUMN exported_at TEXT;
+            PRAGMA user_version = 11;
             COMMIT;
         """)
         return
