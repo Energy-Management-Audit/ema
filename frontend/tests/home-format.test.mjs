@@ -19,3 +19,10 @@ test('feminine counts and attention sentences', () => {
   assert.equal(attentionLine(3, 2), '2 lucrări aşteaptă o decizie de la tine')
   assert.equal(attentionLine(0, 0), '')
 })
+
+test('F18 home sentences handle singular and de plurals', () => {
+  assert.equal(attentionLine(1, 0), 'lucrarea este la zi')
+  assert.equal(attentionLine(20, 0), 'toate cele 20 de lucrări sunt la zi')
+  assert.equal(attentionLine(21, 21), '21 de lucrări aşteaptă o decizie de la tine')
+  assert.equal(attentionLine(101, 101), '101 lucrări aşteaptă o decizie de la tine')
+})

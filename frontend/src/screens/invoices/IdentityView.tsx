@@ -1,3 +1,4 @@
+import { plural as romanianCount, noun as romanianForm } from '../../lib/plural.ts'
 import { Check } from 'lucide-react'
 import { api } from '../../api/endpoints.ts'
 import type { InvoiceBatchView, InvoiceIdentity } from '../../api/invoices-types.ts'
@@ -9,7 +10,7 @@ import { Button } from '../../ui/Button.tsx'
 import { FailureNotice } from '../../ui/Feedback.tsx'
 import { Highlight } from '../../ui/Review.tsx'
 import { BrandMark, GroupBox, Paper, SectionKey } from '../../ui/Surface.tsx'
-import { romanianCount, romanianForm, statusSingular, statusWord } from '../../invoices/labels.ts'
+import { statusSingular, statusWord } from '../../invoices/labels.ts'
 
 function digits(value: string | null | undefined): string {
   return value?.replace(/\D/g, '') ?? ''

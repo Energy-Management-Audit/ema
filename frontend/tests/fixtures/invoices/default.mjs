@@ -141,7 +141,6 @@ export const output = {
   kind: 'final',
   media_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   size_bytes: 23456,
-  edited_externally: false,
   name: 'Facturi.xlsx',
   created_at: at,
   run_id: 'run-workbook-1',

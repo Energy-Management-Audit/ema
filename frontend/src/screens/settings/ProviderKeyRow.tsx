@@ -26,6 +26,7 @@ const COPY = {
   },
 }
 
+/** 3i: design handoff screen component. */
 export function ProviderKeyRow({
   provider,
   state,

@@ -1,10 +1,10 @@
+import { plural as romanianCount } from '../src/lib/plural.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   formatInvoiceNumber,
   monthName,
   outlierPercent,
-  romanianCount,
   statusWord,
 } from '../src/invoices/labels.ts'
 

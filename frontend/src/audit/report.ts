@@ -1,3 +1,4 @@
+import { plural as countRo } from '../lib/plural.ts'
 // What the Raport Word (3d) and Predare (7a) screens show, derived from the report view, the run
 // and the readiness the API computes. Nothing here is re-computed from documents.
 
@@ -53,13 +54,6 @@ export function tocItems(summary: RenderSummary | null, progress: Progress): Toc
 /** The markers' sections, each named once, in document order. */
 export function markerLabels(markers: RenderMarker[]): string[] {
   return [...new Set(markers.map((item) => item.label))]
-}
-
-/** A count in Romanian: 1 câmp, 2–19 câmpuri, 20 de câmpuri, 101 câmpuri, 120 de câmpuri. */
-export function countRo(n: number, one: string, many: string): string {
-  if (n === 1) return `1 ${one}`
-  const rest = n % 100
-  return n !== 0 && (rest === 0 || rest >= 20) ? `${String(n)} de ${many}` : `${String(n)} ${many}`
 }
 
 export function unitLine(plan: RenderUnitPlan): string {

@@ -1,14 +1,10 @@
+import { plural as romanianCount } from '../../lib/plural.ts'
 import { useMemo } from 'react'
 import type { InvoiceBatchView, InvoiceRow as InvoiceDataRow } from '../../api/invoices-types.ts'
 import { useBlobUrl } from '../../api/blobUrl.ts'
 import { invoicesApi } from '../../api/invoices.ts'
 import { monthBars } from '../../invoices/bars.ts'
-import {
-  formatInvoiceNumber,
-  monthName,
-  outlierPercent,
-  romanianCount,
-} from '../../invoices/labels.ts'
+import { formatInvoiceNumber, monthName, outlierPercent } from '../../invoices/labels.ts'
 import { Button } from '../../ui/Button.tsx'
 import { EmaWidget, FailureNotice } from '../../ui/Feedback.tsx'
 import { CountBar, KpiTile } from '../../ui/Figures.tsx'
@@ -41,6 +37,7 @@ function snippetWithValue(snippet: string, value: string | null) {
   )
 }
 
+/** 3f: design handoff screen component. */
 export function MonthBars({ year, rows }: { year: number; rows: InvoiceDataRow[] }) {
   return (
     <div className="invoice-bars" aria-label={`Consum lunar ${String(year)}`}>
@@ -56,6 +53,7 @@ export function MonthBars({ year, rows }: { year: number; rows: InvoiceDataRow[]
   )
 }
 
+/** 3f: design handoff screen component. */
 export function KpiStrip({ batch }: { batch: InvoiceBatchView }) {
   const year = batch.year ?? new Date().getFullYear()
   return (
@@ -85,6 +83,7 @@ export function KpiStrip({ batch }: { batch: InvoiceBatchView }) {
   )
 }
 
+/** 3f: design handoff screen component. */
 export function FailedFiles({
   batch,
   onReplace,
@@ -160,6 +159,7 @@ export function FailedFiles({
   )
 }
 
+/** 3f: design handoff screen component. */
 export function InvoiceOpen({ jobId, row }: { jobId: string; row: InvoiceDataRow }) {
   const page = row.sources.active_energy?.page ?? 1
   const pageLoader = useMemo(
@@ -208,6 +208,7 @@ export function InvoiceOpen({ jobId, row }: { jobId: string; row: InvoiceDataRow
   )
 }
 
+/** 3f: design handoff screen component. */
 export function InvoiceRow({
   jobId,
   row,
@@ -225,7 +226,7 @@ export function InvoiceRow({
     : ''
   return (
     <div className={`invoice-row ${open ? 'invoice-row--open' : ''}`} role="row">
-      <div className="invoice-row__cells">
+      <div className="invoice-row__cells" role="presentation">
         <span role="cell">{monthName(row.month)}</span>
         <span role="cell" className="invoice-row__invoice">
           <span>
@@ -265,10 +266,11 @@ export function InvoiceRow({
   )
 }
 
+/** 3f: design handoff screen component. */
 export function MissingMonthRow({ month, onAdd }: { month: string; onAdd: () => void }) {
   return (
     <div className="invoice-row invoice-row--missing" role="row">
-      <div className="invoice-row__cells">
+      <div className="invoice-row__cells" role="presentation">
         <span role="cell">{monthName(month)}</span>
         <span role="cell">factura lipseşte</span>
         <span role="cell">—</span>
@@ -284,6 +286,7 @@ export function MissingMonthRow({ month, onAdd }: { month: string; onAdd: () => 
   )
 }
 
+/** 3f: design handoff screen component. */
 export function InvoiceTable({
   jobId,
   batch,
@@ -327,15 +330,15 @@ export function InvoiceTable({
         </EmaWidget>
       )}
       <FailedFiles batch={batch} onReplace={onReplace} onRemove={onRemove} />
-      <div className="invoice-table__head" role="row">
-        <span>LUNA</span>
-        <span>FACTURA</span>
-        <span>CONSUM kWh</span>
-        <span>VALOARE lei</span>
-        <span>LEI/kWh</span>
-        <span>SURSA</span>
-      </div>
       <div className="invoice-table__rows" role="table" aria-label="Facturi">
+        <div className="invoice-table__head" role="row">
+          <span role="columnheader">LUNA</span>
+          <span role="columnheader">FACTURA</span>
+          <span role="columnheader">CONSUM kWh</span>
+          <span role="columnheader">VALOARE lei</span>
+          <span role="columnheader">LEI/kWh</span>
+          <span role="columnheader">SURSA</span>
+        </div>
         {items.map((item) =>
           item.row ? (
             <InvoiceRow

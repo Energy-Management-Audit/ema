@@ -22,6 +22,7 @@ const TITLES: Record<SettingsGroup, string> = {
   despre: 'Despre Ema',
 }
 
+/** 3i: design handoff screen component. */
 export function SettingsScreen({ group }: SettingsScreenProps) {
   const settings = useResource('settings', settingsApi.settings)
   return (

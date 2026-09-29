@@ -23,6 +23,7 @@ test('shell destinations, job link, finalized expansion and settings work', asyn
       await page.getByRole('heading', { name: 'Clienţi' }).waitFor()
       const sidebar = page.locator('.ema-sidebar')
       const finished = sidebar.locator('.ema-nav-group').last().locator('.ema-nav-job')
+      await finished.first().waitFor()
       assert.equal(await finished.count(), 1)
       assert.match((await finished.first().textContent()) ?? '', /2025/)
       const reporting = sidebar.locator('.ema-nav-item__label', {
@@ -38,6 +39,7 @@ test('shell destinations, job link, finalized expansion and settings work', asyn
         { nowrap: true, ellipsis: true, clipped: true },
       )
       await sidebar.getByRole('button', { name: 'încă două…' }).click()
+      await finished.nth(2).waitFor()
       assert.equal(await sidebar.locator('.ema-nav-job').count(), 6)
       await sidebar.getByRole('button', { name: 'PIEE 2026' }).first().click()
       await page.waitForURL(`**/app/piee/${JOB}/date`)

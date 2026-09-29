@@ -278,3 +278,23 @@ test('M2 contact, sites, memory, jobs and 7c delete use revision-safe calls', as
     },
   )
 })
+
+test('F20 client search has a visible focus ring in both themes', async () => {
+  for (const theme of ['light', 'dark']) {
+    await withHarness({ path: '/app/clienti', routes: CLIENT_ROUTES, theme }, async ({ page }) => {
+      const search = page.getByRole('textbox', { name: 'Caută clienţi' })
+      await search.focus()
+      assert.notEqual(
+        await search.evaluate((node) => getComputedStyle(node.parentElement).boxShadow),
+        'none',
+      )
+      assert.equal(await page.title(), 'Ema — Clienţi')
+      await page
+        .locator('.ema-sidebar')
+        .getByRole('button', { name: 'Raportare manager energetic' })
+        .click()
+      await page.waitForURL('**/app/raportare')
+      await page.waitForFunction(() => document.title === 'Ema — Raportare manager energetic')
+    })
+  }
+})

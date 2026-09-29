@@ -1,7 +1,8 @@
+import { formatDate } from '../../lib/format.ts'
 import { useState } from 'react'
 import type { AuditOutline, OutlineNode } from '../../api/audit-types.ts'
 import { auditApi } from '../../api/audit.ts'
-import { plural } from '../../audit/plural.ts'
+import { plural } from '../../lib/plural.ts'
 import { aggregate, displayTitle, holding, nodeState } from '../../audit/outline.ts'
 import { useJob } from '../../state/job.tsx'
 import { Button } from '../../ui/Button.tsx'
@@ -12,6 +13,7 @@ import { SectionKey } from '../../ui/Surface.tsx'
 import { SectionActions } from './SectionActions.tsx'
 import { ChapterConfirm } from './ChapterConfirm.tsx'
 
+/** 3j: design handoff screen component. */
 export function StructureTab({ outline }: { outline: AuditOutline }) {
   const [expanded, setExpanded] = useState<string | null>('ch3')
   const roots = outline.nodes.filter((node) => node.parent === null)
@@ -19,7 +21,13 @@ export function StructureTab({ outline }: { outline: AuditOutline }) {
     <>
       <div className="audit-tab-head">
         <h2>Structura raportului</h2>
-        <span>Vizita în teren: {outline.visit_date ?? 'nestabilită'} · Şablon: EMA 2026</span>
+        <span>
+          Vizita în teren:{' '}
+          {outline.visit_date
+            ? formatDate(outline.visit_date, { year: false, long: true })
+            : 'nestabilită'}{' '}
+          · Şablon: EMA 2026
+        </span>
       </div>
       <div className="audit-structure">
         {roots.map((root) => {

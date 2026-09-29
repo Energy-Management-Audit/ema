@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { auditApi } from '../../api/audit.ts'
-import { plural } from '../../audit/plural.ts'
+import { plural } from '../../lib/plural.ts'
 import { useJob } from '../../state/job.tsx'
 import { Button } from '../../ui/Button.tsx'
 import { Dialog } from '../../ui/Dialog.tsx'
 
+/** 7c: design handoff screen component. */
 export function RerunDialog({
   stage,
   count,

@@ -13,6 +13,7 @@ function jobsFor(id: string, overview: JobOverview[]): JobOverview[] {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 }
 
+/** M1: design handoff screen component. */
 export function ClientsTable({
   clients,
   jobs,
@@ -72,7 +73,7 @@ export function ClientsTable({
             </Cell>
             <Cell width={88} figures>
               {client.consumption?.year === year
-                ? `${formatNumber(client.consumption.total_tep)} tep`
+                ? `${formatNumber(client.consumption.total_tep, 'tep', true)} tep`
                 : '—'}
             </Cell>
             <Cell width={118}>

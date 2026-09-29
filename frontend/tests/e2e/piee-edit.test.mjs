@@ -39,6 +39,11 @@ test('C2 a found month is click-to-correct with the decide API on its revision',
       await table.getByText('Valoarea nu este un număr.').waitFor()
       assert.equal(count(requests, 'POST', `${J}/fields/${MONTH.id}/decide`), 0)
 
+      await editor.fill('12.500')
+      await table.getByRole('button', { name: 'Salvează' }).click()
+      await table.getByText('Scrie 12500 sau 12,5').waitFor()
+      assert.equal(count(requests, 'POST', `${J}/fields/${MONTH.id}/decide`), 0)
+
       const fieldsBefore = count(requests, 'GET', `${J}/fields`)
       await editor.fill('5 100,5')
       await table.getByRole('button', { name: 'Salvează' }).click()

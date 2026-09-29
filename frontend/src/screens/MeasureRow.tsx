@@ -83,7 +83,7 @@ export function MeasureRow({
         {cell('saving_mwh', (field) => formatNumber(text(field), field.unit))}
         {cell('payback_years', (field) => (
           <>
-            {`${formatNumber(text(field), 'ani')} ani`}
+            {`${formatNumber(text(field), 'ani', true)} ani`}
             {field.state === 'calculated' && <span className="measure-row__muted"> calculat</span>}
           </>
         ))}

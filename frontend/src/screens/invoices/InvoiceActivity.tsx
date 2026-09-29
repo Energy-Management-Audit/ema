@@ -1,13 +1,8 @@
+import { plural as romanianCount } from '../../lib/plural.ts'
 import type { InvoiceBatchView, InvoiceIdentity } from '../../api/invoices-types.ts'
 import type { Decision, Output } from '../../api/types.ts'
 import { formatBytes, rel } from '../../lib/format.ts'
-import {
-  monthName,
-  outlierPercent,
-  romanianCount,
-  statusSingular,
-  statusWord,
-} from '../../invoices/labels.ts'
+import { monthName, outlierPercent, statusSingular, statusWord } from '../../invoices/labels.ts'
 import { ActivityEntry, ActivityPanel } from '../../ui/Activity.tsx'
 import { RunPanel } from '../RunPanel.tsx'
 

@@ -7,6 +7,7 @@ import { Toggle } from '../../ui/Field.tsx'
 import { FailureNotice } from '../../ui/Feedback.tsx'
 import { GroupBox, GroupRow } from '../../ui/Surface.tsx'
 
+/** 3i: design handoff screen component. */
 export function AppearancePage({ settings }: { settings: SettingsView }) {
   const [problem, setProblem] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)

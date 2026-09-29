@@ -33,5 +33,5 @@ test('journal labels human changes and groups across year boundary', () => {
     weeks.map(([week]) => week),
     ['2026-02', '2026-01'],
   )
-  assert.match(weekRange('2026-01'), /^29 dec\.–4 ian\./)
+  assert.match(weekRange('2026-01'), /^29 dec–4 ian$/)
 })

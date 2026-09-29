@@ -8,7 +8,7 @@ import { reportingApi } from '../../api/reporting.ts'
 import { AppSidebar } from '../../app/AppSidebar.tsx'
 import { rel } from '../../lib/format.ts'
 import { exceptionSources } from '../../reporting/view.ts'
-import { roCount } from '../../clients/plural.ts'
+import { plural as roCount } from '../../lib/plural.ts'
 import { invalidate, useResource } from '../../state/resource.ts'
 import { Button } from '../../ui/Button.tsx'
 import { EmaWidget, EmptyState, FailureNotice } from '../../ui/Feedback.tsx'
@@ -23,6 +23,7 @@ import {
 } from './ReportingParts.tsx'
 import './reporting.css'
 
+/** M3: design handoff screen component. */
 export function ReportingScreen() {
   const clients = useResource('clientsOverview', clientsApi.clientsOverview)
   const runs = useResource('reportingRuns', reportingApi.runs)

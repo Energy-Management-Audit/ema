@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SummaryFigure } from '../api/types.ts'
 import { jobHref } from '../app/route.ts'
+import { plural } from '../lib/plural.ts'
 import { formatNumber } from '../lib/format.ts'
 import { firstWithoutTerm, measureGroups } from '../piee/measures.ts'
 import { useJob } from '../state/job.tsx'
@@ -12,12 +13,12 @@ import { MeasureRow } from './MeasureRow.tsx'
 import './measures.css'
 
 function figure(value: SummaryFigure | undefined): string {
-  return value?.value ? formatNumber(value.value, value.unit) : '—'
+  return value?.value ? formatNumber(value.value, value.unit, true) : '—'
 }
 
 function partial(value: SummaryFigure | undefined): string | undefined {
   return value?.value && value.missing.length > 0
-    ? `fără ${String(value.missing.length)} măsuri`
+    ? `fără ${plural(value.missing.length, 'măsură', 'măsuri')}`
     : undefined
 }
 

@@ -1,6 +1,6 @@
 import type { AuditDocuments } from '../../api/audit-types.ts'
 import type { JobStatus } from '../../api/types.ts'
-import { plural } from '../../audit/plural.ts'
+import { plural } from '../../lib/plural.ts'
 import { rel } from '../../lib/format.ts'
 import { ActivityEntry } from '../../ui/Activity.tsx'
 import { Button } from '../../ui/Button.tsx'

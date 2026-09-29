@@ -121,3 +121,43 @@ export function jobPath(job: { id: string; type: string }): string {
   if (job.type === 'invoices') return invoicesHref(job.id)
   return '/app/'
 }
+
+/** The visible screen names from the handoff, also used in the browser window title. */
+export function screenTitle(route: Route): string {
+  switch (route.name) {
+    case 'clients':
+    case 'client':
+      return 'Clienţi'
+    case 'reporting':
+      return 'Raportare manager energetic'
+    case 'invoices':
+      return 'Facturi'
+    case 'settings':
+      return {
+        extragere: 'Extragere',
+        fisiere: 'Fişiere şi dosare',
+        aspect: 'Aspect',
+        despre: 'Despre Ema',
+      }[route.group]
+    case 'job':
+      return {
+        documente: 'Documente',
+        date: 'Date',
+        masuri: 'Măsuri',
+        jurnal: 'Jurnal',
+        predare: 'Predare',
+      }[route.tab]
+    case 'audit':
+      return {
+        documente: 'Documente primite',
+        structura: 'Structura raportului',
+        revizuire: 'Revizuire',
+        jurnal: 'Jurnal',
+        masuratori: 'Măsurători',
+        raport: 'Raport Word',
+        predare: 'Predare',
+      }[route.tab]
+    default:
+      return 'Acasă'
+  }
+}

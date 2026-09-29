@@ -17,7 +17,7 @@ import { FailureNotice } from '../ui/Feedback.tsx'
 import { Content, Window } from '../ui/Shell.tsx'
 import { AppSidebar } from './AppSidebar.tsx'
 import { navigate } from './navigate.ts'
-import { jobPath, parseRoute } from './route.ts'
+import { jobPath, parseRoute, screenTitle } from './route.ts'
 
 function currentLocation(): string {
   return location.pathname + location.search
@@ -108,6 +108,14 @@ export function App({ bootProblem }: { bootProblem: ApiProblem | null }) {
   }, [])
   const [pathname = '', search = ''] = where.split(/(?=\?)/)
   const route = parseRoute(pathname, search)
+  const title = closed
+    ? 'Sesiunea s-a închis'
+    : bootProblem
+      ? 'Nu am putut încărca lucrarea'
+      : screenTitle(route)
+  useEffect(() => {
+    document.title = `Ema — ${title}`
+  }, [title])
   const previous = useRef<string | null>(null)
   const jobTab =
     route.name === 'job' || route.name === 'audit' ? `${route.jobId}/${route.tab}` : null

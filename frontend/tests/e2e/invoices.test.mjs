@@ -263,3 +263,30 @@ test('table explains blocked export and removes a failed invoice with its slot r
     assert.deepEqual(removed.body, { confirm: true, on_revision: 2 })
   })
 })
+
+test('F20 invoice table owns its headers and exposes cells through presentational wrappers', async () => {
+  await withHarness(
+    {
+      path: `/app/facturi/${JOB}`,
+      routes: {
+        ...invoiceRoutes,
+        [`GET ${J}/invoices/identity`]: { body: acceptedIdentity },
+        [`GET ${J}/invoices/batch`]: { body: acceptedBatch },
+      },
+    },
+    async ({ page }) => {
+      const table = page.getByRole('table', { name: 'Facturi' })
+      await table.waitFor()
+      assert.equal(await table.getByRole('columnheader').count(), 6)
+      assert.ok((await table.getByRole('cell').count()) > 0)
+      assert.equal(
+        await table
+          .getByRole('cell')
+          .first()
+          .evaluate((node) => node.parentElement.getAttribute('role')),
+        'presentation',
+      )
+      assert.equal(await page.title(), 'Ema — Facturi')
+    },
+  )
+})

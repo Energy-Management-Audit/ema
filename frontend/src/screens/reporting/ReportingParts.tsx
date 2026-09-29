@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ClientOverview } from '../../api/clients-types.ts'
 import type { AnnexImport } from '../../api/clients-types.ts'
 import type { ReportException, ReportingPreview } from '../../api/reporting-types.ts'
-import { roCount } from '../../clients/plural.ts'
+import { plural as roCount } from '../../lib/plural.ts'
 import { formatReportFigure, previewRows, severityLabel, yearChip } from '../../reporting/view.ts'
 import { Button } from '../../ui/Button.tsx'
 import { SourceChip } from '../../ui/Chip.tsx'
@@ -10,6 +10,7 @@ import { CheckRow, Dialog } from '../../ui/Dialog.tsx'
 import { MissingField } from '../../ui/Field.tsx'
 import { GroupBox, SectionKey } from '../../ui/Surface.tsx'
 
+/** M3: design handoff screen component. */
 export function YearChips({
   years,
   selected,
@@ -39,6 +40,7 @@ export function YearChips({
   )
 }
 
+/** M3: design handoff screen component. */
 export function ClientPickerDialog({
   clients,
   selected,
@@ -113,6 +115,7 @@ export function ClientPickerDialog({
   )
 }
 
+/** M3: design handoff screen component. */
 export function AnnexImportDialog({
   result,
   error,
@@ -159,6 +162,7 @@ export function AnnexImportDialog({
   )
 }
 
+/** M3: design handoff screen component. */
 export function PreviewTable({
   preview,
   year,
@@ -233,6 +237,7 @@ export function PreviewTable({
   )
 }
 
+/** M3: design handoff screen component. */
 export function ExceptionsBox({
   exceptions,
   clients,

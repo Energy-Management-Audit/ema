@@ -7,6 +7,7 @@ import { Button } from '../../ui/Button.tsx'
 import { FailureNotice } from '../../ui/Feedback.tsx'
 import { GroupBox, GroupRow } from '../../ui/Surface.tsx'
 
+/** 3i: design handoff screen component. */
 export function AboutPage() {
   const health = useResource('health', settingsApi.health)
   const update = useResource('update', updateApi.status)

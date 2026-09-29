@@ -21,6 +21,7 @@ import './clients.css'
 
 export type ClientScreenProps = { clientId: string; tab: ClientTab }
 
+/** M2: design handoff screen component. */
 export function ClientScreen({ clientId, tab }: ClientScreenProps) {
   const profile = useResource(`client/${clientId}/profile`, () => clientsApi.profile(clientId))
   const overview = useResource('overview', api.overview)

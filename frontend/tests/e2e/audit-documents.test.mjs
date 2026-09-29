@@ -328,3 +328,52 @@ test('document stage shows run progress and offers stop', async () => {
     },
   )
 })
+
+test('cover/photo upload accepts one JPEG/PNG and uses the approved cover copy', async () => {
+  await withHarness(
+    {
+      path: `/app/audit/${JOB.id}/documente`,
+      routes: {
+        ...routes,
+        [`POST /clients/${JOB.client_slug}/files`]: { body: { sha: 'cover-sha' } },
+        [`PUT ${J}/slots/cover/photo`]: { body: {} },
+      },
+    },
+    async ({ page, requests }) => {
+      await page.getByRole('button', { name: 'Adaugă documente' }).first().click()
+      const dialog = page.getByRole('dialog')
+      await dialog.getByText('Fotografia sediului', { exact: true }).click()
+      await dialog.getByText('Un fişier JPEG sau PNG', { exact: true }).waitFor()
+      const picker = dialog.locator('input[type=file]')
+      assert.equal(await picker.getAttribute('accept'), '.jpg,.jpeg,.png')
+      assert.equal(await picker.getAttribute('multiple'), null)
+      await picker.setInputFiles({
+        name: 'cover.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('pdf'),
+      })
+      await dialog.getByRole('button', { name: 'Adaugă documente' }).click()
+      await dialog.getByRole('alert').getByText('Un fişier JPEG sau PNG', { exact: true }).waitFor()
+      assert.equal(
+        requests.some((request) => request.method === 'POST' && request.path.endsWith('/files')),
+        false,
+      )
+      await picker.setInputFiles({
+        name: 'cover.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from('png'),
+      })
+      const binding = page.waitForResponse((response) =>
+        response.url().endsWith('/slots/cover/photo'),
+      )
+      await dialog.getByRole('button', { name: 'Adaugă documente' }).click()
+      await binding
+      assert.deepEqual(
+        requests.find(
+          (request) => request.method === 'PUT' && request.path.endsWith('/slots/cover/photo'),
+        ).body,
+        { file_sha: 'cover-sha' },
+      )
+    },
+  )
+})

@@ -4,6 +4,7 @@ import { formatDate } from '../../lib/format.ts'
 import { SourceChip, Status } from '../../ui/Chip.tsx'
 import { Card, SectionKey } from '../../ui/Surface.tsx'
 
+/** M2: design handoff screen component. */
 export function IdentificationCard({ profile }: { profile: ClientProfile }) {
   const item = profile.identification
   const source =
@@ -68,6 +69,7 @@ export function IdentificationCard({ profile }: { profile: ClientProfile }) {
   )
 }
 
+/** M2: design handoff screen component. */
 export function ContactCard({
   title,
   name,
