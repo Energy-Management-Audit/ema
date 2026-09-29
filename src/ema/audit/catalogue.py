@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from ema.audit.catalogue_analysis import ANALYSIS
 from ema.audit.catalogue_general import GENERAL
+from ema.audit.catalogue_labels import FACT_LABELS, fact_spec, field_label
 from ema.audit.catalogue_types import (
     AuditFact,
     CarrierPattern,
@@ -171,6 +172,7 @@ NOT_SECTIONS: dict[str, str] = {
 
 __all__ = [
     "CATALOGUE",
+    "FACT_LABELS",
     "NOT_SECTIONS",
     "AuditFact",
     "CarrierPattern",
@@ -181,5 +183,7 @@ __all__ = [
     "SectionKind",
     "Source",
     "fact",
+    "fact_spec",
+    "field_label",
     "material",
 ]

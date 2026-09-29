@@ -11,6 +11,7 @@ from lxml import etree
 
 from ema.audit.base_numbering import effective_indent, printed_numbers
 from ema.audit.base_units import heading_spans_document
+from ema.audit.catalogue import CATALOGUE
 from ema.core.errors import EmaError
 
 PASTE_SLIP = (
@@ -129,6 +130,8 @@ def _heading_values(properties: Any) -> str:
 def clean_base(document: Any) -> list[str]:
     """Return local digest evidence; reference documents and image bytes remain untouched."""
     changes = _correct_law(document) + _cover_shape(document)
+    changes.extend(_normalise_headings(document))
+    changes.extend(_normalise_fixed_text(document))
     numbers = printed_numbers(document)
     for item, start, _ in heading_spans_document(document):
         paragraph = document.element.body[start]
@@ -161,5 +164,45 @@ def clean_base(document: Any) -> list[str]:
                 f"{old_values} → {_heading_values(properties)}; "
                 f"effective left {old_left} → {left}, hanging {old_hanging} → {hanging}, "
                 f"number position {old_left - old_hanging} → {left - hanging}"
+            )
+    return changes
+
+
+def _normalise_headings(document: Any) -> list[str]:
+    changes: list[str] = []
+    for item, start, _ in heading_spans_document(document):
+        paragraph = document.element.body[start]
+        nodes = list(paragraph.iter(qn("w:t")))
+        before = "".join(node.text or "" for node in nodes)
+        after = before.translate(str.maketrans("şţŞŢ", "șțȘȚ"))
+        if before == after:
+            continue
+        for node in nodes:
+            node.text = (node.text or "").translate(str.maketrans("şţŞŢ", "șțȘȚ"))
+        changes.append(
+            f"F17 {item.section_id} heading: {hashlib.sha256(before.encode()).hexdigest()} → "
+            f"{hashlib.sha256(after.encode()).hexdigest()}; {before} → {after}"
+        )
+    return changes
+
+
+def _normalise_fixed_text(document: Any) -> list[str]:
+    fixed = {section.id for section in CATALOGUE if section.kind == "fixed"}
+    changes: list[str] = []
+    for section, start, end in heading_spans_document(document):
+        if section.section_id not in fixed:
+            continue
+        for paragraph in list(document.element.body)[start + 1 : end]:
+            nodes = list(paragraph.iter(qn("w:t")))
+            before = "".join(node.text or "" for node in nodes)
+            after = before.translate(str.maketrans("şţŞŢ", "șțȘȚ"))
+            if before == after:
+                continue
+            for node in nodes:
+                node.text = (node.text or "").translate(str.maketrans("şţŞŢ", "șțȘȚ"))
+            changes.append(
+                f"F17 {section.section_id} fixed text: "
+                f"{hashlib.sha256(before.encode()).hexdigest()} → "
+                f"{hashlib.sha256(after.encode()).hexdigest()}"
             )
     return changes

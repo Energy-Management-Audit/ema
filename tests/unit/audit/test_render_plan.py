@@ -92,6 +92,7 @@ def test_unit_plan_counts_every_unit_from_the_job(tmp_path: Path) -> None:
         equipment_tables=2,
         measures=3,
         processes_source="fisa",
+        client_revision=("synthetic", 1),
     )
     named = propose(ws, job, spec, "Nume din anexă SA", [], state="extracted")
     assert unit_plan(ws, job).client_name == "Nume din anexă SA"

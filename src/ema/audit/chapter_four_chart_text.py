@@ -47,28 +47,28 @@ SUBJECT = {
 }
 ANNUAL = {
     "ch4.echiv_electric": (
-        "Evoluția anuală al consumului total echivalent de energie electrică "
+        "Evoluția anuală a consumului total echivalent de energie electrică "
         "din SEN înregistrat la nivelul {client}"
     ),
     "ch4.echiv_gaz": (
-        "Evoluția anuală al consumului echivalent de gaz natural înregistrat la nivelul {client}"
+        "Evoluția anuală a consumului echivalent de gaz natural înregistrat la nivelul {client}"
     ),
     "ch4.echiv_carburant": (
-        "Evoluția anuală al consumului echivalent de carburant înregistrat la nivelul {client}"
+        "Evoluția anuală a consumului echivalent de carburant înregistrat la nivelul {client}"
     ),
     "ch4.echiv_total": (
-        "Evoluția anuală al consumului total echivalent de energie înregistrat la nivelul {client}"
+        "Evoluția anuală a consumului total echivalent de energie înregistrat la nivelul {client}"
     ),
     "ch4.specific_electric": (
-        "Evoluția anuală al consumului specific echivalent de energie electrică "
+        "Evoluția anuală a consumului specific echivalent de energie electrică "
         "înregistrat la nivelul {client}"
     ),
     "ch4.specific_gaz": (
-        "Evoluția anuală al consumului specific echivalent de gaz natural "
+        "Evoluția anuală a consumului specific echivalent de gaz natural "
         "înregistrat la nivelul {client}"
     ),
     "ch4.specific_carburant": (
-        "Evoluția anuală al consumului specific echivalent de carburant "
+        "Evoluția anuală a consumului specific echivalent de carburant "
         "înregistrat la nivelul {client}"
     ),
     "ch4.specific_total": (

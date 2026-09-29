@@ -68,7 +68,7 @@ def test_draft_without_word_writes_every_chapter_in_order(
         3,
         7,
         "Capitolul 4 din 7 — Analiza modului în care se realizează consumurile energetice pe "
-        "platforma societății",
+        "platforma societăţii",
     )
     assert progress[-1][:2] == (7, 7)
     summary = summary_of(ws, job_id, str(record["id"]))

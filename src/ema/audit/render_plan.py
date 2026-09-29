@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +14,8 @@ from docx import Document
 from ema.audit.base_units import UnitPlan
 from ema.audit.visit import visit_view_from_slots
 from ema.core.errors import EmaError
+from ema.core.jobs import StageContext
+from ema.core.jobs.reads import revision
 from ema.core.review.models import Field
 from ema.core.workspace import SlotVersion, Workspace
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
@@ -38,6 +41,7 @@ _FAMILIES: dict[Carrier, str] = {
 @dataclass(frozen=True)
 class JobUnitPlan(UnitPlan):
     processes_source: ProcessesSource = "default"
+    client_revision: tuple[str, int] | None = None
 
 
 def process_count(slot_names: Iterable[str], fisa: Path | None) -> tuple[int, ProcessesSource]:
@@ -78,26 +82,35 @@ def _slot(row: dict[str, object]) -> SlotVersion:
     )
 
 
-def unit_plan(ws: Workspace, job: str) -> JobUnitPlan:
-    with ws.connect() as db:
-        db.execute("BEGIN")
-        record = db.execute(
-            "SELECT j.client_slug, c.name FROM jobs j LEFT JOIN clients c ON c.id=j.client_slug "
-            "WHERE j.id=?",
-            (job,),
-        ).fetchone()
-        job_fields = [
-            Field.model_validate_json(row["data"])
-            for row in db.execute("SELECT data FROM fields WHERE job_id=?", (job,))
-        ]
-        rows = db.execute(
-            "SELECT v.*, f.relative_path, f.added_at FROM slots s JOIN slot_versions v "
-            "ON v.job_id=s.job_id AND v.slot=s.name AND v.version=s.active_version "
-            "JOIN jobs j ON j.id=s.job_id "
-            "LEFT JOIN files f ON f.sha=v.file_sha AND f.client_slug=j.client_slug "
-            "WHERE s.job_id=? ORDER BY s.name",
-            (job,),
-        ).fetchall()
+def unit_plan(
+    ws: Workspace,
+    job: str,
+    *,
+    db: sqlite3.Connection | None = None,
+    ctx: StageContext | None = None,
+) -> JobUnitPlan:
+    if db is None:
+        with ws.connect() as connection:
+            connection.execute("BEGIN")
+            return unit_plan(ws, job, db=connection, ctx=ctx)
+    record = db.execute(
+        "SELECT j.client_slug, c.name, c.revision FROM jobs j "
+        "LEFT JOIN clients c ON c.id=j.client_slug "
+        "WHERE j.id=?",
+        (job,),
+    ).fetchone()
+    job_fields = [
+        Field.model_validate_json(row["data"])
+        for row in db.execute("SELECT data FROM fields WHERE job_id=?", (job,))
+    ]
+    rows = db.execute(
+        "SELECT v.*, f.relative_path, f.added_at FROM slots s JOIN slot_versions v "
+        "ON v.job_id=s.job_id AND v.slot=s.name AND v.version=s.active_version "
+        "JOIN jobs j ON j.id=s.job_id "
+        "LEFT JOIN files f ON f.sha=v.file_sha AND f.client_slug=j.client_slug "
+        "WHERE s.job_id=? ORDER BY s.name",
+        (job,),
+    ).fetchall()
     by_key = {field.key: field for field in job_fields}
     company = by_key.get("audit.company_name")
     client_name = (
@@ -105,10 +118,29 @@ def unit_plan(ws: Workspace, job: str) -> JobUnitPlan:
         if company and company.value and company.review != "rejected"
         else ""
     )
+    client_revision = None
     if not client_name and record is not None:
+        client_revision = (str(record["client_slug"]), int(record["revision"]))
+        if ctx is not None:
+            ctx.record_read("clients", *client_revision)
         client_name = str(record["name"] or "").strip()
     if not client_name:
         raise EmaError("audit_client_name", "Denumirea clientului lipseşte.", "")
+    if ctx is not None:
+        for key, field in by_key.items():
+            ctx.record_read("fields.key", f"{job}:{key}", field.revision)
+        ctx.record_read(
+            "fields.key",
+            f"{job}:audit.company_name",
+            by_key["audit.company_name"].revision if "audit.company_name" in by_key else 0,
+        )
+        ctx.record_read(
+            "slots.collection", f"{job}:", revision(db, "slots.collection", f"{job}:") or 0
+        )
+        for row in rows:
+            ctx.record_read(
+                "slots", f"{job}:{row['slot']}", revision(db, "slots", f"{job}:{row['slot']}") or 0
+            )
     dossier = [row for row in rows if str(row["slot"]).startswith("dossier/")]
     fisas = sorted(
         (
@@ -139,4 +171,5 @@ def unit_plan(ws: Workspace, job: str) -> JobUnitPlan:
         equipment_tables=tables,
         measures=measures,
         processes_source=source,
+        client_revision=client_revision,
     )

@@ -143,6 +143,7 @@ def section(  # noqa: PLR0913
     templates: tuple[str, ...] = (),
     has_intro_content: bool = False,
 ) -> Section:
+    title = title.translate(str.maketrans("şţŞŢ", "șțȘȚ"))
     return Section(
         id,
         chapter,

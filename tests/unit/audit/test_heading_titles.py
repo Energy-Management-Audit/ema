@@ -68,7 +68,10 @@ def test_fixed_chapter_marked_na_still_counts_as_empty():
     ):
         assert any(
             issue.code == "chapter_empty"
-            and issue.message == f"{chapter.title}: capitolul nu are conținut"
+            and issue.message
+            == f"{chapter.title}: capitolul nu are conținut".translate(
+                str.maketrans("șțȘȚ", "şţŞŢ")
+            )
             for issue in empty_chapters(states)
         )
 

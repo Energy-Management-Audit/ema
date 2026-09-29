@@ -38,37 +38,37 @@ NAMES = {
 SINGLE = (
     (
         "ch4.echiv_electric",
-        "Evoluția anuală al consumului total echivalent de energie electrică din SEN înregistrat la nivelul {client}",  # noqa: E501
+        "Evoluția anuală a consumului total echivalent de energie electrică din SEN înregistrat la nivelul {client}",  # noqa: E501
         "tep",
     ),
     (
         "ch4.echiv_gaz",
-        "Evoluția anuală al consumului echivalent de gaz natural înregistrat la nivelul {client}",
+        "Evoluția anuală a consumului echivalent de gaz natural înregistrat la nivelul {client}",
         "tep",
     ),
     (
         "ch4.echiv_carburant",
-        "Evoluția anuală al consumului echivalent de carburant înregistrat la nivelul {client}",
+        "Evoluția anuală a consumului echivalent de carburant înregistrat la nivelul {client}",
         "tep",
     ),
     (
         "ch4.echiv_total",
-        "Evoluția anuală al consumului total echivalent de energie înregistrat la nivelul {client}",
+        "Evoluția anuală a consumului total echivalent de energie înregistrat la nivelul {client}",
         "tep",
     ),
     (
         "ch4.specific_electric",
-        "Evoluția anuală al consumului specific echivalent de energie electrică înregistrat la nivelul {client}",  # noqa: E501
+        "Evoluția anuală a consumului specific echivalent de energie electrică înregistrat la nivelul {client}",  # noqa: E501
         "tep/kg",
     ),
     (
         "ch4.specific_gaz",
-        "Evoluția anuală al consumului specific echivalent de gaz natural înregistrat la nivelul {client}",  # noqa: E501
+        "Evoluția anuală a consumului specific echivalent de gaz natural înregistrat la nivelul {client}",  # noqa: E501
         "tep/kg",
     ),
     (
         "ch4.specific_carburant",
-        "Evoluția anuală al consumului specific echivalent de carburant înregistrat la nivelul {client}",  # noqa: E501
+        "Evoluția anuală a consumului specific echivalent de carburant înregistrat la nivelul {client}",  # noqa: E501
         "tep/kg",
     ),
     (
@@ -210,14 +210,14 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
             tuple(year for year in dataset.years if year in dataset.carriers[carrier]),
             _unit(dataset, carrier),
             subject,
-            "Evoluția anuală al " + subject + " înregistrat la nivelul {client}",
+            "Evoluția anuală a " + subject + " înregistrat la nivelul {client}",
         )
     group(
         [(NAMES[carrier], Metric("carrier", (carrier,))) for carrier in fuels],
         tuple(year for year in dataset.years if any(year in dataset.carriers[c] for c in fuels)),
         _unit(dataset, fuels[0]),
         "consumului de carburant",
-        "Evoluția anuală al consumului de carburant înregistrat la nivelul {client}",
+        "Evoluția anuală a consumului de carburant înregistrat la nivelul {client}",
     )
     for carrier, subject in (
         (Carrier.water_potable, "consumului de apă"),
@@ -229,7 +229,7 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
                 tuple(year for year in dataset.years if year in dataset.carriers[carrier]),
                 _unit(dataset, carrier),
                 subject,
-                "Evoluția anuală al " + subject + " înregistrat la nivelul {client}",
+                "Evoluția anuală a " + subject + " înregistrat la nivelul {client}",
             )
     for section, text, unit in SINGLE:
         if section == "ch4.intensitate":

@@ -72,7 +72,7 @@ def test_na_section_text_never_blocks_the_final(tmp_path: Path) -> None:
     labels = {message.removeprefix("Textul lipseşte: ") for message in blocking}
     assert labels == {
         "Concluziile privind analiza consumului echivalent de energie",
-        "Analiza eficienței utilizării energiei",
+        "Analiza eficienţei utilizării energiei",
         "Introducerea capitolului 3",
         "Introducerea capitolului 6",
     }

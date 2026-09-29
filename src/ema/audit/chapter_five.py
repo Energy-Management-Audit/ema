@@ -11,7 +11,8 @@ from pydantic import Field as PydanticField
 
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.measurement_rules import assess
-from ema.audit.sections import Status, get_status, mark_drafted, recompute_ready
+from ema.audit.publication import queue_sections, record_field_prefixes
+from ema.audit.sections import Status, get_status, recompute_ready
 from ema.audit.visit import VisitPanel, VisitPhoto, VisitView, visit_view, visit_view_from_slots
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, get_job, run_stage, status, subscribe
@@ -187,10 +188,14 @@ def compose_measurements(ctx: StageContext) -> StageOutcome:
     slots = ctx.read_slots("visit")
     current_fields = fields(ws, job)
     for field in current_fields:
-        if field.key.startswith(("meter.", "thermal.", "visit.", "narrative.ch5.")):
+        if (
+            field.key.startswith(("meter.", "thermal.", "visit.", "narrative.ch5."))
+            or field.key == "audit.company_name"
+        ):
             ctx.record_read("fields", field.id, field.revision)
     plan = _plan(visit_view_from_slots(slots), {field.key: field for field in current_fields})
-    existing = {field.key for field in current_fields}
+    by_key = {field.key: field for field in current_fields}
+    existing = set(by_key)
     labels = {
         photo.narrative_key: f"Interpretarea – {panel.label}, {photo.caption}"
         for panel in plan.panels
@@ -206,7 +211,7 @@ def compose_measurements(ctx: StageContext) -> StageOutcome:
     )
     for key in plan.missing_narratives:
         if key not in existing:
-            mark_absent(
+            by_key[key] = mark_absent(
                 ws,
                 job,
                 FieldSpec(key=key, label=labels[key], value_type="text", chapter="ch5"),
@@ -221,14 +226,18 @@ def compose_measurements(ctx: StageContext) -> StageOutcome:
         for field in current_fields
         if field.key.startswith(("meter.", "thermal.", "visit.", "narrative.ch5."))
     }
-    used = tuple(f"fact:{key}" for key in sorted(used_keys | set(plan.missing_narratives)))
-    for section in CATALOGUE:
-        section_state = get_status(ws, job, section.id)
-        if section.id.startswith("ch5") and (
-            section_state.status == Status.READY
-            or (section_state.status == Status.DRAFTED and section_state.stale)
-        ):
-            mark_drafted(ws, job, section.id, "ema", used)
+    used = tuple(
+        f"fact:{key}"
+        for key in sorted(used_keys | set(plan.missing_narratives) | {"audit.company_name"})
+    )
+    record_field_prefixes(ctx, by_key, ("meter.", "thermal.", "visit.", "narrative.ch5."))
+    queue_sections(
+        ctx,
+        (section.id for section in CATALOGUE if section.id.startswith("ch5")),
+        "ema",
+        used,
+        facts=by_key,
+    )
     return StageOutcome()
 
 

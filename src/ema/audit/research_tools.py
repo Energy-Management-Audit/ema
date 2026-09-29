@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from ema.audit.catalogue import CATALOGUE, AuditFact
+from ema.audit.catalogue_labels import field_label
 from ema.audit.research_equipment import cached_equipment, record_equipment
 from ema.audit.research_map import locality_map
 from ema.audit.research_web import OutboundGuard, Snapshot, fetch, load_snapshot
@@ -256,7 +257,7 @@ class ResearchTools:
         field = propose(
             self.ws,
             self.job,
-            FieldSpec(key=key, label=key, value_type="text", chapter=self.section),
+            FieldSpec(key=key, label=field_label(key), value_type="text", chapter=self.section),
             value,
             [evidence],
             state="enriched",

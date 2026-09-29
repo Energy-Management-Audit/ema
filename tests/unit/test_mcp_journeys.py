@@ -94,5 +94,5 @@ def test_audit_draft_replay_journey(tmp_path: Path) -> None:
     assert seen["live"] == refusal(
         "audit_draft_section",
         "ai_client_disabled",
-        "Redactarea pe documente reale așteaptă aprobarea.",
+        "Redactarea pe documente reale aşteaptă aprobarea.",
     )

@@ -23,6 +23,7 @@ from ema.core.jobs.reads import (
     JobStatus,
     get_job,
     latest_ready_run,
+    list_jobs,
     revision,
     status,
 )
@@ -82,15 +83,6 @@ def create_job(ws: Workspace, type: JobType, client_slug: str, year: int | None)
     return job
 
 
-def list_jobs(ws: Workspace) -> list[dict[str, Any]]:
-    with ws.connect() as db:
-        rows = db.execute(
-            "SELECT id,type,client_slug,year,state,revision "
-            "FROM jobs WHERE deleted=0 ORDER BY created_at"
-        ).fetchall()
-    return [dict(row) for row in rows]
-
-
 class StageContext:
     def __init__(self, ws: Workspace, job: JobId, run_id: RunId, stage: str) -> None:
         self.ws, self.job, self.run_id, self.stage = ws, job, run_id, stage
@@ -98,6 +90,7 @@ class StageContext:
         self.inputs: dict[str, str] = {}
         self.changed_reads = False
         self.outputs: list[tuple[Path, str]] = []
+        self.publications: list[Callable[[sqlite3.Connection], None]] = []
 
     def read_slot(self, slot: str) -> SlotVersion:
         with self.ws.connect() as db:
@@ -212,7 +205,7 @@ class StageContext:
         return bool(row and row["cancel_requested"])
 
 
-def _finish(  # noqa: C901
+def _finish(  # noqa: C901, PLR0912
     ws: Workspace,
     context: StageContext,
     outcome: StageOutcome | None,
@@ -220,14 +213,6 @@ def _finish(  # noqa: C901
     on_finish: Callable[[sqlite3.Connection, str], None] | None = None,
     failure: EmaError | None = None,
 ) -> None:
-    fingerprint_data = {
-        "reads": sorted(
-            (table, row_id, revision) for (table, row_id), revision in context.reads.items()
-        ),
-        "inputs": context.inputs,
-        "ema": __version__,
-    }
-    fingerprint = hashlib.sha256(json.dumps(fingerprint_data, sort_keys=True).encode()).hexdigest()
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
         row = db.execute(
@@ -242,10 +227,23 @@ def _finish(  # noqa: C901
         cancelled = bool(row["cancel_requested"])
         state = "cancelled" if cancelled else "failed" if error else "ready"
         publication = "stale" if stale else "current" if state == "ready" else None
+        if publication == "current":
+            for publish in context.publications:
+                publish(db)
+        fingerprint_data = {
+            "reads": sorted(
+                (table, row_id, revision) for (table, row_id), revision in context.reads.items()
+            ),
+            "inputs": context.inputs,
+            "ema": __version__,
+        }
+        fingerprint = hashlib.sha256(
+            json.dumps(fingerprint_data, sort_keys=True).encode()
+        ).hexdigest()
         if state != "ready":
             for path, _kind in context.outputs:
                 path.unlink(missing_ok=True)
-        directory = context.artifact_dir()
+        directory = ws.artifact_dir(db, context.job, context.stage, context.run_id)
         ws.record_artifacts(db, context.run_id, directory)
         if state == "ready":
             ws.record_outputs(db, context.job, context.run_id, context.outputs)

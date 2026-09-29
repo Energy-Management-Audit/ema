@@ -6,11 +6,12 @@ from collections.abc import Collection
 from pathlib import Path
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.publication import queue_sections
 from ema.audit.render_steps import section_ids
-from ema.audit.sections import mark_drafted, refresh_staleness, statuses
+from ema.audit.sections import refresh_staleness, statuses
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext
-from ema.core.review.section_transition import Status
+from ema.core.review.models import Field
 
 # Her fixed text, the chapter introductions she writes, and ch. 4, written from reviewed data.
 RENDER_DRAFTED = tuple(
@@ -29,7 +30,13 @@ def _fingerprint(section_id: str, base_sha: str) -> tuple[str, ...]:
 
 
 def mark_render_drafted(
-    ctx: StageContext, docx: Path, base_sha: str, failed: Collection[str]
+    ctx: StageContext,
+    docx: Path,
+    base_sha: str,
+    failed: Collection[str],
+    *,
+    facts: dict[str, Field] | None = None,
+    client_revision: tuple[str, int] | None = None,
 ) -> list[str]:
     """Mark each present, render-written section `ready -> drafted` (or a stale draft anew).
 
@@ -37,30 +44,24 @@ def mark_render_drafted(
     render read every section's revision as an input; a mark it makes itself is recorded as
     what it read, so the draft stays current, while any other change still makes it stale.
     """
-    ws, job = ctx.ws, ctx.job
-    prior = {state.section_id: state.revision for state in statuses(ws, job)}
-    refresh_staleness(ws, job, base_sha=base_sha)
     present = set(section_ids(docx))
+    selected = [
+        section_id
+        for section_id in RENDER_DRAFTED
+        if section_id in present
+        and section_id not in failed
+        and not (section_id.startswith("ch4") and "ch4" in failed)
+    ]
     marked: list[str] = []
-    for state in statuses(ws, job):
-        section_id = state.section_id
-        if (
-            section_id not in RENDER_DRAFTED
-            or section_id not in present
-            or section_id in failed
-            or (section_id.startswith("ch4") and "ch4" in failed)
-            or not (
-                state.status == Status.READY or (state.status == Status.DRAFTED and state.stale)
+    for section_id in selected:
+        fingerprint = _fingerprint(section_id, base_sha)
+        if client_revision is not None:
+            fingerprint += (f"client:{client_revision[0]}@{client_revision[1]}",)
+        marked.extend(
+            queue_sections(
+                ctx, (section_id,), "ema", fingerprint, facts=facts, detail="audit_render"
             )
-        ):
-            continue
-        after = mark_drafted(
-            ws, job, section_id, "ema", _fingerprint(section_id, base_sha), detail="audit_render"
         )
-        read = ("section_states", f"{job}:{section_id}")
-        if ctx.reads.get(read) == prior[section_id]:
-            ctx.reads[read] = after.revision
-        marked.append(section_id)
     return marked
 
 

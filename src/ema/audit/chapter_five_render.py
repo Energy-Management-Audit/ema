@@ -22,6 +22,7 @@ from ema.audit.base_toc import refresh_toc
 from ema.audit.base_units import heading_spans_document
 from ema.audit.chapter_five import ChapterFivePlan, PlannedPhoto, PlannedReading
 from ema.audit.chapter_five_fixed import fixed_elements
+from ema.audit.reading_labels import READING_LABELS
 from ema.core.config import Settings
 from ema.core.office.blocks import (
     Block,
@@ -62,13 +63,15 @@ def _positions(base: Path) -> tuple[dict[str, int], list[etree._Element]]:
     return positions, list(body)
 
 
-def _model_elements(
+def _model_elements(  # noqa: PLR0913
     base: Path,
     model: Path,
     prototype: Path,
     prepared: Path,
     identities: tuple[str, ...],
     required: frozenset[str],
+    *,
+    digest_changes: list[str],
 ) -> tuple[dict[str, etree._Element], dict[str, list[str]], list[str]]:
     target = Document(str(base))
     source = Document(str(model))
@@ -91,7 +94,9 @@ def _model_elements(
         raise ValueError("measurement sheet model lacks caption or bullet prototype")
     copies = [deepcopy(item._p) for item in (picture, caption, bullet)]
     import_formatting(target, source, copies)
-    fixed_nodes, fixed_keys, issues = fixed_elements(target, prototype, identities, required)
+    fixed_nodes, fixed_keys, issues = fixed_elements(
+        target, prototype, identities, required, digest_changes=digest_changes
+    )
     target.save(str(prepared))
     return (
         {**dict(zip(("picture", "caption", "bullet"), copies, strict=True)), **fixed_nodes},
@@ -155,17 +160,12 @@ def _electric_rules_pass(plan: ChapterFivePlan) -> bool:
 
 def _bullet(reading: PlannedReading) -> list[Segment]:
     parts = reading.key.split(".")
+    if len(parts) < 2:
+        return [MARKER]
     quantity, phase = parts[-2:]
-    label = {
-        ("voltage_ll", "l12"): "U 12 (Faza 1 - Faza 2): ",
-        ("voltage_ll", "l23"): "U 23 (Faza 2 - Faza 3): ",
-        ("voltage_ll", "l31"): "U 31 (Faza 3 - Faza 1): ",
-        ("current", "l1"): "I1 (Curentul pe Faza 1): ",
-        ("current", "l2"): "I2 (Curentul pe Faza 2): ",
-        ("current", "l3"): "I3 (Curentul pe Faza 3): ",
-        ("thd_u", "l1"): "V1 Total HD (Faza 1): ",
-        ("thd_i", "l1"): "I1 Total HD (Faza 1): ",
-    }.get((quantity, phase), f"{quantity} {phase}: ")
+    if (quantity, phase) not in READING_LABELS:
+        return [MARKER]
+    label = READING_LABELS[quantity, phase] + ": "
     if reading.value is None:
         return [label, Num(None, 0, reading.unit, fact=reading.key), ";"]
     number = Decimal(reading.value)
@@ -328,6 +328,7 @@ def render_chapter_five(
     prototype = settings.audit_measurement_prototype
     if model is None or prototype is None:
         raise ValueError("audit measurement sheet model or prototype is not configured")
+    digest_changes: list[str] = []
     with TemporaryDirectory() as temporary:
         prepared = Path(temporary) / "base.docx"
         required: frozenset[str] = frozenset(
@@ -335,7 +336,7 @@ def render_chapter_five(
             | ({"thermal"} if plan.thermal else set[str]())
         )
         model_elements, fixed, fixed_issues = _model_elements(
-            base, model, prototype, prepared, base_identity, required
+            base, model, prototype, prepared, base_identity, required, digest_changes=digest_changes
         )
         positions, body = _positions(prepared)
         with resource_path("audit", "measurement_phrases.json").open(encoding="utf-8") as handle:
@@ -355,4 +356,7 @@ def render_chapter_five(
     if issues:
         output.unlink(missing_ok=True)
         raise ValueError("chapter-five package invalid: " + "; ".join(issues[:8]))
+    if digest_changes:
+        with (output.parent / "digest-changes.txt").open("a", encoding="utf-8") as handle:
+            handle.write("\n".join(digest_changes) + "\n")
     return replace(report, issues=[*report.issues, *fixed_issues])

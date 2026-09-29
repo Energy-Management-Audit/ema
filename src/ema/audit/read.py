@@ -9,7 +9,8 @@ from decimal import Decimal
 from pathlib import Path
 
 from ema.audit import measure_fields
-from ema.audit.catalogue import CATALOGUE
+from ema.audit.catalogue import CATALOGUE, fact_spec
+from ema.audit.catalogue_labels import CEDILLA
 from ema.audit.intake import select_checklist
 from ema.audit.sections import recompute_ready, record_applicability
 from ema.consumption_analysis.analysis import Metric, resolve_value
@@ -70,7 +71,7 @@ def _record(  # noqa: PLR0913
     unit: str | None = None,
 ) -> Field:
     ref = source.ref
-    evidence_id = hashlib.sha256(f"{sha}:{ref.a1}:{key}".encode()).hexdigest()
+    evidence_id = hashlib.sha256(f"{job}:{sha}:{ref.a1}:{key}".encode()).hexdigest()
     with ws.connect() as db:
         previous = db.execute(
             "SELECT data FROM evidence WHERE id=? AND job_id=?", (evidence_id, job)
@@ -92,14 +93,22 @@ def _record(  # noqa: PLR0913
     value = source.value
     if value_type is None:
         value_type = "number" if isinstance(value, int | float) else "text"
-    if value_type == "number":
-        value = Decimal(str(value))
-    spec = FieldSpec(
-        key=key,
-        label=key,
-        value_type=value_type,  # type: ignore[arg-type]
+    if isinstance(value, float) and source.displayed_decimals == 0 and value.is_integer():
+        value = int(value)
+    spec = fact_spec(
+        key,
+        value_type,  # type: ignore[arg-type]
         unit=unit or source.unit,
         chapter="ch2" if key.startswith("audit.") else "ch4",
+        decimals=source.displayed_decimals,
+        source_label=source.label,
+    )
+    value = (
+        str(value)
+        if spec.value_type == "text"
+        else Decimal(str(value))
+        if spec.value_type == "number" and not (type(value) is int and spec.decimals == 0)
+        else value
     )
     return propose(ws, job, spec, value, [evidence], state="supplied")
 
@@ -214,7 +223,7 @@ def _texts_to_write(ws: Workspace, job: str) -> None:
     """The texts the auditor writes herself exist from the start, absent until she writes them."""
     for section in CATALOGUE:
         if section.id in NARRATIVE_SECTIONS:
-            label = section.title[:1].upper() + section.title[1:]
+            label = (section.title[:1].upper() + section.title[1:]).translate(CEDILLA)
             spec = FieldSpec(
                 key=f"narrative.{section.id}", label=label, value_type="text", chapter="ch4"
             )
@@ -251,7 +260,9 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
             issues.append(f"tep_class_missing:{year}")
             continue
         key = "audit.tep_class"
-        evidence_id = hashlib.sha256(f"{sha}:{key}:{FACTORS_2026.version}".encode()).hexdigest()
+        evidence_id = hashlib.sha256(
+            f"{job}:{sha}:{key}:{FACTORS_2026.version}".encode()
+        ).hexdigest()
         with ws.connect() as db:
             previous = db.execute(
                 "SELECT data FROM evidence WHERE id=? AND job_id=?", (evidence_id, job)

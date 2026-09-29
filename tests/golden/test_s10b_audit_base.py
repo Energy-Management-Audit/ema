@@ -256,3 +256,24 @@ def test_absent_measurements_shift_printed_chapters(
     assert any(title.startswith("6.\t") for title in toc_roots)
     assert not any(title.startswith("7.\t") for title in toc_roots)
     _toc_in_step(output)
+
+
+def test_normalised_fixed_numbers_stay_approved(reference_library: Path) -> None:
+    source, _ = _references(reference_library)
+    document = Document(source)
+    paragraphs = list(document.element.iter(qn("w:p")))
+    before = [_paragraph_text(paragraph) for paragraph in paragraphs]
+    clean_base(document)
+    changed = 0
+    for original, paragraph in zip(before, paragraphs, strict=True):
+        normalised = _paragraph_text(paragraph)
+        if (
+            original != normalised
+            and original.translate(str.maketrans("şţŞŢ", "șțȘȚ")) == normalised
+            and approved_fixed_text(original)
+        ):
+            assert approved_fixed_text(normalised)
+            if has_number(normalised):
+                assert not approved_fixed_text(re.sub(r"\d+", "999999999", normalised, count=1))
+            changed += 1
+    assert changed > 0

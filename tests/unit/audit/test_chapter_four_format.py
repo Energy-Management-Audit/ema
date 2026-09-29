@@ -101,3 +101,73 @@ def test_invalid_table_grid_raises_contextual_ema_error(width):
         format_chapter_four(document)
     assert failure.value.code == "chapter_four_layout"
     assert "chapter-four table" in failure.value.detail
+
+
+def test_long_production_values_get_width_from_shorter_columns_within_text_width():
+    document = Document()
+    document.add_heading(TITLES["ch4"], 1)
+    document.add_heading(TITLES["ch4.productie"], 2)
+    table = document.add_table(rows=3, cols=7)
+    for row in table.rows[1:]:
+        for cell, text in zip(
+            row.cells,
+            ("2024", "123.456.789,12", "12,34", "1.234.567,89", "2,00", "3,00", "4,00"),
+            strict=True,
+        ):
+            cell.text = text
+    document.add_heading(TITLES["ch4.consum"], 2)
+    normal = document.add_table(rows=2, cols=7)
+    document.add_heading(TITLES["ch5"], 1)
+    text_before = [[cell.text for cell in row.cells] for row in table.rows]
+    format_chapter_four(document)
+    grid = [
+        int(column.get(W + "w")) for column in table._tbl.findall(W + "tblGrid/" + W + "gridCol")
+    ]
+    section = document.sections[0]
+    width = (section.page_width - section.left_margin - section.right_margin) // 635
+    assert sum(grid) == width
+    assert len(grid) == 7  # Her two six-month rows retain the year column and six value columns.
+    assert grid[1] >= 10 * 120 + 3 * 60 + 216
+    assert grid[1] > grid[3] > grid[2]
+    assert [[cell.text for cell in row.cells] for row in table.rows] == text_before
+    assert (
+        max(
+            int(column.get(W + "w"))
+            for column in normal._tbl.findall(W + "tblGrid/" + W + "gridCol")
+        )
+        - min(
+            int(column.get(W + "w"))
+            for column in normal._tbl.findall(W + "tblGrid/" + W + "gridCol")
+        )
+        <= len(grid) - 1
+    )
+    for row in table.rows:
+        assert [
+            int(cell._tc.find(W + "tcPr/" + W + "tcW").get(W + "w")) for cell in row.cells
+        ] == grid
+
+
+def test_six_long_production_values_fit_without_changing_font_or_text():
+    document = Document()
+    section = document.sections[0]
+    section.left_margin = section.right_margin = Pt(72)
+    document.add_heading(TITLES["ch4"], 1)
+    document.add_heading(TITLES["ch4.productie"], 2)
+    tables = [document.add_table(rows=2, cols=7) for _ in range(2)]
+    for table in tables:
+        for column, cell in enumerate(table.rows[1].cells):
+            cell.text = "2025" if column == 0 else "1.234.567,89"
+            cell.paragraphs[0].runs[0].font.size = Pt(12)
+    document.add_heading(TITLES["ch5"], 1)
+    format_chapter_four(document)
+    for table in tables:
+        assert len(table.columns) == 7
+        assert sum(column.width for column in table.columns) == (
+            section.page_width - section.left_margin - section.right_margin
+        )
+        for cell in table.rows[1].cells[1:]:
+            margins = cell._tc.find(W + "tcPr/" + W + "tcMar")
+            padding = sum(int(margins.find(W + side).get(W + "w")) for side in ("left", "right"))
+            assert cell.width // 635 - padding >= 1260  # 63 pt of text at her 12 pt font
+            assert cell.text == "1.234.567,89"
+            assert cell.paragraphs[0].runs[0].font.size == Pt(12)

@@ -137,7 +137,8 @@ def test_empty_chapter_title_does_not_count_as_content(section_id):
     chapter = next(section for section in CATALOGUE if section.id == section_id)
     assert any(
         issue.code == "chapter_empty"
-        and issue.message == f"{chapter.title}: capitolul nu are conținut"
+        and issue.message
+        == f"{chapter.title}: capitolul nu are conținut".translate(str.maketrans("șțȘȚ", "şţŞŢ"))
         for issue in issues
     )
     states = [

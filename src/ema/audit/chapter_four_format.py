@@ -2,6 +2,8 @@
 
 # pyright: reportPrivateUsage=false
 
+import re
+
 from docx.document import Document as DocumentObject
 from lxml import etree
 
@@ -91,7 +93,9 @@ def _missing_cell(cell: etree._Element, missing_text: str) -> None:
             _property(paragraph, "pPr", "jc").set(W + "val", "center")
 
 
-def _table(table: etree._Element, width: int, missing_text: str) -> None:
+def _table(
+    table: etree._Element, width: int, missing_text: str, *, grow_values: bool = False
+) -> None:
     for name, value in (("tblW", width), ("tblInd", 0)):
         item = _property(table, "tblPr", name)
         item.set(W + "type", "dxa")
@@ -107,6 +111,8 @@ def _table(table: etree._Element, width: int, missing_text: str) -> None:
         raise _layout_error("chapter-four table lacks column widths")
     widths = [round(width * value / total) for value in old]
     widths[-1] += width - sum(widths)
+    if grow_values:
+        widths = _value_widths(table, widths)
     for column, value in zip(grid, widths, strict=True):
         column.set(W + "w", str(value))
     for index, row in enumerate(table.findall(W + "tr")):
@@ -156,14 +162,71 @@ def format_chapter_four(document: DocumentObject, *, missing_text: str = MISSING
     body = document.element.find(W + "body")
     if body is None:
         raise _layout_error("chapter-four document body missing")
+    production_start = positions.get("ch4.productie", -1)
+    production_end = min((index for index in headings if index > production_start), default=end)
     for index, node in enumerate(body):
         if not start <= index < end:
             continue
         if node.tag == W + "tbl":
-            _table(node, width, missing_text)
+            _table(
+                node, width, missing_text, grow_values=production_start <= index < production_end
+            )
         elif node.tag == W + "p":
             text = "".join(item.text or "" for item in node.iter(W + "t"))
             if index in headings or text in labels or node.find(".//" + W + "drawing") is not None:
                 keep_paragraph(node, "keepNext")
             if text.startswith(("Fig. nr. 4.", "Tabelul 4.")):
                 keep_paragraph(node, "keepLines")
+
+
+def _value_widths(table: etree._Element, widths: list[int]) -> list[int]:
+    """Spend spare width on the longest production values, without changing the six-month grid."""
+    contents = [0] * len(widths)
+    numeric: list[etree._Element] = []
+    for row in table.findall(W + "tr")[1:]:
+        cells = row.findall(W + "tc")
+        if len(cells) != len(widths):
+            continue
+        for column, cell in enumerate(cells):
+            text = "".join(node.text or "" for node in cell.iter(W + "t")).strip()
+            if not re.fullmatch(r"[+-]?\d[\d., ]*", text):
+                continue
+            numeric.append(cell)
+            # Times New Roman digits occupy half an em; allow a little rounding space.
+            sizes = [int(node.get(W + "val", "24")) for node in cell.iter(W + "sz")]
+            half_points = max(sizes, default=24)
+            glyphs = sum(5 if char.isdigit() else 2.5 for char in text)
+            contents[column] = max(contents[column], round(glyphs * half_points) + 24)
+    padding = 108
+    # Six long values fit at her font size once surplus cell padding gives way to the text.
+    while padding and sum(max(600, size + 2 * padding) for size in contents) > sum(widths):
+        padding -= 1
+    if padding < 108:
+        for cell in numeric:
+            margins = _property(cell, "tcPr", "tcMar")
+            for side in ("left", "right"):
+                margin = margins.find(W + side)
+                if margin is None:
+                    margin = etree.SubElement(margins, W + side)
+                margin.set(W + "type", "dxa")
+                margin.set(W + "w", str(padding))
+    needed = [max(600, size + 2 * padding) for size in contents]
+    return _grow_values(widths, needed)
+
+
+def _grow_values(widths: list[int], needed: list[int]) -> list[int]:
+    result = list(widths)
+    for column in sorted(range(1, len(widths)), key=lambda index: needed[index], reverse=True):
+        deficit = max(0, needed[column] - result[column])
+        for donor in sorted(
+            range(len(widths)), key=lambda index: result[index] - needed[index], reverse=True
+        ):
+            if donor == column:
+                continue
+            moved = min(deficit, max(0, result[donor] - needed[donor]))
+            result[donor] -= moved
+            result[column] += moved
+            deficit -= moved
+            if deficit == 0:
+                break
+    return result

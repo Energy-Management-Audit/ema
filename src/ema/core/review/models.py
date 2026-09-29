@@ -149,6 +149,8 @@ class Field(BaseModel):
     label: str
     value_type: ValueType
     unit: str | None = None
+    decimals: int = PydanticField(default=2, ge=0)
+    grouping: bool = True
     required: bool = False
     value: Any = None
     revision: int = 1
@@ -173,7 +175,10 @@ class Field(BaseModel):
             return values
         try:
             if values.get("value") is not None:
-                values["value"] = Decimal(str(values["value"]))
+                raw = values["value"]
+                values["value"] = (
+                    raw if type(raw) is int and values.get("decimals") == 0 else Decimal(str(raw))
+                )
             candidates = cast("list[Candidate | dict[str, Any]]", values.get("alternatives", []))
             normalized: list[dict[str, Any]] = []
             for candidate in candidates:
@@ -207,7 +212,9 @@ class Field(BaseModel):
         for value in [self.value, *values]:
             if value is None:
                 continue
-            number = isinstance(value, Decimal) and value.is_finite()
+            number = (isinstance(value, Decimal) and value.is_finite()) or (
+                type(value) is int and self.decimals == 0
+            )
             year = isinstance(value, int) and not isinstance(value, bool)
             text = isinstance(value, str)
             valid = {"number": number, "year": year, "text": text, "enum": text, "date": text}
@@ -252,6 +259,8 @@ class FieldSpec(BaseModel):
     required: bool = False
     unit: str | None = None
     chapter: str = ""
+    decimals: int = PydanticField(default=2, ge=0)
+    grouping: bool = True
 
 
 class Approval(BaseModel):

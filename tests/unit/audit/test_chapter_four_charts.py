@@ -52,7 +52,7 @@ def test_monthly_gap_caption_letters_and_skipped_variants() -> None:
     assert _captions(electricity) == [
         "Fig. nr. 4.2 a) Evoluția lunară a consumului de energie electrică din SEN "
         "înregistrat de către Atelier Exemplu SRL la nivelul anului 2024",
-        "Fig. nr. 4.2 c) Evoluția anuală al consumului de energie electrică din SEN "
+        "Fig. nr. 4.2 c) Evoluția anuală a consumului de energie electrică din SEN "
         "înregistrat la nivelul Atelier Exemplu SRL",
     ]
     monthly, annual = _charts(electricity)
@@ -97,9 +97,9 @@ def test_fuels_share_one_chart_with_one_series_each_and_no_monthly_letter_when_a
     )
     water, _ = chart_blocks("ch4.apa", dataset, FACTORS_2026, CLIENT)
     assert _captions(water) == [
-        "Fig. nr. 4.5 b) Evoluția anuală al consumului de apă înregistrat "
+        "Fig. nr. 4.5 b) Evoluția anuală a consumului de apă înregistrat "
         "la nivelul Atelier Exemplu SRL",
-        "Fig. nr. 4.6 b) Evoluția anuală al consumului de apă industrială "
+        "Fig. nr. 4.6 b) Evoluția anuală a consumului de apă industrială "
         "înregistrat la nivelul Atelier Exemplu SRL",
     ]
 
@@ -190,37 +190,37 @@ def test_every_sourced_annual_caption_and_axis_uses_the_contract() -> None:
     assert skipped == []
     expected = {
         "ch4.echiv_electric": (
-            "Fig. nr. 4.7 Evoluția anuală al consumului total echivalent de energie "
+            "Fig. nr. 4.7 Evoluția anuală a consumului total echivalent de energie "
             "electrică din SEN înregistrat la nivelul Atelier Exemplu SRL",
             "tep/an",
         ),
         "ch4.echiv_gaz": (
-            "Fig. nr. 4.8 Evoluția anuală al consumului echivalent de gaz natural "
+            "Fig. nr. 4.8 Evoluția anuală a consumului echivalent de gaz natural "
             "înregistrat la nivelul Atelier Exemplu SRL",
             "tep/an",
         ),
         "ch4.echiv_carburant": (
-            "Fig. nr. 4.9 Evoluția anuală al consumului echivalent de carburant "
+            "Fig. nr. 4.9 Evoluția anuală a consumului echivalent de carburant "
             "înregistrat la nivelul Atelier Exemplu SRL",
             "tep/an",
         ),
         "ch4.echiv_total": (
-            "Fig. nr. 4.10 Evoluția anuală al consumului total echivalent de energie "
+            "Fig. nr. 4.10 Evoluția anuală a consumului total echivalent de energie "
             "înregistrat la nivelul Atelier Exemplu SRL",
             "tep/an",
         ),
         "ch4.specific_electric": (
-            "Fig. nr. 4.11 Evoluția anuală al consumului specific echivalent de energie "
+            "Fig. nr. 4.11 Evoluția anuală a consumului specific echivalent de energie "
             "electrică înregistrat la nivelul Atelier Exemplu SRL",
             "tep/t",
         ),
         "ch4.specific_gaz": (
-            "Fig. nr. 4.12 Evoluția anuală al consumului specific echivalent de gaz "
+            "Fig. nr. 4.12 Evoluția anuală a consumului specific echivalent de gaz "
             "natural înregistrat la nivelul Atelier Exemplu SRL",
             "tep/t",
         ),
         "ch4.specific_carburant": (
-            "Fig. nr. 4.13 Evoluția anuală al consumului specific echivalent de "
+            "Fig. nr. 4.13 Evoluția anuală a consumului specific echivalent de "
             "carburant înregistrat la nivelul Atelier Exemplu SRL",
             "tep/t",
         ),
@@ -268,7 +268,7 @@ def test_empty_and_zero_charts_hold_markers_and_report_no_data() -> None:
         ),
         Missing(
             "body",
-            "Fig. nr. 4.1 b) Evoluția anuală al consumului de energie electrică "
+            "Fig. nr. 4.1 b) Evoluția anuală a consumului de energie electrică "
             "din SEN înregistrat la nivelul Atelier Exemplu SRL: date indisponibile",
         ),
     ]

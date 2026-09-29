@@ -67,8 +67,8 @@ def test_replay_draft_is_a_ready_run_with_artifacts_and_reads(tmp_path: Path) ->
     assert {(row[0], row[1]) for row in reads} == {(row[0], row[1]) for row in facts}
     assert result.draft_path == folder / f"{SECTION}.json"
     assert result.review_path == folder / f"{SECTION}.draft-review.json"
-    assert json.loads(result.draft_path.read_text())["section"] == SECTION
-    assert list(json.loads(result.review_path.read_text())) == [
+    assert json.loads(result.draft_path.read_text(encoding="utf-8"))["section"] == SECTION
+    assert list(json.loads(result.review_path.read_text(encoding="utf-8"))) == [
         "section",
         "coverage",
         "cited_sentences",
@@ -144,7 +144,7 @@ def test_mismatched_recording_fails_the_run_and_keeps_the_section(tmp_path: Path
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
     drafts, support = _recordings(ws, job, tmp_path / "rec")
-    recording = json.loads(drafts.read_text())
+    recording = json.loads(drafts.read_text(encoding="utf-8"))
     recording["responses"][0]["request_hashes"] = {"messages": "0" * 64}
     drafts.write_text(json.dumps(recording))
     before = get_status(ws, job, SECTION)
@@ -171,7 +171,7 @@ def test_render_writes_the_review_payload(tmp_path: Path) -> None:
     facts = recorded_facts(ws, job, SECTION)
     check = render_draft_section(ws, job, base, output, draft=CH2_DRAFT, facts=facts, flags=())
 
-    written = json.loads(output.with_suffix(".draft-review.json").read_text())
+    written = json.loads(output.with_suffix(".draft-review.json").read_text(encoding="utf-8"))
     assert written == json.loads(json.dumps(review_payload(CH2_DRAFT, check, ())))
     assert get_status(ws, job, SECTION).status.value == "drafted"
 
@@ -215,7 +215,7 @@ def test_cli_without_recordings_exits_with_the_disabled_message(
         app()
 
     assert exited.value.code == 1
-    assert "Redactarea pe documente reale așteaptă aprobarea." in capsys.readouterr().err
+    assert "Redactarea pe documente reale aşteaptă aprobarea." in capsys.readouterr().err
 
 
 def test_cli_with_a_missing_recording_exits_with_the_invalid_message(

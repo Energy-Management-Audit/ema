@@ -76,6 +76,16 @@ def revision(db: sqlite3.Connection, table: str, row_id: str) -> int | None:
             (job, len(collection), collection),
         ).fetchall()
         return collection_revision([str(row["name"]) for row in rows])
+    elif table == "audit_materials":
+        job, _, kind = row_id.partition(":")
+        rows = db.execute(
+            "SELECT kind,present,source FROM audit_materials "
+            "WHERE job_id=? AND (?='' OR kind=?) ORDER BY kind",
+            (job, kind, kind),
+        ).fetchall()
+        return collection_revision(
+            [f"{row['kind']}:{row['present']}:{row['source']}" for row in rows]
+        )
     elif table == "fields.key":
         # A key the stage looked up, present or not: absent is revision 0, so an insertion or a
         # deletion changes it as much as a decision does.
@@ -121,3 +131,12 @@ def run_current(db: sqlite3.Connection, run_id: str) -> bool:
         "SELECT table_name,row_id,revision FROM run_reads WHERE run_id=?", (run_id,)
     ).fetchall()
     return all(revision(db, row["table_name"], row["row_id"]) == row["revision"] for row in reads)
+
+
+def list_jobs(ws: Workspace) -> list[dict[str, Any]]:
+    with ws.connect() as db:
+        rows = db.execute(
+            "SELECT id,type,client_slug,year,state,revision "
+            "FROM jobs WHERE deleted=0 ORDER BY created_at"
+        ).fetchall()
+    return [dict(row) for row in rows]

@@ -118,11 +118,11 @@ def synthetic_render(
 
     plan = JobUnitPlan("Client", 1, frozenset({"gas"}), 1, False, 0, 1, "default")
     monkeypatch.setattr(render, "build_base", build)
-    monkeypatch.setattr(render, "unit_plan", lambda ws, job: plan)
+    monkeypatch.setattr(render, "unit_plan", lambda ws, job, **kwargs: plan)
     monkeypatch.setattr(
-        render, "drafted_sections", lambda ws, job: {"ch2.date_generale", "ch3.flux"}
+        render, "drafted_sections", lambda ws, job, **kwargs: {"ch2.date_generale", "ch3.flux"}
     )
-    monkeypatch.setattr(render, "ready_runs", lambda ws, job, stage: [tmp_path])
+    monkeypatch.setattr(render, "ready_runs", lambda ws, job, stage, **kwargs: [tmp_path])
     monkeypatch.setattr(render, "write_draft", writer("draft"))
     monkeypatch.setattr(render, "write_four", writer("ch4", "ch4.concluzii"))
     monkeypatch.setattr(render, "write_five", writer("ch5"))
@@ -140,7 +140,7 @@ def run_render(ws: Workspace, job: str, kind: render.Kind = "draft") -> dict[str
 def summary_of(ws: Workspace, job: str, run: str, stage: str = "audit_render") -> RenderSummary:
     with ws.connect() as db:
         folder = ws.artifact_dir(db, job, stage, run)
-    return RenderSummary.model_validate_json((folder / "render.json").read_text("utf-8"))
+    return RenderSummary.model_validate_json((folder / "render.json").read_text(encoding="utf-8"))
 
 
 def outputs(ws: Workspace, job: str) -> list[tuple[str, str]]:

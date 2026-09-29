@@ -109,7 +109,7 @@ def test_chapter_five_in_real_base_with_synthetic_readings(
         return "".join(
             part.text or ""
             for part in node.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t")
-        )  # type: ignore[attr-defined]
+        ).translate(str.maketrans("şţŞŢ", "șțȘȚ"))  # type: ignore[attr-defined]
 
     method = [
         visible(node)

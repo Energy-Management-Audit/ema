@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import re
+import shutil
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 from docx import Document
 from docx.oxml.ns import qn
+from tests.conftest import artifacts_path
 
 from ema.audit.base import build_base
 from ema.audit.base_package import package_issues
@@ -19,6 +21,7 @@ from ema.audit.read import read_dossier
 from ema.audit.sections import get_status
 from ema.consumption_analysis.analysis import Metric, value
 from ema.core.jobs import create_job
+from ema.core.office.missing_text import TABLE_MISSING_TEXT
 from ema.core.review.models import Cell, Evidence
 from ema.core.workspace import Workspace
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
@@ -62,7 +65,9 @@ def _calculated(read: object) -> dict[str, set[Decimal]]:
     return result
 
 
-def test_CLIENT-A1_read_to_chapter_four(reference_library: Path, tmp_path: Path) -> None:
+def test_CLIENT-A1_read_to_chapter_four(  # noqa: PLR0915
+    reference_library: Path, tmp_path: Path
+) -> None:
     received = reference_library / "audit/cases/audit-case-a/received"
     necesar = next(received.glob("*Necesar info*.xls"))
     ws = Workspace(tmp_path / "workspace")
@@ -97,6 +102,10 @@ def test_CLIENT-A1_read_to_chapter_four(reference_library: Path, tmp_path: Path)
         output=base,
         base_identity=identity,
     )
+    digest = artifacts_path("s19", "digest-changes.txt")
+    assert digest.relative_to(artifacts_path()).as_posix() == "s19/digest-changes.txt"
+    digest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(base.parent / "digest-changes.txt", digest)
     report, skipped = render_chapter_four(
         base,
         output,
@@ -110,15 +119,18 @@ def test_CLIENT-A1_read_to_chapter_four(reference_library: Path, tmp_path: Path)
     assert report.values
     assert all(use.fact for use in report.values)
 
+    # D3 presents tep/kg as tep/t and intensity as tep/mil lei; facts retain source units.
+    assert any(use.scale != 1 for use in report.values)
     expected = _calculated(read)
     for use in report.values:
-        if "date indisponibile" in use.text:
+        if "date indisponibile" in use.text or use.text == TABLE_MISSING_TEXT:
             continue
         assert use.fact is not None
         if not any(
-            abs(_number(use.text) - item) <= Decimal("0.01") for item in expected.get(use.fact, ())
+            abs(_number(use.text) - item * Decimal(str(use.scale))) <= Decimal("0.01")
+            for item in expected.get(use.fact, ())
         ):
-            pytest.fail("rendered number differs from its located input or S7 calculation")
+            pytest.fail("rendered number differs from its located input or scaled S7 calculation")
 
     mapped = map_headings(output, "AUDIT-01").mapped
     wanted = [item.id for item in CATALOGUE if item.id.startswith("ch4.")]

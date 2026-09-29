@@ -3,6 +3,7 @@
 from collections.abc import Sequence
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.catalogue_labels import CEDILLA
 from ema.core.review.models import Issue
 from ema.core.review.section_transition import SectionState, Status
 
@@ -31,6 +32,9 @@ def empty_chapters(states: Sequence[SectionState]) -> list[Issue]:
         )
         if not any(by_id[section.id].status == Status.DONE for section in content):
             issues.append(
-                Issue(code="chapter_empty", message=f"{chapter.title}: capitolul nu are conținut")
+                Issue(
+                    code="chapter_empty",
+                    message=f"{chapter.title}: capitolul nu are conținut".translate(CEDILLA),
+                )
             )
     return issues

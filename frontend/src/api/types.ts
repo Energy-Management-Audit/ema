@@ -62,6 +62,8 @@ export type Field = {
   label: string
   value_type: 'number' | 'text' | 'year' | 'date' | 'enum'
   unit?: string | null
+  decimals?: number
+  grouping?: boolean
   required?: boolean
   value?: unknown
   revision?: number

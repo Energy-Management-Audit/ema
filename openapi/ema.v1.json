@@ -1969,6 +1969,12 @@
             "title": "Confidence",
             "type": "string"
           },
+          "decimals": {
+            "default": 2,
+            "minimum": 0.0,
+            "title": "Decimals",
+            "type": "integer"
+          },
           "derivation": {
             "anyOf": [
               {
@@ -1996,6 +2002,11 @@
               }
             ],
             "title": "Failure"
+          },
+          "grouping": {
+            "default": true,
+            "title": "Grouping",
+            "type": "boolean"
           },
           "id": {
             "title": "Id",

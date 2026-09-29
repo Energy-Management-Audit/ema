@@ -170,7 +170,7 @@ def test_readiness_lists_unknown_stale_conflict_and_complete(tmp_path: Path) -> 
     ws, job = _job(tmp_path)
     initial = audit_readiness(ws, job)
     assert not initial.final_ok and len(initial.blocking) >= len(CATALOGUE)
-    assert any("așteaptă preluarea dosarului" in item for item in initial.next)
+    assert any("aşteaptă preluarea dosarului" in item for item in initial.next)
     for section in CATALOGUE:
         set_status(ws, job, section.id, Status.NA, "user")
     assert {issue.code for issue in audit_readiness(ws, job).blocking} == {"chapter_empty"}
@@ -352,7 +352,8 @@ def test_empty_chapter_refuses_final_but_allows_draft(tmp_path: Path) -> None:
     chapter = next(section for section in CATALOGUE if section.id == "ch2")
     assert any(
         issue.code == "chapter_empty"
-        and issue.message == f"{chapter.title}: capitolul nu are conținut"
+        and issue.message
+        == f"{chapter.title}: capitolul nu are conținut".translate(str.maketrans("șțȘȚ", "şţŞŢ"))
         for issue in readiness.blocking
     )
     _code(lambda: AuditWorkflow().start_final(ws, job), "not_ready")

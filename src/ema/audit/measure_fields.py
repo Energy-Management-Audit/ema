@@ -6,6 +6,7 @@ import hashlib
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from ema.audit.catalogue_labels import field_label
 from ema.audit.measures_form import MeasureRow
 from ema.core.review.fields import fields, mark_absent, propose
 from ema.core.review.models import Cell, Derivation, Evidence, Field, FieldSpec, ValueType
@@ -16,7 +17,7 @@ from ema.energy_data.source import Located
 
 
 def _evidence(ws: Workspace, job: str, sha: str, key: str, source: Located) -> Evidence:
-    evidence_id = hashlib.sha256(f"{sha}:{source.ref.a1}:{key}".encode()).hexdigest()
+    evidence_id = hashlib.sha256(f"{job}:{sha}:{source.ref.a1}:{key}".encode()).hexdigest()
     with ws.connect() as db:
         old = db.execute(
             "SELECT data FROM evidence WHERE id=? AND job_id=?", (evidence_id, job)
@@ -56,7 +57,9 @@ def supplied(
 
 
 def calculated(ws: Workspace, job: str, key: str, result: Derived) -> Field:
-    spec = FieldSpec(key=key, label=key, value_type="number", unit=result.unit, chapter="ch6")
+    spec = FieldSpec(
+        key=key, label=field_label(key), value_type="number", unit=result.unit, chapter="ch6"
+    )
     if result.value is None:
         return absent(ws, job, spec)
     derivation = Derivation(
@@ -66,7 +69,7 @@ def calculated(ws: Workspace, job: str, key: str, result: Derived) -> Field:
     )
     evidence = Evidence(
         id=hashlib.sha256(
-            f"{key}:{result.value}:{derivation.model_dump_json()}".encode()
+            f"{job}:{key}:{result.value}:{derivation.model_dump_json()}".encode()
         ).hexdigest(),
         provenance="calculated",
         method="calc",
@@ -106,7 +109,11 @@ def supplied_row(
     result: dict[str, Field] = {}
     for name, source, value_type, unit, value in entries:
         spec = FieldSpec(
-            key=prefix + name, label=prefix + name, value_type=value_type, unit=unit, chapter="ch6"
+            key=prefix + name,
+            label=field_label(prefix + name),
+            value_type=value_type,
+            unit=unit,
+            chapter="ch6",
         )
         result[name] = supplied(ws, job, sha, spec, source, value)
     return result
