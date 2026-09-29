@@ -1,4 +1,4 @@
-"""Independent CLIENT-A1 chart oracle from the chart contract and reviewed source values."""
+"""Independent audit_case_a chart oracle from the chart contract and reviewed source values."""
 
 from __future__ import annotations
 

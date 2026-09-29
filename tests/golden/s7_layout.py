@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
 from docx import Document
+from tests.golden.cases import case_path
 from tests.golden.s7_reader import Chapter, _text, read_chapter
 
 from ema.audit.headings import map_headings
@@ -27,10 +27,7 @@ from ema.energy_data.factors import Factor, FactorTable
 
 
 def _source(name: str) -> Path:
-    root = Path(os.environ["EMA_REFERENCE"]) / "audit" / "finished-audits"
-    matches = list(root.glob(f"*{name}*.docx"))
-    assert len(matches) == 1
-    return matches[0]
+    return case_path(name)
 
 
 def build_blocks(name: str) -> tuple[dict[int, Block], Chapter]:  # noqa: C901, PLR0912, PLR0915
@@ -213,7 +210,7 @@ def build_blocks(name: str) -> tuple[dict[int, Block], Chapter]:  # noqa: C901, 
             chart_plans[chart.body_index] = item
     document = Document(str(case.docx))
     children = list(document.element.body)
-    source_id = "audit-01" if name == "AUDIT-01" else "audit-02"
+    source_id = "audit-01" if name == "audit-01" else "audit-02"
     bank = {item.paragraph: item for item in phrase_bank() if item.source_document == source_id}
     mapped = map_headings(case.docx, name.lower()).mapped
     chapter = next(item for item in mapped if item.section_id == "ch4")

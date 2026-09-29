@@ -2,5 +2,5 @@
   "voltage": {"nominal_v": [230, 400, 6000, 10000, 20000], "tolerance": 0.10, "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Conform standardului EN 50160"},
   "frequency": {"ideal_hz": [49.95, 50.05], "normal_hz": [49.80, 50.20], "alert_hz": [49.20, 50.50], "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Frecvența"},
   "thd_u": {"max_percent": 8, "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Armonicelor THD"},
-  "power_factor": {"min": 0.9, "source": "AUDIT-03 audit ¶ factorul de putere"}
+  "power_factor": {"min": 0.9, "source": "audit-03 audit ¶ factorul de putere"}
 }

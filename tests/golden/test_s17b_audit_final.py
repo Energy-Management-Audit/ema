@@ -1,4 +1,4 @@
-"""S17b acceptance: the real CLIENT-A1 final passes audit_markers, is approved and exported (D8, Word).
+"""S17b: the case A final passes audit_markers, approval and export (D8, Word).
 
 Every marker is cleared by a source: her reviewed base text, a field, the render date, a
 human-confirmed section or a text she wrote. Client values are compared, never printed.
@@ -23,6 +23,7 @@ from openpyxl import load_workbook
 from PIL import Image
 from tests.audit_replay import CH2_DRAFT, draft_recording, support_recording
 from tests.conftest import artifacts_path
+from tests.golden.cases import case_path
 from tests.golden.s17b_chart_oracle import assert_final_charts, expected_charts
 from tests.golden.s17c_chart_layout_oracle import assert_production_values_fit_pdf
 from tests.golden.s17c_structure_oracle import assert_final_structure
@@ -242,16 +243,16 @@ def _export(ws: Workspace, job: str) -> Path:
     return copy
 
 
-def test_CLIENT-A1_final_approved_and_exported(
+def test_audit_case_a_final_approved_and_exported(
     reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     identity = _settings(reference_library, tmp_path, monkeypatch)
     form = _complete_form(tmp_path / "all.xlsx")
     ws, job = seed_job(reference_library, tmp_path / "workspace", tmp_path, form)
-    # CLIENT-A1 came without its Anexa: the auditor types the address in Revizuire (manual evidence).
+    # The case came without an Anexa: the auditor enters the address in Revizuire.
     _supply(ws, job, "audit.address", ADDRESS)
     photo = _cover_photo(tmp_path / "cover.png")  # the job's own cover photo, synthetic
-    ws.set_slot(job, COVER_SLOT, ws.add_file("CLIENT-A1-golden", photo))
+    ws.set_slot(job, COVER_SLOT, ws.add_file("audit_case_a-golden", photo))
     reviewed = review_inputs(ws, job)  # 2. her texts, one reading corrected, one rejected
     marked, present = _draft_marks(ws, job)  # 3.
     confirm_chapters(ws, job)  # 4. one confirmation per chapter, the rest n/a by the user
@@ -319,7 +320,7 @@ def test_CLIENT-A1_final_approved_and_exported(
     )
 
 
-def test_CLIENT-A1_final_charts(
+def test_audit_case_a_final_charts(
     reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _settings(reference_library, tmp_path, monkeypatch)
@@ -327,7 +328,7 @@ def test_CLIENT-A1_final_charts(
     ws, job = seed_job(reference_library, tmp_path / "workspace", tmp_path, form)
     _supply(ws, job, "audit.address", ADDRESS)
     photo = _cover_photo(tmp_path / "cover.png")
-    ws.set_slot(job, COVER_SLOT, ws.add_file("CLIENT-A1-golden", photo))
+    ws.set_slot(job, COVER_SLOT, ws.add_file("audit_case_a-golden", photo))
     reviewed = review_inputs(ws, job)
     _draft_marks(ws, job)
     confirm_chapters(ws, job)
@@ -340,7 +341,7 @@ def test_CLIENT-A1_final_charts(
     )
     docx = _outputs(ws, job, str(final["id"]))["Audit-final.docx"]
     source = next(
-        (reference_library / "audit/cases/audit-case-a/received").glob("*Necesar info*.xls")
+        (reference_library / case_path("audit-case-a", "received")).glob("*Necesar info*.xls")
     )
     dataset = reviewed_dataset(to_dataset(parse_necesar_info(source)), fields(ws, job))
     expected = expected_charts(dataset, "Atelier Exemplu SRL")

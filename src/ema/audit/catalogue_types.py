@@ -138,7 +138,7 @@ def section(  # noqa: PLR0913
     *,
     aliases: tuple[str, ...] = (),
     when: Condition = ALWAYS,
-    prototype: str = "AUDIT-01",
+    prototype: str = "audit-01",
     facts: tuple[FactRef, ...] = (),
     templates: tuple[str, ...] = (),
     has_intro_content: bool = False,

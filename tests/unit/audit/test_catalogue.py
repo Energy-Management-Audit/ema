@@ -99,7 +99,7 @@ def test_inventory_scales_process_units(tmp_path: Path) -> None:
     for count in (2, 5):
         path = tmp_path / f"synthetic-{count}.docx"
         _process_doc(path, count)
-        result = inventory(path)
+        result = inventory(path, "audit-01")
         assert len(result.processes) == count
         assert all(unit.element_range[1] > unit.element_range[0] for unit in result.processes)
 

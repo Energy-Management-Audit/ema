@@ -1,4 +1,4 @@
-"""CLIENT-A1 input-level acceptance: deterministic Read and chapter-four package."""
+"""audit_case_a input-level acceptance: deterministic Read and chapter-four package."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import pytest
 from docx import Document
 from docx.oxml.ns import qn
 from tests.conftest import artifacts_path
+from tests.golden.cases import case_path
 from tests.workspace_jobs import create_job
 
 from ema.audit.base import build_base
@@ -27,7 +28,7 @@ from ema.core.workspace import Workspace
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
 from ema.energy_data.factors import FACTORS_2026
 
-from .test_s10b_audit_base import _identity, _CLIENT-A1_plan, _references
+from .test_s10b_audit_base import _audit_case_a_plan, _identity, _references
 
 pytestmark = pytest.mark.golden
 
@@ -65,13 +66,13 @@ def _calculated(read: object) -> dict[str, set[Decimal]]:
     return result
 
 
-def test_CLIENT-A1_read_to_chapter_four(  # noqa: PLR0915
+def test_audit_case_a_read_to_chapter_four(  # noqa: PLR0915
     reference_library: Path, tmp_path: Path
 ) -> None:
-    received = reference_library / "audit/cases/audit-case-a/received"
+    received = reference_library / case_path("audit-case-a", "received")
     necesar = next(received.glob("*Necesar info*.xls"))
     ws = Workspace(tmp_path / "workspace")
-    job = create_job(ws, "audit", "CLIENT-A1", 2026)
+    job = create_job(ws, "audit", "audit-case-a", 2026)
     read = read_dossier(ws, job, necesar)
     assert WATER_CARRIERS.intersection(read.dataset.carriers)
     assert Carrier.electricity_pv in read.dataset.carriers
@@ -96,7 +97,7 @@ def test_CLIENT-A1_read_to_chapter_four(  # noqa: PLR0915
     base = tmp_path / "base.docx"
     output = tmp_path / "filled.docx"
     build_base(
-        _CLIENT-A1_plan(reference_library),
+        _audit_case_a_plan(reference_library),
         base_document=base_source,
         measurement_prototype=prototype,
         output=base,
@@ -132,7 +133,7 @@ def test_CLIENT-A1_read_to_chapter_four(  # noqa: PLR0915
         ):
             pytest.fail("rendered number differs from its located input or scaled S7 calculation")
 
-    mapped = map_headings(output, "AUDIT-01").mapped
+    mapped = map_headings(output, "audit-01").mapped
     wanted = [item.id for item in CATALOGUE if item.id.startswith("ch4.")]
     present = [item.section_id for item in mapped if item.section_id.startswith("ch4.")]
     assert present == wanted

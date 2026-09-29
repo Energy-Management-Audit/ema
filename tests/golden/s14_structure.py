@@ -4,25 +4,17 @@ from pathlib import Path
 
 from docx import Document
 from docx.oxml.ns import qn
+from tests.golden.cases import case_path
 
 from ema.audit.headings import map_headings
 
 
 def auditor_structure(root: Path) -> dict[str, dict[str, object]]:
-    audits = root / "audit/finished-audits"
-    patterns = (
-        "*AUDIT-01*.docx",
-        "*AUDIT-02*.docx",
-        "*AUDIT-03*.docx",
-        "*AUDIT-04*.docx",
-        "Cap 2-3-4 V2.docx",
-    )
+    profiles = ("audit-01", "audit-02", "audit-03", "audit-04", "audit-05")
     result: dict[str, dict[str, object]] = {}
-    for pattern in patterns:
-        paths = list(audits.glob(pattern))
-        assert len(paths) == 1, pattern
-        path = paths[0]
-        mapped = map_headings(path, "pcm" if "Cap 2-3-4" in pattern else "AUDIT-01")
+    for profile in profiles:
+        path = case_path(profile)
+        mapped = map_headings(path, profile)
         chapter_ids = {
             item.section_id for item in mapped.mapped if item.section_id.startswith(("ch2", "ch3"))
         }
@@ -66,5 +58,5 @@ def auditor_structure(root: Path) -> dict[str, dict[str, object]]:
                 "figure_or_table_reference": "figura" in text or "tabel" in text,
                 "process_stage": "etap" in text or "flux" in text,
             }
-        result[pattern] = {"sections": len(chapter_ids), "detail": sections}
+        result[profile] = {"sections": len(chapter_ids), "detail": sections}
     return result

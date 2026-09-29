@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path
 
 from ema.energy_data.anexa import parse_anexa
 from ema.energy_data.source import normal
@@ -22,13 +23,15 @@ def _annexes(reference_library: Path) -> list[Path]:
     corrections = [
         path
         for case in ("piee-case-a", "piee-case-b")
-        for path in (root / "cases" / case / "received").glob("*Anexa*.xlsx")
+        for path in case_path(case, "received").glob("*Anexa*.xlsx")
     ]
     return sorted([*batch, *corrections])
 
 
-def _case(reference_library: Path, fragment: str) -> Path:
-    return next(path for path in _annexes(reference_library) if fragment in path.name)
+def _case(reference_library: Path, code: str) -> Path:
+    path = case_path(code)
+    assert path in _annexes(reference_library)
+    return path
 
 
 def test_all_38_annexes_read_with_traceable_core_values(reference_library: Path) -> None:
@@ -55,7 +58,9 @@ def _snapshot(reference_library: Path, path: Path) -> dict[str, list[list[str]]]
     return json.loads(source.read_text())[str(path.relative_to(reference_library))]
 
 
-@pytest.mark.parametrize("filename", ["CLIENT-P1", "CLIENT-X3", "CLIENT-P2", "CLIENT-X1", "CLIENT-X2"])
+@pytest.mark.parametrize(
+    "filename", ["anexa-case-a", "anexa-case-b", "anexa-case-c", "anexa-case-d", "anexa-case-e"]
+)
 def test_five_layouts_match_independent_snapshot(reference_library: Path, filename: str) -> None:
     path = _case(reference_library, filename)
     parsed = parse_anexa(path)
@@ -110,13 +115,13 @@ def test_five_layouts_match_independent_snapshot(reference_library: Path, filena
 
 
 def test_shifted_measure_columns_and_missing_year_remain_visible(reference_library: Path) -> None:
-    shifted = parse_anexa(_case(reference_library, "CLIENT-X1"))
+    shifted = parse_anexa(_case(reference_library, "anexa-case-d"))
     assert shifted.existing_measures[0].commissioning_year is not None
     assert shifted.existing_measures[0].commissioning_year.ref.a1.endswith("D5")
     assert shifted.existing_measures[0].location is not None
     assert shifted.existing_measures[0].description.ref.a1.endswith("C5")
 
-    extra_column = parse_anexa(_case(reference_library, "CLIENT-X5"))
+    extra_column = parse_anexa(_case(reference_library, "anexa-case-g"))
     assert len(extra_column.planned_measures) == 4
     assert [
         item.commissioning_year.value
@@ -126,16 +131,16 @@ def test_shifted_measure_columns_and_missing_year_remain_visible(reference_libra
     assert extra_column.planned_measures[0].commissioning_year is not None
     assert extra_column.planned_measures[0].commissioning_year.ref.a1.endswith("D6")
 
-    long_list = parse_anexa(_case(reference_library, "CLIENT-X4"))
+    long_list = parse_anexa(_case(reference_library, "anexa-case-f"))
     assert len(long_list.existing_measures) == 121
 
 
 def test_monthly_utility_block_does_not_overwrite_previous_fuel(reference_library: Path) -> None:
-    public_water = parse_anexa(_case(reference_library, "CLIENT-X1"))
+    public_water = parse_anexa(_case(reference_library, "anexa-case-d"))
     assert sum(float(item.value) for item in public_water.monthly["coal"].values()) == 0
     assert sum(float(item.value) for item in public_water.monthly["water_potable"].values()) > 0
 
-    industrial_water = parse_anexa(_case(reference_library, "Oras"))
+    industrial_water = parse_anexa(_case(reference_library, "anexa-case-h"))
     assert sum(float(item.value) for item in industrial_water.monthly["coal"].values()) == 0
     assert (
         sum(float(item.value) for item in industrial_water.monthly["water_industrial"].values()) > 0

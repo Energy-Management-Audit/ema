@@ -8,6 +8,7 @@ from pathlib import Path
 
 import psutil
 import pytest
+from tests.golden.cases import case_path
 
 from ema.core.config import Settings
 from ema.core.office.errors import OfficeError
@@ -24,7 +25,7 @@ def test_timeout_preserves_bystander_and_normal_conversion(
     settings = Settings()
     if not word_available(settings):
         pytest.skip("Word is not configured")
-    received = reference_library / "audit/cases/audit-case-a/received"
+    received = reference_library / case_path("audit-case-a", "received")
     source = next(path for path in received.iterdir() if path.suffix.lower() == ".doc")
     bystander = subprocess.Popen([str(settings.word_path), "/n"])
     identity = psutil.Process(bystander.pid).create_time()

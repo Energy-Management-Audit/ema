@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
+from tests.golden.cases import case_path
 
 from ema.energy_data.anexa import parse_anexa
 from ema.reporting import generate, write_report
@@ -78,7 +79,7 @@ def test_36_annexes_equal_delivered_year_sheets_and_control(
     output = write_report(result, tmp_path / "report.xlsx")
     actual = load_workbook(output, data_only=True)
     delivered = load_workbook(
-        next((reference_library / "energy-manager-reporting/cases/2023-2025/final").glob("*.xlsx")),
+        next((reference_library / case_path("report-2023-2025", "final")).glob("*.xlsx")),
         data_only=True,
     )
     for year in YEARS:
@@ -118,35 +119,26 @@ def test_36_annexes_equal_delivered_year_sheets_and_control(
 
 
 def test_two_company_year_blocks_equal_delivered(reference_library: Path, tmp_path: Path) -> None:
-    annexes = [
-        path
-        for path in (reference_library / "piee/anexa-2-3-2025").glob("*.xls*")
-        if "CLIENT-R1" in path.name or "CLIENT-R2" in path.name
-    ]
+    annexes = [case_path("report-2025", "annex_a"), case_path("report-2025", "annex_b")]
     assert len(annexes) == 2
     result = generate(annexes, YEARS)
     output = write_report(result, tmp_path / "report.xlsx")
     actual = load_workbook(output, data_only=True)
-    delivered = load_workbook(
-        next(
-            (reference_library / "energy-manager-reporting/cases/2025-CLIENT-R1-client-r2/final").glob(
-                "*.xlsx"
-            )
-        ),
-        data_only=True,
+    delivered = load_workbook(case_path("report-2025", "workbook"), data_only=True)
+    report_client_a = case_path("report-2025", "annex_a")
+    report_client_a_name = next(
+        company.name for company in result.companies if company.source == report_client_a
     )
-    CLIENT-R1 = next(path for path in annexes if "CLIENT-R1" in path.name)
-    CLIENT-R1_name = next(company.name for company in result.companies if company.source == CLIENT-R1)
     for year in YEARS:
         generated_blocks = _blocks(actual[str(year)])
         delivered_blocks = _blocks(delivered[str(year)])
         assert generated_blocks.keys() == delivered_blocks.keys()
         for name, rows in generated_blocks.items():
             expected_rows = delivered_blocks[name]
-            older_omission = year == 2024 and name == CLIENT-R1_name
+            older_omission = year == 2024 and name == report_client_a_name
             if older_omission:
                 assert len(rows) == len(expected_rows) + 5
-                source = parse_anexa(CLIENT-R1)
+                source = parse_anexa(report_client_a)
                 extra_source_rows = [
                     measure
                     for measure in source.existing_measures
@@ -159,7 +151,7 @@ def test_two_company_year_blocks_equal_delivered(reference_library: Path, tmp_pa
                     " ".join(str(measure.description.value).split())
                     for measure in extra_source_rows
                 ]
-                source_book = load_workbook(CLIENT-R1, data_only=True, read_only=True)
+                source_book = load_workbook(report_client_a, data_only=True, read_only=True)
                 source_sheet = source_book["Solutii EE existente"]
                 for report_row, source_row in zip(rows[10:15], range(26, 31), strict=True):
                     assert _same(report_row[5], source_sheet.cell(source_row, 7).value)

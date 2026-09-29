@@ -9,6 +9,7 @@ import pytest
 from docx import Document
 from PIL import Image
 from tests.conftest import artifacts_path
+from tests.golden.cases import case_path
 from tests.golden.test_s10b_audit_base import _identity, _references
 
 from ema.audit.base import build_base
@@ -31,16 +32,16 @@ def test_chapter_five_in_real_base_with_synthetic_readings(
     reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     base_document, _ = _references(reference_library)
-    AUDIT-03 = next((reference_library / "audit/finished-audits").glob("*AUDIT-03*.docx"))
+    audit_03 = case_path("audit-03")
     model = (
         reference_library / "audit/section-models/Fișa de măsuratori electroenergetice - model.docx"
     )
     assert model.is_file()
-    identity = (*_identity(base_document), *_identity(AUDIT-03))
+    identity = (*_identity(base_document), *_identity(audit_03))
     base = build_base(
         UnitPlan("Atelier Exemplu", 1, frozenset({"electricity"}), 1, True, 0, 0),
         base_document=base_document,
-        measurement_prototype=AUDIT-03,
+        measurement_prototype=audit_03,
         output=tmp_path / "base.docx",
         base_identity=_identity(base_document),
     )
@@ -85,7 +86,7 @@ def test_chapter_five_in_real_base_with_synthetic_readings(
         missing_narratives=["narrative.ch5.termic_rezultate"],
     )
     monkeypatch.setenv("EMA_AUDIT_MEASUREMENT_SHEET_MODEL", str(model))
-    monkeypatch.setenv("EMA_AUDIT_MEASUREMENT_PROTOTYPE", str(AUDIT-03))
+    monkeypatch.setenv("EMA_AUDIT_MEASUREMENT_PROTOTYPE", str(audit_03))
     output = artifacts_path("s15a", "chapter-five-synthetic.docx")
     output.parent.mkdir(parents=True, exist_ok=True)
     report = render_chapter_five(base, output, plan, {slot: image, thermal_slot: thermal}, identity)
@@ -97,7 +98,7 @@ def test_chapter_five_in_real_base_with_synthetic_readings(
     assert "[de completat]" in text
     assert not package_issues(output, identity)
     assert not report.issues
-    source = Document(AUDIT-03)
+    source = Document(audit_03)
     source_positions = {item.section_id: start for item, start, _ in heading_spans_document(source)}
     result_positions = {
         item.section_id: start for item, start, _ in heading_spans_document(document)

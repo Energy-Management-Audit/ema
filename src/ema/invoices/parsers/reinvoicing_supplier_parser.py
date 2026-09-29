@@ -23,21 +23,21 @@ from ema.invoices.parsers.engie_text import plain_text
 from ema.invoices.parsers.identity_fields import field_issues as issues_for_fields
 from ema.invoices.parsers.identity_fields import required_value as required
 from ema.invoices.parsers.normalization import parse_romanian_date
-from ema.invoices.parsers.CLIENT-I7_identity import (
+from ema.invoices.parsers.reinvoicing_identity import (
     document_text,
     electric_client_identity,
     first_match,
     getica_client_identity,
     missing_location_draft,
 )
-from ema.invoices.parsers.CLIENT-I7_patterns import (
+from ema.invoices.parsers.reinvoicing_patterns import (
     DATE,
     ELECTRIC_ROW,
     GETICA_ROW,
     GETICA_SPLIT_ROW,
     POD,
 )
-from ema.invoices.parsers.CLIENT-I7_rows import (
+from ema.invoices.parsers.reinvoicing_rows import (
     InvoiceHeader,
     electric_client_level_advance,
     electric_segments,

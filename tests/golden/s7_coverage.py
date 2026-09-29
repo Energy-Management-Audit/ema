@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 
 from docx import Document
+from tests.golden.cases import case_path
 from tests.golden.s7_layout import build_blocks
 from tests.golden.s7_reader import Chapter
 
@@ -117,7 +118,7 @@ def _filed_block_count(generated: dict[int, object], case: Chapter) -> int:
 
 
 def _audit(name: str, root: Path) -> dict[str, object]:
-    source = next((root / "audit" / "finished-audits").glob(f"*{name}*.docx"))
+    source = case_path(name)
     generated, case = build_blocks(name)
     document, children, start, end = _chapter(source, name.lower())
     retained = retained_categories(source, name.lower(), generated)
@@ -172,9 +173,9 @@ def _audit(name: str, root: Path) -> dict[str, object]:
     }
 
 
-def _pcm(root: Path) -> dict[str, int]:
-    source = root / "audit" / "finished-audits" / "Cap 2-3-4 V2.docx"
-    document, children, start, end = _chapter(source, "pcm")
+def _audit_05(root: Path) -> dict[str, int]:
+    source = case_path("audit-05")
+    document, children, start, end = _chapter(source, "audit-05")
     paragraphs = {id(item._p): index for index, item in enumerate(document.paragraphs)}
     present = {
         paragraphs[id(children[index])]
@@ -193,15 +194,15 @@ def _pcm(root: Path) -> dict[str, int]:
 def main() -> None:
     root = Path(os.environ["EMA_REFERENCE"])
     report = {
-        "AUDIT-01": _audit("AUDIT-01", root),
-        "AUDIT-02": _audit("AUDIT-02", root),
-        "AUDIT-05": _pcm(root),
+        "audit-01": _audit("audit-01", root),
+        "audit-02": _audit("audit-02", root),
+        "audit_05_rom": _audit_05(root),
     }
     output = artifacts_path("s7") / "coverage.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     for name, case in report.items():
-        if name == "AUDIT-05":
+        if name == "audit_05_rom":
             print(name, case)
         else:
             print(name, case["generated_blocks"], case["paragraph_coverage"])

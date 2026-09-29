@@ -20,7 +20,7 @@ from ema.audit.render_bindings import binding_values, fill_bindings
 from ema.audit.render_steps import body_counts
 from ema.core.review.models import Field
 
-IDENTITY = ("Acme Industrie SRL", "Oras")
+IDENTITY = ("Acme Industrie SRL", "Client Site")
 REVIEWED = (
     "Elaborator:",
     "Autorizația nr. 12 din 01.02.2020",
@@ -52,7 +52,7 @@ def _cover(picture: bytes = _png("red")) -> object:
     cell.paragraphs[0].text = "Acme Industrie  SRL"
     cell.add_paragraph("Sediul", style="Body Text")
     cell.add_paragraph("")
-    cell.add_paragraph("Str. Exemplu 1, Oras Test")
+    cell.add_paragraph("Strada Exemplu 7, Oras Test")
     cell.add_paragraph("Elaborator:")
     cell.add_paragraph("Autorizația nr. 12 din 01.02.2020")
     cell.add_paragraph("Autorizația nr. 13 din 01.02.2020")

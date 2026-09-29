@@ -38,10 +38,10 @@ def _visible_cells(workbook: object) -> dict[str, list[tuple[object, ...]]]:
 
 @pytest.mark.golden
 def test_http_upload_identity_and_workbook_equal_cli(tmp_path: Path) -> None:
-    expected, _ = _baseline("CLIENT-I2")
-    sources = _source_paths("CLIENT-I2", expected)
+    expected, _ = _baseline("invoice-case-b")
+    sources = _source_paths("invoice-case-b", expected)
     ws = Workspace(tmp_path / "http")
-    job = create_job(ws, "invoices", "CLIENT-I2", None)
+    job = create_job(ws, "invoices", "invoice-case-b", None)
     client = TestClient(create_app(ws, 8766, launch_code="synthetic-code"), base_url=BASE)
     csrf = client.post("/session", json={"code": "synthetic-code"}).json()["csrf"]
     headers = {"x-ema-csrf": csrf}
@@ -72,7 +72,7 @@ def test_http_upload_identity_and_workbook_equal_cli(tmp_path: Path) -> None:
     confirmed = client.post(
         f"/jobs/{job}/invoices/identity",
         json={
-            "client_id": "CLIENT-I2",
+            "client_id": "invoice-case-b",
             "on_revision": identity.json()["revision"],
             "confirm": True,
         },
@@ -103,7 +103,7 @@ def test_http_upload_identity_and_workbook_equal_cli(tmp_path: Path) -> None:
     assert response.status_code == 200
     http_book = load_workbook(BytesIO(response.content), data_only=False)
 
-    cli_ws, cli_job, _raw = _run_case(tmp_path / "cli", "CLIENT-I2", expected)
+    cli_ws, cli_job, _raw = _run_case(tmp_path / "cli", "invoice-case-b", expected)
     confirm_client(cli_ws, cli_job)
     with cli_ws.connect() as db:
         cli_path = cli_ws.job_path(db, cli_job) / "outputs" / "Facturi.xlsx"

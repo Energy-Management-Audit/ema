@@ -119,7 +119,7 @@ markers = [
     "word: reaches Word automation (requires the coordinator Word slot)",
     "golden: runs against the real reference library; needs EMA_REFERENCE (skipped without it)",
     "network: live public network acceptance; CI excludes it because the source may be unavailable",
-    "live_research: pending CLIENT-A1 equipment acceptance; requires a controlled live search API",
+    "live_research: pending audit-case-a equipment acceptance; requires a controlled live search API",
 ]
 
 [tool.coverage.run]

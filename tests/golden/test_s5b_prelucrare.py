@@ -8,6 +8,7 @@ from pathlib import Path
 
 import openpyxl
 import pytest
+from tests.golden.cases import case_path
 
 from ema.energy_data.calc import co2, energy_intensity, specific_consumption, tep_total
 from ema.energy_data.carriers import Carrier
@@ -23,21 +24,18 @@ from .s3_workbooks import _factor_after_equals, load_case
 pytestmark = pytest.mark.golden
 CASES = (
     (
-        "CLIENT-P1",
-        "piee/cases/piee-case-a/received/CLIENT-P1 - Prelucrare date program "
-        "eficienta energetica 2022-2024.xls",
+        "piee-case-a",
+        case_path("piee-case-a", "prelucrare"),
         (2022, 2023, 2024),
     ),
     (
-        "CLIENT-A3",
-        "audit/cases/audit-case-c/received/CLIENT-A3 - Prelucrare date program "
-        "eficienta energetica 2025.xls",
+        "audit-case-c",
+        case_path("audit-case-c", "prelucrare"),
         (2022, 2023, 2024),
     ),
     (
-        "CLIENT-P2",
-        "piee/cases/piee-case-b/received/CLIENT-P2 - Prelucrare date program "
-        "eficienta energetica 2025 (1).xlsx",
+        "piee-case-b",
+        case_path("piee-case-b", "prelucrare"),
         (2023, 2024, 2025),
     ),
 )
@@ -45,14 +43,14 @@ CASES = (
 
 @pytest.mark.parametrize("case,relative,years", CASES)
 def test_reader_matches_auditor(
-    reference_library: Path, case: str, relative: str, years: tuple[int, ...]
+    reference_library: Path, case: str, relative: Path, years: tuple[int, ...]
 ) -> None:
     imported = import_prelucrare(reference_library / relative)
     _, expected, factors, _, _ = load_case(reference_library / relative, case, years)
     assert imported.dataset.years == years
     assert imported.dataset.production == expected.production
     assert imported.dataset.turnover_lei == expected.turnover_lei
-    if case == "CLIENT-A3":
+    if case == "audit-case-c":
         assert set(imported.dataset.carriers[Carrier.water_potable]) == set(years)
         assert all(
             len(imported.dataset.carriers[Carrier.water_potable][year].months) == 12
@@ -69,7 +67,7 @@ def test_reader_matches_auditor(
                 assert actual.months[month].value == pytest.approx(reading.value)
                 assert actual.months[month].unit == reading.unit
     expected_factors = {(factor.carrier, factor.unit, factor.per_unit) for factor in factors.tep}
-    if case == "CLIENT-A3":
+    if case == "audit-case-c":
         # B1 preserves labeled, all-missing carriers; their filed factors remain traceable.
         book = Workbook.open(reference_library / relative)
         for carrier, sheet, label, unit in (
@@ -91,30 +89,26 @@ def test_reader_matches_auditor(
         (factor.carrier, factor.unit, factor.per_unit) for factor in imported.factors.tep
     } == expected_factors
     assert all(
-        relative.rsplit("/", 1)[-1] in factor.source and "!" in factor.source
+        relative.name in factor.source and "!" in factor.source
         for factor in (*imported.factors.tep, *imported.factors.co2)
     )
     expected_issues = (
-        [("cell_error", f"TEP!P{row}") for row in (10, 21, 32)] if case == "CLIENT-P1" else []
+        [("cell_error", f"TEP!P{row}") for row in (10, 21, 32)] if case == "piee-case-a" else []
     )
     assert [
         (issue.code, issue.ref.a1 if issue.ref else None) for issue in imported.issues
     ] == expected_issues
 
 
-def test_CLIENT-P1_generator_and_writer(  # noqa: C901
+def test_piee_case_a_generator_and_writer(  # noqa: C901
     reference_library: Path, tmp_path: Path
 ) -> None:
-    case = reference_library / "piee/cases/piee-case-a"
-    prelucrare = import_prelucrare(
-        case / "received/CLIENT-P1 - Prelucrare date program eficienta energetica 2022-2024.xls"
-    )
-    necesar = to_dataset(
-        parse_necesar_info(case / "received/Necesar info 2025 - CLIENT-P1 - completat .xls")
-    )
+    case = reference_library / case_path("piee-case-a")
+    prelucrare = import_prelucrare(case_path("piee-case-a", "prelucrare"))
+    necesar = to_dataset(parse_necesar_info(case_path("piee-case-a", "necesar")))
     dataset, conflicts = merge_prelucrare(necesar, prelucrare)
     assert not conflicts
-    expected = runpy.run_path(str(case / "working/CLIENT-I5-format-generator/data_tg.py"))
+    expected = runpy.run_path(str(case_path("piee-case-a", "generator")))
     for name, carrier in (
         ("el", Carrier.electricity_grid),
         ("gas", Carrier.natural_gas),

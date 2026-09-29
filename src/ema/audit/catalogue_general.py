@@ -13,7 +13,7 @@ GENERAL: tuple[Section, ...] = (
         aliases=("CAPITOLUL 1 - DESCRIEREA ȘI SCOPUL AUDITULUI",),
         has_intro_content=True,
     ),
-    section("ch1.scop", 1, "Scopul auditului", "ch1", "fixed", ("template",), prototype="pcm"),
+    section("ch1.scop", 1, "Scopul auditului", "ch1", "fixed", ("template",), prototype="audit-05"),
     section("ch1.obiective", 1, "Obiective urmărite", "ch1", "fixed", ("template",)),
     section("ch1.continut", 1, "Conţinutul auditului", "ch1", "fixed", ("template",)),
     section("ch1.intocmire", 1, "Întocmirea auditului energetic", "ch1", "fixed", ("template",)),
@@ -43,7 +43,7 @@ GENERAL: tuple[Section, ...] = (
         "ch2",
         "data",
         ("questionnaire", "anexa"),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         facts=(AuditFact.ENERGY_MANAGER,),
     ),
     section(
@@ -53,7 +53,7 @@ GENERAL: tuple[Section, ...] = (
         "ch2",
         "data",
         ("questionnaire",),
-        prototype="AUDIT-04",
+        prototype="audit-04",
     ),
     section(
         "ch2.localizare",
@@ -104,7 +104,7 @@ GENERAL: tuple[Section, ...] = (
         "ch3",
         "narrative",
         ("dossier", "visit"),
-        prototype="AUDIT-01",
+        prototype="audit-01",
         templates=(
             "DESCRIEREA SECȚIEI {process}",
             "Prezentarea procesului tehnologic {process}",
@@ -191,7 +191,7 @@ GENERAL: tuple[Section, ...] = (
         "ch3",
         "narrative",
         ("dossier",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         when=fact(AuditFact.COMPRESSED_AIR),
     ),
     section(
@@ -201,7 +201,7 @@ GENERAL: tuple[Section, ...] = (
         "ch3",
         "narrative",
         ("dossier",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
     ),
     section(
         "ch3.iluminat",
@@ -210,7 +210,7 @@ GENERAL: tuple[Section, ...] = (
         "ch3",
         "data",
         ("questionnaire", "visit"),
-        prototype="AUDIT-03",
+        prototype="audit-03",
         aliases=(
             "Descrierea situației privind iluminarea platformei",
             "Situația sistemului de iluminat",
@@ -224,7 +224,7 @@ GENERAL: tuple[Section, ...] = (
         "ch3",
         "data",
         ("questionnaire",),
-        prototype="pcm",
+        prototype="audit-05",
         when=fact(AuditFact.FLEET),
         aliases=("Situația parcului auto",),
         templates=("Situația parcului auto din cadrul {client}",),
@@ -259,7 +259,7 @@ GENERAL: tuple[Section, ...] = (
         "ch3",
         "data",
         ("dossier",),
-        prototype="AUDIT-03",
+        prototype="audit-03",
     ),
     section(
         "ch3.equipment",

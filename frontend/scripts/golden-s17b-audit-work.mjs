@@ -1,4 +1,4 @@
-// Local acceptance: the real CLIENT-A1 dossier through the audit UI and API.
+// Local acceptance: the real audit-case-a dossier through the audit UI and API.
 // Never print client names, values, or document text. The seven .doc files use Word during intake.
 import { execFileSync, spawn } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -6,11 +6,12 @@ import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { casePath } from './case-path.mjs'
 
 const reference = process.env.EMA_REFERENCE
 if (!reference) throw new Error('EMA_REFERENCE is required')
 const root = fileURLToPath(new URL('../..', import.meta.url))
-const received = join(reference, 'audit/cases/audit-case-a/received')
+const received = casePath('audit-case-a', 'received')
 const files = readdirSync(received).map((name) => join(received, name))
 const outFlag = process.argv.indexOf('--out')
 const artifacts = process.env.EMA_ARTIFACTS ?? join(homedir(), 'Code/projects/ema/artifacts')
@@ -75,7 +76,7 @@ async function waitRun(page, job, stage) {
 }
 
 try {
-  check(files.length === 27, 'CLIENT-A1 dossier has 27 files')
+  check(files.length === 27, 'audit-case-a dossier has 27 files')
   execFileSync('npm', ['run', 'build', '--prefix', 'frontend'], { cwd: root, stdio: 'ignore' })
   server = await serve()
   browser = await chromium.launch()
@@ -90,7 +91,7 @@ try {
     check(Boolean(job), 'reused audit workspace has a job')
     await page.goto(new URL(`/app/audit/${job}/revizuire`, server.url).href)
   } else {
-    const client = await api(page, 'POST', '/clients', { name: 'CLIENT-A1 golden' })
+    const client = await api(page, 'POST', '/clients', { name: 'Client A SRL' })
     check(client.status === 201, 'client created in the temporary workspace')
     const created = await api(page, 'POST', '/jobs', {
       type: 'audit',
@@ -131,7 +132,7 @@ try {
     const documents = (await api(page, 'GET', `/jobs/${job}/audit/documents`)).body
     check(
       JSON.stringify(documents.missing) === JSON.stringify([1, 3, 6, 10]),
-      'checklist gaps match the delivered CLIENT-A1 expectation',
+      'checklist gaps match the delivered audit-case-a expectation',
     )
     check(
       documents.files.length === 27 && documents.files.every((file) => Boolean(file.status)),

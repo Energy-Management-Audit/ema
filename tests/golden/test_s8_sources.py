@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path
 
 from ema.core.office.sheets import open_book
 from ema.energy_data.carriers import Carrier
@@ -19,8 +20,8 @@ def _only(folder: Path, pattern: str) -> Path:
     return matches[0]
 
 
-def test_CLIENT-P1_sources_reconcile_to_filed_annual(reference_library: Path) -> None:
-    folder = reference_library / "piee/cases/piee-case-a"
+def test_piee_case_a_sources_reconcile_to_filed_annual(reference_library: Path) -> None:
+    folder = reference_library / case_path("piee-case-a")
     necesar = _only(folder, "Necesar*.xls")
     book = open_book(necesar)
     try:
@@ -35,10 +36,10 @@ def test_CLIENT-P1_sources_reconcile_to_filed_annual(reference_library: Path) ->
     assert result.disagreements
 
 
-def test_CLIENT-P2_prelucrare_covers_missing_necesar_and_exposes_internal_conflict(
+def test_piee_case_b_prelucrare_covers_missing_necesar_and_exposes_internal_conflict(
     reference_library: Path,
 ) -> None:
-    folder = reference_library / "piee/cases/piee-case-b"
+    folder = reference_library / case_path("piee-case-b")
     result = load(2025, _only(folder, "Anexa*.xlsx"), None, _only(folder, "*Prelucrare*.xlsx"))
     assert result.dataset.years == (2023, 2024, 2025)
     assert result.necesar_status.startswith("not needed: covered by Prelucrare")
@@ -48,10 +49,10 @@ def test_CLIENT-P2_prelucrare_covers_missing_necesar_and_exposes_internal_confli
     assert any(item.key.startswith("tep.internal_total.") for item in result.disagreements)
 
 
-def test_CLIENT-P2_delivered_unit_converts_every_production_reading(
+def test_piee_case_b_delivered_unit_converts_every_production_reading(
     reference_library: Path,
 ) -> None:
-    folder = reference_library / "piee/cases/piee-case-b"
+    folder = reference_library / case_path("piee-case-b")
     anexa = _only(folder, "Anexa*.xlsx")
     prelucrare = _only(folder, "*Prelucrare*.xlsx")
     previous = next((folder / "final").glob("*.docx"))

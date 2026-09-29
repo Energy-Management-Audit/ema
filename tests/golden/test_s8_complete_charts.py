@@ -1,4 +1,4 @@
-"""All CLIENT-P1 chart caches and editable workbooks follow the approved figures."""
+"""All piee_case_a chart caches and editable workbooks follow the approved figures."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
+from tests.golden.cases import case_path
 
 from conftest import artifacts_path
 from ema.core.office.chart_series import Series, read_series
@@ -50,10 +51,10 @@ def _same_value(left: Any, right: Any) -> bool:
     return bool(left == right)
 
 
-def test_all_CLIENT-P1_charts_and_workbooks_match_approved_semantics(
+def test_all_piee_case_a_charts_and_workbooks_match_approved_semantics(
     reference_library: Path, tmp_path: Path
 ) -> None:
-    case = reference_library / "piee/cases/piee-case-a"
+    case = reference_library / case_path("piee-case-a")
     data = load(
         2025,
         next(case.rglob("Anexa*.xlsx")),

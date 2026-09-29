@@ -9,7 +9,7 @@ from typing import Any, cast
 from docx import Document
 from docx.oxml.ns import qn
 
-from ema.audit.headings import Heading, MappedHeading, map_headings, normalize
+from ema.audit.headings import Heading, MappedHeading, map_headings, normalize, profile_for_document
 
 
 @dataclass(frozen=True)
@@ -42,14 +42,6 @@ class BaseInventory:
     @property
     def equipment_tables(self) -> tuple[BaseUnit, ...]:
         return (*self.equipment_lists, *self.equipment_specs)
-
-
-def _audit_id(path: Path) -> str:
-    name = path.name.lower()
-    for key in ("AUDIT-01", "AUDIT-02", "AUDIT-03", "AUDIT-04", "CLIENT-A3"):
-        if key in name:
-            return key
-    return "pcm"
 
 
 def _span(
@@ -108,11 +100,11 @@ def _owner(index: int, items: list[MappedHeading], positions: list[int]) -> Mapp
     return next(reversed(list(previous)), None)
 
 
-def inventory(docx: Path) -> BaseInventory:  # noqa: C901, PLR0912
+def inventory(docx: Path, audit_id: str | None = None) -> BaseInventory:  # noqa: C901, PLR0912
     document = Document(str(docx))
     body: list[Any] = list(cast(Any, document.element).body)
     positions = [i for i, element in enumerate(body) if element.tag == qn("w:p")]
-    mapping = map_headings(docx, _audit_id(docx))
+    mapping = map_headings(docx, audit_id or profile_for_document(docx))
     items = list(mapping.mapped)
     all_headings = [item.heading for item in items]
     processes: list[BaseUnit] = []

@@ -1,7 +1,7 @@
 {
   "version": "audit-draft-v1",
-  "sources": ["AUDIT-01 2026", "AUDIT-02 2026", "AUDIT-03 2026", "AUDIT-04 2026", "AUDIT-05 Cap 2-3-4 V2"],
-  "content_only": "CLIENT-A3 2022",
+  "sources": ["audit-01 2026", "audit-02 2026", "audit-03 2026", "audit-04 2026", "audit-05 Cap 2-3-4 V2"],
+  "content_only": "audit-06 2022",
   "patterns": [
     "Introduce a section's subject before a relevant figure or table; observe what the evidence shows and enumerate distinct parts only when the source supports them.",
     "Describe a process stage by its purpose, input, operation and output when those facts exist.",

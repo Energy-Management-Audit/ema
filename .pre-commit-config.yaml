@@ -1,4 +1,4 @@
-# Commit hooks may fix; pre-push delegates to the same non-mutating check as CI.
+# Commit hooks may fix; pre-push checks outgoing commits and runs the non-mutating CI gate.
 # Install once with: uv run pre-commit install --install-hooks -t pre-commit -t pre-push
 default_stages: [pre-commit]
 
@@ -31,6 +31,13 @@ repos:
 
   - repo: local
     hooks:
+      - id: check-outgoing-private-terms
+        name: outgoing private-term guard
+        entry: uv run python -m scripts.check_outgoing_private_terms
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
       - id: check-pre-push
         name: complete check
         entry: bash scripts/check

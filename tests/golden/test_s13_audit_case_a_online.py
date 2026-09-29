@@ -1,8 +1,9 @@
-"""CLIENT-A1 keyless ANAF acceptance; live network and reference library required."""
+"""audit_case_a keyless ANAF acceptance; live network and reference library required."""
 
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path
 from tests.workspace_jobs import create_job
 
 from ema.audit.cf_owner import company_from_necesar_name, read_owner_cui
@@ -21,16 +22,16 @@ class NoSearch:
         raise AssertionError(f"No live search backend configured: {query}")
 
 
-def test_CLIENT-A1_anaf_with_snapshot(reference_library: Path, tmp_path: Path) -> None:
-    received = reference_library / "audit/cases/audit-case-a/received"
+def test_audit_case_a_anaf_with_snapshot(reference_library: Path, tmp_path: Path) -> None:
+    received = reference_library / case_path("audit-case-a", "received")
     necesar = next(received.glob("*Necesar info*.xls"))
     ws = Workspace(tmp_path / "workspace")
-    job = create_job(ws, "audit", "CLIENT-A1", 2026)
+    job = create_job(ws, "audit", "audit-case-a", 2026)
     read_dossier(ws, job, necesar)
     located = read_owner_cui(
         list(received.glob("*Extras_Informare_CF*.pdf")), company_from_necesar_name(necesar)
     )
-    assert ws.add_file("CLIENT-A1", located.source) == located.evidence.file_sha
+    assert ws.add_file("audit-case-a", located.source) == located.evidence.file_sha
     propose(
         ws,
         job,

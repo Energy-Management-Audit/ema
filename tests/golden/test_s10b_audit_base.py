@@ -13,6 +13,7 @@ import pytest
 from docx import Document
 from docx.oxml.ns import qn
 from lxml import etree
+from tests.golden.cases import case_path
 
 from ema.audit.base import build_base, build_configured_base
 from ema.audit.base_anchor import MARKER, _paragraph_text
@@ -35,12 +36,11 @@ pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 def _references(root: Path) -> tuple[Path, Path]:
-    audits = root / "audit/finished-audits"
-    return next(audits.glob("*AUDIT-01*.docx")), next(audits.glob("*AUDIT-04*.docx"))
+    return case_path("audit-01"), case_path("audit-04")
 
 
-def _CLIENT-A1_plan(root: Path) -> UnitPlan:
-    received = root / "audit/cases/audit-case-a/received"
+def _audit_case_a_plan(root: Path) -> UnitPlan:
+    received = root / case_path("audit-case-a", "received")
     # Six distinct 5.x Flux schemes; the second 5.1 file is a revision.
     assert process_count([path.name for path in received.iterdir()], None) == (6, "schemes")
     panels = list(received.glob("13.[56].Armonici*.pdf"))
@@ -54,8 +54,8 @@ def _CLIENT-A1_plan(root: Path) -> UnitPlan:
     return UnitPlan(received.parent.name, 6, frozenset(families), 2, False, 3, 0)
 
 
-def _CLIENT-A2_plan(root: Path) -> UnitPlan:
-    case = root / "audit/cases/audit-case-b"
+def _audit_case_b_plan(root: Path) -> UnitPlan:
+    case = root / case_path("audit-case-b")
     received = case / "received"
     # No 5.x schemes; the received Fisa has two body paragraphs beginning "Flux".
     fisa = next(received.glob("Fisa*.docx"))
@@ -71,7 +71,7 @@ def _CLIENT-A2_plan(root: Path) -> UnitPlan:
 def _section_paragraphs(path: Path, section: str) -> list[object]:
     document = Document(path)
     clean_base(document)
-    mapping = map_headings(path, "AUDIT-01")
+    mapping = map_headings(path, "audit-01")
     heading = next(item.heading for item in mapping.mapped if item.section_id == section)
     later = [
         item.heading.index
@@ -103,9 +103,9 @@ def _prototype_format(base: Path, prototype: Path, output: Path) -> None:
     source = Document(base)
     reference = Document(prototype)
     built = Document(output)
-    source_map = map_headings(base, "AUDIT-01")
-    reference_map = map_headings(prototype, "AUDIT-04")
-    built_map = map_headings(output, "AUDIT-01")
+    source_map = map_headings(base, "audit-01")
+    reference_map = map_headings(prototype, "audit-04")
+    built_map = map_headings(output, "audit-01")
     source_process = next(item for item in source_map.mapped if item.section_id == "ch3.process")
     expected_style = source.paragraphs[source_process.heading.index].style.style_id
     for item in built_map.mapped:
@@ -170,16 +170,20 @@ def _toc_in_step(path: Path) -> None:
     assert len(names) == len(set(names))
 
 
-@pytest.mark.parametrize("case", ("CLIENT-A1", "CLIENT-A2"))
+@pytest.mark.parametrize("case", ("audit-case-a", "audit-case-b"))
 def test_audit_base_for_case(reference_library: Path, tmp_path: Path, case: str) -> None:
     base, prototype = _references(reference_library)
     identity = _identity(base)
-    plan = _CLIENT-A1_plan(reference_library) if case == "CLIENT-A1" else _CLIENT-A2_plan(reference_library)
-    with NamedTemporaryFile(suffix="-AUDIT-01.docx") as temporary:
+    plan = (
+        _audit_case_a_plan(reference_library)
+        if case == "audit-case-a"
+        else _audit_case_b_plan(reference_library)
+    )
+    with NamedTemporaryFile(suffix="-audit-01.docx") as temporary:
         selected = Document(base)
         select_units(selected, base, prototype, plan)
         selected.save(temporary.name)
-        units = inventory(Path(temporary.name))
+        units = inventory(Path(temporary.name), "audit-01")
         assert len(units.processes) == plan.processes
         assert len(units.measured_panels) == plan.measured_panels
         assert len(units.equipment_tables) == plan.equipment_tables
@@ -190,7 +194,7 @@ def test_audit_base_for_case(reference_library: Path, tmp_path: Path, case: str)
         output=tmp_path / f"{case}.docx",
         base_identity=identity,
     )
-    mapping = map_headings(output, "AUDIT-01")
+    mapping = map_headings(output, "audit-01")
     assert not mapping.unmapped
     assert {item.section_id for item in mapping.mapped} <= {item.id for item in CATALOGUE}
     assert sum(item.section_id == "ch3.process" for item in mapping.mapped) == plan.processes
@@ -246,7 +250,7 @@ def test_absent_measurements_shift_printed_chapters(
         output=tmp_path / "without-measurements.docx",
         base_identity=_identity(base),
     )
-    mapping = map_headings(output, "AUDIT-01")
+    mapping = map_headings(output, "audit-01")
     assert not any(item.section_id == "ch5" for item in mapping.mapped)
     document = Document(output)
     toc_roots = [

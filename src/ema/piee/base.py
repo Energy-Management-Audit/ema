@@ -1,4 +1,4 @@
-"""One-time CLIENT-I5 base classification; only the resulting bookmarks are used at render."""
+"""One-time approved PIEE base classification; only the resulting bookmarks are used at render."""
 
 # pyright: reportPrivateUsage=false
 

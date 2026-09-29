@@ -21,7 +21,7 @@ from ema.invoices.models import (
     FieldStatus,
     InputDocument,
 )
-from ema.invoices.parsers.CLIENT-I7_supplier_parser import (
+from ema.invoices.parsers.reinvoicing_supplier_parser import (
     ElectricPlannersInvoiceParser,
     GeticaInvoiceParser,
 )
@@ -34,7 +34,7 @@ def _document(*texts: str) -> InputDocument:
     )
 
 
-def test_CLIENT-I7_getica_splits_locations_and_uses_only_location_price_rows() -> None:
+def test_reinvoicing_getica_splits_locations_and_uses_only_location_price_rows() -> None:
     document = _document(
         """
 Nr. factura: BZGETEE23 1001
@@ -67,7 +67,7 @@ Alt loc (POD: 123456789012345679)
     assert all(draft.is_exportable for draft in drafts)
 
 
-def test_CLIENT-I7_electric_planners_preserves_same_pod_with_distinct_meters() -> None:
+def test_reinvoicing_electric_planners_preserves_same_pod_with_distinct_meters() -> None:
     header = """
 FACTURĂ ENERGIE ELECTRICĂ
 SERIA ELEC Nr. 1001
@@ -103,7 +103,7 @@ Certificate verzi MWH 5 20 100 19 119
     assert all(draft.is_exportable for draft in drafts)
 
 
-def test_CLIENT-I7_electric_planners_exports_client_level_advance_without_inventing_pod() -> None:
+def test_reinvoicing_electric_planners_exports_client_level_advance_without_inventing_pod() -> None:
     document = _document(
         """
 FACTURĂ ENERGIE ELECTRICĂ (AVANS)
@@ -130,7 +130,9 @@ ELECTRICĂ (MWh) CU TVA (RON)
     assert draft.is_exportable
 
 
-def test_CLIENT-I7_electric_planners_recovers_wrapped_quantity_from_printed_net_and_price() -> None:
+def test_reinvoicing_electric_planners_recovers_wrapped_quantity_from_printed_net_and_price() -> (
+    None
+):
     document = _document(
         """
 FACTURĂ ENERGIE ELECTRICĂ

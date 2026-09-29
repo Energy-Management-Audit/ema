@@ -13,7 +13,7 @@ from docx.oxml.ns import qn
 
 from ema.audit.base_numbering import insert_chapter_numbering
 from ema.audit.base_prototypes import import_formatting
-from ema.audit.headings import MappedHeading, map_headings
+from ema.audit.headings import MappedHeading, map_headings, profile_for_document
 from ema.audit.inventory import BaseUnit, inventory
 
 
@@ -126,7 +126,7 @@ def _insert_measurements(document: Any, prototype: Path, needed: bool) -> None:
     if not needed:
         return
     source = Document(str(prototype))
-    audit = "AUDIT-04" if "AUDIT-04" in prototype.name.casefold() else "AUDIT-03"
+    audit = profile_for_document(prototype)
     span = next(
         (start, end)
         for item, start, end in _heading_spans(prototype, audit, source)
@@ -138,7 +138,7 @@ def _insert_measurements(document: Any, prototype: Path, needed: bool) -> None:
         if item.section_id == "ch6"
     )
     assert span[1] == chapter_six
-    # AUDIT-01's catalogue ch6 is printed as chapter 5; insert before that heading.
+    # The audit base's catalogue ch6 is printed as chapter 5; insert before that heading.
     following = [
         _body(document)[start]
         for item, start, _ in heading_spans_document(document)
@@ -156,7 +156,7 @@ def _insert_measurements(document: Any, prototype: Path, needed: bool) -> None:
 def heading_spans_document(document: Any) -> list[tuple[MappedHeading, int, int]]:
     # A transient copy allows the existing mapper to supply catalogue identities.
     with _Saved(document) as temporary:
-        return _heading_spans(temporary, "AUDIT-01", document)
+        return _heading_spans(temporary, "audit-01", document)
 
 
 def _remove_carriers(document: Any, source_path: Path, present: frozenset[str]) -> None:
@@ -177,7 +177,7 @@ def _remove_carriers(document: Any, source_path: Path, present: frozenset[str]) 
         "ch4.apa": "water",
         "ch4.specific_apa": "water",
     }
-    spans = _heading_spans(source_path, "AUDIT-01", document)
+    spans = _heading_spans(source_path, "audit-01", document)
     for item, start, end in reversed(spans):
         group = family.get(item.section_id)
         if group and group not in present:
@@ -185,20 +185,23 @@ def _remove_carriers(document: Any, source_path: Path, present: frozenset[str]) 
 
 
 def select_units(document: Any, base: Path, prototype: Path, plan: UnitPlan) -> None:
+    base_profile = profile_for_document(base)
     _remove_carriers(document, base, plan.carriers)
     # Each operation changes body coordinates, so refresh the inventory.
     with _Saved(document) as current:
-        _resize(document, inventory(current).measures, plan.measures)
+        _resize(document, inventory(current, base_profile).measures, plan.measures)
     with _Saved(document) as current:
-        _resize(document, inventory(current).equipment_tables, plan.equipment_tables)
+        _resize(document, inventory(current, base_profile).equipment_tables, plan.equipment_tables)
     with _Saved(document) as current:
-        _resize(document, inventory(current).processes, plan.processes)
+        _resize(document, inventory(current, base_profile).processes, plan.processes)
     _insert_measurements(
         document, prototype, bool(plan.measured_panels or plan.thermal_measurements)
     )
     if plan.measured_panels or plan.thermal_measurements:
         with _Saved(document) as current:
-            _resize(document, inventory(current).measured_panels, plan.measured_panels)
+            _resize(
+                document, inventory(current, base_profile).measured_panels, plan.measured_panels
+            )
         if not plan.thermal_measurements:
             for item, start, end in reversed(heading_spans_document(document)):
                 if item.section_id == "ch5.termic":
@@ -211,7 +214,7 @@ class _Saved:
         self.path: Path | None = None
 
     def __enter__(self) -> Path:
-        temporary = NamedTemporaryFile(suffix="-AUDIT-01.docx", delete=False)
+        temporary = NamedTemporaryFile(suffix="-audit-01.docx", delete=False)
         temporary.close()
         self.path = Path(temporary.name)
         self.document.save(str(self.path))

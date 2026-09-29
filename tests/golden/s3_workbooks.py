@@ -201,7 +201,7 @@ def _alternate_intensity(rows: list[list[Any]], years: tuple[int, ...]) -> dict[
 def _production(
     book: Workbook, years: tuple[int, ...], case: str
 ) -> tuple[dict[str, dict[int, CarrierSeries]], dict[str, str]]:
-    if case == "CLIENT-P2":
+    if case == "piee-case-b":
         raw = monthly_physical(book.sheet("Productii"), "tone/luna", "tone", years)
         scaled = {
             y: CarrierSeries(
@@ -213,7 +213,7 @@ def _production(
             for y, series in raw.items()
         }
         return {"main": scaled}, {"main": "mii tone"}
-    if case == "CLIENT-A3":
+    if case == "audit-case-c":
         # The labelled annual production row is the denominator of her ratio table.
         rows = book.sheet("Productii-energie")
         header = rows[0]
@@ -225,10 +225,10 @@ def _production(
             }
         }, {"main": "tone"}
     rows = book.sheet("Productii")
-    label = "kWh gaz vehiculat" if case == "CLIENT-P1" else "valoarea productiei"
-    unit = "kWh gaz vehiculat" if case == "CLIENT-P1" else "mii lei"
+    label = "kWh gaz vehiculat" if case == "piee-case-a" else "valoarea productiei"
+    unit = "kWh gaz vehiculat" if case == "piee-case-a" else "mii lei"
     series = monthly_physical(rows, label, unit, years)
-    if case == "CLIENT-P1":
+    if case == "piee-case-a":
         series = {
             y: CarrierSeries(
                 {

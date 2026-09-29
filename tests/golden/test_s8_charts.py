@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path
 
 from ema.core.office.anchors import AnchorLedger
 from ema.core.office.base_map import load as load_map
@@ -23,10 +24,10 @@ def _only(folder: Path, pattern: str) -> Path:
     return files[0]
 
 
-def test_CLIENT-P1_bar_charts_keep_first_ten_approved_value_caches(
+def test_piee_case_a_bar_charts_keep_first_ten_approved_value_caches(
     reference_library: Path, tmp_path: Path
 ) -> None:
-    sources = reference_library / "piee/cases/piee-case-a"
+    sources = reference_library / case_path("piee-case-a")
     data = load(
         2025,
         _only(sources, "Anexa*.xlsx"),

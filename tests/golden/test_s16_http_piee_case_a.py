@@ -1,4 +1,4 @@
-"""CLIENT-P1's received files exercise the complete HTTP PIEE review journey."""
+"""piee_case_a's received files exercise the complete HTTP PIEE review journey."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 from lxml import etree
 from pypdfium2 import PdfDocument
+from tests.golden.cases import case_path
 
 from conftest import artifacts_path
 from ema.api import create_app
@@ -54,7 +55,7 @@ def _journey(  # noqa: PLR0915
     base = next((reference_library / "piee/finished-programs").glob("*MODEL_2026.docx"))
     monkeypatch.setenv("EMA_PIEE_BASE_DOCUMENT", str(base))
     monkeypatch.setenv("EMA_PIEE_BASE_DIRECTORY", str(artifacts_path("s8", "base")))
-    received = reference_library / "piee/cases/piee-case-a/received"
+    received = reference_library / case_path("piee-case-a", "received")
     sources = {
         "anexa": next(received.glob("Anexa*.xlsx")),
         "questionnaire": next(received.glob("Necesar*.xls")),
@@ -269,7 +270,7 @@ def _journey(  # noqa: PLR0915
     return ws, job, final["id"]
 
 
-def test_CLIENT-P1_http_review_and_final_package(
+def test_piee_case_a_http_review_and_final_package(
     reference_library: Path,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -277,7 +278,7 @@ def test_CLIENT-P1_http_review_and_final_package(
     _journey(reference_library, tmp_path, monkeypatch, stub_word=True)
 
 
-def test_CLIENT-P1_native_word_toc_pdf(
+def test_piee_case_a_native_word_toc_pdf(
     reference_library: Path,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

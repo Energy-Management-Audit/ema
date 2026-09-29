@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 
 import pytest
+from tests.golden.cases import case_path
 
 from ema.core.office.anchors import AnchorLedger
 from ema.core.office.base_map import load as load_map
@@ -36,10 +37,10 @@ def _pies(path: Path) -> list[str]:
     ]
 
 
-def test_CLIENT-P1_pies_match_approved_shares_and_standalone_package(
+def test_piee_case_a_pies_match_approved_shares_and_standalone_package(
     reference_library: Path, tmp_path: Path
 ) -> None:
-    sources = reference_library / "piee/cases/piee-case-a"
+    sources = reference_library / case_path("piee-case-a")
     data = load(
         2025,
         _only(sources, "Anexa*.xlsx"),
@@ -74,10 +75,10 @@ def test_CLIENT-P1_pies_match_approved_shares_and_standalone_package(
     assert not check_standalone(output)
 
 
-def test_CLIENT-P2_raw_mix_pies_follow_delivered_categories_and_available_values(
+def test_piee_case_b_raw_mix_pies_follow_delivered_categories_and_available_values(
     reference_library: Path, tmp_path: Path
 ) -> None:
-    sources = reference_library / "piee/cases/piee-case-b"
+    sources = reference_library / case_path("piee-case-b")
     previous = _only(sources / "final", "*.docx")
     data = load(
         2025,

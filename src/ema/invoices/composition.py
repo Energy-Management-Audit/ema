@@ -20,7 +20,7 @@ from ema.invoices.parsers.met_energy_parser import (
 )
 from ema.invoices.parsers.next_energy_parser import NextEnergyInvoiceParser
 from ema.invoices.parsers.omv_petrom_parser import OmvPetromInvoiceParser
-from ema.invoices.parsers.CLIENT-I7_supplier_parser import (
+from ema.invoices.parsers.reinvoicing_supplier_parser import (
     ElectricPlannersInvoiceParser,
     GeticaInvoiceParser,
 )

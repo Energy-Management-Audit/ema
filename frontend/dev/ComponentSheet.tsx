@@ -117,7 +117,7 @@ export function ComponentSheet({ theme }: { theme: Theme }) {
       </SheetRow>
 
       <SheetRow label="CÂMPURI">
-        <TextField defaultValue="CLIENT-P1 S.A." width={220} aria-label="Denumire" />
+        <TextField defaultValue="Client B S.A." width={220} aria-label="Denumire" />
         <TextField
           defaultValue="4 218 kW"
           width={150}

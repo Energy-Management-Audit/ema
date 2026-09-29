@@ -14,7 +14,7 @@ from ema.piee.base import SUPPORTED_BASE_SHA, build_local_base
 pytestmark = pytest.mark.golden
 
 
-def test_CLIENT-I5_base_map_is_complete_and_version_bound(
+def test_invoice_case_e_base_map_is_complete_and_version_bound(
     reference_library: Path, tmp_path: Path
 ) -> None:
     bases = list((reference_library / "piee" / "finished-programs").glob("*MODEL_2026.docx"))

@@ -1,4 +1,4 @@
-// D9.2 golden (local only): the audit report journey on CLIENT-A1's received dossier through the built
+// D9.2 golden (local only): the audit report journey on audit-case-a's received dossier through the built
 // app, the real API and Word for Mac. Client values stay in the workspace and the artifacts
 // folder; the script prints only pass/fail lines, counts and file names.
 //
@@ -75,7 +75,7 @@ try {
   const base = { ...process.env, EMA_WORKSPACE: workspace }
   const seeded = python(['seed', workspace, scratch], base)
   const job = seeded.job
-  check(Boolean(job), 'seeded: CLIENT-A1 intake + read, two replayed drafts, three measures')
+  check(Boolean(job), 'seeded: audit-case-a intake + read, two replayed drafts, three measures')
   const env = { ...base, ...seeded.env }
   check(
     python(['review-ui', workspace, scratch, job], env).reviewed,

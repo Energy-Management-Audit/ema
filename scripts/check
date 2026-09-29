@@ -12,10 +12,11 @@ else
   pyright=.venv/bin/pyright
   export PATH="$PWD/.venv/bin:$PATH"
 fi
+"$python" scripts/check_private_terms.py
 "$python" -m ruff format --check .
 "$python" -m ruff check .
 "$python" scripts/check_file_size.py
-"$pyright"
+"$pyright" --pythonpath "$python"
 "$lint"
 coverage_file="$(mktemp "${TMPDIR:-/tmp}/ema-coverage.XXXXXX")"
 trap 'rm -f "$coverage_file"' EXIT
