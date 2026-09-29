@@ -6,6 +6,7 @@ import pytest
 from docx import Document
 from openpyxl import load_workbook
 from tests.conftest import artifacts_path
+from tests.workspace_jobs import create_job
 
 from ema.audit.base import build_base
 from ema.audit.base_units import UnitPlan, heading_spans_document
@@ -13,7 +14,6 @@ from ema.audit.chapter_six import ChapterSixPlan, render_chapter_six
 from ema.audit.inventory import inventory
 from ema.audit.measures import run_measures
 from ema.audit.measures_form import write_measures_form
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 
 pytestmark = pytest.mark.golden
@@ -24,10 +24,30 @@ def _synthetic_form(path: Path) -> Path:
     book = load_workbook(path)
     sheet = book["Măsuri propuse"]
     sheet.append(
-        [1, "Lighting retrofit", "Less electricity", "Energie electrică", 100, "MWh", 40, 10, None]
+        [
+            1,
+            "LED lighting retrofit",
+            "Less electricity",
+            "Energie electrică",
+            100,
+            "MWh",
+            40,
+            10,
+            None,
+        ]
     )
     sheet.append(
-        [2, "Gas recovery", "Less gas", "Gaze naturale", 10, "MWh", 20, None, "Estimate pending"]
+        [
+            2,
+            "BMS gas recovery",
+            "Less gas",
+            "Gaze naturale",
+            10,
+            "MWh",
+            20,
+            None,
+            "Estimate pending",
+        ]
     )
     sheet.append([3, "Fleet change", "Less diesel", "Motorină", 1, "t", 50, 25, None])
     book.save(path)
@@ -62,7 +82,7 @@ def test_three_measures_in_base(reference_library: Path, tmp_path: Path, with_ch
     form = _synthetic_form(tmp_path / "measures.xlsx")
     ws.set_slot(job, "measures", ws.add_file("synthetic", form))
     result = run_measures(ws, job)
-    plan = ChapterSixPlan.model_validate_json(result.plan_path.read_text("utf-8"))
+    plan = ChapterSixPlan.model_validate_json(result.plan_path.read_text(encoding="utf-8"))
     output = output_dir / "chapter-six.docx"
     report = render_chapter_six(base, output, plan, identity)
     document = Document(output)
@@ -79,7 +99,10 @@ def test_three_measures_in_base(reference_library: Path, tmp_path: Path, with_ch
         f"{chapter}.3",
         f"{chapter}.4",
     ]
-    assert "Lighting retrofit" in text and "Gas recovery" in text and "Fleet change" in text
+    assert "LED lighting retrofit" in text and "BMS gas recovery" in text and "Fleet change" in text
+    assert {"LED lighting retrofit;", "BMS gas recovery;", "fleet change."} <= {
+        paragraph.text for paragraph in document.paragraphs
+    }
     assert "[de completat]" in text
     assert len(document.tables) >= 4
     spans = heading_spans_document(document)

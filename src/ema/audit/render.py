@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sqlite3
 from collections.abc import Iterable
 from datetime import date
 from functools import partial
@@ -45,6 +46,8 @@ from ema.audit.render_writers import (
     write_intro,
     write_six,
 )
+from ema.audit.sections import refresh_staleness
+from ema.audit.staleness import current_inputs
 from ema.core.config import Settings, load_settings
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, get_job, run_stage
@@ -120,19 +123,23 @@ ITERATED = ("carrier.", "carrier_tep.", "production.", "turnover.", "energy_cost
 LOOKED_UP = ("audit.company_name", "audit.address", "audit_measure.count")
 
 
-def _read_fields(ctx: StageContext, keys: Iterable[str]) -> list[Field]:
+def _read_fields(
+    ctx: StageContext, keys: Iterable[str], db: sqlite3.Connection | None = None
+) -> list[Field]:
     """The fields the render uses, with their membership bound: a key looked up is recorded even
     when absent, and each iterated family by the (key, revision) set it holds, so an insertion,
     a deletion or a decision in any of them makes the render stale."""
     looked_up = set(keys)
-    with ctx.ws.connect() as db:
-        db.execute("BEGIN")
-        rows = db.execute(
-            "SELECT key,data FROM fields WHERE job_id=? ORDER BY key", (ctx.job,)
-        ).fetchall()
-        reads = [("fields.key", f"{ctx.job}:{key}") for key in sorted(looked_up)]
-        reads += [("fields.prefix", f"{ctx.job}:{prefix}") for prefix in ITERATED]
-        recorded = [(table, row_id, revision(db, table, row_id) or 0) for table, row_id in reads]
+    if db is None:
+        with ctx.ws.connect() as connection:
+            connection.execute("BEGIN")
+            return _read_fields(ctx, looked_up, connection)
+    rows = db.execute(
+        "SELECT key,data FROM fields WHERE job_id=? ORDER BY key", (ctx.job,)
+    ).fetchall()
+    reads = [("fields.key", f"{ctx.job}:{key}") for key in sorted(looked_up)]
+    reads += [("fields.prefix", f"{ctx.job}:{prefix}") for prefix in ITERATED]
+    recorded = [(table, row_id, revision(db, table, row_id) or 0) for table, row_id in reads]
     for table, row_id, value in recorded:
         ctx.record_read(table, row_id, value)
     return [
@@ -142,12 +149,14 @@ def _read_fields(ctx: StageContext, keys: Iterable[str]) -> list[Field]:
     ]
 
 
-def _record_sections(ctx: StageContext) -> None:
+def _record_sections(ctx: StageContext, db: sqlite3.Connection | None = None) -> None:
     """Every section's decision is an input: a later done -> n/a makes this render stale."""
-    with ctx.ws.connect() as db:
-        rows = db.execute(
-            "SELECT section_id,revision FROM section_states WHERE job_id=?", (ctx.job,)
-        ).fetchall()
+    if db is None:
+        with ctx.ws.connect() as connection:
+            return _record_sections(ctx, connection)
+    rows = db.execute(
+        "SELECT section_id,revision FROM section_states WHERE job_id=?", (ctx.job,)
+    ).fetchall()
     revisions = {str(row["section_id"]): int(row["revision"]) for row in rows}
     for section in CATALOGUE:
         ctx.record_read("section_states", f"{ctx.job}:{section.id}", revisions.get(section.id, 0))
@@ -198,11 +207,17 @@ def _render(  # noqa: C901, PLR0912, PLR0915
     client = str(get_job(ws, job)["client_slug"])
     dossier = ctx.read_slots("dossier")
     visit = ctx.read_slots("visit")
-    drafted = drafted_sections(ws, job)
+    drafted = drafted_sections(ws, job, ctx=ctx)
     facts = (key for section in drafted for key in SECTION_FACTS.get(section, ()))
-    job_fields = _read_fields(ctx, (*LOOKED_UP, *facts))
-    _record_sections(ctx)
-    plan = unit_plan(ws, job)
+    with ws.connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        refresh_staleness(ws, job, db, base_sha=base_sha)
+        job_fields = _read_fields(ctx, (*LOOKED_UP, *facts), db)
+        _record_sections(ctx, db)
+        plan = unit_plan(ws, job, db=db, ctx=ctx)
+        composition_facts, _ = current_inputs(db, job)
+        ctx.record_read("audit_materials", job, revision(db, "audit_materials", job) or 0)
+
     ctx.record_input(template=base_sha)
     (folder / INPUTS).write_text(json.dumps(base.inputs, indent=2), encoding="utf-8")
     start = build_base(
@@ -253,6 +268,7 @@ def _render(  # noqa: C901, PLR0912, PLR0915
                             job=job,
                             section=section.id,
                             by_key=by_key,
+                            ctx=ctx,
                         ),
                     )
         elif chapter_id == "ch4":
@@ -270,10 +286,10 @@ def _render(  # noqa: C901, PLR0912, PLR0915
                     charts_skipped=charts_skipped,
                 ),
             )
-        elif chapter_id == "ch5" and (runs := ready_runs(ws, job, "measurements")):
+        elif chapter_id == "ch5" and (runs := ready_runs(ws, job, "measurements", ctx=ctx)):
             images = {slot.slot: ws.file_path(client, slot.file_sha) for slot in visit}
             chain.apply("ch5", partial(write_five, runs[0], images, base.identity))
-        elif chapter_id == "ch6" and (runs := ready_runs(ws, job, "measures")):
+        elif chapter_id == "ch6" and (runs := ready_runs(ws, job, "measures", ctx=ctx)):
             chain.apply("ch6", partial(write_six, runs[0], base.identity))
     ctx.progress(len(chapters), len(chapters), f"Capitolul {len(chapters)} din {len(chapters)}")
     name = NAMES[kind]
@@ -294,10 +310,8 @@ def _render(  # noqa: C901, PLR0912, PLR0915
         raise EmaError(
             "audit_package", "Pachetul Word al auditului este invalid.", "; ".join(issues[:3])
         )
-    if kind == "final" and (hits := ai_wording_hits(docx, job_fields)):
-        raise EmaError(
-            "audit_ai_wording", "Raportul final conţine formulări despre AI.", "; ".join(hits)
-        )
+    if hits := ai_wording_hits(docx, job_fields):
+        raise EmaError("audit_ai_wording", "Raportul conţine formulări despre AI.", "; ".join(hits))
     counts = body_counts(docx, cover_labels(anchors))
     if kind == "final" and counts.markers:
         sections = dict.fromkeys(section_id for section_id, _ in counts.markers)
@@ -351,7 +365,14 @@ def _render(  # noqa: C901, PLR0912, PLR0915
         failed = failed_intros | {
             item.section_id for item in chain.failures if item.section_id == "ch4"
         }
-        mark_render_drafted(ctx, docx, base_sha, failed)
+        mark_render_drafted(
+            ctx,
+            docx,
+            base_sha,
+            failed,
+            facts=composition_facts,
+            client_revision=plan.client_revision,
+        )
     return StageOutcome(item_failures=[item.section_id for item in chain.failures])
 
 

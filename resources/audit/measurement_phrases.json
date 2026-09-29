@@ -17,12 +17,10 @@
   {"id": "results_voltage", "template": "Valorile tensiunii sunt în limitele admise.", "source": "AUDIT-03 audit ¶ Rezultatele măsurătorilor electroenergetice", "adapted": true},
   {"id": "results_frequency", "template": "Valorile frecvenței sunt în limitele admise.", "source": "AUDIT-03 audit ¶ Rezultatele măsurătorilor electroenergetice", "adapted": true},
   {"id": "results_thd_u", "template": "Distorsiunea armonică totală a tensiunii respectă limita admisă.", "source": "AUDIT-03 audit ¶ Rezultatele măsurătorilor electroenergetice", "adapted": true},
-  {"id": "results_current_asymmetry", "template": "Asimetria curenților pe fază este în limita admisă.", "source": "AUDIT-03 audit ¶ Rezultatele măsurătorilor electroenergetice", "adapted": true},
   {"id": "results_power_factor", "template": "Factorul de putere este în limita admisă.", "source": "AUDIT-03 audit ¶ Rezultatele măsurătorilor electroenergetice", "adapted": true},
   {"id": "conclusions_first", "template": "Măsurătorile electroenergetice confirmă încadrarea valorilor evaluate în limitele admise.", "source": "AUDIT-03 audit ¶ Concluziile măsurătorilor electroenergetice", "adapted": true},
   {"id": "norm_voltage", "template": "Valorile tensiunii se încadrează în limita de ±10 % față de tensiunea nominală.", "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Conform standardului EN 50160", "adapted": true},
   {"id": "norm_frequency", "template": "Valorile frecvenței se încadrează în intervalul admis.", "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Frecvența", "adapted": true},
   {"id": "norm_thd_u", "template": "Distorsiunea armonică totală a tensiunii este sub limita de 8 %.", "source": "Fișa de măsuratori electroenergetice - model.docx ¶ Armonicelor THD", "adapted": true},
-  {"id": "norm_current_asymmetry", "template": "Asimetria curenților pe fază se încadrează în limita de 2 %.", "source": "Fișa de măsuratori electroenergetice - model.docx ¶ curenților pe fază", "adapted": true},
   {"id": "norm_power_factor", "template": "Factorul de putere este cel puțin 0,9.", "source": "AUDIT-03 audit ¶ factorul de putere", "adapted": true}
 ]

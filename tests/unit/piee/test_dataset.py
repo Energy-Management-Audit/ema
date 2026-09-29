@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from ema.core.errors import EmaError
 from ema.core.office.sheets import CellRef
 from ema.energy_data.anexa_cells import AnexaData
 from ema.energy_data.carriers import Carrier
@@ -79,8 +80,9 @@ def test_prelucrare_covering_analysis_years_exempts_necesar() -> None:
 def test_missing_necesar_requires_full_prelucrare_period() -> None:
     anexa, _ = _inputs(0.086)
     imported = PrelucrareData(EnergyDataset((2024, 2025), {}), FactorTable("test", 1, (), ()))
-    with pytest.raises(ValueError, match="Necesar info is required"):
+    with pytest.raises(EmaError) as error:
         assemble(2025, anexa, None, imported)
+    assert error.value.code == "piee_sources_incomplete"
 
 
 @pytest.mark.parametrize("filed_tep, conflict", [(1.0, False), (2.0, True)])

@@ -5,13 +5,13 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.core.jobs import StageOutcome, create_job, run_stage, subscribe
+from ema.core.jobs import StageOutcome, run_stage, subscribe
 from ema.core.workspace import Workspace
 from ema.invoices.batch_identity import KEY as BATCH_CLIENT_KEY
 
@@ -110,16 +110,6 @@ def test_client_anaf_settings_and_reporting_persistence(
     )
     assert indexed.status_code == 200
     assert len(indexed.json()["imported"]) == 1
-    monkeypatch.setattr(
-        "ema.reporting.runs.generate",
-        lambda _paths, _years, _names: SimpleNamespace(
-            exceptions=[], companies=[], consumption_year=2025
-        ),
-    )
-    monkeypatch.setattr(
-        "ema.reporting.runs.write_report",
-        lambda _result, path: path.write_bytes(b"synthetic workbook"),
-    )
     started = client.post(
         "/reporting/runs",
         json={"years": [2025], "client_ids": [client_id]},
@@ -181,7 +171,7 @@ def test_invoice_http_confirm_and_final_export(tmp_path: Path, monkeypatch) -> N
 
     def extract(ctx):  # type: ignore[no-untyped-def]
         ctx.read_slots("invoices")
-        (ctx.artifact_dir() / "outcomes.json").write_text(json.dumps(rows))
+        (ctx.artifact_dir() / "outcomes.json").write_text(json.dumps(rows), encoding="utf-8")
         return StageOutcome()
 
     run_stage(ws, job, "invoices", extract)
@@ -217,19 +207,12 @@ def test_invoice_http_confirm_and_final_export(tmp_path: Path, monkeypatch) -> N
         "ema.invoices.OpenpyxlWorkbookExporter.export",
         lambda _self, _drafts, path: path.write_bytes(b"synthetic workbook"),
     )
-    draft = client.post(
-        f"/jobs/{job}/export/draft",
-        json={"on_revision": client.get(f"/jobs/{job}").json()["revision"]},
-        headers=headers,
+    assert (
+        client.post(
+            f"/jobs/{job}/export/draft", json={"on_revision": 1}, headers=headers
+        ).status_code
+        == 404
     )
-    assert draft.status_code == 200 and draft.json()["kind"] == "draft"
-    next_draft = client.post(
-        f"/jobs/{job}/export/draft",
-        json={"on_revision": client.get(f"/jobs/{job}").json()["revision"]},
-        headers=headers,
-    )
-    assert next_draft.status_code == 200
-    assert next_draft.json()["output_id"] != draft.json()["output_id"]
     started = client.post(
         f"/jobs/{job}/stages/invoices_workbook",
         json={"on_revision": client.get(f"/jobs/{job}").json()["revision"]},
@@ -245,7 +228,7 @@ def test_invoice_http_confirm_and_final_export(tmp_path: Path, monkeypatch) -> N
     exported = client.post(
         f"/jobs/{job}/export",
         json={
-            "final": True,
+            "dest_dir": None,
             "output_id": final["id"],
             "readiness_hash": checks["readiness_hash"],
             "confirm": True,
@@ -258,7 +241,7 @@ def test_invoice_http_confirm_and_final_export(tmp_path: Path, monkeypatch) -> N
     stale_export = client.post(
         f"/jobs/{job}/export",
         json={
-            "final": True,
+            "dest_dir": None,
             "output_id": final["id"],
             "readiness_hash": checks["readiness_hash"],
             "confirm": True,

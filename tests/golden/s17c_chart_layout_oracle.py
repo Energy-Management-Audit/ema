@@ -1,8 +1,10 @@
 """Independent chart-layout assertions for S17c generated final documents."""
 
 import re
+from collections import Counter
 from pathlib import Path
 
+import pdfplumber
 from docx import Document
 from docx.text.paragraph import Paragraph
 from lxml import etree
@@ -103,3 +105,28 @@ def assert_chapter_tables(docx: Path) -> None:
         assert (text == TABLE_MISSING_NOTE) == missing
         if missing:
             assert any(node.get(W + "val") == "FF0000" for node in following.iter(W + "color"))
+
+
+def assert_production_values_fit_pdf(docx: Path, pdf: Path) -> None:
+    """Word keeps each long production value on one line within the six-month table."""
+    document = Document(str(docx))
+    span = next(
+        (start, end)
+        for item, start, end in heading_spans_document(document)
+        if item.section_id == "ch4.productie"
+    )
+    expected: Counter[str] = Counter()
+    for table in list(document.element.body)[span[0] : span[1]]:
+        if table.tag != W + "tbl":
+            continue
+        assert len(table.findall(W + "tblGrid/" + W + "gridCol")) == 7
+        for row in table.findall(W + "tr")[1:]:
+            for cell in row.findall(W + "tc")[1:]:
+                text = "".join(node.text or "" for node in cell.iter(W + "t"))
+                if re.fullmatch(r"\d[\d.,]*", text) and len(text) >= 10:
+                    expected[text] += 1
+    assert expected, "reference production table must exercise long values"
+    with pdfplumber.open(pdf) as exported:
+        whole = Counter(word["text"] for page in exported.pages for word in page.extract_words())
+    fits = all(whole[value] >= count for value, count in expected.items())
+    assert fits, "Word wrapped a long production value"

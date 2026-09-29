@@ -9,6 +9,7 @@ from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+from ema.core.office.workbook import save_workbook
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
 from ema.energy_data.factors import FACTORS_2026, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset
@@ -306,7 +307,12 @@ def _impact(
 
 
 def write_prelucrare(
-    dataset: EnergyDataset, years: tuple[int, ...], path: Path, factors: FactorTable = FACTORS_2026
+    dataset: EnergyDataset,
+    years: tuple[int, ...],
+    path: Path,
+    factors: FactorTable = FACTORS_2026,
+    *,
+    firm_name: str | None = None,
 ) -> None:
     if (
         not years
@@ -328,4 +334,4 @@ def write_prelucrare(
     _mwh_factor_sheet(book, factors, factor_refs)
     book.calculation.fullCalcOnLoad = True
     book.calculation.forceFullCalc = True
-    book.save(path)
+    save_workbook(book, path, firm_name=firm_name)

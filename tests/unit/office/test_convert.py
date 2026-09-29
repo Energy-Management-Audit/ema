@@ -2,12 +2,14 @@
 
 import pytest
 from docx import Document
+from tests.intake_helpers import intake_stage
+from tests.workspace_jobs import create_job
 from typer.testing import CliRunner
 
 from ema.cli import _app
 from ema.core.config import Settings
-from ema.core.intake import ItemOutcome, intake_file, intake_legacy, intake_stage
-from ema.core.jobs import StageContext, create_job, status
+from ema.core.intake import ItemOutcome, intake_file, intake_legacy
+from ema.core.jobs import StageContext, status
 from ema.core.office import convert as conversion_module
 from ema.core.office.convert import ConversionFailed, convert_doc
 from ema.core.office.errors import OfficeError
@@ -128,7 +130,7 @@ def test_superseded_result_is_stage_warning_with_rerun_step(tmp_path, monkeypatc
             FileKind.DOC,
             "superseded",
             warning=(
-                "Fișierul a fost înlocuit în timpul conversiei; rulați din nou preluarea "
+                "Fişierul a fost înlocuit în timpul conversiei; rulaţi din nou preluarea "
                 "pentru noua versiune (R21)."
             ),
         ),
@@ -137,7 +139,7 @@ def test_superseded_result_is_stage_warning_with_rerun_step(tmp_path, monkeypatc
     assert outcome.item_failures == []
     assert len(outcome.warnings) == 1
     assert "R21" in outcome.warnings[0]
-    assert "rulați din nou" in outcome.warnings[0]
+    assert "rulaţi din nou" in outcome.warnings[0]
 
 
 def test_conversion_timeout_preserves_original(tmp_path, monkeypatch):
@@ -168,9 +170,9 @@ def test_cancelled_before_conversion(tmp_path, monkeypatch):
 
 def test_cli_records_html_saved_as_xls(tmp_path, monkeypatch):
     ws = Workspace(tmp_path / "workspace")
-    job = create_job(ws, "audit", "synthetic", 2026)
+    job = create_job(ws, "piee", "synthetic", 2026)
     source = tmp_path / "misnamed.xls"
-    source.write_text("<!doctype html><html><body><table></table></body></html>")
+    source.write_text("<!doctype html><html><body><table></table></body></html>", encoding="utf-8")
     sha = ws.add_file("synthetic", source)
     ws.set_slot(job, "meters/0001", sha)
     monkeypatch.setenv("EMA_WORKSPACE", str(ws.root))
@@ -189,7 +191,7 @@ def test_collection_reports_each_item_and_keeps_failed_file_local(tmp_path, monk
     job = create_job(ws, "audit", "synthetic", 2026)
     for number in (1, 2, 3):
         source = tmp_path / f"item-{number}.txt"
-        source.write_text(f"item {number}")
+        source.write_text(f"item {number}", encoding="utf-8")
         ws.set_slot(job, f"dossier/{number:04}", ws.add_file("synthetic", source))
     original_intake = intake_file
 
@@ -212,7 +214,7 @@ def test_collection_stops_before_next_file_on_cancellation(tmp_path, monkeypatch
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "audit", "synthetic", 2026)
     source = tmp_path / "item.txt"
-    source.write_text("item")
+    source.write_text("item", encoding="utf-8")
     sha = ws.add_file("synthetic", source)
     for number in (1, 2):
         ws.set_slot(job, f"dossier/{number:04}", sha)
@@ -228,7 +230,7 @@ def test_html_with_unrelated_extension_is_detected(tmp_path):
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "audit", "synthetic", 2026)
     source = tmp_path / "misnamed.pdf"
-    source.write_text("<!doctype html><html><body>hello</body></html>")
+    source.write_text("<!doctype html><html><body>hello</body></html>", encoding="utf-8")
     sha = ws.add_file("synthetic", source)
     ws.set_slot(job, "meters/0001", sha)
     result = intake_file(StageContext(ws, job, "synthetic", "intake"), "meters/0001")

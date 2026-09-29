@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from ema.core.errors import EmaError
+from ema.core.llm.models import curated_models
 from ema.core.llm.types import Exchange, ToolCall, ToolSpec
 
 
@@ -51,7 +52,32 @@ class ReplayProvider:
         self._responses: list[dict[str, Any]] = data["responses"]
         self._format: str = data["format"]
         self.source: str = data["source"]
+        self._model_id: str | None = data.get("model")
         self.calls = 0
+
+    @property
+    def model_id(self) -> str:
+        if self._model_id:
+            return self._model_id
+        ids = {row["model"] for row in self._responses if isinstance(row.get("model"), str)}
+        if len(ids) == 1:
+            return str(ids.pop())
+        hashes = {row.get("request_hashes", {}).get("model") for row in self._responses}
+        matches = [
+            model.id
+            for model in curated_models()
+            if hashlib.sha256(json.dumps(model.id).encode()).hexdigest() in hashes
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        raise EmaError("replay_invalid", "Modelul înregistrării lipseşte.", "model")
+
+    @property
+    def provider_name(self) -> str:
+        for model in curated_models():
+            if model.id == self.model_id:
+                return model.provider
+        raise EmaError("model_unknown", "Modelul ales nu este disponibil.", self.model_id)
 
     def respond(  # noqa: PLR0913
         self,

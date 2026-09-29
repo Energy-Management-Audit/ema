@@ -21,8 +21,8 @@ def validate_id(client_id: str) -> str:
 
 def _view(row: Any) -> dict[str, Any]:
     result = dict(row)
-    result["sites"] = json.loads(result.pop("sites_json"))
-    result["contacts"] = json.loads(result.pop("contacts_json"))
+    result["sites"] = json.loads(result.pop("sites_json")) or []
+    result["contacts"] = json.loads(result.pop("contacts_json")) or []
     return result
 
 
@@ -65,6 +65,11 @@ def update_client(
             raise EmaError("client_missing", "Clientul nu există.", "")
         if row["revision"] != on_revision:
             raise EmaError("stale_revision", "Clientul a fost modificat.", "")
+        if "cui" in patch and re.sub(r"\D", "", str(patch["cui"] or "")) != re.sub(
+            r"\D", "", str(row["cui"] or "")
+        ):
+            db.execute("DELETE FROM anaf_snapshots WHERE client_id=?", (client_id,))
+            db.execute("UPDATE clients SET anaf_refreshed_at=NULL WHERE id=?", (client_id,))
         current = _view(row)
         current.update(patch)
         db.execute(
@@ -88,3 +93,13 @@ def list_sites(ws: Workspace, client_id: str) -> list[dict[str, Any]]:
 
 def list_contacts(ws: Workspace, client_id: str) -> list[dict[str, Any]]:
     return get_client(ws, client_id)["contacts"]
+
+
+def find_by_cui(ws: Workspace, cui: str) -> dict[str, Any]:
+    digits = re.sub(r"\D", "", cui)
+    with ws.connect() as db:
+        rows = db.execute("SELECT * FROM clients WHERE cui IS NOT NULL").fetchall()
+    for row in rows:
+        if digits and re.sub(r"\D", "", str(row["cui"])) == digits:
+            return _view(row)
+    raise EmaError("client_unknown", "Clientul nu există.", cui)

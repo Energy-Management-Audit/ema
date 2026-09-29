@@ -1,0 +1,22 @@
+"""Delivered timestamps migrate without changing existing approvals or FieldSpec data."""
+
+import sqlite3
+
+from ema.core.workspace.schema import SCHEMA_VERSION, migrate
+
+
+def test_v10_approval_survives_upgrade_with_null_delivery_timestamp():
+    with sqlite3.connect(":memory:") as db:
+        db.execute(
+            "CREATE TABLE approvals (id TEXT PRIMARY KEY, job_id TEXT, output_id TEXT, "
+            "readiness_hash TEXT, on_decision TEXT, at TEXT, actor TEXT)"
+        )
+        row = ("approved", "job", "output", "hash", None, "2026-09-29T00:00:00Z", "user")
+        db.execute("INSERT INTO approvals VALUES (?,?,?,?,?,?,?)", row)
+        db.execute("PRAGMA user_version=10")
+        db.commit()
+        migrate(db)
+        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 11
+        assert db.execute("SELECT * FROM approvals").fetchone() == (*row, None)
+        migrate(db)
+        assert db.execute("SELECT * FROM approvals").fetchone() == (*row, None)

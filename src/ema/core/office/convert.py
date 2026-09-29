@@ -16,9 +16,9 @@ from ema.core.workspace import SlotVersion, Workspace
 from ema.core.workspace.conversion import publish_conversion
 
 _MESSAGES = {
-    "needs_conversion": "Fișierul DOC trebuie convertit în DOCX.",
-    "convert_timeout": "Conversia fișierului DOC a depășit timpul permis.",
-    "convert_failed": "Conversia fișierului DOC a eșuat.",
+    "needs_conversion": "Fişierul DOC trebuie convertit în DOCX.",
+    "convert_timeout": "Conversia fişierului DOC a depăşit timpul permis.",
+    "convert_failed": "Conversia fişierului DOC a eşuat.",
 }
 
 

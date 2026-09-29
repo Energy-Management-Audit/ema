@@ -3,9 +3,9 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 
 

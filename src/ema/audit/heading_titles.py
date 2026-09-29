@@ -15,6 +15,7 @@ MARKER = "[de completat]"
 
 
 def body_title(text: str, level: int, prototype: str) -> str:
+    text = text.translate(str.maketrans("şţŞŢ", "șțȘȚ"))
     prototype = prototype.replace(MARKER, "")
     if level <= 2 or prototype.isupper():
         return text.upper().replace(MARKER.upper(), MARKER)

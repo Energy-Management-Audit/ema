@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
@@ -25,7 +26,12 @@ def _text(element: etree._Element) -> str:
 
 
 def fixed_elements(  # noqa: C901
-    target: Any, prototype: Path, identities: tuple[str, ...], required: frozenset[str]
+    target: Any,
+    prototype: Path,
+    identities: tuple[str, ...],
+    required: frozenset[str],
+    *,
+    digest_changes: list[str] | None = None,
 ) -> tuple[dict[str, etree._Element], dict[str, list[str]], list[str]]:
     source = Document(str(prototype))
     positions = {item.section_id: start for item, start, _ in heading_spans_document(source)}
@@ -72,6 +78,16 @@ def fixed_elements(  # noqa: C901
         copies = [deepcopy(node) for node in selected]
         import_formatting(target, source, copies)
         for copy in copies:
+            before = _text(copy)
+            for node in copy.iter(W + "t"):
+                node.text = (node.text or "").translate(str.maketrans("şţŞŢ", "șțȘȚ"))
+            after = _text(copy)
+            if before != after and digest_changes is not None:
+                digest_changes.append(
+                    f"F17 ch5 {name} fixed text: "
+                    f"{hashlib.sha256(before.encode()).hexdigest()} → "
+                    f"{hashlib.sha256(after.encode()).hexdigest()}"
+                )
             for blip in copy.iter(A + "blip"):
                 relationship = blip.get(R + "embed")
                 if relationship is not None:

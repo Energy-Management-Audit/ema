@@ -111,7 +111,7 @@ def generate_draft(ws: Workspace, request: GenerateRequest) -> GeneratedDraft:
         pass
     record = next(item for item in status(ws, job).runs if item["id"] == run)
     if record["state"] != "ready":
-        raise EmaError("piee_generation_failed", "Generarea PIEE a eșuat.", str(record["error"]))
+        raise EmaError("piee_generation_failed", "Generarea PIEE a eşuat.", str(record["error"]))
     with ws.connect() as db:
         rows = db.execute(
             "SELECT relative_path FROM outputs WHERE job_id=? AND run_id=? AND kind='draft'",
@@ -121,7 +121,7 @@ def generate_draft(ws: Workspace, request: GenerateRequest) -> GeneratedDraft:
     draft = next((path for path in paths if path.suffix == ".docx"), None)
     workbook = next((path for path in paths if path.suffix == ".xlsx"), None)
     if draft is None or workbook is None:
-        raise EmaError("piee_output_missing", "Ciorna PIEE lipsește.", run)
+        raise EmaError("piee_output_missing", "Ciorna PIEE lipseşte.", run)
     return GeneratedDraft(job, run, draft, workbook)
 
 
@@ -284,7 +284,13 @@ def start_generate_for_job(
             encoding="utf-8",
         )
         workbook = ctx.artifact_dir() / "Prelucrare-date.xlsx"
-        write_prelucrare(data.dataset, data.dataset.years, workbook, data.factors)
+        write_prelucrare(
+            data.dataset,
+            data.dataset.years,
+            workbook,
+            data.factors,
+            firm_name=load_settings(ws).firm_name,
+        )
         ctx.save_output(workbook, "Prelucrare-date.xlsx")
         ctx.save_output(temporary, "PIEE-draft.docx")
         ctx.progress(2, 2, "Prelucrare date generată")

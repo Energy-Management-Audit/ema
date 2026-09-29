@@ -78,7 +78,7 @@ def _annual(  # noqa: PLR0913
                     [
                         *prefix,
                         f"pentru anul {year} s-a înregistrat o valoare de ",
-                        Num(number * scale, 2, display_unit, fact),
+                        Num(number * scale, 2, display_unit, fact, scale=scale),
                         ";",
                     ],
                 )

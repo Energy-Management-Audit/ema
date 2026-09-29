@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from decimal import Decimal
 from urllib.parse import urlsplit
 
 from ema.energy_data.anexa_cells import AnexaData
@@ -28,21 +29,24 @@ def website_target(anexa: AnexaData) -> str | None:
     return candidate
 
 
-def _percent(raw: str | None) -> str | None:
+def percent_text(raw: str | None) -> str | None:
     if raw is None:
         return None
     value = re.sub(r"\s+%", "%", raw.strip())
-    return value if value.endswith("%") else value + "%"
+    if not re.fullmatch(r"\d+(?:[.,]\d+)?%", value):
+        return None
+    value = value.replace(".", ",")
+    return value if 0 <= Decimal(value[:-1].replace(",", ".")) <= 100 else None
 
 
 def ownership(anexa: AnexaData) -> str | None:
-    state = _percent(_value(anexa.identity, "ownership_state"))
-    private = _percent(_value(anexa.identity, "ownership_private"))
+    state = percent_text(_value(anexa.identity, "ownership_state"))
+    private = percent_text(_value(anexa.identity, "ownership_private"))
     if state is None or private is None:
         return None
-    if state in {"0%", "0,00%"}:
+    if Decimal(state[:-1].replace(",", ".")) == 0:
         return f"Companie cu capital integral privat: {private} capital privat."
-    if private in {"0%", "0,00%"}:
+    if Decimal(private[:-1].replace(",", ".")) == 0:
         return f"Companie cu capital integral de stat: {state} capital de stat."
     return f"Companie cu capital mixt: {state} capital de stat și {private} capital privat."
 

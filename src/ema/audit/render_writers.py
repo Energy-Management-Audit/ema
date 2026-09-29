@@ -23,6 +23,8 @@ from ema.audit.read import NARRATIVE_SECTIONS
 from ema.audit.render_dataset import reviewed_dataset
 from ema.audit.section_body import replace_section_body
 from ema.core.errors import EmaError
+from ema.core.jobs import StageContext
+from ema.core.jobs.reads import run_current
 from ema.core.review.models import Field
 from ema.core.workspace import SlotVersion, Workspace
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
@@ -62,7 +64,9 @@ def text_of(by_key: dict[str, Field], key: str) -> str | None:
     return str(field.value)
 
 
-def ready_runs(ws: Workspace, job: str, stage: str) -> list[Path]:
+def ready_runs(
+    ws: Workspace, job: str, stage: str, *, ctx: StageContext | None = None
+) -> list[Path]:
     """Artifact folders of the stage's ready runs, newest first."""
     with ws.connect() as db:
         rows = db.execute(
@@ -70,38 +74,66 @@ def ready_runs(ws: Workspace, job: str, stage: str) -> list[Path]:
             "ORDER BY ended_at DESC",
             (job, stage),
         ).fetchall()
-        return [ws.artifact_dir(db, job, stage, str(row["id"])) for row in rows]
+        current: list[Path] = []
+        for index, row in enumerate(rows):
+            run = str(row["id"])
+            if not run_current(db, run):
+                if index == 0:
+                    raise EmaError(
+                        "output_stale",
+                        "Planul capitolului s-a modificat. Refaceţi compunerea.",
+                        stage,
+                    )
+                continue
+            if ctx is not None:
+                for read in db.execute(
+                    "SELECT table_name,row_id,revision FROM run_reads WHERE run_id=?", (run,)
+                ):
+                    ctx.record_read(read["table_name"], read["row_id"], read["revision"])
+            current.append(ws.artifact_dir(db, job, stage, run))
+        return current
 
 
-def _draft(ws: Workspace, job: str, section: str) -> tuple[SectionDraft, tuple[DraftReview, ...]]:
+def _draft(
+    ws: Workspace, job: str, section: str, ctx: StageContext | None = None
+) -> tuple[SectionDraft, tuple[DraftReview, ...]]:
     folder = next(
         item / "sections"
-        for item in ready_runs(ws, job, "draft")
+        for item in ready_runs(ws, job, "draft", ctx=ctx)
         if (item / "sections" / f"{section}.json").is_file()
     )
-    draft = SectionDraft.model_validate_json((folder / f"{section}.json").read_text("utf-8"))
+    draft = SectionDraft.model_validate_json(
+        (folder / f"{section}.json").read_text(encoding="utf-8")
+    )
     review = folder / f"{section}.draft-review.json"
     items: list[dict[str, str]] = (
-        json.loads(review.read_text("utf-8"))["review"] if review.is_file() else []
+        json.loads(review.read_text(encoding="utf-8"))["review"] if review.is_file() else []
     )
     return draft, tuple(
         DraftReview(item["code"], item["location"], item["detail"]) for item in items
     )
 
 
-def drafted_sections(ws: Workspace, job: str) -> set[str]:
+def drafted_sections(ws: Workspace, job: str, *, ctx: StageContext | None = None) -> set[str]:
     return {
         path.stem
-        for folder in ready_runs(ws, job, "draft")
+        for folder in ready_runs(ws, job, "draft", ctx=ctx)
         for path in (folder / "sections").glob("*.json")
         if not path.name.endswith(".draft-review.json")
     }
 
 
-def write_draft(
-    source: Path, target: Path, *, ws: Workspace, job: str, section: str, by_key: dict[str, Field]
+def write_draft(  # noqa: PLR0913
+    source: Path,
+    target: Path,
+    *,
+    ws: Workspace,
+    job: str,
+    section: str,
+    by_key: dict[str, Field],
+    ctx: StageContext | None = None,
 ) -> None:
-    draft, flags = _draft(ws, job, section)
+    draft, flags = _draft(ws, job, section, ctx)
     facts = {key: by_key[key] for key in SECTION_FACTS.get(section, ()) if key in by_key}
     render_section(source, target, draft, facts, flags, job=job)
 
@@ -150,10 +182,14 @@ def write_four(  # noqa: PLR0913
 def write_five(
     run: Path, images: dict[str, Path], identity: tuple[str, ...], source: Path, target: Path
 ) -> None:
-    plan = ChapterFivePlan.model_validate_json((run / "sections" / "ch5.json").read_text("utf-8"))
+    plan = ChapterFivePlan.model_validate_json(
+        (run / "sections" / "ch5.json").read_text(encoding="utf-8")
+    )
     render_chapter_five(source, target, plan, images, identity)
 
 
 def write_six(run: Path, identity: tuple[str, ...], source: Path, target: Path) -> None:
-    plan = ChapterSixPlan.model_validate_json((run / "sections" / "ch6.json").read_text("utf-8"))
+    plan = ChapterSixPlan.model_validate_json(
+        (run / "sections" / "ch6.json").read_text(encoding="utf-8")
+    )
     render_chapter_six(source, target, plan, identity)

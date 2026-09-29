@@ -10,9 +10,9 @@ from types import SimpleNamespace
 
 import pytest
 from test_review import FakeWorkflow, evidence, get
+from tests.workspace_jobs import create_job
 
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.review import (
     approve_final,
     base_readiness,

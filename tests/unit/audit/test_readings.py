@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 from PIL import Image
+from tests.replay_models import REPLAY_MODEL
+from tests.workspace_jobs import create_job
 
 from ema.audit.prompts import (
     METER_PROMPT,
@@ -14,11 +16,10 @@ from ema.audit.prompts import (
     THERMAL_PROMPT,
     THERMAL_PROMPT_VERSION,
 )
-from ema.audit.readings import REPLAY_MODEL, _image, run_readings
+from ema.audit.readings import _image, run_readings
 from ema.audit.readings_schema import MeterReadout, ThermalReadout
 from ema.audit.visit import VisitPhoto, run_visit
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.llm.replay import request_hashes
 from ema.core.review import decide, fields
 from ema.core.review.evidence import get_evidence

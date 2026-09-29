@@ -5,13 +5,13 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit import research_web
 from ema.audit.research_equipment import record_equipment
 from ema.audit.research_tools import ANAF_URL, ResearchTools
 from ema.audit.research_web import OutboundGuard, Snapshot
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.review.fields import fields, propose
 from ema.core.review.models import Evidence, FieldSpec, Manual
 from ema.core.workspace import Workspace
@@ -35,7 +35,7 @@ def test_private_query_refused_and_logged(tmp_path: Path) -> None:
         tools.search({"query": "secret@example.org company"})
     assert error.value.code == "outbound_refused"
     with ws.connect() as db:
-        log = (ws.job_path(db, job) / "log.jsonl").read_text()
+        log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
     assert '"verdict": "private_value"' in log
     assert "secret@example.org" not in log
     with pytest.raises(EmaError) as encoded:
@@ -137,7 +137,7 @@ def test_online_quote_and_supplied_first(tmp_path: Path) -> None:
 def test_equipment_model_cached_with_source(tmp_path: Path) -> None:
     tools, ws, job = setup(tmp_path)
     page = tmp_path / "page.txt"
-    page.write_text("Example Motor X pumps water with variable speed.")
+    page.write_text("Example Motor X pumps water with variable speed.", encoding="utf-8")
     sha = ws.add_file("synthetic", page)
     snapshot = Snapshot(
         "https://example.org/motor", sha, datetime.now(UTC), "text/plain", page.read_bytes()

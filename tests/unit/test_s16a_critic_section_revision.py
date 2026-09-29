@@ -1,10 +1,10 @@
 """A stale section confirmation must not overwrite a newer decision."""
 
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
 from ema.audit.catalogue import CATALOGUE
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 
 

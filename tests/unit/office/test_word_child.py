@@ -105,7 +105,10 @@ def test_timeout_kills_word_and_spares_bystander(
         assert error.value.code == "word_timeout"
         assert psutil.Process(bystander.pid).create_time() == identity
         assert bystander.poll() is None
-        pids = [int(value) for value in (tmp_path / "scratch/.word_pids").read_text().splitlines()]
+        pids = [
+            int(value)
+            for value in (tmp_path / "scratch/.word_pids").read_text(encoding="utf-8").splitlines()
+        ]
         assert len(pids) == 2
         assert all(
             not psutil.pid_exists(pid) or psutil.Process(pid).status() == psutil.STATUS_ZOMBIE
@@ -170,7 +173,8 @@ def test_launch_window(
                     raise AssertionError("fake worker never signalled launch readiness")
                 time.sleep(0.01)
             private_pids[:] = [
-                json.loads(path.read_text())["pid"] for path in ready.parent.glob("dummy*.json")
+                json.loads(path.read_text(encoding="utf-8"))["pid"]
+                for path in ready.parent.glob("dummy*.json")
             ]
             private_word = psutil.Process(private_pids[0])
             word.word_image = private_word.name()
@@ -195,7 +199,10 @@ def test_launch_window(
             word._attempt("open", _source(tmp_path), None)
         assert ("word process unidentified" in str(error.value)) == unidentified
         assert bystander is not None and bystander.poll() is None
-        pids = [int(value) for value in (tmp_path / "scratch/.word_pids").read_text().splitlines()]
+        pids = [
+            int(value)
+            for value in (tmp_path / "scratch/.word_pids").read_text(encoding="utf-8").splitlines()
+        ]
         assert len(pids) == (2 if unidentified else 1)
         assert (
             all(psutil.pid_exists(pid) for pid in pids)
@@ -232,7 +239,7 @@ def test_timeout_scans_before_stopping_child(
         pid = 456
 
         def __init__(self, command: list[str], **_kwargs: object) -> None:
-            (Path(command[-1]).parent / "launch.json").write_text("{}")
+            (Path(command[-1]).parent / "launch.json").write_text("{}", encoding="utf-8")
 
         def wait(self, timeout: float) -> int:
             raise subprocess.TimeoutExpired("fake", timeout)
@@ -266,7 +273,7 @@ def test_timeout_scans_before_stopping_child(
     )
     with pytest.raises(OfficeError if stop_fails else TimeoutError):
         word._attempt("open", source, None)
-    assert events == ["scan", "child", ("word", identity)]
+    assert events == ["scan", "child", ("word", identity), ("word", None)]
 
 
 @pytest.mark.parametrize("failure", ["vanished", "denied"])
@@ -308,9 +315,10 @@ def test_word_kill_preserves_worker_failure(
 ) -> None:
     word = _child(tmp_path)
     (tmp_path / "result.json").write_text(
-        json.dumps({"ok": False, "code": "word_automation", "detail": "COM detail"})
+        json.dumps({"ok": False, "code": "word_automation", "detail": "COM detail"}),
+        encoding="utf-8",
     )
-    (tmp_path / "worker.log").write_text("worker trace")
+    (tmp_path / "worker.log").write_text("worker trace", encoding="utf-8")
 
     def stuck(*_args: object, **_kwargs: object) -> None:
         raise OfficeError("word_kill", "private Word remained")
@@ -332,21 +340,24 @@ def test_sweep_dead_owner_and_live_owner(tmp_path: Path) -> None:
     live = word.scratch_root / "live"
     live.mkdir()
     (live / "owner.json").write_text(
-        json.dumps({"pid": owner.pid, "create_time": owner.create_time()})
+        json.dumps({"pid": owner.pid, "create_time": owner.create_time()}), encoding="utf-8"
     )
     live_word = _bystander()
     (live / "word.json").write_text(
         json.dumps(
             {"pid": live_word.pid, "create_time": psutil.Process(live_word.pid).create_time()}
-        )
+        ),
+        encoding="utf-8",
     )
     stale = word.scratch_root / "stale"
     stale.mkdir()
-    (stale / "owner.json").write_text(json.dumps({"pid": owner.pid, "create_time": 0}))
+    (stale / "owner.json").write_text(
+        json.dumps({"pid": owner.pid, "create_time": 0}), encoding="utf-8"
+    )
     dummy = _bystander()
     identity = psutil.Process(dummy.pid)
     (stale / "word.json").write_text(
-        json.dumps({"pid": dummy.pid, "create_time": identity.create_time()})
+        json.dumps({"pid": dummy.pid, "create_time": identity.create_time()}), encoding="utf-8"
     )
     try:
         word._sweep()
@@ -371,7 +382,8 @@ def test_exit_hook_stops_in_flight_child(tmp_path: Path) -> None:
     (folder / "word.json").write_text(
         json.dumps(
             {"pid": private_word.pid, "create_time": psutil.Process(private_word.pid).create_time()}
-        )
+        ),
+        encoding="utf-8",
     )
     WordChild._active[folder] = (child, word.word_image)
     WordChild.on_exit()

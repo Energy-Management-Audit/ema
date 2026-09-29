@@ -6,7 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 from ema.core.workspace.lock import workspace_lock
-from ema.core.workspace.references import annex_uses_file, evidence_uses_file
+from ema.core.workspace.references import annex_uses_file, evidence_uses_file, upload_uses_file
 
 if TYPE_CHECKING:
     from ema.core.workspace import Workspace
@@ -47,6 +47,7 @@ def collect_garbage(ws: Workspace) -> None:
             if used is None and not (
                 evidence_uses_file(db, str(row["sha"]), str(row["client_slug"]))
                 or annex_uses_file(db, str(row["sha"]), str(row["client_slug"]))
+                or upload_uses_file(db, str(row["sha"]), str(row["client_slug"]))
             ):
                 ws.path(str(row["relative_path"])).unlink(missing_ok=True)
                 db.execute(

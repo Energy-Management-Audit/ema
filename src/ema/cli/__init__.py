@@ -28,6 +28,7 @@ from ema.core.intake import ItemOutcome, intake_legacy
 from ema.core.jobs import (
     StageContext,
     StageOutcome,
+    get_job,
     list_jobs,
     recover,
     run_stage,
@@ -49,8 +50,8 @@ from ema.invoices import (
     readiness as invoice_readiness,
 )
 from ema.mcp.server import serve as serve_mcp
-from ema.reporting import collect_annexes, write_report
-from ema.reporting import generate as generate_report
+from ema.reporting import collect_annexes
+from ema.reporting.runs import generate_from_sources
 
 _app = typer.Typer(no_args_is_help=True, invoke_without_command=True)
 workspace_app = typer.Typer()
@@ -83,7 +84,7 @@ def reporting_generate(
     paths = collect_annexes(sources)
     if not paths:
         raise typer.BadParameter("No annex workbooks found")
-    write_report(generate_report(paths, tuple(range(first, last + 1))), out)
+    generate_from_sources(_workspace(), paths, list(range(first, last + 1)), out)
     typer.echo(str(out))
 
 
@@ -178,17 +179,14 @@ def invoices_confirm(job: str, confirm: bool = typer.Option(False, "--confirm"))
 @invoices_app.command("export")
 def invoices_export(job: str) -> None:
     ws = _workspace()
-    with ws.connect() as db:
-        dest = ws.job_path(db, job) / "outputs" / "Facturi.xlsx"
-    checks = invoice_readiness(ws, job)
-    if checks.omitted:
-        typer.echo(f"Omise din Excel ({len(checks.omitted)}): {', '.join(checks.omitted)}")
-    typer.echo(str(export_invoices(ws, job, dest)))
+    typer.echo(str(export_invoices(ws, job)))
 
 
 @_app.command("intake")
 def intake_command(job: str, collection: str) -> None:
     ws = _workspace()
+    if get_job(ws, job)["type"] == "audit":
+        raise EmaError("use_audit_intake", "Folosiţi ema audit add şi ema audit run intake.", job)
     results: list[ItemOutcome] = []
 
     def stage(ctx: StageContext) -> StageOutcome:

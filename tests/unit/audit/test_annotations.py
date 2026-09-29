@@ -7,11 +7,12 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit.annotations import put_deadline, put_note
 from ema.audit.outline import outline
 from ema.core.errors import EmaError
-from ema.core.jobs import StageOutcome, create_job, run_stage, subscribe
+from ema.core.jobs import StageOutcome, run_stage, subscribe
 from ema.core.jobs.reads import run_current
 from ema.core.review.section_transition import SectionState, Status
 from ema.core.workspace import Workspace

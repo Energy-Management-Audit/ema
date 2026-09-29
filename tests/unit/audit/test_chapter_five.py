@@ -6,12 +6,14 @@ from pathlib import Path
 
 import pytest
 from PIL import Image
+from tests.workspace_jobs import create_job
 
 import ema.audit.chapter_five as chapter_five_module
+import ema.audit.publication as publication_module
 from ema.audit.chapter_five import chapter_five_plan, run_measurements, start_measurements
 from ema.audit.sections import Status, audit_readiness, get_status
 from ema.audit.visit import run_visit
-from ema.core.jobs import create_job, status, subscribe
+from ema.core.jobs import status, subscribe
 from ema.core.review import decide, fields, propose
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace
@@ -133,7 +135,7 @@ def test_measurements_uses_one_snapshot_for_plan_and_fingerprint(
     )
     decide(ws, job, reading.id, "accept", reading.revision, "user")
     original_fields = chapter_five_module.fields
-    original_draft = chapter_five_module.mark_drafted
+    original_draft = publication_module.mark_drafted
     reads = 0
     fingerprints: list[tuple[str, ...]] = []
 
@@ -149,7 +151,7 @@ def test_measurements_uses_one_snapshot_for_plan_and_fingerprint(
         return original_draft(*args, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr(chapter_five_module, "fields", once)
-    monkeypatch.setattr(chapter_five_module, "mark_drafted", capture)
+    monkeypatch.setattr(publication_module, "mark_drafted", capture)
     run = start_measurements(ws, job)
     for _ in subscribe(ws, job):
         pass

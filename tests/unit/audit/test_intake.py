@@ -7,11 +7,12 @@ from pathlib import Path
 
 import pytest
 from openpyxl import Workbook
+from tests.workspace_jobs import create_job
 
 from ema.audit.checklist import read_checklist
 from ema.audit.intake import audit_intake
 from ema.audit.intake_tools import IntakeDocument, IntakeTools
-from ema.core.jobs import create_job, run_stage, status, subscribe
+from ema.core.jobs import run_stage, status, subscribe
 from ema.core.llm import AgentContext, Limits, ReplayProvider, agent_state, run_agent
 from ema.core.workspace import Workspace
 
@@ -154,7 +155,7 @@ def test_intake_keeps_unclassified_file_when_replay_fails(tmp_path: Path) -> Non
         pass
     outcome = next(row for row in status(ws, job).runs if row["id"] == run)
     assert outcome["state"] == "ready"
-    assert "ai_provider" in outcome["outcome"]
+    assert "replay_invalid" in outcome["outcome"]
     with ws.connect() as db:
         path = ws.artifact_dir(db, job, "audit_intake", run) / "completeness.json"
     report = json.loads(path.read_text(encoding="utf-8"))

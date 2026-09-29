@@ -8,9 +8,11 @@ from tests.piee_seams import stub_piee_seams, synthetic_inputs
 from typer.testing import CliRunner
 
 from ema.cli import _app
+from ema.clients.registry import create_client
 from ema.core.errors import EmaError
 from ema.core.workspace import Workspace
-from ema.piee.workflow import GenerateRequest, generate_draft
+from ema.piee.workflow import GenerateRequest
+from ema.workflows_registry import generate_draft
 
 
 def test_draft_is_the_document_and_workbook_the_spreadsheet(
@@ -19,8 +21,9 @@ def test_draft_is_the_document_and_workbook_the_spreadsheet(
     stub_piee_seams(monkeypatch, tmp_path)
     anexa, necesar, prelucrare = synthetic_inputs(tmp_path / "in")
     ws = Workspace(tmp_path / "ws")
+    create_client(ws, "Synthetic", "12345678")
 
-    result = generate_draft(ws, GenerateRequest("synthetic", 2025, anexa, necesar, prelucrare))
+    result = generate_draft(ws, GenerateRequest("12345678", 2025, anexa, necesar, prelucrare))
 
     assert result.draft.suffix == ".docx" and result.draft.is_file()
     assert result.workbook.suffix == ".xlsx" and result.workbook.is_file()
@@ -33,8 +36,9 @@ def test_draft_is_the_document_even_when_the_workbook_is_saved_first(
     stub_piee_seams(monkeypatch, tmp_path)
     anexa, _, prelucrare = synthetic_inputs(tmp_path / "in")
     ws = Workspace(tmp_path / "ws")
+    create_client(ws, "Synthetic", "12345678")
 
-    result = generate_draft(ws, GenerateRequest("synthetic", 2025, anexa, None, prelucrare))
+    result = generate_draft(ws, GenerateRequest("12345678", 2025, anexa, None, prelucrare))
 
     with ws.connect() as db:
         ordered = db.execute(
@@ -62,8 +66,10 @@ def test_failing_stage_is_piee_generation_failed(
     monkeypatch.setattr("ema.piee.workflow.compose_draft", broken)
     anexa, _, _ = synthetic_inputs(tmp_path / "in")
 
+    ws = Workspace(tmp_path / "ws")
+    create_client(ws, "Synthetic", "12345678")
     with pytest.raises(EmaError) as failed:
-        generate_draft(Workspace(tmp_path / "ws"), GenerateRequest("synthetic", 2025, anexa))
+        generate_draft(ws, GenerateRequest("12345678", 2025, anexa))
 
     assert failed.value.code == "piee_generation_failed"
 
@@ -72,7 +78,8 @@ def test_cli_prints_job_run_draft_workbook(tmp_path: Path, monkeypatch: pytest.M
     stub_piee_seams(monkeypatch, tmp_path)
     monkeypatch.setenv("EMA_WORKSPACE", str(tmp_path / "ws"))
     anexa, _, prelucrare = synthetic_inputs(tmp_path / "in")
-    args = ["piee", "generate", "--client", "synthetic", "--year", "2025", "--anexa", str(anexa)]
+    create_client(Workspace(tmp_path / "ws"), "Synthetic", "12345678")
+    args = ["piee", "generate", "--client", "12345678", "--year", "2025", "--anexa", str(anexa)]
 
     printed = CliRunner().invoke(_app, [*args, "--prelucrare", str(prelucrare)])
 

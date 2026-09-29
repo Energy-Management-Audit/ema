@@ -79,6 +79,7 @@ class _ValuesSource(PydanticBaseSettingsSource):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="EMA_", env_ignore_empty=True, extra="ignore")
     _workspace_values: ClassVar[dict[str, Any]] = {}
+    firm_name: str = "ENERGY MANAGEMENT & AUDIT SRL"
     word_path: Path = Field(default_factory=_word_default)
     word_timeout_s: float = Field(default=120, gt=0)
     tesseract_path: Path = Field(default_factory=_tesseract_default)

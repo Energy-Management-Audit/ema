@@ -6,9 +6,10 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.core.errors import EmaError
-from ema.core.jobs import StageOutcome, create_job, run_stage, subscribe
+from ema.core.jobs import StageOutcome, run_stage, subscribe
 from ema.core.review import propose
 from ema.core.review.models import Cell, Evidence, FieldSpec
 from ema.core.workspace import Workspace

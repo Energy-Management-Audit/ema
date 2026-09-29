@@ -7,16 +7,10 @@ import time
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.core.errors import EmaError
-from ema.core.jobs import (
-    StageOutcome,
-    create_job,
-    get_job,
-    latest_ready_run,
-    run_stage,
-    status,
-)
+from ema.core.jobs import StageOutcome, get_job, latest_ready_run, run_stage, status
 from ema.core.workspace import Workspace
 from ema.invoices import export
 
@@ -28,7 +22,7 @@ def ws(tmp_path: Path) -> Workspace:
 
 def file(ws: Workspace, tmp_path: Path, content: str) -> str:
     source = tmp_path / f"{content}.txt"
-    source.write_text(content)
+    source.write_text(content, encoding="utf-8")
     return ws.add_file("client", source)
 
 
@@ -102,7 +96,7 @@ def test_invoice_export_rejects_changed_slot(ws: Workspace, tmp_path: Path) -> N
 
     def stage(ctx):  # type: ignore[no-untyped-def]
         ctx.read_slots("invoices")
-        (ctx.artifact_dir() / "outcomes.json").write_text("[]")
+        (ctx.artifact_dir() / "outcomes.json").write_text("[]", encoding="utf-8")
         return StageOutcome()
 
     run_stage(ws, job, "invoices", stage)

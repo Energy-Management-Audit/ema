@@ -134,6 +134,19 @@ def _record_identity(ws: Workspace, job: str, data: PieeData, anexa_sha: str) ->
             [_evidence(found, anexa_sha, "anexa", key)],
             state="extracted",
         )
+    for issue in data.anexa.issues:
+        if issue.code == "ownership_flag" and issue.detail not in data.anexa.identity:
+            mark_absent(
+                ws,
+                job,
+                FieldSpec(
+                    key=f"identity.{issue.detail}",
+                    label=issue.detail,
+                    value_type="text",
+                    required=True,
+                ),
+                "not_found",
+            )
     if "registrul_comertului" not in data.anexa.identity:
         mark_absent(
             ws,

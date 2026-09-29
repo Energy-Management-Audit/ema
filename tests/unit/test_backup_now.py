@@ -5,10 +5,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.core.backup import backup_now, restore
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.settings import read, settings_values, update, write_settings_values
 from ema.core.workspace import Workspace
 
@@ -17,7 +17,7 @@ from ema.core.workspace import Workspace
 def test_backup_directory_validation(tmp_path: Path, name: str) -> None:
     ws = Workspace(tmp_path / "workspace")
     file = tmp_path / "file"
-    file.write_text("synthetic")
+    file.write_text("synthetic", encoding="utf-8")
     destination = {"relative": "relative", "workspace": str(ws.root / "inside"), "file": str(file)}[
         name
     ]

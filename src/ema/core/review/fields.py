@@ -82,12 +82,7 @@ def propose(  # noqa: PLR0913
             field = Field(
                 id=uuid.uuid4().hex,
                 job_id=job,
-                key=spec.key,
-                chapter=spec.chapter,
-                label=spec.label,
-                value_type=spec.value_type,
-                unit=spec.unit,
-                required=spec.required,
+                **spec.model_dump(),
                 value=value,
                 state=state,
                 presence="found",
@@ -101,6 +96,9 @@ def propose(  # noqa: PLR0913
             if preserve_reviewed and old.review in {"accepted", "corrected"}:
                 return old
             if old.value == value:
+                if (old.decimals, old.grouping) != (spec.decimals, spec.grouping):
+                    old = _changed(old, **spec.model_dump(include={"decimals", "grouping"}))
+                    save_field(db, old)
                 return old
             candidates = (
                 old.alternatives or [_candidate(old.value, old.evidence)]
@@ -117,6 +115,7 @@ def propose(  # noqa: PLR0913
             if protected:
                 field = _changed(
                     old,
+                    **spec.model_dump(include={"decimals", "grouping"}),
                     alternatives=candidates,
                     chosen=None,
                     confidence="conflict" if len(candidates) >= 2 else old.confidence,
@@ -125,6 +124,7 @@ def propose(  # noqa: PLR0913
             else:
                 field = _changed(
                     old,
+                    **spec.model_dump(include={"decimals", "grouping"}),
                     value=value,
                     state=state,
                     presence="found",
@@ -182,12 +182,7 @@ def mark_absent(  # noqa: PLR0913
             field = Field(
                 id=uuid.uuid4().hex,
                 job_id=job,
-                key=spec.key,
-                chapter=spec.chapter,
-                label=spec.label,
-                value_type=spec.value_type,
-                required=spec.required,
-                unit=spec.unit,
+                **spec.model_dump(),
                 state="extracted",
                 presence=presence,
                 failure=failure,

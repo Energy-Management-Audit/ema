@@ -346,5 +346,5 @@ def test_failed_save_as_cleanup_addresses_old_and_new_names(tmp_path):
 
 def test_unknown_office_code_keeps_generic_message():
     error = OfficeError("unlisted", "private detail")
-    assert error.user_message_ro == "Operația Office a eșuat."
+    assert error.user_message_ro == "Operaţia Office a eşuat."
     assert error.detail == "private detail"

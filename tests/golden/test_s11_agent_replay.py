@@ -3,9 +3,9 @@
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit.intake_tools import IntakeDocument, IntakeTools
-from ema.core.jobs import create_job
 from ema.core.llm import AgentContext, Limits, ReplayProvider, run_agent
 from ema.core.workspace import Workspace
 

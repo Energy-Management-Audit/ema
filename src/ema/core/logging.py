@@ -1,7 +1,6 @@
 """Structured local logs; workspace owns their paths and handles."""
 
 import json
-import logging
 import subprocess
 import traceback
 from datetime import UTC, datetime
@@ -29,9 +28,3 @@ def capture_child(proc: subprocess.Popen[str], handle: IO[str]) -> None:
         return
     for line in proc.stderr:
         write_event(handle, "child_stderr", line=line.rstrip("\n"))
-
-
-def configure_app_log(handle: IO[str]) -> None:
-    logger = logging.getLogger("ema")
-    logger.addHandler(logging.StreamHandler(handle))
-    logger.setLevel(logging.INFO)

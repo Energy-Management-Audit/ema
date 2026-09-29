@@ -9,6 +9,7 @@ from ema.core.review.fields import (
     mark_absent,
     propose,
 )
+from ema.core.review.final_export import ExportResult, export_final
 from ema.core.review.readiness import (
     Workflow,
     approve_final,
@@ -20,6 +21,7 @@ from ema.core.review.readiness import (
 from ema.core.review.undo import undo
 
 __all__ = [
+    "ExportResult",
     "Workflow",
     "accept_batch",
     "approve_final",
@@ -27,6 +29,7 @@ __all__ = [
     "conflicts",
     "decide",
     "export",
+    "export_final",
     "fields",
     "log",
     "mark_absent",

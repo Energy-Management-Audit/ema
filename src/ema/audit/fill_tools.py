@@ -9,13 +9,13 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from ema.audit.catalogue import CATALOGUE, AuditFact
+from ema.audit.catalogue import CATALOGUE, AuditFact, fact_spec
 from ema.audit.sections import recompute_ready, set_status
 from ema.core.errors import EmaError
 from ema.core.llm.agent import Tool
 from ema.core.llm.types import ToolSpec
 from ema.core.review.fields import fields, mark_absent, propose
-from ema.core.review.models import Evidence, FieldSpec, PdfText, TextLoc
+from ema.core.review.models import Evidence, PdfText, TextLoc
 from ema.core.review.section_transition import Status
 from ema.core.workspace import Workspace
 
@@ -150,7 +150,7 @@ class FillTools:
             None,
         )
         locator = PdfText(page=page, span=quote) if page is not None else TextLoc(span=quote)
-        evidence_id = hashlib.sha256(f"{document.sha}:{quote}".encode()).hexdigest()
+        evidence_id = hashlib.sha256(f"{self.job}:{document.sha}:{quote}".encode()).hexdigest()
         with self.ws.connect() as db:
             previous = db.execute(
                 "SELECT data FROM evidence WHERE id=? AND job_id=?", (evidence_id, self.job)
@@ -186,13 +186,12 @@ class FillTools:
         else:
             name, quote = str(args["name"]), str(args["quote"])
             evidence = [self._document_evidence(name, quote, value)]
-        spec = FieldSpec(
-            key=key,
-            label=key,
-            value_type="number" if isinstance(value, int | float) else "text",
+        spec = fact_spec(
+            key,
+            "number" if isinstance(value, int | float) else "text",
             chapter=self.section,
         )
-        stored_value = Decimal(str(value)) if isinstance(value, int | float) else value
+        stored_value = str(value) if spec.value_type == "text" else Decimal(str(value))
         field = propose(self.ws, self.job, spec, stored_value, evidence, state="extracted")
         recompute_ready(self.ws, self.job)
         return {"key": field.key, "evidence": field.evidence}
@@ -202,7 +201,9 @@ class FillTools:
         if key not in _FACTS:
             raise EmaError("fact_unknown", "Faptul nu există în catalog.", key)
         self._validate_section_fact(key)
-        field = mark_absent(self.ws, self.job, key, "not_found")
+        field = mark_absent(
+            self.ws, self.job, fact_spec(key, "text", chapter=self.section), "not_found"
+        )
         recompute_ready(self.ws, self.job)
         return {"missing": field.key}
 

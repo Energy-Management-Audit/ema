@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic import Field as PydanticField
 
 from ema.core.review.models import Readiness
+from ema.core.review.readiness import FinalOutput
 
 
 class SessionResult(BaseModel):
@@ -116,10 +117,18 @@ class SectionState(BaseModel):
 class ExportChecks(BaseModel):
     readiness: Readiness
     readiness_hash: str
+    final: FinalOutput | None
 
 
-class ExportResult(BaseModel):
-    output_id: str
+class ExportFile(BaseModel):
+    name: str
+    path: str
+
+
+class ExportResponse(BaseModel):
+    approved_at: str
+    files: list[ExportFile]
+    folder: str
 
 
 class Site(BaseModel):
@@ -143,8 +152,8 @@ class ClientPatch(BaseModel):
     name: str | None = PydanticField(default=None, min_length=1)
     cui: str | None = None
     caen: str | None = None
-    sites: list[Site] | None = None
-    contacts: list[Contact] | None = None
+    sites: list[Site] = PydanticField(default_factory=list[Site])
+    contacts: list[Contact] = PydanticField(default_factory=list[Contact])
     on_revision: int
 
 
@@ -193,7 +202,6 @@ class Output(BaseModel):
     kind: Literal["draft", "final"]
     media_type: str
     size_bytes: int
-    edited_externally: bool
     name: str
     created_at: str | None
     run_id: str
@@ -364,8 +372,3 @@ class SectionPatch(BaseModel):
     on_revision: int
     reason: str | None = None
     confirm: bool = False
-
-
-class NaProposal(BaseModel):
-    reason: str
-    on_revision: int

@@ -86,6 +86,7 @@ def snapshot_base(base: AuditBase, folder: Path) -> AuditBase:
 
 def sentence(title: str) -> str:
     """A title written in capitals reads as a sentence; any other title is kept."""
+    title = title.translate(str.maketrans("șțȘȚ", "şţŞŢ"))
     if any(char.islower() for char in title):
         return title
     return title[:1].upper() + title[1:].lower()
@@ -240,6 +241,4 @@ def ai_wording_hits(docx: Path, job_fields: Iterable[Field]) -> list[str]:
                     else name.removeprefix("word/").removesuffix(".xml")
                 )
                 hits.append(where)
-    if not hits:
-        return []
     return list(dict.fromkeys([*texts, *hits]))

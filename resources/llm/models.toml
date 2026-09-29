@@ -31,6 +31,7 @@ long_output_usd = 18.0
 [[models]]
 provider = "openai"
 id = "gpt-6-luna"
+request_options = { reasoning_effort = "none" }
 tier = "standard"
 vision = true
 input_usd = 0.10

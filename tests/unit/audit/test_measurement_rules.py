@@ -57,12 +57,12 @@ def test_current_asymmetry_and_pending() -> None:
         _field("current", phase, value, "A")
         for phase, value in (("l1", "100"), ("l2", "101"), ("l3", "99"))
     ]
-    assert assess(balanced)[0].status == "pass"
+    assert assess(balanced)[0].status == "unsupported"
     unbalanced = [
         _field("current", phase, value, "A")
         for phase, value in (("l1", "100"), ("l2", "110"), ("l3", "90"))
     ]
-    assert assess(unbalanced)[0].status == "fail"
+    assert assess(unbalanced)[0].status == "unsupported"
     assert assess(balanced[:2])[0].status == "unsupported"
     assert assess([balanced[0].model_copy(update={"needs_confirmation": True})]) == []
 

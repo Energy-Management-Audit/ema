@@ -21,6 +21,8 @@ def copy_output(ws: Workspace, relative: str, sha: str, dest: Path) -> Path:
         temporary = Path(temp.name)
     try:
         shutil.copyfile(source, temporary)
+        if hashlib.sha256(temporary.read_bytes()).hexdigest() != sha:
+            raise EmaError("output_changed", "Documentul sursă a fost modificat.", relative)
         os.replace(temporary, dest)
     finally:
         temporary.unlink(missing_ok=True)

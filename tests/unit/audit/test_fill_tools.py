@@ -3,12 +3,12 @@
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit.catalogue_types import MaterialKind
 from ema.audit.fill_tools import FillDocument, FillTools
 from ema.audit.sections import get_status, record_material
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.review.fields import fields, propose
 from ema.core.review.models import Evidence, FieldSpec, PdfText
 from ema.core.review.section_transition import Status

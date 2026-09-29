@@ -91,17 +91,17 @@ def _measure_structure(item: Measure) -> str:
     cost = item.values.get("investment_thousand_lei")
     saving = item.values.get("saving_tep")
     columns = {
-        "descriere": item.description.ref.col,
-        "an": item.commissioning_year.ref.col
+        "descriere": get_column_letter(item.description.ref.col),
+        "an": get_column_letter(item.commissioning_year.ref.col)
         if item.commissioning_year
-        else item.description.ref.col + 1,
-        "cost": cost.ref.col if cost else item.description.ref.col + 3,
-        "economie": saving.ref.col if saving else item.description.ref.col + 5,
+        else "—",
+        "cost": get_column_letter(cost.ref.col) if cost else "—",
+        "economie": get_column_letter(saving.ref.col) if saving else "—",
     }
     return (
         item.description.ref.sheet
         + ": "
-        + ", ".join(f"{label} {get_column_letter(col)}" for label, col in columns.items())
+        + ", ".join(f"{label} {col}" for label, col in columns.items())
     )
 
 
@@ -250,17 +250,21 @@ def generate(  # noqa: C901, PLR0912, PLR0915
                 )
             elif int(year) in grouped:
                 grouped[int(year)].append(_measure(measure))
-                if "investment_thousand_lei" not in measure.values:
-                    exceptions.append(
-                        ReportException(
-                            "REVIZUIRE",
-                            path,
-                            name,
-                            "Costul investiției lipsește.",
-                            f"Verificați {measure.description.ref.a1}.",
-                            measure.description.ref.a1,
+                for key, message in (
+                    ("investment_thousand_lei", "Costul investiției lipsește."),
+                    ("saving_tep", "Economia de energie lipsește."),
+                ):
+                    if _numeric(measure.values.get(key)) is None:
+                        exceptions.append(
+                            ReportException(
+                                "REVIZUIRE",
+                                path,
+                                name,
+                                message,
+                                f"Verificați {measure.description.ref.a1}.",
+                                measure.description.ref.a1,
+                            )
                         )
-                    )
         if not annex.existing_measures:
             exceptions.append(
                 ReportException(
@@ -294,7 +298,7 @@ def generate(  # noqa: C901, PLR0912, PLR0915
                 _text(annex.identity.get("cui")),
                 activity,
                 monthly if monthly is not None else annual,
-                (source.ref.a1 + " (fallback explicit; Date lunare!M3 indisponibil)")
+                (source.ref.a1 + " (sursă alternativă; totalul din Date lunare este indisponibil)")
                 if source is not None and monthly is None
                 else source.ref.a1
                 if source

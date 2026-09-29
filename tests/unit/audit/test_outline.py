@@ -4,10 +4,11 @@ import json
 from datetime import date
 from pathlib import Path
 
+from tests.workspace_jobs import create_job
+
 from ema.audit.annotations import put_deadline, put_note
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.outline import outline
-from ema.core.jobs import create_job
 from ema.core.review.models import Field
 from ema.core.review.section_transition import SectionState, Status
 from ema.core.workspace import Workspace

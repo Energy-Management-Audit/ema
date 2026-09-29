@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from pydantic import BaseModel
+
 from ema.core.errors import EmaError
 from ema.core.jobs.reads import run_current
 from ema.core.review.fields import fields
@@ -87,7 +89,7 @@ def _hash(
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
-def _latest_decision(db: sqlite3.Connection, job: str) -> str | None:
+def latest_decision(db: sqlite3.Connection, job: str) -> str | None:
     row = db.execute(
         "SELECT id FROM decisions WHERE job_id=? ORDER BY seq DESC LIMIT 1", (job,)
     ).fetchone()
@@ -102,6 +104,50 @@ def _latest_output(db: sqlite3.Connection, job: str) -> str | None:
     return str(row["id"]) if row else None
 
 
+class FinalOutput(BaseModel):
+    output_id: str
+    created_at: str
+    files: list[str]
+
+
+def final_view(db: sqlite3.Connection, job: str, output_id: str | None) -> FinalOutput | None:
+    row = db.execute(
+        "SELECT o.id,o.run_id,r.ended_at FROM outputs o JOIN runs r ON r.id=o.run_id "
+        "WHERE o.job_id=? AND o.id=? AND o.kind='final'",
+        (job, output_id),
+    ).fetchone()
+    if row is None:
+        return None
+    files = [
+        Path(str(item[0])).name.removeprefix(f"{row['run_id']}-")
+        for item in db.execute(
+            "SELECT relative_path FROM outputs WHERE job_id=? AND run_id=? ORDER BY seq",
+            (job, row["run_id"]),
+        )
+    ]
+    return FinalOutput(output_id=str(row["id"]), created_at=str(row["ended_at"]), files=files)
+
+
+def current_final(
+    db: sqlite3.Connection, job: str, workflow: Workflow | None = None
+) -> FinalOutput | None:
+    selector = getattr(workflow, "current_final", None)
+    return selector(db, job) if selector else final_view(db, job, _latest_output(db, job))
+
+
+def final_checks(ws: Workspace, job: str, workflow: Workflow) -> dict[str, object]:
+    with ws.connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        reader = getattr(workflow, "readiness_in_tx", None)
+        readiness = reader(ws, job, db) if reader else workflow.readiness(ws, job)
+        final = current_final(db, job, workflow)
+        return {
+            "final": final.model_dump(mode="json") if final else None,
+            "readiness": readiness.model_dump(mode="json"),
+            "readiness_hash": readiness_hash_in_tx(ws, db, job, readiness, workflow),
+        }
+
+
 def output_path(ws: Workspace, job: str, output_id: str) -> Path:
     with ws.connect() as db:
         row = db.execute(
@@ -112,7 +158,7 @@ def output_path(ws: Workspace, job: str, output_id: str) -> Path:
     return ws.path(str(row["relative_path"]))
 
 
-def approve_final(
+def approve_final(  # noqa: PLR0913
     ws: Workspace,
     job: str,
     output_id: str,
@@ -120,14 +166,18 @@ def approve_final(
     actor: Actor,
     *,
     db: sqlite3.Connection | None = None,
+    workflow: Workflow | None = None,
 ) -> Approval:
     if actor != "user":
         raise EmaError("approval_requires_user", "Aprobarea aparţine utilizatorului.", job)
     if db is None:
         with ws.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            return approve_final(ws, job, output_id, readiness_hash, actor, db=connection)
-    if _latest_output(db, job) != output_id:
+            return approve_final(
+                ws, job, output_id, readiness_hash, actor, db=connection, workflow=workflow
+            )
+    selected = current_final(db, job, workflow)
+    if selected is None or selected.output_id != output_id:
         raise EmaError("output_stale", "Documentul nu este versiunea curentă.", output_id)
     row = db.execute("SELECT kind FROM outputs WHERE id=?", (output_id,)).fetchone()
     if row is None or row["kind"] != "final":
@@ -137,12 +187,13 @@ def approve_final(
         job_id=job,
         output_id=output_id,
         readiness_hash=readiness_hash,
-        on_decision=_latest_decision(db, job),
+        on_decision=latest_decision(db, job),
         at=datetime.now(UTC),
         actor=actor,
     )
     db.execute(
-        "INSERT INTO approvals VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO approvals(id,job_id,output_id,readiness_hash,on_decision,at,actor) "
+        "VALUES (?,?,?,?,?,?,?)",
         (
             approval.id,
             job,
@@ -159,10 +210,12 @@ def approve_final(
 def approvals(ws: Workspace, job: str) -> list[Approval]:
     """Every final approval of the job, newest first."""
     with ws.connect() as db:
+        db.execute("BEGIN")
         if db.execute("SELECT 1 FROM jobs WHERE id=? AND deleted=0", (job,)).fetchone() is None:
             raise EmaError("job_missing", "Lucrarea nu există.", job)
         rows = db.execute(
-            "SELECT id,job_id,output_id,readiness_hash,on_decision,at,actor FROM approvals "
+            "SELECT id,job_id,output_id,readiness_hash,on_decision,at,actor,exported_at "
+            "FROM approvals "
             "WHERE job_id=? ORDER BY at DESC",
             (job,),
         ).fetchall()
@@ -193,7 +246,8 @@ def export(  # noqa: PLR0913
         draft_output_id = workflow.render(ws, job, "draft")
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
-        output_id = _latest_output(db, job) if final else draft_output_id
+        selected = current_final(db, job, workflow) if final else None
+        output_id = selected.output_id if selected else draft_output_id
         if output_id is None:
             raise EmaError("output_missing", "Documentul lipseşte.", job)
         if expected_output_id is not None and output_id != expected_output_id:
@@ -226,7 +280,7 @@ def export(  # noqa: PLR0913
             approval_row = db.execute(
                 "SELECT 1 FROM approvals WHERE job_id=? AND output_id=? "
                 "AND readiness_hash=? AND on_decision IS ? LIMIT 1",
-                (job, output_id, digest, _latest_decision(db, job)),
+                (job, output_id, digest, latest_decision(db, job)),
             ).fetchone()
             if approval_row is None:
                 raise EmaError("approval_required", "Aprobarea finală lipseşte.", output_id)

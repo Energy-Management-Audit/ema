@@ -3,5 +3,5 @@ scripts:
   # Orca types the setup into the Setup tab's shell; hanging that shell up on success closes the
   # tab. A failed setup leaves it open with the error.
   setup: |
-    uv sync --all-groups && uv run pre-commit install --install-hooks -t pre-commit -t pre-push &&
+    uv sync --all-groups && npm ci --prefix frontend && uv run pre-commit install --install-hooks -t pre-commit -t pre-push &&
       case "$(ps -o comm= -p "$PPID")" in *zsh|*bash) kill -HUP "$PPID" ;; esac

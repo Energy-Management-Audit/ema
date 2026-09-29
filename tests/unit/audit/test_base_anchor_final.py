@@ -104,7 +104,9 @@ def test_bindings_are_judged_on_her_text_and_filled_from_sources(tmp_path: Path)
     docx, mapping = tmp_path / "base.docx", tmp_path / "base.anchors.json"
     document.save(str(docx))  # type: ignore[attr-defined]
     save_anchor_map(mapping, "sha", anchors)
-    assert {item["binding"] for item in json.loads(mapping.read_text())["anchors"]} == {
+    assert {
+        item["binding"] for item in json.loads(mapping.read_text(encoding="utf-8"))["anchors"]
+    } == {
         None,
         "client_name",
         "address",
@@ -182,11 +184,11 @@ def test_heading_slots_take_the_client_her_reviewed_period_or_a_marker() -> None
     anchors = anchor_document(document, "Atelier Exemplu SRL", IDENTITY)
     headings = [p.text for p in document.paragraphs if p.style.name.startswith("Heading")]  # type: ignore[attr-defined]
     assert headings == [
-        "3. DESCRIEREA SITUAŢIEI EXISTENTE",
+        "3. DESCRIEREA SITUAȚIEI EXISTENTE",
         "3.1. DESCRIEREA UTILITĂȚILOR DIN CADRUL ATELIER EXEMPLU SRL",
         "3.2. DESCRIEREA FLUXULUI TEHNOLOGIC",
         f"3.2.1. DESCRIEREA SECȚIEI {MARKER}",
-        "6. MĂSURI DE CREȘTERE A EFICIENŢEI ENERGETICE PERIOADA 2021-2023",
+        "6. MĂSURI DE CREȘTERE A EFICIENȚEI ENERGETICE PERIOADA 2021-2023",
     ]
     headings_slots = {f"body_{index}_0" for index in range(0, 10, 2)}
     variable = {
@@ -198,7 +200,7 @@ def test_heading_slots_take_the_client_her_reviewed_period_or_a_marker() -> None
     unreviewed = _headings("PERIOADA 2019-2020")
     anchor_document(unreviewed, "Atelier Exemplu SRL", IDENTITY)
     assert (
-        unreviewed.paragraphs[8].text == f"6. MĂSURI DE CREȘTERE A EFICIENŢEI ENERGETICE {MARKER}"
+        unreviewed.paragraphs[8].text == f"6. MĂSURI DE CREȘTERE A EFICIENȚEI ENERGETICE {MARKER}"
     )  # type: ignore[attr-defined]
 
 

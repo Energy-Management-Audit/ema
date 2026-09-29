@@ -9,12 +9,14 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from ema.audit.catalogue_labels import field_label
 from ema.audit.prompts import (
     METER_PROMPT,
     METER_PROMPT_VERSION,
     THERMAL_PROMPT,
     THERMAL_PROMPT_VERSION,
 )
+from ema.audit.reading_labels import READING_LABELS
 from ema.audit.readings_schema import UNITS, DisplayValue, MeterReadout, ThermalReadout
 from ema.audit.visit import VisitPanel, VisitPhoto, visit_view, visit_view_from_slots
 from ema.core.errors import EmaError
@@ -29,8 +31,6 @@ from ema.core.office.sniff import FileKind, sniff
 from ema.core.review import fields, mark_absent, propose
 from ema.core.review.models import Evidence, Field, FieldSpec, Photo
 from ema.core.workspace import Workspace
-
-REPLAY_MODEL = "gemini-3.6-flash"
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ def _number(value: str) -> Decimal:
 
 
 def _proof(ctx: StageContext, photo: VisitPhoto, key: str, value: str, region: Photo) -> Evidence:
-    evidence_id = hashlib.sha256(f"vision:{photo.sha}:{key}:{value}".encode()).hexdigest()
+    evidence_id = hashlib.sha256(f"{ctx.job}:vision:{photo.sha}:{key}:{value}".encode()).hexdigest()
     with ctx.ws.connect() as db:
         row = db.execute("SELECT data FROM evidence WHERE id=?", (evidence_id,)).fetchone()
     if row is not None:
@@ -158,7 +158,9 @@ def _meter(
             photo,
             FieldSpec(
                 key=f"{prefix}.{entry.quantity}.{entry.phase}",
-                label=f"{entry.quantity} {entry.phase}",
+                label=READING_LABELS[entry.quantity, entry.phase].translate(
+                    str.maketrans("șțȘȚ", "şţŞŢ")
+                ),
                 value_type="number",
                 unit=entry.unit,
                 chapter="ch5.electric_fisa",
@@ -194,7 +196,7 @@ def _thermal(
         photo,
         FieldSpec(
             key=f"{prefix}.component",
-            label="Componentă",
+            label=field_label(f"{prefix}.component"),
             value_type="text",
             chapter="ch5.termic_fisa",
         ),
@@ -206,7 +208,7 @@ def _thermal(
             photo,
             FieldSpec(
                 key=f"{prefix}.{name}",
-                label=name,
+                label=field_label(f"{prefix}.{name}"),
                 value_type="number",
                 unit="°C",
                 chapter="ch5.termic_fisa",
@@ -227,11 +229,24 @@ def _failed(ctx: StageContext, photo: VisitPhoto, key: str, reason: str) -> None
         old = Field.model_validate_json(row["data"])
         if old.presence == "failed" and old.failure == failure:
             return
-    mark_absent(ctx.ws, ctx.job, key, "failed", failure=failure)
+    mark_absent(
+        ctx.ws,
+        ctx.job,
+        FieldSpec(
+            key=key,
+            label=photo.name if key.startswith("meter.") else field_label(key),
+            value_type="text",
+            chapter="ch5",
+        ),
+        "failed",
+        failure=failure,
+    )
 
 
 def read_photos(ctx: StageContext, *, provider: Provider, model_id: str) -> StageOutcome:  # noqa: C901
-    model = selected_model("gemini" if provider.name == "replay" else provider.name, model_id)
+    model = selected_model(
+        provider.provider_name if isinstance(provider, ReplayProvider) else provider.name, model_id
+    )
     if not model.vision:
         raise EmaError("model_no_vision", "Modelul ales nu citeşte imagini.", model_id)
     client = str(get_job(ctx.ws, ctx.job)["client_slug"])
@@ -277,7 +292,7 @@ def run_readings(ws: Workspace, job: str, *, recording: Path | None) -> Readings
 
     def stage(ctx: StageContext) -> StageOutcome:
         try:
-            return read_photos(ctx, provider=provider, model_id=REPLAY_MODEL)
+            return read_photos(ctx, provider=provider, model_id=provider.model_id)
         except Exception as exc:
             failure.append(exc)
             raise

@@ -145,7 +145,7 @@ def test_t4_a_corrected_intro_stales_a_done_section_until_the_next_draft(
     field = next(item for item in fields(ws, job_id) if item.key == "narrative.ch3")
     decide(ws, job_id, field.id, "correct", field.revision, "user", value="Altă introducere.")
     readiness = AuditWorkflow().readiness(ws, job_id)
-    assert "Refaceţi secţiunea: " + _title("ch3") in [
+    assert "Refaceţi secţiunea: " + _title("ch3").translate(str.maketrans("șțȘȚ", "şţŞŢ")) in [
         issue.message for issue in readiness.blocking if issue.code == "stale"
     ]
     stale = by_id(ws, job_id)["ch3"]
@@ -175,7 +175,8 @@ def test_t6_an_unconfirmed_render_drafted_section_is_still_open(
     ws, job_id = job
     draft(ws, job_id)
     blocking = AuditWorkflow().readiness(ws, job_id).blocking
-    assert f"{_title('ch1')}: Completați și confirmați secțiunea" in [
+    title = _title("ch1").translate(str.maketrans("șțȘȚ", "şţŞŢ"))
+    assert f"{title}: Completaţi şi confirmaţi secţiunea" in [
         issue.message for issue in blocking if issue.code == "section_open"
     ]
 

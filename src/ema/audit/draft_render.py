@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 from decimal import Decimal
 from pathlib import Path
-from typing import cast
 
 from ema.audit.base_anchor import MARKER
 from ema.audit.draft_checks import TOKEN, DraftCheck, DraftReview, check_draft
@@ -23,9 +22,12 @@ from ema.core.workspace import Workspace
 
 def _value(field: Field) -> str:
     if field.value_type in {"number", "year"}:
-        raw = str(field.value)
-        decimals = len(raw.partition(".")[2]) if field.value_type == "number" else 0
-        return format_number(cast(float, Decimal(raw)), decimals, field.unit)
+        return format_number(
+            Decimal(str(field.value)),
+            0 if field.value_type == "year" else field.decimals,
+            field.unit,
+            False if field.value_type == "year" else field.grouping,
+        )
     return str(field.value)
 
 

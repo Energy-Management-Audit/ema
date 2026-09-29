@@ -8,9 +8,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.core.jobs import create_job, status, subscribe
+from ema.core.jobs import status, subscribe
 from ema.core.workspace import Workspace
 from ema.invoices import confirm_client, export, readiness
 from ema.invoices.identity_review import raw_outcomes

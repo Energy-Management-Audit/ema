@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 from tests.unit.energy_data.test_annex_index import annex
+from tests.workspace_jobs import create_job
 
 from ema.clients import anaf
 from ema.clients.overview import overview
 from ema.clients.profile import profile
 from ema.clients.registry import create_client, update_client
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 from ema.energy_data.annex_index import import_annexes
 

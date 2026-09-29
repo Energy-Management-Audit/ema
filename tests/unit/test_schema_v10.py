@@ -5,8 +5,9 @@ import sqlite3
 import zipfile
 from pathlib import Path
 
+from tests.workspace_jobs import create_job
+
 from ema.core.backup import backup
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 from ema.core.workspace.schema import SCHEMA_VERSION, migrate
 
@@ -33,11 +34,12 @@ def test_v9_upgrade_and_fresh_workspace_have_both_tables(tmp_path: Path) -> None
         )
         db.execute("DROP TABLE client_annexes")
         db.execute("DROP TABLE job_annotations")
+        db.execute("ALTER TABLE approvals DROP COLUMN exported_at")
         db.execute("PRAGMA user_version = 9")
     upgraded = Workspace(tmp_path / "old")
     with upgraded.connect() as db:
         assert {"client_annexes", "job_annotations"} <= _tables(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert db.execute("SELECT type,year FROM jobs WHERE id=?", (job,)).fetchone()[:] == (
             "piee",
             2025,
@@ -56,7 +58,7 @@ def test_v9_upgrade_and_fresh_workspace_have_both_tables(tmp_path: Path) -> None
     ws = Workspace(tmp_path / "fresh")
     with ws.connect() as db:
         assert {"client_annexes", "job_annotations"} <= _tables(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 10
+        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 11
 
 
 def test_annex_only_file_survives_gc_and_enters_backup(tmp_path: Path) -> None:

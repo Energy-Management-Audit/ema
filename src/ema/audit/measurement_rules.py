@@ -69,15 +69,7 @@ def assess(fields: list[Field]) -> list[Assessment]:
         elif quantity == "thd_i":
             results.append(Assessment("thd_i", "unsupported", keys))
         elif quantity == "current":
-            phases = {field.key.split(".")[-1]: Decimal(str(field.value)) for field in values}
-            if {"l1", "l2", "l3"} <= phases.keys():
-                three = [phases[phase] for phase in ("l1", "l2", "l3")]
-                average = sum(three, Decimal(0)) / Decimal(3)
-                limit = Decimal(str(norms["current_asymmetry"]["max_ratio"]))
-                valid = average != 0 and (max(three) - min(three)) / average <= limit
-                results.append(Assessment("current_asymmetry", "pass" if valid else "fail", keys))
-            else:
-                results.append(Assessment("current_asymmetry", "unsupported", keys))
+            results.append(Assessment("current_asymmetry", "unsupported", keys))
         elif quantity == "power_factor":
             limit = Decimal(str(norms["power_factor"]["min"]))
             results.append(

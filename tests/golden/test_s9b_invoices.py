@@ -7,10 +7,11 @@ import json
 from pathlib import Path
 
 import pytest
+from tests.invoice_helpers import undo_client
 
 from ema.core.config import Settings
 from ema.core.errors import EmaError
-from ema.invoices import confirm_client, export, readiness, undo_client
+from ema.invoices import confirm_client, export, readiness
 from ema.invoices.identity_review import batch_client
 
 from .s9b_exceptions import ALIVE_PINS, ENGIE_PINS
@@ -180,7 +181,7 @@ def test_s9b_batch_confirmation_and_parser_regression(
     assert readiness(ws, job).exportable == 0
     with pytest.raises(EmaError) as undone:
         export(ws, job, destination)
-        assert undone.value.code == "invoices_unconfirmed_client"
+    assert undone.value.code == "invoices_unconfirmed_client"
     if case == "CLIENT-I2":
         forgotten = tmp_path / "after-undo"
         _, forgotten_job, _ = _run_case(forgotten, case, baseline, ws)

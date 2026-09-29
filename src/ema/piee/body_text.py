@@ -13,6 +13,7 @@ from ema.core.office.run_range import TextSpan, replace_spans, visible_text
 from ema.energy_data.carriers import Carrier
 from ema.piee.chart_plan import BINDINGS, chart_series
 from ema.piee.dataset import PieeData
+from ema.piee.figure_numbering import REFERENCE
 from ema.piee.identity import ownership
 from ema.piee.number import prototype_number
 from ema.piee.units import display_unit
@@ -62,7 +63,7 @@ def _electricity(data: PieeData) -> str | None:
     return None
 
 
-def _pv_share(data: PieeData) -> str | None:
+def _pv_share(data: PieeData, reference: str | None) -> str | None:
     grid = _chart_values(data, 8)
     pv = _chart_values(data, 12)
     if len(grid) != 3 or len(pv) != 3:
@@ -74,15 +75,17 @@ def _pv_share(data: PieeData) -> str | None:
     ]
     if len(shares) != 3:
         return None
+    if reference is None:
+        raise ValueError("PV share paragraph has no figure reference")
     ceiling = math.ceil(max(shares) * 10) / 10
     if ceiling <= 1:
         return (
-            "Conform figurilor 4 se observă că în perioada de analiză ponderea energiei "
+            f"Conform {reference} se observă că în perioada de analiză ponderea energiei "
             "electrice consumate din parcul fotovoltaic propriu în total energie electrică "
             f"este redusă, sub {prototype_number(ceiling, 1)}%."
         )
     return (
-        "Conform figurilor 4, ponderea energiei electrice din parcul fotovoltaic "
+        f"Conform {reference}, ponderea energiei electrice din parcul fotovoltaic "
         f"propriu în total energie electrică este sub {prototype_number(ceiling, 1)}%."
     )
 
@@ -91,12 +94,13 @@ def render_body_text(source: Path, data: PieeData, output: Path, ledger: AnchorL
     parts = read_parts(source)
     root = xml(parts, "word/document.xml")
     fuels = _fuel_names(data)
+    reference = REFERENCE.search(visible_text(find([root], "body_162")))
     replacements: dict[str, str | None] = {
         "body_14": ownership(data.anexa),
         "body_72": f"carburanți ({_joined(fuels)})," if fuels else None,
         "body_83": _electricity(data),
         "body_124": None,
-        "body_162": _pv_share(data),
+        "body_162": _pv_share(data, reference.group() if reference else None),
         "body_201": None,
         "body_78": None,
         "body_79": None,

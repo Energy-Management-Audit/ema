@@ -5,16 +5,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from tests.replay_models import REPLAY_MODEL
+from tests.workspace_jobs import create_job
+
 from ema.audit.draft_agent import (
     INSTRUCTIONS,
     PROMPT_VERSION,
-    REPLAY_MODEL,
     DraftTools,
     recorded_facts,
 )
 from ema.audit.draft_checks import SUPPORT_PROMPT, SupportResult
 from ema.audit.draft_schema import DraftText, SectionDraft
-from ema.core.jobs import create_job
 from ema.core.llm.replay import request_hashes
 from ema.core.review.fields import propose
 from ema.core.review.models import Evidence, Manual

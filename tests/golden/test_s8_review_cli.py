@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from conftest import artifacts_path
 from ema.cli import _app
+from ema.clients.registry import create_client
 from ema.core.errors import EmaError
 from ema.core.jobs import status, subscribe
 from ema.core.review import decide, fields
@@ -17,7 +18,7 @@ from ema.core.workspace import Workspace
 from ema.piee.review_workflow import PieeWorkflow
 from ema.piee.workflow import GenerateRequest, start_generate, start_generate_for_job
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 @pytest.mark.parametrize("case_name", ["piee-case-a", "piee-case-b"])
@@ -33,8 +34,9 @@ def test_review_decision_and_final_gate(
     prelucrare = next(case.rglob("*Prelucrare*.xls*"))
     previous_piee = next((case / "final").glob("*.docx")) if case_name == "piee-case-b" else None
     ws = Workspace(tmp_path / "workspace")
+    registered = create_client(ws, "Synthetic", "12345678")
     job, run = start_generate(
-        ws, GenerateRequest("synthetic-client", 2025, anexa, necesar, prelucrare, previous_piee)
+        ws, GenerateRequest(str(registered["id"]), 2025, anexa, necesar, prelucrare, previous_piee)
     )
     for _ in subscribe(ws, job):
         pass
@@ -62,6 +64,19 @@ def test_review_decision_and_final_gate(
             candidate for candidate in item.alternatives if candidate.value == item.value
         )
         decide(ws, job, item.id, "choose", item.revision, "user", alternative=selected.id)
+    calculated = [
+        item
+        for item in fields(ws, job)
+        if item.key.endswith(".payback_years")
+        and item.state == "calculated"
+        and item.review == "pending"
+    ]
+    assert calculated
+    assert any(
+        issue.code == "calculated_unconfirmed" for issue in workflow.readiness(ws, job).blocking
+    )
+    for item in calculated:
+        decide(ws, job, item.id, "accept", item.revision, "user")
     assert any(issue.code == "stale" for issue in workflow.readiness(ws, job).blocking)
     regenerated = start_generate_for_job(ws, job)
     for _ in subscribe(ws, job):
@@ -110,6 +125,7 @@ def test_cli_generate_review_and_refuse_unresolved_final(
     case = reference_library / "piee/cases/piee-case-b"
     anexa = next(case.rglob("Anexa*.xlsx"))
     prelucrare = next(case.rglob("*Prelucrare*.xls*"))
+    create_client(Workspace(tmp_path / "workspace"), "Synthetic", "12345678")
     runner = CliRunner()
     generated = runner.invoke(
         _app,
@@ -117,7 +133,7 @@ def test_cli_generate_review_and_refuse_unresolved_final(
             "piee",
             "generate",
             "--client",
-            "synthetic-client",
+            "12345678",
             "--year",
             "2025",
             "--anexa",

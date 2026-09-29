@@ -13,9 +13,10 @@ from pathlib import Path
 
 import psutil
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.core.backup import backup
-from ema.core.jobs import StageOutcome, cancel, create_job, recover, run_stage, runner, status
+from ema.core.jobs import StageOutcome, cancel, recover, run_stage, runner, status
 from ema.core.workspace import Workspace
 from ema.core.workspace import schema as workspace_schema
 
@@ -76,7 +77,7 @@ def test_heartbeat_retries_after_sqlite_error(
     assert not worker.is_alive()
     with original_connect() as db:
         assert db.execute("SELECT heartbeat FROM runners WHERE id='runner'").fetchone()[0] > 0
-    assert "synthetic lock timeout" in (ws.root / "logs" / "ema.jsonl").read_text()
+    assert "synthetic lock timeout" in (ws.root / "logs" / "ema.jsonl").read_text(encoding="utf-8")
 
 
 def test_audit_run_failure_and_recovery_leave_job_open(tmp_path: Path) -> None:
@@ -151,7 +152,7 @@ def test_interrupted_delete_keeps_row_on_rmtree_failure(
     with ws.connect() as db:
         assert db.execute("SELECT deleted FROM jobs WHERE id=?", (job,)).fetchone()[0] == 1
     assert folder.exists()
-    assert "synthetic delete denial" in (ws.root / "logs" / "ema.jsonl").read_text()
+    assert "synthetic delete denial" in (ws.root / "logs" / "ema.jsonl").read_text(encoding="utf-8")
     monkeypatch.setattr(shutil, "rmtree", original_rmtree)
     Workspace(ws.root)
     with ws.connect() as db:
@@ -163,8 +164,8 @@ def test_repeated_slot_read_across_edit_is_stale(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "invoices", "client", 2025)
     first, second = tmp_path / "first", tmp_path / "second"
-    first.write_text("first")
-    second.write_text("second")
+    first.write_text("first", encoding="utf-8")
+    second.write_text("second", encoding="utf-8")
     ws.set_slot(job, "input", ws.add_file("client", first))
     read = threading.Event()
     resume = threading.Event()
@@ -190,7 +191,7 @@ def test_failed_run_discards_unpublished_output(tmp_path: Path) -> None:
 
     def stage(ctx):  # type: ignore[no-untyped-def]
         source = ctx.artifact_dir() / "source.txt"
-        source.write_text("output")
+        source.write_text("output", encoding="utf-8")
         saved.append(ctx.save_output(source, "result.txt"))
         raise RuntimeError("after output")
 
@@ -199,7 +200,7 @@ def test_failed_run_discards_unpublished_output(tmp_path: Path) -> None:
     with ws.connect() as db:
         assert db.execute("SELECT COUNT(*) FROM outputs WHERE job_id=?", (job,)).fetchone()[0] == 0
     assert saved and not saved[0].exists()
-    saved[0].write_text("orphan after interrupted cleanup")
+    saved[0].write_text("orphan after interrupted cleanup", encoding="utf-8")
     ws.gc()
     assert not saved[0].exists()
 
@@ -267,7 +268,9 @@ def test_failed_job_log_preserves_diagnostics(
     assert wait_run(ws, job)["state"] == "failed"
     assert status(ws, job).state == "failed"
     diagnostics = (
-        capsys.readouterr().err if app_log_denied else (ws.root / "logs" / "ema.jsonl").read_text()
+        capsys.readouterr().err
+        if app_log_denied
+        else (ws.root / "logs" / "ema.jsonl").read_text(encoding="utf-8")
     )
     assert "Traceback" in diagnostics
     assert ("stage failed" if failure == "stage" else "TypeError") in diagnostics
@@ -323,7 +326,7 @@ def test_gc_grace_allows_upload_then_slot(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "invoices", "client", 2025)
     source = tmp_path / "source.txt"
-    source.write_text("synthetic upload")
+    source.write_text("synthetic upload", encoding="utf-8")
     sha = ws.add_file("client", source)
     ws.gc()
     assert ws.set_slot(job, "input", sha).file_sha == sha
@@ -339,7 +342,7 @@ def test_reupload_refreshes_gc_grace_and_restores_missing_file(tmp_path: Path) -
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "invoices", "client", 2025)
     source = tmp_path / "source.txt"
-    source.write_text("synthetic repeated upload")
+    source.write_text("synthetic repeated upload", encoding="utf-8")
     sha = ws.add_file("client", source)
     with ws.connect() as db:
         relative = db.execute("SELECT relative_path FROM files WHERE sha=?", (sha,)).fetchone()[0]

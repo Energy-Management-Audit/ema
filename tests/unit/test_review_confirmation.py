@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+from tests.workspace_jobs import create_job
 
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.review import accept_batch, decide, fields, log, propose, undo
 from ema.core.review.models import Photo
 from ema.core.workspace import Workspace

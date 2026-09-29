@@ -9,7 +9,8 @@ import typer
 
 from ema.core.config import workspace_path
 from ema.core.workspace import Workspace
-from ema.piee.workflow import GenerateRequest, generate_draft
+from ema.piee.workflow import GenerateRequest
+from ema.workflows_registry import generate_draft
 
 piee_app = typer.Typer()
 

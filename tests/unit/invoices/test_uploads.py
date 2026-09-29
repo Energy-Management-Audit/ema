@@ -6,12 +6,12 @@ from pathlib import Path
 from threading import Barrier
 
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
 from ema.api.mock import preview_pdf
 from ema.clients.registry import create_client
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 from ema.invoices import uploads
 from ema.invoices.uploads import add_invoice_files

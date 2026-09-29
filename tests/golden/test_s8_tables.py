@@ -11,9 +11,10 @@ from docx.oxml.ns import qn
 from conftest import artifacts_path
 from ema.core.office.anchors import AnchorLedger
 from ema.core.office.base_map import load as load_map
+from ema.core.office.numbers_ro import format_number
 from ema.core.office.package import read_parts, xml
 from ema.piee.dataset import load
-from ema.piee.tables import render_tables
+from ema.piee.tables import _monthly, render_tables
 
 
 def _tables(path: Path) -> list[tuple[int, list[list[str]]]]:
@@ -56,7 +57,15 @@ def test_CLIENT-P1_monthly_and_equivalent_tables_match_approved(tmp_path: Path) 
     approved = _tables(next((case / "generated").glob("*.docx")))
     for table_number in (49, 51, 104, 106, 138, 140, 184, 186, 221, 223):
         ordinal = next(i for i, (index, _) in enumerate(original) if index == table_number)
-        assert actual[table_number][1:] == approved[ordinal][1][1:]
+        expected = [list(row) for row in approved[ordinal][1][1:]]
+        if table_number == 104:
+            # F12 changes one authored binary-rounding tie to half-up, from its source.
+            raw = _monthly(data, 6)[0]
+            assert raw is not None
+            old = f"{raw:,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+            assert expected[1][1] == old
+            expected[1][1] = format_number(raw, 2)
+        assert actual[table_number][1:] == expected
     equivalent = actual[277][1:]
     candidates = [cells[1:] for _, cells in approved if len(cells) == 4 and len(cells[0]) == 5]
     assert candidates == [equivalent]

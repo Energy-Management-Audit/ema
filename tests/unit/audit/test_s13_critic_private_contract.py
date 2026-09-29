@@ -3,10 +3,10 @@
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit.research_web import OutboundGuard
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.review.fields import propose
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace

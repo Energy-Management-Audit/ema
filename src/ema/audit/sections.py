@@ -12,11 +12,11 @@ from typing import Literal
 from ema.audit import base_entry
 from ema.audit.applicability import applies, condition_source, fact_fields
 from ema.audit.catalogue import CATALOGUE, MaterialKind, Section
-from ema.audit.chapter_readiness import empty_chapters
+from ema.audit.readiness import audit_readiness as audit_readiness  # noqa: PLC0414
 from ema.audit.staleness import base_changed, capture_inputs, current_inputs, snapshot_inputs
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
-from ema.core.review.models import Actor, Decision, Field, Issue, Readiness
+from ema.core.review.models import Actor, Decision, Field
 from ema.core.review.section_transition import SectionState, Status, transition
 from ema.core.review.store import save_decision
 from ema.core.workspace import Workspace
@@ -29,9 +29,11 @@ def _section(section_id: str) -> Section:
     return section
 
 
-def _audit_job(ws: Workspace, job: str) -> None:
-    with ws.connect() as db:
-        row = db.execute("SELECT type FROM jobs WHERE id=? AND deleted=0", (job,)).fetchone()
+def _audit_job(ws: Workspace, job: str, db: sqlite3.Connection | None = None) -> None:
+    if db is None:
+        with ws.connect() as connection:
+            return _audit_job(ws, job, connection)
+    row = db.execute("SELECT type FROM jobs WHERE id=? AND deleted=0", (job,)).fetchone()
     if row is None or row["type"] != "audit":
         raise EmaError("audit_job_missing", "Lucrarea de audit lipseşte.", job)
 
@@ -47,7 +49,7 @@ def get_status(ws: Workspace, job: str, section_id: str) -> SectionState:
 
 
 def statuses(ws: Workspace, job: str, db: sqlite3.Connection | None = None) -> list[SectionState]:
-    _audit_job(ws, job)
+    _audit_job(ws, job, db)
     if db is None:
         with ws.connect() as connection:
             return statuses(ws, job, connection)
@@ -86,7 +88,7 @@ def _save(  # noqa: PLR0913
             "revision=excluded.revision,data=excluded.data",
             (job, after.section_id, after.revision, json.dumps(after.payload())),
         )
-        if actor == "user" or detail is not None:
+        if actor in {"user", "agent"} or detail is not None:
             save_decision(
                 db,
                 job,
@@ -212,7 +214,7 @@ def set_status(  # noqa: PLR0913
             "se aplică"
             if before.status == Status.NA_PROPOSED and actor == "user" and to == computed
             else reason
-            if actor == "ema"
+            if actor in {"ema", "agent"}
             else None
         )
         return _save(ws, job, before, after, actor, detail, db=db)
@@ -256,7 +258,7 @@ def record_applicability(ws: Workspace, job: str, section_id: str) -> SectionSta
     )
 
 
-def mark_drafted(
+def mark_drafted(  # noqa: PLR0913
     ws: Workspace,
     job: str,
     section_id: str,
@@ -264,10 +266,14 @@ def mark_drafted(
     fingerprint: tuple[str, ...],
     *,
     detail: str | None = None,
+    db: sqlite3.Connection | None = None,
+    inputs: tuple[dict[str, int | None], dict[str, tuple[bool, str] | None]] | None = None,
 ) -> SectionState:
-    before = get_status(ws, job, section_id)
+    before = next(state for state in statuses(ws, job, db) if state.section_id == section_id)
     after = transition(before, Status.DRAFTED, actor)
-    fact_revisions, material_inputs = capture_inputs(ws, job, _section(section_id), fingerprint)
+    fact_revisions, material_inputs = (
+        inputs if inputs is not None else capture_inputs(ws, job, _section(section_id), fingerprint)
+    )
     facts = (f"fact:{key}" for key in fact_revisions)
     materials = (f"material:{key}" for key in material_inputs)
     all_inputs = tuple(dict.fromkeys((*fingerprint, *facts, *materials)))
@@ -283,6 +289,7 @@ def mark_drafted(
         ),
         actor,
         detail,
+        db=db,
     )
 
 
@@ -292,55 +299,6 @@ def mark_stale(ws: Workspace, job: str, section_id: str, changed_input: str) -> 
         return before
     after = transition(before, Status.DRAFTED, "ema", changed_input)
     return _save(ws, job, before, after, "ema", changed_input)
-
-
-def audit_readiness(ws: Workspace, job: str, db: sqlite3.Connection | None = None) -> Readiness:
-    if db is None:
-        with ws.connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            return audit_readiness(ws, job, connection)
-    refresh_staleness(ws, job, db)
-    states = statuses(ws, job, db)
-    materials, facts = _inputs(ws, job, db)
-    issues: list[Issue] = []
-    for section, state in zip(CATALOGUE, states, strict=True):
-        if state.stale:
-            issues.append(Issue(code="stale", message=f"Refaceţi secţiunea: {section.title}"))
-        if (
-            state.status == Status.NA
-            and state.na_applicable is not True
-            and applies(section.applies_when, materials, facts) is True
-        ):
-            issues.append(Issue(code="na_recheck", message=f"Reverificaţi n/a: {section.title}"))
-        if state.status not in (Status.DONE, Status.NA):
-            applicable = applies(section.applies_when, materials, facts)
-            next_step = (
-                "așteaptă preluarea dosarului"
-                if applicable is None
-                else (
-                    "Confirmați că nu se aplică"
-                    if applicable is False
-                    else "Completați și confirmați secțiunea"
-                )
-            )
-            issues.append(Issue(code="section_open", message=f"{section.title}: {next_step}"))
-        for ref in section.facts:
-            for field in fact_fields(ref, facts):
-                if field.confidence == "conflict":
-                    issues.append(
-                        Issue(
-                            code="conflict",
-                            field_id=field.id,
-                            message=f"Rezolvaţi conflictul: {section.title} / {field.label}",
-                        )
-                    )
-    issues.extend(empty_chapters(states))
-    return Readiness(
-        draft_ok=True,
-        final_ok=not issues,
-        blocking=issues,
-        next=[issue.message for issue in issues],
-    )
 
 
 def refresh_staleness(
@@ -392,6 +350,16 @@ def _refresh_inputs(ws: Workspace, job: str, db: sqlite3.Connection) -> list[Sec
                 ),
                 None,
             )
+        if changed is None:
+            for entry in before.fingerprint:
+                if entry.startswith("client:"):
+                    client_id, expected = entry.removeprefix("client:").rsplit("@", 1)
+                    row = db.execute(
+                        "SELECT revision FROM clients WHERE id=?", (client_id,)
+                    ).fetchone()
+                    if row is None or int(row["revision"]) != int(expected):
+                        changed = entry
+                        break
         if changed is None:
             result.append(before)
             continue

@@ -10,6 +10,7 @@ name = Interfaces -> workflows -> domain -> core
 type = layers
 layers =
     ema.api : ema.cli : ema.mcp
+    ema.workflows_registry
     ema.invoices : ema.piee : ema.reporting : ema.audit
     ema.consumption_analysis
     ema.energy_data
@@ -42,6 +43,7 @@ forbidden_modules =
     ema.cli
     ema.mcp
     ema.windows
+    ema.workflows_registry
 
 [importlinter:contract:mcp-standalone]
 name = MCP never imports the other interfaces

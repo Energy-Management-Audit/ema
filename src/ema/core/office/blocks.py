@@ -36,6 +36,7 @@ class Num:
     unit: str | None = None
     fact: str | None = None
     grouping: bool = True
+    scale: float = 1
 
 
 @dataclass(frozen=True)
@@ -142,6 +143,7 @@ class ValueUse:
     fact: str | None
     text: str
     block: int
+    scale: float = 1
 
 
 @dataclass(frozen=True)
@@ -244,7 +246,7 @@ def _segments(
                 else format_number(segment.value, segment.decimals, segment.unit, segment.grouping)
             )
             pieces.append(formatted)
-            report.append(ValueUse(segment.fact, formatted, block_index))
+            report.append(ValueUse(segment.fact, formatted, block_index, segment.scale))
             if absent:
                 missing.append((length, length + len(formatted)))
         else:

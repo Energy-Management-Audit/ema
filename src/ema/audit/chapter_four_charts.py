@@ -307,7 +307,7 @@ def _caption(spec: _Spec, client: str, k: int, letter: str | None, year: int | N
             prefix + f"Evoluția lunară a {spec.subject} înregistrat de către {client} "
             f"la nivelul anului {year}"
         )
-    return prefix + f"Evoluția anuală al {spec.subject} înregistrat la nivelul {client}"
+    return prefix + f"Evoluția anuală a {spec.subject} înregistrat la nivelul {client}"
 
 
 def _group(

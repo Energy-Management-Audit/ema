@@ -12,27 +12,23 @@ import typer
 
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.sections import Status, set_status, statuses
-from ema.audit.workflow import AuditWorkflow
 from ema.core.config import workspace_path
 from ema.core.errors import EmaError
 from ema.core.review import (
-    approve_final,
     decide,
     export,
+    export_final,
     fields,
     log,
     output_path,
-    readiness_hash,
     undo,
 )
-from ema.core.review.readiness import Workflow
+from ema.core.review.models import Readiness
+from ema.core.review.readiness import FinalOutput, final_checks
 from ema.core.workspace import Workspace
-from ema.piee.review_workflow import PieeWorkflow
+from ema.workflows_registry import workflow_for as _workflow
 
 job_review_app = typer.Typer()
-
-# Workflow slices populate these entries through static imports as they land.
-WORKFLOWS: dict[str, Workflow] = {"audit": AuditWorkflow(), "piee": PieeWorkflow()}
 
 
 def _ws() -> Workspace:
@@ -43,19 +39,6 @@ def _terminal() -> bool:
     return sys.stdin.isatty()
 
 
-def _workflow(ws: Workspace, job: str) -> Workflow:
-    with ws.connect() as db:
-        row = db.execute("SELECT type FROM jobs WHERE id=? AND deleted=0", (job,)).fetchone()
-    if row is None:
-        raise EmaError("job_missing", "Lucrarea nu există.", job)
-    workflow = WORKFLOWS.get(str(row["type"]))
-    if workflow is None:
-        raise EmaError(
-            "workflow_unavailable", "Fluxul de lucru nu este disponibil.", str(row["type"])
-        )
-    return workflow
-
-
 def _print(value: Any) -> None:
     typer.echo(json.dumps(value, ensure_ascii=False, default=str))
 
@@ -63,9 +46,9 @@ def _print(value: Any) -> None:
 @job_review_app.command("sections")
 def sections_command(job: str) -> None:
     names = {section.id: section.title for section in CATALOGUE}
-    typer.echo("ID | Stare | Secțiune | Motiv")
+    typer.echo("ID | Stare | Secţiune | Motiv")
     for state in statuses(_ws(), job):
-        label = state.status.value + (" (depășit)" if state.stale else "")
+        label = state.status.value + (" (depăşit)" if state.stale else "")
         typer.echo(
             f"{state.section_id} | {label} | {names[state.section_id]} | {state.reason or ''}"
         )
@@ -85,7 +68,7 @@ def section_command(
             raise EmaError(
                 "confirmation_requires_terminal", "Confirmarea necesită un terminal.", to
             )
-        if not typer.confirm(f"Confirmați {to} pentru {section_id}?", default=False):
+        if not typer.confirm(f"Confirmaţi {to} pentru {section_id}?", default=False):
             raise typer.Exit(code=2)
     _print(set_status(_ws(), job, section_id, Status(to), "user", reason).payload())
 
@@ -143,16 +126,31 @@ def export_command(
 ) -> None:
     ws = _ws()
     workflow = _workflow(ws, job)
-    readiness = workflow.readiness(ws, job)
+    checks = final_checks(ws, job, workflow) if final else None
+    readiness = (
+        Readiness.model_validate(checks["readiness"]) if checks else workflow.readiness(ws, job)
+    )
     _print(readiness.model_dump(mode="json"))
-    if final:
+    if checks is not None:
         if not readiness.final_ok:
             raise EmaError("not_ready", "Lucrarea nu este pregătită pentru export.", job)
         if not _terminal():
             raise EmaError("approval_requires_terminal", "Aprobarea necesită un terminal.", job)
-        output_id = workflow.render(ws, job, "final")
+        final_output = FinalOutput.model_validate(checks["final"]) if checks["final"] else None
+        output_id = final_output.output_id if final_output else None
+        if output_id is None:
+            raise EmaError("output_missing", "Documentul final lipseşte.", job)
         _print({"rendered_path": str(output_path(ws, job, output_id))})
-        if not typer.confirm("Aprobați exportul final?", default=False):
+        if not typer.confirm("Aprobaţi exportul final?", default=False):
             raise typer.Exit(code=2)
-        approve_final(ws, job, output_id, readiness_hash(ws, job, readiness, workflow), "user")
-    _print({"path": str(export(ws, job, workflow, final=final, dest=dest, actor="user"))})
+        result = export_final(
+            ws,
+            job,
+            output_id,
+            str(checks["readiness_hash"]),
+            dest,
+            workflow=workflow,
+        )
+        _print(result.model_dump(mode="json"))
+        return
+    _print({"path": str(export(ws, job, workflow, final=False, dest=dest, actor="user"))})

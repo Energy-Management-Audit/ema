@@ -30,16 +30,17 @@ from ema.audit.sections import Status, set_status
 from ema.audit.workflow import AuditWorkflow
 from ema.core.office.missing_text import MISSING_TEXT, TABLE_MISSING_NOTE, TABLE_MISSING_TEXT
 from ema.core.office.package import P, R, W, encoded, read_parts, write_parts, xml
+from ema.core.review.models import Field
 from ema.core.workspace import Workspace
 
 
 def test_every_text_part_is_read(tmp_path: Path) -> None:
     docx = tmp_path / "gate.docx"
     document = Document()
-    document.sections[0].header.paragraphs[0].text = "Redactat cu GPT"
+    document.sections[0].header.paragraphs[0].text = "Redactat cu GPT-5"
     document.add_paragraph(TITLES["ch1"], style="Heading 1")
     document.add_paragraph("Angajaţi ai unor persoane juridice.")
-    document.add_table(rows=1, cols=1).cell(0, 0).text = "Tabel scris de IA"
+    document.add_table(rows=1, cols=1).cell(0, 0).text = "Tabel generat de IA"
     document.save(str(docx))
     assert ai_wording_hits(docx, []) == ["ch1", "header1"]
     clean = tmp_path / "clean.docx"
@@ -82,7 +83,7 @@ def test_ai_wording_in_a_ch4_text_refuses_the_final_naming_the_field(
     assert record["state"] == "failed"
     assert _failure(ws, job) == {
         "code": "audit_ai_wording",
-        "message": "Raportul final conţine formulări despre AI.",
+        "message": "Raportul conţine formulări despre AI.",
     }
     assert str(record["error"]).split("; ") == ["narrative.ch4.concluzii", "ch4.concluzii"]
     assert outputs(ws, job) == []
@@ -208,3 +209,30 @@ def test_a_changed_picture_bullet_refuses_the_final(
         assert _failure(ws, job)["code"] == "audit_package"
         assert record["error"] == "unreviewed picture bullet: word/media/bullet.png"
         assert outputs(ws, job) == []
+
+
+@pytest.mark.parametrize("kind", ["draft", "final"])
+def test_both_exports_refuse_ai_in_narrative_fields(final, kind) -> None:
+    ws, job = final
+    write_narrative(ws, job, "ch4.concluzii", "Text generat automat.")
+    record = run_render(ws, job, kind)
+    assert record["state"] == "failed"
+    assert _failure(ws, job)["code"] == "audit_ai_wording"
+    assert "narrative.ch4.concluzii" in str(record["error"])
+    assert outputs(ws, job) == []
+
+
+def test_scan_refuses_narrative_wording_even_if_the_rendered_body_omits_it(tmp_path: Path) -> None:
+    path = tmp_path / "clean.docx"
+    Document().save(path)
+    field = Field(
+        id="field",
+        job_id="job",
+        key="narrative.ch6.measure.1",
+        label="Text",
+        value_type="text",
+        value="Generată automat.",
+        state="supplied",
+        presence="found",
+    )
+    assert ai_wording_hits(path, [field]) == ["narrative.ch6.measure.1"]

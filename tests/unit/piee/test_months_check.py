@@ -7,9 +7,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.core.jobs import create_job
 from ema.core.review import decide, fields, propose
 from ema.core.review.models import Cell, Evidence, Field, FieldSpec
 from ema.core.workspace import Workspace

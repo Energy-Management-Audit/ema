@@ -15,8 +15,10 @@ from docx.oxml.ns import qn
 from lxml import etree
 
 from conftest import artifacts_path
+from ema.core.office.numbers_ro import format_number
 from ema.piee.compose import compose_draft
 from ema.piee.dataset import load
+from ema.piee.tables import _monthly
 
 pytestmark = pytest.mark.golden
 
@@ -44,6 +46,10 @@ PARAGRAPHS = {
     "body_390": "unsupported_prose",
     "body_414": "unsupported_prose",
     "approved_only_361": "unsupported_prose",
+    "body_child_138": "figure_renumbered",
+    "identity_423": "figure_renumbered",
+    "body_146": "figure_renumbered",
+    "table_104_r2_c1": "half_up_rounding",
     **{f"table_374_r{row}_c0": "source_verbatim" for row in (4, 6, 7, 8, 9)},
     **{
         f"table_395_r{row}_c{column}": "source_complete_authored_omission"
@@ -51,7 +57,6 @@ PARAGRAPHS = {
         for column in range(6)
     },
     "table_420_r0_c0": "source_verbatim",
-    **{f"table_367_r{row}_c4": "calculated_marker" for row in range(2, 17)},
 }
 
 
@@ -127,7 +132,10 @@ def _formatting_same(actual: etree._Element, approved: etree._Element) -> bool:
 
 
 def _table_differences(
-    actual: etree._Element, approved: etree._Element, table: int
+    actual: etree._Element,
+    approved: etree._Element,
+    table: int,
+    rounding_values: dict[str, float],
 ) -> dict[str, str]:
     found: dict[str, str] = {}
     left_rows, right_rows = actual.findall(qn("w:tr")), approved.findall(qn("w:tr"))
@@ -143,9 +151,11 @@ def _table_differences(
                 continue
             key = f"table_{table}_r{row}_c{column}"
             assert key in PARAGRAPHS, key
-            if PARAGRAPHS[key] == "calculated_marker":
-                assert _text(left_cell).endswith(" (calculat)")
-                assert _text(left_cell).removesuffix(" (calculat)") == _text(right_cell), key
+            if PARAGRAPHS[key] == "half_up_rounding":
+                raw = rounding_values[key]
+                assert _text(left_cell) == format_number(raw, 2)
+                old = f"{raw:,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+                assert _text(right_cell) == old
             if PARAGRAPHS[key] == "formatting_only":
                 assert _formatting_same(left_cell, right_cell), key
             found[key] = PARAGRAPHS[key]
@@ -155,6 +165,30 @@ def _table_differences(
             assert key in PARAGRAPHS, key
             found[key] = PARAGRAPHS[key]
     return found
+
+
+def _paragraph_difference(actual: etree._Element, approved: etree._Element, key: str) -> str:
+    assert key in PARAGRAPHS, key
+    category = PARAGRAPHS[key]
+    if category == "figure_renumbered":
+        assert _text(actual).count("3 c)") == 1
+        assert _text(actual).replace("3 c)", "3 d)") == _text(approved)
+    if category in {"unsupported_prose", "source_policy"} and key in {
+        "body_77",
+        "body_78",
+        "body_79",
+        "body_81",
+        "body_124",
+        "body_165",
+        "body_201",
+        "body_363",
+        "body_390",
+        "body_414",
+    }:
+        assert _text(actual) == "n.d.", key
+    if category == "formatting_only":
+        assert _formatting_same(actual, approved), key
+    return category
 
 
 def test_CLIENT-P1_text_and_tables_have_only_pinned_differences(  # noqa: C901
@@ -176,7 +210,10 @@ def test_CLIENT-P1_text_and_tables_have_only_pinned_differences(  # noqa: C901
     b = [(node.tag, _text(node)) for node in right]
     found: dict[str, str] = {}
     formatting_only = 0
-    table_numbers = {324: 367, 331: 374, 352: 395, 376: 420}
+    table_numbers = {102: 104, 324: 367, 331: 374, 352: 395, 376: 420}
+    rounding = _monthly(data, 6)[0]
+    assert rounding is not None
+    rounding_values = {"table_104_r2_c1": rounding}
     for operation, start, end, ref_start, ref_end in SequenceMatcher(
         None, a, b, autojunk=False
     ).get_opcodes():
@@ -207,27 +244,16 @@ def test_CLIENT-P1_text_and_tables_have_only_pinned_differences(  # noqa: C901
         for index, reference in zip(range(start, end), range(ref_start, ref_end), strict=True):
             actual_node, approved_node = left[index], right[reference]
             if actual_node.tag == qn("w:tbl"):
-                found.update(_table_differences(actual_node, approved_node, table_numbers[index]))
+                found.update(
+                    _table_differences(
+                        actual_node, approved_node, table_numbers[index], rounding_values
+                    )
+                )
                 continue
             key = _slot(actual_node, index + 1)
-            assert key in PARAGRAPHS, key
-            category = PARAGRAPHS[key]
-            if category in {"unsupported_prose", "source_policy"} and key in {
-                "body_77",
-                "body_78",
-                "body_79",
-                "body_81",
-                "body_124",
-                "body_165",
-                "body_201",
-                "body_363",
-                "body_390",
-                "body_414",
-            }:
-                assert _text(actual_node) == "n.d.", key
-            if category == "formatting_only":
-                assert _formatting_same(actual_node, approved_node), key
-            found[key] = category
+            found[key] = _paragraph_difference(actual_node, approved_node, key)
     assert found.keys() == PARAGRAPHS.keys(), sorted(found.keys() ^ PARAGRAPHS.keys())
     assert Counter(found.values()) == Counter(PARAGRAPHS.values())
-    assert formatting_only == 137
+    # Three renumbered paragraphs now belong to the explicit difference inventory.
+    assert formatting_only == 134
+    assert "(calculat)" not in "\n".join(_text(node) for node in left)

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from docx import Document
 from tests.audit_structure import add_audit_toc, number_audit_headings
+from tests.workspace_jobs import create_job
 
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four_blocks import chapter_four_blocks
@@ -13,7 +14,6 @@ from ema.audit.content_checks import content_issues
 from ema.audit.read import read_dossier
 from ema.audit.render_steps import drop_na_sections, droppable
 from ema.audit.sections import Status, set_status
-from ema.core.jobs import create_job
 from ema.core.office.blocks import Missing, Paragraph
 from ema.core.review import decide, fields
 from ema.core.workspace import Workspace
@@ -72,7 +72,7 @@ def test_na_section_text_never_blocks_the_final(tmp_path: Path) -> None:
     labels = {message.removeprefix("Textul lipseşte: ") for message in blocking}
     assert labels == {
         "Concluziile privind analiza consumului echivalent de energie",
-        "Analiza eficienței utilizării energiei",
+        "Analiza eficienţei utilizării energiei",
         "Introducerea capitolului 3",
         "Introducerea capitolului 6",
     }

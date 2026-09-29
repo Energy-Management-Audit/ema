@@ -3,9 +3,9 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 
 BASE = "http://127.0.0.1:8766"
@@ -62,7 +62,12 @@ def test_problem_does_not_leak_detail_and_export_requires_confirmation(tmp_path:
     refused = client.post(
         f"/jobs/{job}/export",
         headers=headers,
-        json={"final": True, "output_id": "synthetic", "readiness_hash": "wrong", "confirm": False},
+        json={
+            "dest_dir": None,
+            "output_id": "synthetic",
+            "readiness_hash": "wrong",
+            "confirm": False,
+        },
     )
     assert refused.status_code == 403
     assert refused.json()["type"] == "urn:ema:error:human_required"
@@ -70,7 +75,7 @@ def test_problem_does_not_leak_detail_and_export_requires_confirmation(tmp_path:
         f"/jobs/{job}/export",
         headers=headers,
         json={
-            "final": True,
+            "dest_dir": None,
             "output_id": "synthetic",
             "readiness_hash": "wrong",
             "confirm": True,

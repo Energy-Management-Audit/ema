@@ -134,6 +134,17 @@
             "title": "At",
             "type": "string"
           },
+          "exported_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exported At"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -1002,18 +1013,11 @@
             "title": "Caen"
           },
           "contacts": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/Contact"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contacts"
+            "items": {
+              "$ref": "#/components/schemas/Contact"
+            },
+            "title": "Contacts",
+            "type": "array"
           },
           "cui": {
             "anyOf": [
@@ -1043,18 +1047,11 @@
             "type": "integer"
           },
           "sites": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/Site"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sites"
+            "items": {
+              "$ref": "#/components/schemas/Site"
+            },
+            "title": "Sites",
+            "type": "array"
           }
         },
         "required": [
@@ -1654,37 +1651,6 @@
         "title": "DocxLoc",
         "type": "object"
       },
-      "DraftInput": {
-        "properties": {
-          "on_revision": {
-            "title": "On Revision",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "on_revision"
-        ],
-        "title": "DraftInput",
-        "type": "object"
-      },
-      "DraftOutput": {
-        "properties": {
-          "kind": {
-            "title": "Kind",
-            "type": "string"
-          },
-          "output_id": {
-            "title": "Output Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "output_id",
-          "kind"
-        ],
-        "title": "DraftOutput",
-        "type": "object"
-      },
       "EmptyInput": {
         "additionalProperties": false,
         "properties": {},
@@ -1852,6 +1818,16 @@
       },
       "ExportChecks": {
         "properties": {
+          "final": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinalOutput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "readiness": {
             "$ref": "#/components/schemas/Readiness"
           },
@@ -1862,23 +1838,48 @@
         },
         "required": [
           "readiness",
-          "readiness_hash"
+          "readiness_hash",
+          "final"
         ],
         "title": "ExportChecks",
+        "type": "object"
+      },
+      "ExportFile": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path"
+        ],
+        "title": "ExportFile",
         "type": "object"
       },
       "ExportInput": {
         "additionalProperties": false,
         "properties": {
           "confirm": {
-            "default": false,
             "title": "Confirm",
             "type": "boolean"
           },
-          "final": {
-            "const": true,
-            "title": "Final",
-            "type": "boolean"
+          "dest_dir": {
+            "anyOf": [
+              {
+                "format": "path",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dest Dir"
           },
           "output_id": {
             "title": "Output Id",
@@ -1890,24 +1891,38 @@
           }
         },
         "required": [
-          "final",
           "output_id",
-          "readiness_hash"
+          "readiness_hash",
+          "confirm",
+          "dest_dir"
         ],
         "title": "ExportInput",
         "type": "object"
       },
-      "ExportResult": {
+      "ExportResponse": {
         "properties": {
-          "output_id": {
-            "title": "Output Id",
+          "approved_at": {
+            "title": "Approved At",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ExportFile"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "folder": {
+            "title": "Folder",
             "type": "string"
           }
         },
         "required": [
-          "output_id"
+          "approved_at",
+          "files",
+          "folder"
         ],
-        "title": "ExportResult",
+        "title": "ExportResponse",
         "type": "object"
       },
       "ExtractionSettings": {
@@ -1969,6 +1984,12 @@
             "title": "Confidence",
             "type": "string"
           },
+          "decimals": {
+            "default": 2,
+            "minimum": 0.0,
+            "title": "Decimals",
+            "type": "integer"
+          },
           "derivation": {
             "anyOf": [
               {
@@ -1996,6 +2017,11 @@
               }
             ],
             "title": "Failure"
+          },
+          "grouping": {
+            "default": true,
+            "title": "Grouping",
+            "type": "boolean"
           },
           "id": {
             "title": "Id",
@@ -2123,6 +2149,32 @@
           "size_bytes"
         ],
         "title": "FileVersion",
+        "type": "object"
+      },
+      "FinalOutput": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "output_id": {
+            "title": "Output Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "output_id",
+          "created_at",
+          "files"
+        ],
+        "title": "FinalOutput",
         "type": "object"
       },
       "Health": {
@@ -3354,24 +3406,6 @@
         "title": "MemoryRow",
         "type": "object"
       },
-      "NaProposal": {
-        "properties": {
-          "on_revision": {
-            "title": "On Revision",
-            "type": "integer"
-          },
-          "reason": {
-            "title": "Reason",
-            "type": "string"
-          }
-        },
-        "required": [
-          "reason",
-          "on_revision"
-        ],
-        "title": "NaProposal",
-        "type": "object"
-      },
       "NewJob": {
         "additionalProperties": false,
         "properties": {
@@ -3383,8 +3417,7 @@
             "enum": [
               "invoices",
               "piee",
-              "audit",
-              "reporting"
+              "audit"
             ],
             "title": "Type",
             "type": "string"
@@ -3567,10 +3600,6 @@
             ],
             "title": "Created At"
           },
-          "edited_externally": {
-            "title": "Edited Externally",
-            "type": "boolean"
-          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -3614,7 +3643,6 @@
           "kind",
           "media_type",
           "size_bytes",
-          "edited_externally",
           "name",
           "created_at",
           "run_id",
@@ -10473,11 +10501,38 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExportResult"
+                  "$ref": "#/components/schemas/ExportResponse"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "output_path"
           },
           "403": {
             "content": {
@@ -10531,7 +10586,7 @@
                 }
               }
             },
-            "description": "output_missing"
+            "description": "file_missing, output_missing"
           },
           "409": {
             "content": {
@@ -10558,7 +10613,7 @@
                 }
               }
             },
-            "description": "job_running, not_ready, output_not_final, output_stale, stale_revision"
+            "description": "job_running, not_ready, output_changed, output_not_final, output_stale, stale_revision"
           },
           "421": {
             "content": {
@@ -10613,6 +10668,33 @@
               }
             },
             "description": "validation_error"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "output_copy_failed"
           }
         },
         "summary": "Do Export",
@@ -10729,210 +10811,6 @@
           }
         },
         "summary": "Checks",
-        "tags": [
-          "export"
-        ]
-      }
-    },
-    "/jobs/{job_id}/export/draft": {
-      "post": {
-        "operationId": "draft_jobs__job_id__export_draft_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DraftInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DraftOutput"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "403": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "csrf_required, invalid_origin, session_required"
-          },
-          "404": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "job_missing"
-          },
-          "409": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "invoices_unconfirmed_client, stale_revision"
-          },
-          "421": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "invalid_host"
-          },
-          "422": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "validation_error"
-          },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "audit_render_unavailable"
-          }
-        },
-        "summary": "Draft",
         "tags": [
           "export"
         ]
@@ -11279,6 +11157,33 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "action_invalid, value_invalid"
+          },
           "403": {
             "content": {
               "application/problem+json": {
@@ -11305,6 +11210,60 @@
               }
             },
             "description": "csrf_required, invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "alternative_missing, field_missing"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "field_unresolved, stale_revision, value_missing"
           },
           "421": {
             "content": {
@@ -12692,6 +12651,33 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "decision_superseded"
+          },
           "403": {
             "content": {
               "application/problem+json": {
@@ -12718,6 +12704,60 @@
               }
             },
             "description": "csrf_required, invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "decision_missing, field_missing, section_missing"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "already_undone, field_changed, stale_revision, transition_forbidden"
           },
           "421": {
             "content": {
@@ -14766,6 +14806,33 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "wrong_job_type"
+          },
           "403": {
             "content": {
               "application/problem+json": {
@@ -14791,7 +14858,61 @@
                 }
               }
             },
-            "description": "csrf_required, invalid_origin, session_required"
+            "description": "csrf_required, human_required, invalid_origin, session_required"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "job_missing, section_missing"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "pattern": "^urn:ema:error:",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "reason_missing, stale_revision, transition_forbidden"
           },
           "421": {
             "content": {
@@ -15042,192 +15163,6 @@
           "provisional"
         ],
         "x-provisional": "live per-section draft agent pending"
-      }
-    },
-    "/jobs/{job_id}/sections/{section_id}/na-proposal": {
-      "post": {
-        "operationId": "na_proposal_jobs__job_id__sections__section_id__na_proposal_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "section_id",
-            "required": true,
-            "schema": {
-              "title": "Section Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NaProposal"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SectionState"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "403": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "csrf_required, invalid_origin, session_required"
-          },
-          "404": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "job_missing, section_missing"
-          },
-          "409": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "stale_revision"
-          },
-          "421": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "invalid_host"
-          },
-          "422": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "integer"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "pattern": "^urn:ema:error:",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "title",
-                    "status"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "validation_error"
-          }
-        },
-        "summary": "Na Proposal",
-        "tags": [
-          "audit"
-        ]
       }
     },
     "/jobs/{job_id}/slots": {

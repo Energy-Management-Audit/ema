@@ -17,7 +17,6 @@ from ema.core.review.models import Field
 from ema.core.workspace import Workspace
 
 PROMPT_VERSION = "audit-draft-v1"
-REPLAY_MODEL = "gemini-3.6-flash"
 INSTRUCTIONS = (
     "Draft only the requested section from recorded facts. Read facts and the style guide first. "
     "Use {{f:fact_id}} for every number and client-specific name; list supporting fact ids on "
@@ -38,10 +37,13 @@ def recorded_facts(ws: Workspace, job: str, section: str) -> dict[str, Field]:
 
 
 class DraftTools:
-    def __init__(self, ws: Workspace, job: str, section: str) -> None:
+    def __init__(
+        self, ws: Workspace, job: str, section: str, facts: dict[str, Field] | None = None
+    ) -> None:
         if section not in SECTION_FACTS:
             raise EmaError("section_missing", "Secţiunea de redactare lipseşte.", section)
         self.ws, self.job, self.section = ws, job, section
+        self.facts = recorded_facts(ws, job, section) if facts is None else facts
         self.draft: SectionDraft | None = None
         self.check: DraftCheck | None = None
 
@@ -54,17 +56,19 @@ class DraftTools:
                 "presence": field.presence,
                 "evidence_ids": field.evidence,
             }
-            for key, field in recorded_facts(self.ws, self.job, self.section).items()
+            for key, field in self.facts.items()
         ]
 
     def read_style_guide(self, _args: dict[str, Any]) -> object:
-        return json.loads(resource_path("audit", "prompts", "style_guide_v1.json").read_text())
+        return json.loads(
+            resource_path("audit", "prompts", "style_guide_v1.json").read_text(encoding="utf-8")
+        )
 
     def write_section_draft(self, args: dict[str, Any]) -> object:
         draft = SectionDraft.model_validate(args)
         if draft.section != self.section:
             raise EmaError("draft_section", "Secţiunea redactată nu corespunde.", self.section)
-        check = check_draft(draft, recorded_facts(self.ws, self.job, self.section), self.job)
+        check = check_draft(draft, self.facts, self.job)
         if check.fatal:
             return {"accepted": False, "errors": [issue.code for issue in check.fatal]}
         self.draft, self.check = draft, check
@@ -99,16 +103,17 @@ def draft_section_replay(  # noqa: PLR0913
     support_recording: Path,
     limits: Limits,
     *,
-    model_id: str = REPLAY_MODEL,
+    model_id: str | None = None,
+    facts: dict[str, Field] | None = None,
 ) -> tuple[AgentState, SectionDraft, DraftCheck, tuple[DraftReview, ...]]:
     """Run request-bound Draft and support replay; real client use is disabled."""
-    tools = DraftTools(ws, job, section)
+    tools = DraftTools(ws, job, section, facts)
     context = AgentContext(
         ws,
         job,
         f"draft:{section}",
         ReplayProvider(draft_recording),
-        model_id,
+        model_id or ReplayProvider(draft_recording).model_id,
         PROMPT_VERSION,
         synthetic=True,
     )
@@ -129,13 +134,13 @@ def draft_section_replay(  # noqa: PLR0913
                     tools.write_section_draft(call["arguments"])
     if state.status != "done" or tools.draft is None or tools.check is None:
         raise EmaError("draft_incomplete", "Redactarea secţiunii nu s-a încheiat.", section)
-    facts = recorded_facts(ws, job, section)
+    facts = tools.facts
     support_context = AgentContext(
         ws,
         job,
         f"support:{section}",
         ReplayProvider(support_recording),
-        model_id,
+        model_id or ReplayProvider(support_recording).model_id,
         PROMPT_VERSION + "-support",
         synthetic=True,
     )
@@ -144,4 +149,4 @@ def draft_section_replay(  # noqa: PLR0913
 
 
 def draft_section_live(*_args: object, **_kwargs: object) -> NoReturn:
-    raise EmaError("ai_client_disabled", "Redactarea pe documente reale așteaptă aprobarea.", "")
+    raise EmaError("ai_client_disabled", "Redactarea pe documente reale aşteaptă aprobarea.", "")

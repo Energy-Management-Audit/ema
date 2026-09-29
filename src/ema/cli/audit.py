@@ -13,9 +13,12 @@ from ema.audit.draft_stage import draft_section
 from ema.audit.measures import run_measures
 from ema.audit.measures_form import write_measures_form
 from ema.audit.readings import run_readings
+from ema.audit.stages import add_document, new_audit, start_audit_stage
 from ema.audit.visit import run_visit
 from ema.core.config import workspace_path
-from ema.core.jobs import recover
+from ema.core.errors import EmaError
+from ema.core.jobs import get_job, recover, subscribe
+from ema.core.jobs import status as job_status
 from ema.core.workspace import Workspace
 
 audit_app = typer.Typer()
@@ -73,3 +76,34 @@ def measures(job: str) -> None:
 def measures_form(dest: Path) -> None:
     """Write a blank Măsuri propuse workbook."""
     typer.echo(str(write_measures_form(dest)))
+
+
+@audit_app.command("new")
+def new(
+    client: str = typer.Option(..., "--client"), year: int = typer.Option(..., "--year")
+) -> None:
+    typer.echo(new_audit(Workspace(workspace_path()), client, year))
+
+
+@audit_app.command("add")
+def add(job: str, sources: list[Path], slot: str | None = typer.Option(None, "--slot")) -> None:
+    if slot is not None and len(sources) != 1:
+        raise EmaError("invalid_slot", "Un singur fişier poate ocupa locul ales.", slot)
+    ws = Workspace(workspace_path())
+    for source in sources:
+        typer.echo(add_document(ws, job, source, slot))
+
+
+@audit_app.command("run")
+def run(job: str, stage: str) -> None:
+    ws = Workspace(workspace_path())
+    recover(ws)
+    started = start_audit_stage(ws, job, stage, int(str(get_job(ws, job)["revision"])))
+    for _ in subscribe(ws, job):
+        pass
+    typer.echo(json.dumps({"run_id": started, "state": job_status(ws, job).state}))
+
+
+@audit_app.command("status")
+def status(job: str) -> None:
+    typer.echo(json.dumps(asdict(job_status(Workspace(workspace_path()), job)), default=str))

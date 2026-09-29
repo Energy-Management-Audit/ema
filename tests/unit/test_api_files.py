@@ -6,16 +6,17 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.api.job_routes import validate_slot
 from ema.api.mock import preview_pdf
 from ema.clients.files import store_upload
 from ema.clients.registry import create_client
 from ema.core.errors import EmaError
-from ema.core.jobs import StageOutcome, create_job, run_stage, status, subscribe
+from ema.core.jobs import StageOutcome, run_stage, status, subscribe
 from ema.core.review.models import Evidence, PdfRegion
 from ema.core.workspace import Workspace
+from ema.core.workspace.slots import validate_slot
 
 BASE = "http://127.0.0.1:8766"
 
@@ -106,7 +107,7 @@ def test_multipart_dedupe_cross_client_and_binary_download(tmp_path: Path) -> No
             "SELECT relative_path FROM outputs WHERE id=?", (output_id,)
         ).fetchone()[0]
     ws.path(relative).write_bytes(b"modified")
-    assert client.get(f"/jobs/{job}/outputs").json()[0]["edited_externally"]
+    assert "edited_externally" not in client.get(f"/jobs/{job}/outputs").json()[0]
     assert client.get(f"/jobs/{job}/outputs/{output_id}").status_code == 409
 
 

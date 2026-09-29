@@ -34,7 +34,10 @@ def _compose(_data: object, _base: Path, output: Path, _today: object) -> Simple
     return SimpleNamespace(untouched=[], package_issues=[], leftover_parts=[], final_ready=True)
 
 
-def _workbook(_dataset: object, _years: object, path: Path, _factors: object) -> None:
+def _workbook(
+    _dataset: object, _years: object, path: Path, _factors: object, *, firm_name: str | None = None
+) -> None:
+    del firm_name
     Workbook().save(str(path))
 
 

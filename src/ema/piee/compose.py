@@ -21,6 +21,7 @@ from ema.piee.body_text import remove_unsourced_recommendation, render_body_text
 from ema.piee.charts import render_bar_charts
 from ema.piee.dataset import PieeData
 from ema.piee.extra_figures import render_extra_figures
+from ema.piee.figure_numbering import renumber_figures
 from ema.piee.identity import identity_values
 from ema.piee.identity_map import render_identity
 from ema.piee.measure_tables import render_measure_tables
@@ -118,7 +119,7 @@ def compose_draft(
     production = str(data.necesar.production[0].name.value) if data.necesar.production else None
     values = identity_values(data.anexa, generated_on, production_name=production)
     with TemporaryDirectory() as directory:
-        stages = [Path(directory) / f"stage-{index}.docx" for index in range(18)]
+        stages = [Path(directory) / f"stage-{index}.docx" for index in range(19)]
         render_identity(
             base_directory / "piee-master.docx",
             base_directory / "identity-spans.json",
@@ -166,13 +167,18 @@ def compose_draft(
             water_missing=water_missing(data),
         )
         toc_slots = frozenset(
-            json.loads((base_directory / "toc-manifest.json").read_text())["number_slots"]
+            json.loads((base_directory / "toc-manifest.json").read_text(encoding="utf-8"))[
+                "number_slots"
+            ]
         )
         _mark_unresolved(stages[15], stages[16], ledger, toc_slots)
         _strip_bookmarks(stages[16], stages[17])
+        renumber_figures(stages[17], stages[18])
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(stages[17].read_bytes())
-    denylist = tuple(json.loads((base_directory / "base-identity.json").read_text()))
+        output.write_bytes(stages[18].read_bytes())
+    denylist = tuple(
+        json.loads((base_directory / "base-identity.json").read_text(encoding="utf-8"))
+    )
     leftovers = tuple(leftover_issues(output, denylist))
     if leftovers:
         output.unlink(missing_ok=True)

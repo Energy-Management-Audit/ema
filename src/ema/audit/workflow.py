@@ -13,6 +13,7 @@ from ema.core.errors import EmaError
 from ema.core.jobs import status, subscribe
 from ema.core.jobs.reads import revision
 from ema.core.review.models import Issue, Readiness
+from ema.core.review.readiness import FinalOutput, final_view
 from ema.core.workspace import Workspace
 
 
@@ -48,6 +49,10 @@ def _cover_changed(db: sqlite3.Connection, job: str) -> bool:
 
 
 class AuditWorkflow:
+    def current_final(self, db: sqlite3.Connection, job: str) -> FinalOutput | None:
+        found = _newest_docx_in(db, job, "audit_final")
+        return final_view(db, job, found[1] if found else None)
+
     def readiness(self, ws: Workspace, job: str) -> Readiness:
         with ws.connect() as db:
             db.execute("BEGIN IMMEDIATE")

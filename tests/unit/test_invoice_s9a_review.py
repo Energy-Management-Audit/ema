@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from ema.clients.registry import create_client
 from ema.core.workspace import Workspace
 from ema.invoices import pipeline, run_batch
 from ema.invoices.configuration.field_catalog import (
@@ -167,7 +168,7 @@ def test_eds_green_adjustment_uses_confirmed_english_grammar() -> None:
 
 class _Reader:
     def read(self, path: Path) -> InputDocument:
-        return InputDocument(path, (_page(path.read_text()),))
+        return InputDocument(path, (_page(path.read_text(encoding="utf-8")),))
 
 
 class _Parser:
@@ -191,8 +192,8 @@ class _Parser:
 
 def test_identity_duplicate_with_different_file_bytes(tmp_path: Path) -> None:
     first, second = tmp_path / "first.pdf", tmp_path / "second.pdf"
-    first.write_text("1")
-    second.write_text("1.0")
+    first.write_text("1", encoding="utf-8")
+    second.write_text("1.0", encoding="utf-8")
     result = ProcessInvoiceFiles(_Reader(), ExtractInvoice([_Parser()])).execute([first, second])
     assert [outcome.status.value for outcome in result.outcomes] == ["exportable", "duplicate"]
     assert result.outcomes[1].drafts == ()
@@ -200,8 +201,8 @@ def test_identity_duplicate_with_different_file_bytes(tmp_path: Path) -> None:
 
 def test_identity_conflict_blocks_both_invoices(tmp_path: Path) -> None:
     first, second = tmp_path / "first.pdf", tmp_path / "second.pdf"
-    first.write_text("1")
-    second.write_text("2")
+    first.write_text("1", encoding="utf-8")
+    second.write_text("2", encoding="utf-8")
     result = ProcessInvoiceFiles(_Reader(), ExtractInvoice([_Parser()])).execute([first, second])
     assert [outcome.status.value for outcome in result.outcomes] == [
         "requires_review",
@@ -231,8 +232,8 @@ def test_multimeter_duplicate_with_missing_meter_value_is_safe(tmp_path: Path) -
             ]
 
     first, second = tmp_path / "first.pdf", tmp_path / "second.pdf"
-    first.write_text("1")
-    second.write_text("1.0")
+    first.write_text("1", encoding="utf-8")
+    second.write_text("1.0", encoding="utf-8")
     result = ProcessInvoiceFiles(_Reader(), ExtractInvoice([MultiMeterParser()])).execute(
         [first, second]
     )
@@ -244,8 +245,8 @@ def test_multimeter_duplicate_with_missing_meter_value_is_safe(tmp_path: Path) -
 
 def test_dedupe_error_marks_both_documents_for_review(tmp_path: Path, monkeypatch) -> None:
     first, second = tmp_path / "first.pdf", tmp_path / "second.pdf"
-    first.write_text("1")
-    second.write_text("1.0")
+    first.write_text("1", encoding="utf-8")
+    second.write_text("1.0", encoding="utf-8")
 
     def fail_dedupe(*args, **kwargs):
         raise TypeError("synthetic dedupe failure")
@@ -276,8 +277,8 @@ def test_supplier_suffix_variants_share_canonical_identity(tmp_path: Path) -> No
             ]
 
     first, second = tmp_path / "MET ROMANIA ENERGY SA.pdf", tmp_path / "MET ROMANIA ENERGY S.A..pdf"
-    first.write_text("1")
-    second.write_text("1.0")
+    first.write_text("1", encoding="utf-8")
+    second.write_text("1.0", encoding="utf-8")
     result = ProcessInvoiceFiles(_Reader(), ExtractInvoice([SupplierSuffixParser()])).execute(
         [first, second]
     )
@@ -288,7 +289,9 @@ def test_unreadable_source_does_not_abort_run_batch(tmp_path: Path) -> None:
     missing = tmp_path / "missing.pdf"
     corrupt = tmp_path / "corrupt.pdf"
     corrupt.write_bytes(b"not a PDF")
-    result = run_batch(Workspace(tmp_path / "workspace"), "example", [missing, corrupt])
+    ws = Workspace(tmp_path / "workspace")
+    create_client(ws, "Synthetic", "12345678")
+    result = run_batch(ws, "12345678", [missing, corrupt])
     assert [outcome["status"] for outcome in result.outcomes] == ["failed", "failed"]
     assert result.outcomes[0]["metadata"]["technical_detail"]
     assert result.workbook is None

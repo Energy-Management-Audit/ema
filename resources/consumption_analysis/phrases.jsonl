@@ -162,7 +162,6 @@
 {"direction": "value", "paragraph": 1789, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei,", "source_document": "audit-03"}
 {"direction": "value", "paragraph": 1790, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei,", "source_document": "audit-03"}
 {"direction": "value", "paragraph": 1791, "pattern": "pentru anul {year} s-a înregistrat o valoare de {number} m3/mil lei.", "source_document": "audit-03"}
-{"direction": "decline", "paragraph": 416, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a populației la nivelul municipiului Oras.", "source_document": "audit-04"}
 {"direction": "decline", "paragraph": 937, "pattern": "Conform figurii numărul {figure_number} se poate observa că pe parcursul întregii perioade de analiză, consumul anual de energie echivalentă a înregistrat o tendință de scădere.", "source_document": "audit-04"}
 {"direction": "decline", "paragraph": 954, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de energie electrică, cu un maxim înregistrat nivelul anului {year}.", "source_document": "audit-04"}
 {"direction": "decline", "paragraph": 965, "pattern": "Conform figurii numărul {figure_number} se observă tendința de scădere a consumului specific echivalent de gaz natural, cu un maxim înregistrat nivelul anului {year}.", "source_document": "audit-04"}

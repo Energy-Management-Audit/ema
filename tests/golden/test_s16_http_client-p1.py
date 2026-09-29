@@ -16,9 +16,10 @@ from pypdfium2 import PdfDocument
 
 from conftest import artifacts_path
 from ema.api import create_app
+from ema.clients.registry import create_client
 from ema.core.workspace import Workspace
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 BASE = "http://127.0.0.1:8766"
 
 
@@ -114,10 +115,15 @@ def _journey(  # noqa: PLR0915
     api_draft_path.write_bytes(downloaded.content)
     refused = client.post(
         f"/jobs/{job}/export",
-        json={"final": True, "output_id": draft["id"], "readiness_hash": "wrong", "confirm": True},
+        json={
+            "dest_dir": None,
+            "output_id": draft["id"],
+            "readiness_hash": "wrong",
+            "confirm": True,
+        },
         headers=headers,
     )
-    assert refused.status_code == 409 and refused.json()["type"] == "urn:ema:error:not_ready"
+    assert refused.status_code == 409 and refused.json()["type"] == "urn:ema:error:output_stale"
     conflicts = client.get(f"/jobs/{job}/conflicts").json()
     assert conflicts
     for field in conflicts:
@@ -128,6 +134,21 @@ def _journey(  # noqa: PLR0915
         )
         assert chosen.status_code == 200
     assert client.get(f"/jobs/{job}/conflicts").json() == []
+    calculated = [
+        item
+        for item in client.get(f"/jobs/{job}/fields").json()
+        if item["key"].endswith(".payback_years")
+        and item["state"] == "calculated"
+        and item["review"] == "pending"
+    ]
+    assert calculated
+    for field in calculated:
+        accepted = client.post(
+            f"/jobs/{job}/fields/{field['id']}/decide",
+            json={"action": "accept", "on_revision": field["revision"]},
+            headers=headers,
+        )
+        assert accepted.status_code == 200
     refreshed = client.post(
         f"/jobs/{job}/piee/generate",
         json={"kind": "draft", "on_revision": _revision(client, job)},
@@ -169,7 +190,12 @@ def _journey(  # noqa: PLR0915
     assert checks["readiness"]["final_ok"]
     wrong_hash = client.post(
         f"/jobs/{job}/export",
-        json={"final": True, "output_id": final["id"], "readiness_hash": "wrong", "confirm": True},
+        json={
+            "dest_dir": None,
+            "output_id": final["id"],
+            "readiness_hash": "wrong",
+            "confirm": True,
+        },
         headers=headers,
     )
     assert wrong_hash.status_code == 403
@@ -177,7 +203,7 @@ def _journey(  # noqa: PLR0915
     old_output = client.post(
         f"/jobs/{job}/export",
         json={
-            "final": True,
+            "dest_dir": None,
             "output_id": draft["id"],
             "readiness_hash": checks["readiness_hash"],
             "confirm": True,
@@ -189,7 +215,7 @@ def _journey(  # noqa: PLR0915
     exported = client.post(
         f"/jobs/{job}/export",
         json={
-            "final": True,
+            "dest_dir": None,
             "output_id": final["id"],
             "readiness_hash": checks["readiness_hash"],
             "confirm": True,
@@ -197,9 +223,10 @@ def _journey(  # noqa: PLR0915
         headers=headers,
     )
     assert exported.status_code == 200, exported.json().get("type")
-    assert exported.json()["output_id"] == final["id"]
+    assert {file["name"] for file in exported.json()["files"]} == set(checks["final"]["files"])
 
     cli_workspace = tmp_path / "cli-workspace"
+    create_client(Workspace(cli_workspace), "Synthetic", "12345678")
     cli_env = os.environ.copy()
     cli_env["EMA_WORKSPACE"] = str(cli_workspace)
     cli = subprocess.run(
@@ -210,7 +237,7 @@ def _journey(  # noqa: PLR0915
             "piee",
             "generate",
             "--client",
-            "Synthetic",
+            "12345678",
             "--year",
             "2025",
             "--anexa",

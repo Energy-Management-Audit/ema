@@ -9,15 +9,15 @@ from typing import Literal
 
 from ema.audit.draft_agent import (
     PROMPT_VERSION,
-    REPLAY_MODEL,
     draft_section_live,
     draft_section_replay,
     recorded_facts,
 )
 from ema.audit.draft_checks import DraftCheck, DraftReview
-from ema.audit.draft_render import mark_section_drafted, review_payload
+from ema.audit.draft_render import review_payload
 from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
-from ema.audit.sections import get_status
+from ema.audit.publication import queue_sections
+from ema.audit.sections import get_status, recompute_ready
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, get_job, run_stage, status, subscribe
 from ema.core.llm import Limits, ReplayProvider
@@ -66,7 +66,7 @@ def draft_section(
     if record["state"] == "running":
         raise EmaError("job_running", "Lucrarea rulează deja.", job)
     if section not in SECTION_FACTS:
-        raise EmaError("section_missing", "Secțiunea de redactare lipsește.", section)
+        raise EmaError("section_missing", "Secţiunea de redactare lipseşte.", section)
     if draft_recording is None or support_recording is None:
         draft_section_live()
     _replayable(draft_recording)
@@ -74,11 +74,18 @@ def draft_section(
     drafted: list[tuple[SectionDraft, DraftCheck, tuple[DraftReview, ...], Path]] = []
 
     def stage(ctx: StageContext) -> StageOutcome:
-        for field in recorded_facts(ws, job, section).values():
+        composition_facts = recorded_facts(ws, job, section)
+        for field in composition_facts.values():
             ctx.record_read("fields", field.id, field.revision)
-        ctx.record_input(prompt=PROMPT_VERSION, model=REPLAY_MODEL)
+        ctx.record_input(prompt=PROMPT_VERSION, model=ReplayProvider(draft_recording).model_id)
         _, draft, check, flags = draft_section_replay(
-            ws, job, section, draft_recording, support_recording, Limits(DRAFT_STEPS)
+            ws,
+            job,
+            section,
+            draft_recording,
+            support_recording,
+            Limits(DRAFT_STEPS),
+            facts=composition_facts,
         )
         directory = ctx.artifact_dir() / "sections"
         directory.mkdir(parents=True, exist_ok=True)
@@ -87,7 +94,15 @@ def draft_section(
             json.dumps(review_payload(draft, check, flags), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        mark_section_drafted(ws, job, draft)
+        if draft.status == "drafted":
+            recompute_ready(ws, job)
+            queue_sections(
+                ctx,
+                (section,),
+                "agent",
+                tuple(f"fact:{key}" for key in SECTION_FACTS[section]),
+                facts=composition_facts,
+            )
         drafted.append((draft, check, flags, directory))
         return StageOutcome()
 
@@ -96,7 +111,7 @@ def draft_section(
         pass
     recorded = next(item for item in status(ws, job).runs if item["id"] == run)
     if recorded["state"] != "ready" or not drafted:
-        raise EmaError("draft_failed", "Redactarea secțiunii a eșuat.", str(recorded["error"]))
+        raise EmaError("draft_failed", "Redactarea secţiunii a eşuat.", str(recorded["error"]))
     draft, check, flags, directory = drafted[0]
     return DraftResult(
         job=job,

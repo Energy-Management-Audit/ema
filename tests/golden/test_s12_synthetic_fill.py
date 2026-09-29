@@ -1,13 +1,14 @@
 """Request-bound Fill replay over a made-up dossier; no provider call."""
 
 from pathlib import Path
+from uuid import UUID
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit.fill_agent import fill_section_replay
 from ema.audit.fill_tools import FillDocument
 from ema.audit.read import read_dossier
-from ema.core.jobs import create_job
 from ema.core.llm import Limits, ReplayProvider
 from ema.core.review.fields import fields
 from ema.core.workspace import Workspace
@@ -16,9 +17,14 @@ pytestmark = pytest.mark.golden
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
 
-def test_synthetic_fill_rejects_fabrication_and_resumes(tmp_path: Path) -> None:
+def test_synthetic_fill_rejects_fabrication_and_resumes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     ws = Workspace(tmp_path / "workspace")
-    job = create_job(ws, "audit", "made-up", 2026)
+    # The request-bound recording includes job-owned evidence IDs.
+    with monkeypatch.context() as fixed_job:
+        fixed_job.setattr("ema.core.jobs.uuid.uuid4", lambda: UUID(int=19))
+        job = create_job(ws, "audit", "made-up", 2026)
     read = read_dossier(ws, job, FIXTURES / "audit/synthetic_necesar.xlsx")
     assert any(item.key == "audit.tep_class" for item in read.fields)
     docs = {

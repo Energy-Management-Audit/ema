@@ -13,6 +13,7 @@ from ema.core.office.package import read_parts
 from ema.energy_data.carriers import Carrier
 from ema.piee.chart_plan import ChartBinding, chart_series
 from ema.piee.dataset import PieeData
+from ema.piee.figure_numbering import numbered_caption
 from ema.piee.pies import expanded_mix
 
 BIOMASS = (
@@ -83,22 +84,35 @@ def render_extra_figures(source: Path, data: PieeData, output: Path) -> None:  #
         current = source
         step = 0
 
-        def add(style: str, after: str, series: list[Series], caption: str) -> None:
+        def add(style: str, after: str, series: list[Series], caption: str) -> str | None:
             nonlocal current, step
             if not series:
                 return
             following = Path(directory) / f"figure-{step}.docx"
-            clone_chart(current, style, series, None, following, after_part=after, caption=caption)
+            part = clone_chart(
+                current,
+                style,
+                series,
+                None,
+                following,
+                after_part=after,
+                caption=numbered_caption(current, caption),
+            )
             current = following
             step += 1
+            return part
 
         annual_fuel = _annual_fuel(data)
+        fuel_after = "word/charts/chart20.xml"
         if annual_fuel:
-            add(
-                "word/charts/chart17.xml",
-                "word/charts/chart19.xml",
-                annual_fuel,
-                "Fig. Consumul anual de carburant, pe tipuri",
+            fuel_after = (
+                add(
+                    "word/charts/chart17.xml",
+                    "word/charts/chart20.xml",
+                    annual_fuel,
+                    "Fig. Consumul anual de carburant, pe tipuri",
+                )
+                or fuel_after
             )
         biomass = _biomass(data)
         if biomass is not None:
@@ -110,7 +124,7 @@ def render_extra_figures(source: Path, data: PieeData, output: Path) -> None:  #
                 annual = offset is None
                 add(
                     "word/charts/chart16.xml" if annual else "word/charts/chart13.xml",
-                    "word/charts/chart20.xml",
+                    fuel_after,
                     [series],
                     f"Fig. Consumul {'anual' if annual else 'lunar'} de {label}"
                     + ("" if annual else f" în {data.year + offset}"),

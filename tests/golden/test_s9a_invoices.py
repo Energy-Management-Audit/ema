@@ -12,10 +12,11 @@ from pathlib import Path
 
 import pytest
 from openpyxl import load_workbook
+from tests.workspace_jobs import create_job
 
 from conftest import artifacts_path
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job, run_stage, status, subscribe
+from ema.core.jobs import run_stage, status, subscribe
 from ema.core.workspace import Workspace
 from ema.invoices import (
     confirm_client,

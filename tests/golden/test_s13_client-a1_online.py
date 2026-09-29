@@ -3,12 +3,12 @@
 from pathlib import Path
 
 import pytest
+from tests.workspace_jobs import create_job
 
 from ema.audit.cf_owner import company_from_necesar_name, read_owner_cui
 from ema.audit.read import read_dossier
 from ema.audit.research_tools import ANAF_URL, ResearchTools
 from ema.audit.research_web import OutboundGuard
-from ema.core.jobs import create_job
 from ema.core.review.fields import propose
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace

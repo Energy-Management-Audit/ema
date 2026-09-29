@@ -4,10 +4,11 @@ import json
 from pathlib import Path
 
 from openpyxl import Workbook
+from tests.workspace_jobs import create_job
 
 from ema.audit.intake import audit_intake
 from ema.audit.intake_tools import IntakeDocument, IntakeTools
-from ema.core.jobs import create_job, run_stage, status, subscribe
+from ema.core.jobs import run_stage, status, subscribe
 from ema.core.llm import ReplayProvider
 from ema.core.workspace import Workspace
 

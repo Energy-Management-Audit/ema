@@ -5,9 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.core.jobs import StageContext, StageOutcome, create_job, run_stage, subscribe
+from ema.core.jobs import StageContext, StageOutcome, run_stage, subscribe
 from ema.core.review import approve_final
 from ema.core.workspace import Workspace
 
@@ -45,7 +46,9 @@ def test_approvals_are_listed_newest_first(tmp_path: Path) -> None:
         "on_decision",
         "at",
         "actor",
+        "exported_at",
     }
+    assert body[0]["exported_at"] is None
     assert body[0]["output_id"] == output and body[0]["readiness_hash"] == "hash-2"
     missing = client.get("/jobs/nope/approvals")
     assert missing.status_code == 404

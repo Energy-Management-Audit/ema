@@ -298,6 +298,8 @@ class WordChild:
                     self._timed_out(folder, child, action, exc)
             return self._result(folder, action, source, target, exit_code)
         finally:
+            # Keep recovery metadata if identity-checked cleanup fails.
+            self._kill_word(folder, self.word_image, identity=_record(folder / "word.json"))
             self._active.pop(folder, None)
             shutil.rmtree(folder, ignore_errors=True)
 

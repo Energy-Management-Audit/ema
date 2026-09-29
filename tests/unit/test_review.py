@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import threading
 import time
 from datetime import UTC, datetime
@@ -11,12 +10,10 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
-from typer.testing import CliRunner
+from tests.workspace_jobs import create_job
 
-from ema.cli import _app
-from ema.cli import review as cli_review
 from ema.core.errors import EmaError
-from ema.core.jobs import StageOutcome, create_job, run_stage, status
+from ema.core.jobs import StageOutcome, run_stage, status
 from ema.core.review import (
     accept_batch,
     approve_final,
@@ -75,7 +72,7 @@ class FakeWorkflow:
         def stage(ctx):  # type: ignore[no-untyped-def]
             ctx.read_review_row("fields", get(ws, job, "source").id)
             source = ctx.artifact_dir() / "synthetic.txt"
-            source.write_text(kind)
+            source.write_text(kind, encoding="utf-8")
             ctx.save_output(source, f"{kind}.txt", kind=kind)
             return StageOutcome()
 
@@ -154,7 +151,7 @@ def test_review_journal_undo_readiness_and_approval(tmp_path: Path) -> None:
     digest = readiness_hash(ws, job, workflow.readiness(ws, job), workflow)
     approve_final(ws, job, output, digest, "user")
     assert export(ws, job, workflow, final=True, dest=destination, actor="agent") == destination
-    assert destination.read_text() == "final"
+    assert destination.read_text(encoding="utf-8") == "final"
     current = get(ws, job, "source")
     decide(ws, job, current.id, "accept", current.revision, "user")
     assert_error(
@@ -170,68 +167,6 @@ def test_review_journal_undo_readiness_and_approval(tmp_path: Path) -> None:
     )
     assert_error("approval_requires_user", lambda: approve_final(ws, job, output, digest, "agent"))
     assert len(log(ws, job)) == 7
-
-
-def test_cli_review_and_noninteractive_export(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ws = Workspace(tmp_path / "workspace")
-    job = setup(ws)
-    monkeypatch.setenv("EMA_WORKSPACE", str(ws.root))
-    monkeypatch.setitem(cli_review.WORKFLOWS, "piee", FakeWorkflow())
-    runner = CliRunner()
-    result = runner.invoke(_app, ["job", "checks", job])
-    assert result.exit_code == 0, result.output
-    assert not json.loads(result.stdout)["final_ok"]
-    source = get(ws, job, "source")
-    result = runner.invoke(
-        _app,
-        ["job", "decide", job, source.id, "correct", "11", "--on-revision", str(source.revision)],
-    )
-    assert result.exit_code == 0, result.output
-    assert get(ws, job, "source").value == 11
-    result = runner.invoke(_app, ["job", "log", job])
-    assert result.exit_code == 0 and len(json.loads(result.stdout)) == 1
-    result = runner.invoke(_app, ["job", "undo", job, json.loads(result.stdout)[0]["id"]])
-    assert result.exit_code == 0, result.output
-    assert get(ws, job, "source").value == 10
-    result = runner.invoke(
-        _app, ["job", "export", job, "--final", "--dest", str(tmp_path / "final.txt")]
-    )
-    assert result.exit_code == 1
-    assert not (tmp_path / "final.txt").exists()
-    conflict = get(ws, job, "conflict")
-    result = runner.invoke(
-        _app,
-        [
-            "job",
-            "decide",
-            job,
-            conflict.id,
-            "choose",
-            "--on-revision",
-            str(conflict.revision),
-            "--alternative",
-            conflict.alternatives[0].id,
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    missing = get(ws, job, "missing")
-    result = runner.invoke(
-        _app,
-        ["job", "decide", job, missing.id, "correct", "30", "--on-revision", str(missing.revision)],
-    )
-    assert result.exit_code == 0, result.output
-    monkeypatch.setattr(cli_review, "_terminal", lambda: True)
-    command = ["job", "export", job, "--final", "--dest", str(tmp_path / "final.txt")]
-    denied = runner.invoke(_app, command, input="n\n")
-    assert denied.exit_code == 2 and not (tmp_path / "final.txt").exists()
-    assert "rendered_path" in denied.stdout
-    assert denied.stdout.index("rendered_path") < denied.stdout.index("Aprobați")
-    assert denied.stdout.count("Aprobați") == 1
-    accepted = runner.invoke(_app, command, input="y\n")
-    assert accepted.exit_code == 0, accepted.output
-    assert (tmp_path / "final.txt").read_text() == "final"
 
 
 def test_final_export_rejects_draft_and_older_output(tmp_path: Path) -> None:
@@ -253,9 +188,9 @@ def test_final_export_rejects_draft_and_older_output(tmp_path: Path) -> None:
     draft = workflow.render(ws, job, "draft")
     digest = readiness_hash(ws, job, workflow.readiness(ws, job), workflow)
     destination = tmp_path / "final.txt"
-    assert_error("output_not_final", lambda: approve_final(ws, job, draft, digest, "user"))
+    assert_error("output_stale", lambda: approve_final(ws, job, draft, digest, "user"))
     assert_error(
-        "output_not_final",
+        "output_missing",
         lambda: export(ws, job, workflow, final=True, dest=destination, actor="user"),
     )
     final = workflow.render(ws, job, "final")
@@ -264,7 +199,7 @@ def test_final_export_rejects_draft_and_older_output(tmp_path: Path) -> None:
     assert newer_draft != final
     assert_error("output_stale", lambda: approve_final(ws, job, final, digest, "user"))
     assert_error(
-        "output_not_final",
+        "output_missing",
         lambda: export(ws, job, workflow, final=True, dest=destination, actor="user"),
     )
     assert not destination.exists()
@@ -382,7 +317,7 @@ def test_evidence_keeps_file_referenced_until_job_delete(tmp_path: Path) -> None
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "piee", "synthetic", 2026)
     source = tmp_path / "source.txt"
-    source.write_text("synthetic evidence")
+    source.write_text("synthetic evidence", encoding="utf-8")
     sha = ws.add_file("synthetic", source)
     proof = evidence("backed")
     proof = proof.model_copy(update={"file_sha": sha})

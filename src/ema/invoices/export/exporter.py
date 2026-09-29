@@ -80,8 +80,11 @@ _PRICE_FIELDS = {
 
 
 class OpenpyxlWorkbookExporter:
-    def __init__(self, verifier: OpenpyxlWorkbookVerifier | None = None) -> None:
+    def __init__(
+        self, verifier: OpenpyxlWorkbookVerifier | None = None, *, firm_name: str | None = None
+    ) -> None:
         self._verifier = verifier or OpenpyxlWorkbookVerifier()
+        self._firm_name = firm_name
 
     def export(self, invoices: list[InvoiceDraft], destination: Path) -> Path:
         if not invoices:
@@ -113,6 +116,7 @@ class OpenpyxlWorkbookExporter:
             workbook,
             destination,
             lambda path: self._verifier.verify(path, invoices),
+            firm_name=self._firm_name,
         )
 
     def _write_summary(

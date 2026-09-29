@@ -14,7 +14,7 @@ from ema.core.office.errors import OfficeError
 from ema.core.office.word_api import word_available, worker_command
 from ema.core.office.word_child import WordChild
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows Word COM only")

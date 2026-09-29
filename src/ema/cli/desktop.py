@@ -70,6 +70,13 @@ class DesktopApi:
         self._ws = ws
         self._window: Window | None = None
 
+    def choose_folder(self) -> dict[str, str] | None:
+        if self._window is None:
+            raise RuntimeError("Desktop window is not ready")
+        choice = self._window.create_file_dialog(webview.FileDialog.FOLDER)
+        folder = (choice if isinstance(choice, str) else choice[0]) if choice else None
+        return {"path": folder} if folder else None
+
     def save_output(self, job_id: str, output_id: str) -> DesktopSaveResult:
         try:
             if self._window is None:

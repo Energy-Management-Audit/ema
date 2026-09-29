@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from ema.core.errors import EmaError
 from ema.energy_data.anexa import parse_anexa
 from ema.energy_data.anexa_cells import AnexaData
 from ema.energy_data.calc import tep
@@ -278,12 +279,16 @@ def assemble(
 ) -> PieeData:
     """Keep preferred values while retaining every disagreement for review."""
     if anexa.year is not None and anexa.year.value != year:
-        raise ValueError("Anexa reporting year differs from PIEE data year")
+        raise EmaError(
+            "piee_annex_year", "Anul anexei nu corespunde perioadei PIEE.", str(anexa.year.value)
+        )
     if necesar is None:
         required_years = set(range(year - 2, year + 1))
         if prelucrare is None or not required_years.issubset(prelucrare.dataset.years):
-            raise ValueError(
-                "Necesar info is required unless Prelucrare covers every analysis year"
+            raise EmaError(
+                "piee_sources_incomplete",
+                "Necesar info lipseşte, iar Prelucrare date nu acoperă toţi anii analizei.",
+                ", ".join(str(item) for item in sorted(required_years)),
             )
         necesar_status = (
             "not needed: covered by Prelucrare (years "

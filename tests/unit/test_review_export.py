@@ -3,7 +3,9 @@
 import time
 from pathlib import Path
 
-from ema.core.jobs import StageOutcome, create_job, run_stage, status
+from tests.workspace_jobs import create_job
+
+from ema.core.jobs import StageOutcome, run_stage, status
 from ema.core.review import export
 from ema.core.review.models import Readiness
 from ema.core.workspace import Workspace
@@ -16,7 +18,7 @@ class InterleavedWorkflow:
     def render(self, ws: Workspace, job: str, kind: str) -> str:
         def stage(ctx):  # type: ignore[no-untyped-def]
             source = ctx.artifact_dir() / f"{kind}.txt"
-            source.write_text(kind)
+            source.write_text(kind, encoding="utf-8")
             ctx.save_output(source, source.name, kind=kind)
             return StageOutcome()
 
@@ -46,4 +48,4 @@ def test_draft_export_uses_rendered_id_when_final_interleaves(tmp_path: Path) ->
         export(ws, job, InterleavedWorkflow(), final=False, dest=destination, actor="user")
         == destination
     )
-    assert destination.read_text() == "draft"
+    assert destination.read_text(encoding="utf-8") == "draft"

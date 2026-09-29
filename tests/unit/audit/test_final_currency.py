@@ -73,7 +73,7 @@ def _refused_after_change(client: TestClient, headers: dict[str, str], job: str,
     exported = client.post(
         f"/jobs/{job}/export",
         json={
-            "final": True,
+            "dest_dir": None,
             "output_id": output,
             "readiness_hash": checks["readiness_hash"],
             "confirm": True,

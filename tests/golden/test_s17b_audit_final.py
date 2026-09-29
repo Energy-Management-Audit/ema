@@ -24,6 +24,7 @@ from PIL import Image
 from tests.audit_replay import CH2_DRAFT, draft_recording, support_recording
 from tests.conftest import artifacts_path
 from tests.golden.s17b_chart_oracle import assert_final_charts, expected_charts
+from tests.golden.s17c_chart_layout_oracle import assert_production_values_fit_pdf
 from tests.golden.s17c_structure_oracle import assert_final_structure
 from tests.golden.test_s17b_audit_render import (
     _outputs,
@@ -56,7 +57,7 @@ from ema.core.review import fields
 from ema.core.workspace import Workspace
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
 
-pytestmark = pytest.mark.golden
+pytestmark = [pytest.mark.golden, pytest.mark.word]
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 FIXED = {section.id for section in CATALOGUE if section.kind == "fixed"}
 ADDRESS = "Str. Exemplu nr. 1, Localitatea Exemplu"
@@ -118,7 +119,7 @@ def _bound(docx: Path, anchors: Path) -> dict[str, list[str]]:
     """Each binding's filled paragraphs, found by the anchor bookmark the base recorded."""
     wanted = {
         f"_ema_{item['slot']}": item["binding"]
-        for item in json.loads(anchors.read_text("utf-8"))["anchors"]
+        for item in json.loads(anchors.read_text(encoding="utf-8"))["anchors"]
         if item.get("binding")
     }
     document = Document(str(docx))
@@ -153,18 +154,7 @@ def _images_are_reviewed_or_uploaded(docx: Path, photo: Path) -> None:
 
 def _draft_marks(ws: Workspace, job: str) -> tuple[list[str], set[str]]:
     """Step 3: the draft renders without failure and marks what it wrote itself."""
-    before = {state.section_id: state.status for state in statuses(ws, job)}
-    draft = _wait(ws, job, start_audit_render(ws, job, "draft"))
-    assert draft["state"] == "ready", draft["error"]
-    with ws.connect() as db:
-        folder = ws.artifact_dir(db, job, "audit_render", str(draft["id"]))
-    summary = RenderSummary.model_validate_json((folder / "render.json").read_text("utf-8"))
-    assert summary.failures == []
-    present = set(section_ids(folder / "Audit-ciorna.docx"))
-    after = {state.section_id: state.status for state in statuses(ws, job)}
-    marked = [key for key in RENDER_DRAFTED if key in present and before[key] == Status.READY]
-    assert marked and all(after[key] == Status.DRAFTED for key in marked)
-    # Review changes recorded inputs; replay CH2 against the current facts before confirmation.
+    # Review changes recorded inputs; replay CH2 against the current facts before rendering.
     directory = ws.root / "final-recordings"
     directory.mkdir(exist_ok=True)
     draft_section(
@@ -176,6 +166,19 @@ def _draft_marks(ws: Workspace, job: str) -> tuple[list[str], set[str]]:
             ws, job, CH2_DRAFT, directory / "ch2-support.json", None
         ),
     )
+    before = {state.section_id: state.status for state in statuses(ws, job)}
+    draft = _wait(ws, job, start_audit_render(ws, job, "draft"))
+    assert draft["state"] == "ready", draft["error"]
+    with ws.connect() as db:
+        folder = ws.artifact_dir(db, job, "audit_render", str(draft["id"]))
+    summary = RenderSummary.model_validate_json(
+        (folder / "render.json").read_text(encoding="utf-8")
+    )
+    assert summary.failures == []
+    present = set(section_ids(folder / "Audit-ciorna.docx"))
+    after = {state.section_id: state.status for state in statuses(ws, job)}
+    marked = [key for key in RENDER_DRAFTED if key in present and before[key] == Status.READY]
+    assert marked and all(after[key] == Status.DRAFTED for key in marked)
     return marked, present
 
 
@@ -224,7 +227,7 @@ def _export(ws: Workspace, job: str) -> Path:
     checks = client.get(f"/jobs/{job}/export/checks").json()
     assert checks["readiness"]["final_ok"], checks["readiness"]["blocking"]
     body = {
-        "final": True,
+        "dest_dir": None,
         "output_id": output_id,
         "readiness_hash": checks["readiness_hash"],
         "confirm": True,
@@ -232,7 +235,9 @@ def _export(ws: Workspace, job: str) -> Path:
     exported = client.post(f"/jobs/{job}/export", json=body, headers=headers)
     assert exported.status_code == 200, exported.json()
     assert len(client.get(f"/jobs/{job}/approvals").json()) == 1
-    copy = ws.root / "exports" / f"{job}-{output_id}.docx"
+    copy = Path(
+        next(file["path"] for file in exported.json()["files"] if file["name"].endswith(".docx"))
+    )
     assert copy.read_bytes() == client.get(f"/jobs/{job}/outputs/{output_id}").content
     return copy
 
@@ -263,7 +268,9 @@ def test_CLIENT-A1_final_approved_and_exported(
     run = str(final["id"])
     with ws.connect() as db:
         folder = ws.artifact_dir(db, job, "audit_final", run)
-    summary = RenderSummary.model_validate_json((folder / "render.json").read_text("utf-8"))
+    summary = RenderSummary.model_validate_json(
+        (folder / "render.json").read_text(encoding="utf-8")
+    )
     outputs = _outputs(ws, job, run)
     docx, pdf = outputs["Audit-final.docx"], outputs["Audit-final.pdf"]
     assert body_counts(docx).markers == []
@@ -271,6 +278,7 @@ def test_CLIENT-A1_final_approved_and_exported(
     toc_pages = _toc_pages(docx)
     assert summary.toc_pages_set and toc_pages and all(text.strip().isdigit() for text in toc_pages)
     pages, toc_entries = assert_final_structure(docx, pdf)
+    assert_production_values_fit_pdf(docx, pdf)
     assert pages > 0 and toc_entries == len(toc_pages)
     _document_checks(ws, job, docx, folder / "base.anchors.json", reviewed)
     _images_are_reviewed_or_uploaded(docx, photo)
@@ -285,6 +293,9 @@ def test_CLIENT-A1_final_approved_and_exported(
     shutil.copyfile(pdf, review / "Audit-final.pdf")
     shutil.copyfile(docx, review / "Audit-final.docx")
     shutil.copyfile(folder / "digest-changes.txt", review.parent / "digest-changes.txt")
+    p1_digest = artifacts_path("s19", "digest-changes.txt")
+    p1_digest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(folder / "digest-changes.txt", p1_digest)
     done = sum(value == Status.DONE for value in states.values())
     evidence = {
         "chapters": len(summary.chapters),
@@ -324,7 +335,9 @@ def test_CLIENT-A1_final_charts(
     assert final["state"] == "ready", final["error"]
     with ws.connect() as db:
         folder = ws.artifact_dir(db, job, "audit_final", str(final["id"]))
-    summary = RenderSummary.model_validate_json((folder / "render.json").read_text("utf-8"))
+    summary = RenderSummary.model_validate_json(
+        (folder / "render.json").read_text(encoding="utf-8")
+    )
     docx = _outputs(ws, job, str(final["id"]))["Audit-final.docx"]
     source = next(
         (reference_library / "audit/cases/audit-case-a/received").glob("*Necesar info*.xls")

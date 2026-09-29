@@ -5,12 +5,14 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.workspace_jobs import create_job
 
-from ema.api import create_app, job_routes, piee_routes
+from ema import invoices, workflows_registry
+from ema.api import create_app
 from ema.api.job_routes import start_named_stage
+from ema.audit import stages as audit_stages
 from ema.clients.registry import create_client
 from ema.core.errors import EmaError
-from ema.core.jobs import create_job
 from ema.core.workspace import Workspace
 
 
@@ -100,8 +102,15 @@ def test_stage_dispatch_starts_supported_stage(
         calls.append((*args, kwargs))
         return "synthetic-run"
 
-    monkeypatch.setattr(job_routes, runner, fake_runner)
-    monkeypatch.setattr(job_routes, "select_checklist", lambda _slots: None)
+    module = (
+        audit_stages
+        if job_type == "audit"
+        else invoices
+        if job_type == "invoices" and stage == "invoices"
+        else workflows_registry
+    )
+    monkeypatch.setattr(module, runner, fake_runner)
+    monkeypatch.setattr(audit_stages, "select_checklist", lambda _slots: None)
     monkeypatch.setattr(ws, "list_slots", lambda *_args: ["invoices/2026"])
 
     assert start_named_stage(ws, job, stage, 1, human_session=True) == "synthetic-run"
@@ -117,44 +126,14 @@ def test_piee_routes_render_only_supported_draft_jobs(
     invoice = create_job(ws, "invoices", client_id, 2026)
     audit = create_job(ws, "audit", client_id, 2026)
     reporting = create_job(ws, "reporting", client_id, 2026)
-    rendered: list[tuple[str, str]] = []
-
-    class StubPiee:
-        def render(self, _ws: Workspace, job_id: str, kind: str) -> str:
-            rendered.append((job_id, kind))
-            return "piee-output"
-
-    monkeypatch.setattr(piee_routes, "PieeWorkflow", StubPiee)
-    monkeypatch.setattr(piee_routes, "render_invoice", lambda _ws, _job, _kind: "invoice-output")
     client = TestClient(
         create_app(ws, 8766, launch_code="synthetic-code"), base_url="http://127.0.0.1:8766"
     )
     token = client.post("/session", json={"code": "synthetic-code"}).json()["csrf"]
     headers = {"X-Ema-CSRF": token}
 
-    for job, expected in ((piee, "piee-output"), (invoice, "invoice-output")):
+    for job in (piee, invoice, audit, reporting):
         response = client.post(
             f"/jobs/{job}/export/draft", json={"on_revision": 1}, headers=headers
         )
-        assert response.status_code == 200
-        assert response.json() == {"output_id": expected, "kind": "draft"}
-
-    assert rendered == [(piee, "draft")]
-    assert (
-        client.post(
-            f"/jobs/{audit}/export/draft", json={"on_revision": 1}, headers=headers
-        ).status_code
-        == 501
-    )
-    assert (
-        client.post(
-            f"/jobs/{reporting}/export/draft", json={"on_revision": 1}, headers=headers
-        ).status_code
-        == 400
-    )
-    assert (
-        client.post(
-            f"/jobs/{piee}/export/draft", json={"on_revision": 99}, headers=headers
-        ).status_code
-        == 409
-    )
+        assert response.status_code == 404
