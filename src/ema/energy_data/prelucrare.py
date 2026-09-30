@@ -147,6 +147,7 @@ def _production(
     if sheet is not None:
         tonnes = physical(sheet, ("tone",), "tone", "production", out)
         if tonnes:
+            out.deferred_production.update(tonnes)
             return {"main": tonnes}, {"main": "tone"}
         for label, unit, divisor in (
             ("kWh gaz vehiculat", "mii MWh gaz vehiculat", 1_000_000),
@@ -262,6 +263,30 @@ def _filed_specific(book: Book, out: PrelucrareData) -> None:  # noqa: C901
         break
 
 
+def _filed_production_partial(book: Book, out: PrelucrareData) -> None:
+    """Keep the gas plus grid figure without treating it as the energy total."""
+    sheet = sheet_named(book, "Productii", out.issues)
+    if sheet is None:
+        return
+    for row in range(1, sheet.max_row + 1):
+        columns = [
+            col
+            for col in range(1, sheet.max_col + 1)
+            if normal(str(cell_or_blank(sheet, row, col).value or "")) == "consum specific total en"
+        ]
+        if len(columns) != 1:
+            continue
+        for later in range(row + 1, sheet.max_row + 1):
+            year = year_label(cell_or_blank(sheet, later, 3).value)
+            if year is None:
+                break
+            cell = cell_or_blank(sheet, later, columns[0])
+            value = numeric(cell.value)
+            if value is not None:
+                out.filed[f"specific.gas_grid_partial.{year}"] = located(cell, value, "tep/tone")
+        break
+
+
 def import_prelucrare(path: Path) -> PrelucrareData:  # noqa: C901, PLR0912
     book = open_book(path)
     try:
@@ -275,9 +300,12 @@ def import_prelucrare(path: Path) -> PrelucrareData:  # noqa: C901, PLR0912
             series = physical(sheet, label, unit, carrier.value, out)
             if series:
                 carriers[carrier] = series
+                if carrier == Carrier.electricity_cogen:
+                    out.deferred_series.update((carrier, year) for year in series)
         coke = sheet_named(book, "Consum Cocs", out.issues)
         if coke is not None and (series := coke_series(coke, out)):
             carriers[Carrier.coke] = series
+            out.deferred_series.update((Carrier.coke, year) for year in series)
         carriers.update(water_tables(book, out))
         for carrier, by_year in tuple(carriers.items()):
             values = [
@@ -322,6 +350,7 @@ def import_prelucrare(path: Path) -> PrelucrareData:  # noqa: C901, PLR0912
                     )
         _filed_tep(book, out)
         _filed_specific(book, out)
+        _filed_production_partial(book, out)
         return out
     finally:
         book.close()

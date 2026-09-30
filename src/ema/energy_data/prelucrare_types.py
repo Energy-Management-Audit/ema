@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from ema.core.office.errors import OfficeError
 from ema.core.office.sheets import Book, CellRef, CellValue, Sheet
+from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FactorTable
 from ema.energy_data.model import EnergyDataset, Reading
 from ema.energy_data.source import Located, ReaderIssue, normal
@@ -19,6 +20,10 @@ class PrelucrareData:
     located: dict[str, Located] = field(default_factory=lambda: {})
     filed: dict[str, Located] = field(default_factory=lambda: {})
     issues: list[ReaderIssue] = field(default_factory=lambda: [])
+    deferred_series: set[tuple[Carrier, int]] = field(default_factory=set[tuple[Carrier, int]])
+    deferred_production: set[int] = field(default_factory=set[int])
+    previous_annual: dict[str, Reading] = field(default_factory=lambda: {})
+    previous_annual_located: dict[str, Located] = field(default_factory=lambda: {})
 
     def to_dataset(self) -> EnergyDataset:
         return self.dataset

@@ -56,6 +56,7 @@ def _read_row(  # noqa: PLR0913
     year: int,
     months: dict[int, int],
     annual_col: int | None,
+    *,
     unit: str,
     key: str,
     out: PrelucrareData,
@@ -78,6 +79,10 @@ def _read_row(  # noqa: PLR0913
     annual = Reading(annual_value, unit) if annual_value is not None else None
     if annual_value is not None and total is not None:
         out.located[f"{key}.{year}"] = located(total, annual_value, unit)
+    adjacent = cell_or_blank(sheet, row, max(months.values()) + 1)
+    if (prior_value := numeric(adjacent.value)) is not None:
+        out.previous_annual[f"{key}.{year}"] = Reading(prior_value, unit)
+        out.previous_annual_located[f"{key}.{year}"] = located(adjacent, prior_value, unit)
     return CarrierSeries(readings, annual)
 
 
@@ -178,10 +183,16 @@ def physical(
                 year,
                 months,
                 _annual_column(sheet, start, months),
-                resolved_unit,
-                f"carrier.{key}" if key != "production" else "production.main",
-                out,
+                unit=resolved_unit,
+                key=f"carrier.{key}" if key != "production" else "production.main",
+                out=out,
             )
+            if source_label in bare_fuel and key in {
+                Carrier.diesel.value,
+                Carrier.petrol.value,
+                Carrier.lpg.value,
+            }:
+                out.deferred_series.add((Carrier(key), year))
     return found
 
 
@@ -237,8 +248,17 @@ def water_tables(  # noqa: C901
             if year is None:
                 break
             series[year] = _read_row(
-                sheet, later, year, months, annual_col, "m3", f"carrier.{carrier.value}", out
+                sheet,
+                later,
+                year,
+                months,
+                annual_col,
+                unit="m3",
+                key=f"carrier.{carrier.value}",
+                out=out,
             )
+        if found:
+            out.deferred_series.update((carrier, year) for year in series)
         found[carrier] = series
     if not found and not ambiguous:
         out.issues.append(ReaderIssue("month_header_missing", sheet.name))

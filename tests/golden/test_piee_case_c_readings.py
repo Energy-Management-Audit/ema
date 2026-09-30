@@ -165,5 +165,15 @@ def test_piee_case_c_factors_and_annual_cross_check() -> None:
         gas = specific_consumption(
             imported.dataset, imported.factors, year, Carrier.natural_gas, "main"
         )
+        total = specific_consumption(imported.dataset, imported.factors, year, None, "main")
+        production = imported.dataset.production["main"][year].annual
+        filed_total = imported.filed[f"tep.total.{year}"]
+        filed_partial = imported.filed[f"specific.gas_grid_partial.{year}"]
         assert gas.value is not None
         assert round(gas.value * 1000, 4) == round(book["Productii"][f"E{row}"].value * 1000, 4)
+        assert total.value is not None and production is not None
+        assert total.value == pytest.approx(filed_total.value / production.value)
+        assert filed_partial.ref.a1 == f"Productii!G{row}"
+        assert filed_partial.value == pytest.approx(
+            book["Productii"][f"E{row}"].value + book["Productii"][f"F{row}"].value
+        )

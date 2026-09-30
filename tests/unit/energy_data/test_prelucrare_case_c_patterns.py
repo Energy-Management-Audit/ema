@@ -224,6 +224,36 @@ def test_shifted_fuel_row_keeps_its_label_and_evidence(tmp_path: Path) -> None:
     assert imported.located["carrier.diesel.2025.01"].ref.a1 == "Consum Carburanti!D14"
 
 
+def test_all_blank_series_remains_missing_while_explicit_zero_is_omitted(tmp_path: Path) -> None:
+    path = _workbook(tmp_path / "blank.xlsx")
+    book = load_workbook(path)
+    book["Consum Carburanti"].cell(14, 3, "Benzina")
+    book.save(path)
+    imported = import_prelucrare(path)
+    assert Carrier.lpg not in imported.dataset.carriers
+    blank = imported.dataset.carriers[Carrier.petrol][2025]
+    assert blank.annual is None
+    assert all(reading.value is None for reading in blank.months.values())
+    assert not any(
+        issue.code == "carrier_all_zero" and issue.detail == "petrol" for issue in imported.issues
+    )
+
+
+def test_filed_gas_grid_partial_has_separate_evidence(tmp_path: Path) -> None:
+    path = _workbook(tmp_path / "partial.xlsx")
+    book = load_workbook(path)
+    production = book["Productii"]
+    production.cell(26, 7, "consum specific total en")
+    production.cell(27, 3, 2025)
+    production.cell(27, 7, 0.3)
+    book.save(path)
+    imported = import_prelucrare(path)
+    filed = imported.filed["specific.gas_grid_partial.2025"]
+    assert filed.value == 0.3
+    assert filed.ref.a1 == "Productii!G27"
+    assert "specific.total.2025" not in imported.filed
+
+
 def test_missing_applicable_factor_is_reviewable(tmp_path: Path) -> None:
     path = _workbook(tmp_path / "factor.xlsx")
     book = load_workbook(path)

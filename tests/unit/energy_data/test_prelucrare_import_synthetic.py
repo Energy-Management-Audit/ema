@@ -30,6 +30,7 @@ def _source(path: Path) -> Path:
     electric.cell(2, 1, 2025)
     for column, month in enumerate(MONTHS, 4):
         electric.cell(2, column, month)
+    electric.cell(2, 16, "TOTAL")
     electric.cell(3, 3, "[MWh]")
     electric.cell(3, 4, 10)
     electric.cell(3, 16, 10)
