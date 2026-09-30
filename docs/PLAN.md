@@ -1586,14 +1586,29 @@ code/ (repository root)
   <branch> --agent codex --model <id> --effort <level>`; tab titled `role@model`; the Orca
   worktree status is set to `in-review` when its PR opens. Branches: `feature/<slice>`; an agent
   or review branch tied to a PR is `PR<number>-<summary>`.
-- **Light workflow:** one build, one cross-model review (a Sonnet reviewer for a Codex build), one
-  fix round; the coordinator verifies small fixes by reading the diff. No plan critics or extra
-  experiment runs.
-- **Big slices:** split into one PR per layer (backend, frontend, ...) from child worktrees under a
-  parent worktree.
-- **Completion signal:** the PR head and its CI, waited on with one blocking call
-  (`gh pr checks <n> --watch`); no marker-line watchers. The required CI check is `checks`; the
-  Windows build and smoke run on PRs to `dev`.
+- **Two tracks, chosen per issue by label.** `small`: one module or config, no change to a
+  deliverable's numbers, format or content rules, no API or data-model change, roughly 200 changed
+  lines at most. The issue's acceptance is the plan; one engineer (`gpt-6-luna`, or `gpt-6-sol` at
+  low effort for logic), one PR that closes the issue; review is CI plus the coordinator's diff
+  read; related small issues in one area are bundled into one PR, so they pay for CI once. `slice`:
+  anything that changes a deliverable, a contract, the API or the data model, spans layers, or Vlad
+  marks as high importance. A parent issue with one sub-issue per PR, then: (1) a decision-complete
+  plan (a private spec, case codes, the template above); (2) one plan review by a cross-model critic
+  and one revision; (3) one PR per layer from child worktrees, built from the plan; (4) one
+  cross-model reviewer per PR (a Sonnet reviewer for a Codex build), findings as one list; (5) one fix
+  round, the coordinator verifying small fixes from the diff; (6) the coordinator runs the slice's
+  goldens (Word slot) before merging. The parent issue closes with its last sub-issue. A `small`
+  issue that turns out to need a decision is relabelled `slice`, and the agent stops with a QUESTION.
+- **Board and landing:** the GitHub Project "Ema" shows Todo → In Progress → In Review → Done.
+  Agents move their issue with `tools/board.sh <n> progress|review`; the coordinator lands a PR with
+  `tools/land.sh <pr>` (merge, close its issues as completed, Done, remove the worktree). Both live
+  in the coordinator's private tools folder.
+- **Completion signal:** the PR head and its CI, waited on with one blocking REST call
+  (`gh run watch <run-id> --interval 90 --exit-status`; `gh pr checks --watch` polls GraphQL, and
+  many parallel watchers exhaust the shared limit), then one DONE or QUESTION message to the
+  coordinator's handle. The required check is `checks`; the Windows build and smoke run on PRs to
+  `dev` that touch packaging paths, and the Windows unit job runs on release tags and manual
+  dispatch.
 - **Word for Mac is exclusive:** one golden run that drives Word at a time, scheduled by the
   coordinator; reviewers never run goldens or Word. The coordinator runs the full golden suite once
   per merge batch.
