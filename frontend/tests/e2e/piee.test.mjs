@@ -248,6 +248,53 @@ test('B10 evidence: a cell chip and a calculated chip, each evidence fetched onc
   })
 })
 
+test('M6 slot row uses the version name and keeps the title for an unnamed version', async () => {
+  const named = 'source-anexa.xlsx'
+  await withHarness(
+    {
+      path: `/app/piee/${JOB}/documente`,
+      routes: {
+        [`GET ${J}/slots/anexa/versions`]: {
+          body: [
+            {
+              job_id: JOB,
+              slot: 'anexa',
+              version: 1,
+              file_sha: 'sha-anexa',
+              origin: 'upload',
+              converted_from: null,
+              original_name: named,
+              slot_revision: 2,
+            },
+          ],
+        },
+        [`GET ${J}/slots/questionnaire/versions`]: {
+          body: [
+            {
+              job_id: JOB,
+              slot: 'questionnaire',
+              version: 1,
+              file_sha: 'sha-questionnaire',
+              origin: 'upload',
+              converted_from: null,
+              original_name: null,
+              slot_revision: 2,
+            },
+          ],
+        },
+      },
+    },
+    async ({ page }) => {
+      await page.getByTestId('slot-row-anexa').getByText(named).waitFor()
+      await page
+        .getByTestId('slot-row-questionnaire')
+        .locator('.slot-row__name')
+        .getByText('Necesar info')
+        .waitFor()
+    },
+  )
+})
+
 test('B11 E1 reads the documents; import_required shows the widget and disables generation', async () => {
   await withHarness(
     {

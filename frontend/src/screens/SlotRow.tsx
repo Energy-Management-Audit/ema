@@ -82,7 +82,7 @@ export function SlotRow({
       <Icon icon={glyph} size={16} stroke={1.6} />
       <div className="slot-row__text">
         <span className="slot-row__name slot-row__name--file">
-          {file?.name ?? SLOT_TITLES[slot]}
+          {active?.original_name ?? SLOT_TITLES[slot]}
         </span>
         <span className="slot-row__detail">
           {detail(slot, job.data?.year ?? null, prelucrareYears)}

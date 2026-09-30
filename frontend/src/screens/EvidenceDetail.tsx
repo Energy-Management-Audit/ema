@@ -38,11 +38,8 @@ export function fieldValue(field: Field): string {
   return field.value_type === 'number' ? withUnit(text, field.unit) : text
 }
 
-function FileName({ sha }: { sha: string }) {
-  const { job } = useJob()
-  const client = job.data?.client_slug ?? ''
-  const files = useResource(`fileVersions:${sha}`, () => api.fileVersions(client, sha))
-  return <span>{files.data?.find((item) => item.sha === sha)?.name ?? ''}</span>
+function FileName({ name }: { name: string | null | undefined }) {
+  return <span>{name ?? ''}</span>
 }
 
 function Inputs({ inputs }: { inputs: string[] }) {
@@ -105,7 +102,7 @@ export function EvidenceDetail({ id }: { id: string }) {
       <div className="evidence-detail" data-testid="evidence-detail">
         <SectionKey>Celula din document</SectionKey>
         <span className="evidence-detail__mono">{cellReference(data)}</span>
-        {data.file_sha && <FileName sha={data.file_sha} />}
+        {data.file_sha && <FileName name={data.file_name} />}
         <span className="evidence-detail__muted">{`citit ${formatDate(data.retrieved_at)}`}</span>
       </div>
     )
