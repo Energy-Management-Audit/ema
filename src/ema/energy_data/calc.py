@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier, counts_in_total
+from ema.energy_data.co2_units import converted_co2
 from ema.energy_data.factors import FactorTable
 from ema.energy_data.model import (
     CarrierSeries,
@@ -16,7 +17,6 @@ from ema.energy_data.trend import trend
 
 
 def annual(series: CarrierSeries, kind: Kind, name: str, year: int) -> Derived:
-    """Use a filed annual reading, or require all twelve months before summing."""
     key = field_key(kind, name, year)
     if series.annual is not None:
         return Derived(
@@ -103,6 +103,12 @@ def _converted(
         if target == "tep"
         else factors.co2_factor(carrier, reading.unit, year)
     )
+    if target != "tep" and factor is None:
+        converted = converted_co2(
+            carrier, reading.unit, reading.value, reading.inputs, factors, year
+        )
+        if converted is not None:
+            return converted
     if factor is None:
         factor_kind = "tep" if target == "tep" else "co2"
         missing = f"factor.{factor_kind}.{carrier.value}.{reading.unit}.{year}"

@@ -19,6 +19,7 @@ from ema.core.review import base_readiness, fields
 from ema.core.review.models import Field, FieldSpec, Issue, Readiness
 from ema.core.workspace import Workspace
 from ema.piee.annual_check import months_check
+from ema.piee.completeness_review import completeness_issues
 from ema.piee.compose import load_approved_base
 from ema.piee.identity import percent_text, production_share
 from ema.piee.workflow import base_directory, current_import
@@ -167,8 +168,10 @@ class PieeWorkflow:
             ],
         )
         job_fields = fields(ws, job)
+        completeness, unfiled = completeness_issues(job_fields)
         issues = [
             *base.blocking,
+            *completeness,
             *_months_issues(job_fields),
             *_payback_issues(job_fields),
             *_ownership_issues(job_fields),
@@ -200,7 +203,7 @@ class PieeWorkflow:
             draft_ok=True,
             final_ok=not issues,
             blocking=issues,
-            warnings=_site_warnings(job_fields),
+            warnings=[*_site_warnings(job_fields), *unfiled],
             next=[item.message for item in issues],
         )
 
