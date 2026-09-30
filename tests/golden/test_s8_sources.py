@@ -55,7 +55,7 @@ def test_piee_case_b_delivered_unit_converts_every_production_reading(
     folder = reference_library / case_path("piee-case-b")
     anexa = _only(folder, "Anexa*.xlsx")
     prelucrare = _only(folder, "*Prelucrare*.xlsx")
-    previous = next((folder / "final").glob("*.docx"))
+    previous = reference_library / case_path("piee-case-b", "final")
     source = load(2025, anexa, None, prelucrare)
     presented = load(2025, anexa, None, prelucrare, previous)
     conversion = presented.production_conversion

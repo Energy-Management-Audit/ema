@@ -33,7 +33,11 @@ def test_review_decision_and_final_gate(
     anexa = next(case.rglob("Anexa*.xlsx"))
     necesar = next(case.rglob("Necesar*.xls"), None)
     prelucrare = next(case.rglob("*Prelucrare*.xls*"))
-    previous_piee = next((case / "final").glob("*.docx")) if case_name == "piee-case-b" else None
+    previous_piee = (
+        reference_library / case_path("piee-case-b", "final")
+        if case_name == "piee-case-b"
+        else None
+    )
     ws = Workspace(tmp_path / "workspace")
     registered = create_client(ws, "Synthetic", "12345678")
     job, run = start_generate(

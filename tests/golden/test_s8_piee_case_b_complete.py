@@ -8,6 +8,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from docx import Document
 from docx.oxml.ns import qn
 from tests.golden.cases import case_path
 
@@ -106,7 +107,9 @@ def test_piee_case_b_figure_inventory_and_numbers_match_or_have_pinned_reason(
     reference_library: Path, tmp_path: Path
 ) -> None:
     case = reference_library / case_path("piee-case-b")
-    final = next((case / "final").glob("*.docx"))
+    final = reference_library / case_path("piee-case-b", "final")
+    cover = "\n".join(paragraph.text for paragraph in Document(final).paragraphs[:5])
+    assert "-2026-" in cover
     data = load(
         2025,
         next(case.rglob("Anexa*.xlsx")),
