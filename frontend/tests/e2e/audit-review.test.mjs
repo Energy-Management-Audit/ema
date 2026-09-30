@@ -50,10 +50,13 @@ test('pdf source opens a fetched crop and a correction reaches the decision endp
       assert.equal(await page.locator('img[src^="/evidence/"]').count(), 0)
       await page.getByRole('button', { name: 'Scrie altă valoare' }).click()
       await page.getByRole('textbox', { name: FIELDS[0].label }).fill('Atelier Nou')
-      await page.getByRole('button', { name: 'Salvează' }).click()
-      await page.waitForResponse((response) =>
-        response.url().endsWith(`/fields/${FIELDS[0].id}/decide`),
+      const decided = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url().endsWith(`/fields/${FIELDS[0].id}/decide`),
       )
+      await page.getByRole('button', { name: 'Salvează' }).click()
+      await decided
       assert.deepEqual(
         requests.find((item) => item.path.endsWith(`/fields/${FIELDS[0].id}/decide`)).body,
         { action: 'correct', on_revision: FIELDS[0].revision, value: 'Atelier Nou' },
@@ -251,8 +254,12 @@ test('batch undo in Jurnal reverses the decisions in latest-first order', async 
       },
     },
     async ({ page, requests }) => {
+      const undoing = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' && response.url().endsWith('/log/decision-0/undo'),
+      )
       await page.getByRole('button', { name: 'Anulează toate' }).click()
-      await page.waitForResponse((response) => response.url().endsWith('/log/decision-0/undo'))
+      await undoing
       assert.deepEqual(
         requests
           .filter((item) => item.method === 'POST' && item.path.includes('/undo'))
@@ -290,8 +297,12 @@ test('review activity names a batch, shows progress, and undoes newest first', a
     async ({ page, requests }) => {
       await page.getByText('acceptate toate deodată').waitFor()
       await page.getByText('CÂT A MAI RĂMAS').waitFor()
+      const undoing = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' && response.url().endsWith('/log/activity-0/undo'),
+      )
       await page.getByRole('button', { name: 'Anulează toate' }).click()
-      await page.waitForResponse((response) => response.url().endsWith('/log/activity-0/undo'))
+      await undoing
       assert.deepEqual(
         requests
           .filter((item) => item.method === 'POST' && item.path.includes('/undo'))
