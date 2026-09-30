@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from docx import Document
 from docx.oxml.ns import qn
-from tests.audit_replay import draft_recording, support_recording
+from tests.audit_replay import draft_recording, render_draft_section, support_recording
 from tests.golden.s14_structure import auditor_structure
 from tests.golden.test_s10b_audit_base import _identity, _references
 from tests.workspace_jobs import create_job
@@ -21,7 +21,7 @@ from ema.audit.draft_agent import (
     draft_section_replay,
     recorded_facts,
 )
-from ema.audit.draft_render import render_draft_section, render_section
+from ema.audit.draft_render import render_section
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.sections import get_status, refresh_staleness
 from ema.core.llm import Limits

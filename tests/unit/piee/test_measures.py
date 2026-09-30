@@ -8,11 +8,21 @@ from ema.core.office.sheets import CellRef
 from ema.energy_data.anexa_cells import AnexaData, Measure
 from ema.energy_data.source import Located
 from ema.piee.measure_tables import _solution_row
-from ema.piee.measures import measures, planned_period
+from ema.piee.measures import MeasureRow, measures
 
 
 def _value(value: str | float | int) -> Located:
     return Located(value, CellRef("Solutii EE", 6, 2))
+
+
+def planned_period(rows: tuple[MeasureRow, ...]) -> tuple[int, int] | None:
+    years = [
+        int(row.commissioning_year.value)
+        for row in rows
+        if row.commissioning_year is not None
+        and isinstance(row.commissioning_year.value, int | float)
+    ]
+    return (min(years), max(years)) if years else None
 
 
 def test_measures_keep_source_and_derive_payback() -> None:

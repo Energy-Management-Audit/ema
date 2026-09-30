@@ -1,9 +1,21 @@
 """Draft trust boundary: references, missing facts and names (rendering: test_section_body)."""
 
 from ema.audit.draft_checks import check_draft
-from ema.audit.draft_render import unrendered_items
 from ema.audit.draft_schema import DraftFigure, DraftTable, DraftText, SectionDraft
 from ema.core.review.models import Field
+
+
+def unrendered_items(draft: SectionDraft) -> tuple[str, ...]:
+    return tuple(
+        [
+            f"table:{index}: not rendered yet; S8 table slots required"
+            for index in range(len(draft.tables))
+        ]
+        + [
+            f"figure:{index}: not rendered yet; S8 figure slots required"
+            for index in range(len(draft.figures))
+        ]
+    )
 
 
 def _fact(key: str, value: str | int, kind: str = "text") -> Field:

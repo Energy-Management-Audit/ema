@@ -13,8 +13,6 @@ from ema.consumption_analysis.analysis import (
     resolve_value,
 )
 from ema.consumption_analysis.phrases import (
-    largest_share,
-    notable_month,
     phrase_bank,
     trend_direction,
 )
@@ -156,6 +154,18 @@ def test_sourced_numeric_sentence_uses_a_calculated_fact() -> None:
     assert isinstance(sentence.segments[1], Num)
     assert sentence.segments[1].value == 0.086
     assert sentence.segments[1].fact == "carrier.natural_gas.2023+production.turnover_specific.2023"
+
+
+def largest_share(shares: dict[str, float | None]) -> str | None:
+    present = [(name, value) for name, value in shares.items() if value is not None]
+    return sorted(present, key=lambda item: (-item[1], item[0]))[0][0] if present else None
+
+
+def notable_month(values: dict[int, float | None], *, high: bool) -> int | None:
+    present = [(month, value) for month, value in values.items() if value is not None]
+    if not present:
+        return None
+    return sorted(present, key=lambda item: ((-1 if high else 1) * item[1], item[0]))[0][0]
 
 
 def test_largest_share_and_notable_month_break_ties_deterministically() -> None:

@@ -79,13 +79,3 @@ def payback_matches(measure: Measure, calculated: float) -> bool:
 def measures(anexa: AnexaData, *, planned: bool) -> tuple[MeasureRow, ...]:
     source = anexa.planned_measures if planned else anexa.existing_measures
     return tuple(_row(item) for item in source)
-
-
-def planned_period(rows: tuple[MeasureRow, ...]) -> tuple[int, int] | None:
-    years = [
-        int(row.commissioning_year.value)
-        for row in rows
-        if row.commissioning_year is not None
-        and isinstance(row.commissioning_year.value, int | float)
-    ]
-    return (min(years), max(years)) if years else None

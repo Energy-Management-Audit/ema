@@ -48,18 +48,6 @@ def trend_direction(values: list[float | None], decimals: int = 2) -> Direction 
     return "constant"
 
 
-def largest_share(shares: dict[str, float | None]) -> str | None:
-    present = [(name, value) for name, value in shares.items() if value is not None]
-    return sorted(present, key=lambda item: (-item[1], item[0]))[0][0] if present else None
-
-
-def notable_month(values: dict[int, float | None], *, high: bool) -> int | None:
-    present = [(month, value) for month, value in values.items() if value is not None]
-    if not present:
-        return None
-    return sorted(present, key=lambda item: ((-1 if high else 1) * item[1], item[0]))[0][0]
-
-
 def trend_phrase(  # noqa: PLR0913
     scope: Literal["audit", "piee"],
     subject: str,

@@ -1,5 +1,7 @@
 """The §5.9 status table and section decisions use the shared Jurnal."""
 
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
@@ -15,10 +17,10 @@ from ema.audit.catalogue import CATALOGUE, AuditFact, Condition, MaterialKind
 from ema.audit.sections import (
     SectionState,
     Status,
+    _save,
     audit_readiness,
     get_status,
     mark_drafted,
-    mark_stale,
     recompute_ready,
     record_material,
     set_status,
@@ -33,6 +35,14 @@ from ema.core.review.models import Field
 from ema.core.workspace import Workspace
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.model import field_key
+
+
+def mark_stale(ws: Workspace, job: str, section_id: str, changed_input: str) -> SectionState:
+    before = get_status(ws, job, section_id)
+    if changed_input not in before.fingerprint:
+        return before
+    after = transition(before, Status.DRAFTED, "ema", changed_input)
+    return _save(ws, job, before, after, "ema", changed_input)
 
 
 def _job(tmp_path: Path) -> tuple[Workspace, str]:

@@ -293,14 +293,6 @@ def mark_drafted(  # noqa: PLR0913
     )
 
 
-def mark_stale(ws: Workspace, job: str, section_id: str, changed_input: str) -> SectionState:
-    before = get_status(ws, job, section_id)
-    if changed_input not in before.fingerprint:
-        return before
-    after = transition(before, Status.DRAFTED, "ema", changed_input)
-    return _save(ws, job, before, after, "ema", changed_input)
-
-
 def refresh_staleness(
     ws: Workspace, job: str, db: sqlite3.Connection | None = None, *, base_sha: str | None = None
 ) -> list[SectionState]:

@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import json
 from decimal import Decimal
 from pathlib import Path
 
@@ -12,12 +11,10 @@ from ema.audit.base_anchor import MARKER
 from ema.audit.draft_checks import TOKEN, DraftCheck, DraftReview, check_draft
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.section_body import replace_section_body
-from ema.audit.sections import mark_drafted, recompute_ready
 from ema.core.errors import EmaError
 from ema.core.office.blocks import Block, Caption, Missing, Num, Paragraph, Ref, Segment, Table
 from ema.core.office.numbers_ro import format_number
 from ema.core.review.models import Field
-from ema.core.workspace import Workspace
 
 
 def _value(field: Field) -> str:
@@ -87,19 +84,6 @@ def render_section(
     return check
 
 
-def unrendered_items(draft: SectionDraft) -> tuple[str, ...]:
-    return tuple(
-        [
-            f"table:{index}: not rendered yet; S8 table slots required"
-            for index in range(len(draft.tables))
-        ]
-        + [
-            f"figure:{index}: not rendered yet; S8 figure slots required"
-            for index in range(len(draft.figures))
-        ]
-    )
-
-
 def review_payload(
     draft: SectionDraft, check: DraftCheck, flags: tuple[DraftReview, ...]
 ) -> dict[str, object]:
@@ -110,33 +94,3 @@ def review_payload(
         "total_sentences": check.total_sentences,
         "review": [item.__dict__ for item in (*check.review, *flags)],
     }
-
-
-def mark_section_drafted(ws: Workspace, job: str, draft: SectionDraft) -> None:
-    """Capture the exact fact dependency of a drafted section for staleness."""
-    if draft.status == "drafted":
-        recompute_ready(ws, job)
-        keys = {key for paragraph in draft.paragraphs for key in paragraph.fact_ids}
-        keys.update(figure.fact_id for figure in draft.figures)
-        mark_drafted(ws, job, draft.section, "agent", tuple(f"fact:{key}" for key in sorted(keys)))
-
-
-def render_draft_section(  # noqa: PLR0913
-    ws: Workspace,
-    job: str,
-    base: Path,
-    output: Path,
-    *,
-    draft: SectionDraft,
-    facts: dict[str, Field],
-    flags: tuple[DraftReview, ...],
-) -> DraftCheck:
-    """Publish paragraph output and capture the exact fact dependency for staleness."""
-    check = render_section(base, output, draft, facts, flags, job=job)
-    review_path = output.with_suffix(".draft-review.json")
-    review_path.write_text(
-        json.dumps(review_payload(draft, check, flags), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    mark_section_drafted(ws, job, draft)
-    return check
