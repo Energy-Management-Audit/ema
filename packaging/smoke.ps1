@@ -36,7 +36,9 @@ if (-not (Test-Path (Join-Path $env:APPDATA 'Ema'))) { throw 'Default workspace 
 
 # S5: one image-only invoice through the installed CLI and bundled OCR.
 $env:EMA_WORKSPACE = Join-Path $env:RUNNER_TEMP 'ws'
-$lines = @(& $cli invoices extract 'packaging\smoke' --client client-smoke)
+$client = (& $cli clients add --name 'Client Smoke' --cui 'RO1234567' | ConvertFrom-Json)
+if ($LASTEXITCODE -ne 0 -or -not $client.id -or $client.cui -ne 'RO1234567') { throw 'Client registration failed' }
+$lines = @(& $cli invoices extract 'packaging\smoke' --client 'RO1234567')
 if ($LASTEXITCODE -ne 0) { throw 'Invoice extraction failed' }
 $expected = (Get-Content 'packaging\smoke\expected-line.txt' -Raw -Encoding utf8).TrimEnd().Replace('{path}', 'factura-scanata.pdf')
 if ($lines[0] -ne $expected) { throw "Invoice first line differed: $($lines[0])" }
