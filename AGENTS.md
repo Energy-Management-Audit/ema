@@ -38,7 +38,8 @@ enters git, CI or a bug report.
 
 ## How work is sliced
 
-One slice = one `feature/<slice>` branch = one PR into `dev`; a big slice splits into one PR per layer (backend, frontend, …) from child worktrees under a parent. A slice carries its golden
+One slice = one `feature/<slice>` branch = one PR into `dev`; a big slice splits into one PR per
+layer (backend, frontend, …) from child worktrees under a parent. A slice carries its golden
 acceptance; when it merges, the code and that test are the record — slice specs are not kept as
 files. `dev` merges into `prod` as a release; `prod` is what the auditor runs. `hotfix/<issue>` starts
 from `prod` and lands in both.

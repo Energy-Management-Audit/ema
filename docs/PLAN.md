@@ -1564,16 +1564,45 @@ code/ (repository root)
 
 ### 6.4 Working model: Claude coordinates, Codex builds (in Orca)
 
-- **Roles:** Claude is architect and coordinator (decision-complete plans, dispatch, review, merge readiness); Codex engineers build (`gpt-6-sol` by default, `gpt-6-luna` for mechanical work); Opus builds only a screen that needs design taste. Vlad arbitrates and merges (a merge grant is per session).
-- **Coordinator home:** its own Orca worktree on a detached `origin/dev` (`~/orca/workspaces/ema/coordinator`); it never commits there. Vlad's primary checkout is his; agents never run, pull or write in it.
-- **One worktree per agent:** `orca orchestration worker-start --worktree new-top-level --name <branch> --agent codex --model <id> --effort <level>`; tab titled `role@model`; the Orca worktree status is set to `in-review` when its PR opens. Branches: `feature/<slice>`; an agent or review branch tied to a PR is `PR<number>-<summary>`.
-- **Light workflow:** one build, one cross-model review (a Sonnet reviewer for a Codex build), one fix round; the coordinator verifies small fixes by reading the diff. No plan critics or extra experiment runs.
-- **Big slices:** split into one PR per layer (backend, frontend, ...) from child worktrees under a parent worktree.
-- **Completion signal:** the PR head and its CI, waited on with one blocking call (`gh pr checks <n> --watch`); no marker-line watchers. The required CI check is `checks`; the Windows build and smoke run on PRs to `dev`.
-- **Word for Mac is exclusive:** one golden run that drives Word at a time, scheduled by the coordinator; reviewers never run goldens or Word. The coordinator runs the full golden suite once per merge batch.
-- **Engineering follow-ups:** GitHub issues labelled `follow-up` (case codes only) and new worktrees link them with `--issue`; anything naming a client or the auditor stays in the coordinator's private STATE file, outside git.
-- Agents never mark audit sections done or n/a and never make a final export (R14). Never pattern-kill processes; never bypass hooks.
-- **Private names:** `scripts/check_private_terms.py` and the pre-push outgoing check read their terms from `$EMA_REFERENCE/cases.toml` (local only; the check is skipped only in CI).
+- **Roles:** Claude is architect and coordinator (decision-complete plans, dispatch, review, merge
+  readiness); Codex engineers build (`gpt-6-sol` by default, `gpt-6-luna` for mechanical work); Opus
+  builds only a screen that needs design taste. Vlad arbitrates and merges (a merge grant is per
+  session).
+- **Slice spec template** (level 3; lives in the worker's dispatch + the PR description):
+  1. **Goal**: 1–2 sentences + the requirement IDs (R…).
+  2. **Context**: links to the § of this document.
+  3. **Scope**: modules/files to create or change.
+  4. **Interfaces**: function signatures, pydantic models, CLI/API shapes.
+  5. **Behaviour rules**: edge cases taken from the real files.
+  6. **Golden acceptance**: the exact command + expected result on the reference library.
+  7. **Unit tests required.**
+  8. **Out of scope.**
+  9. **Done**: `scripts/check` · the golden command · the Word check where §6.3 asks for it.
+- **Coordinator home:** its own Orca worktree on a detached `origin/dev`
+  (`~/orca/workspaces/ema/coordinator`); it never commits there. Vlad's primary checkout is his;
+  agents never run, pull or write in it.
+- **One worktree per agent:** `orca orchestration worker-start --worktree new-top-level --name
+  <branch> --agent codex --model <id> --effort <level>`; tab titled `role@model`; the Orca
+  worktree status is set to `in-review` when its PR opens. Branches: `feature/<slice>`; an agent
+  or review branch tied to a PR is `PR<number>-<summary>`.
+- **Light workflow:** one build, one cross-model review (a Sonnet reviewer for a Codex build), one
+  fix round; the coordinator verifies small fixes by reading the diff. No plan critics or extra
+  experiment runs.
+- **Big slices:** split into one PR per layer (backend, frontend, ...) from child worktrees under a
+  parent worktree.
+- **Completion signal:** the PR head and its CI, waited on with one blocking call
+  (`gh pr checks <n> --watch`); no marker-line watchers. The required CI check is `checks`; the
+  Windows build and smoke run on PRs to `dev`.
+- **Word for Mac is exclusive:** one golden run that drives Word at a time, scheduled by the
+  coordinator; reviewers never run goldens or Word. The coordinator runs the full golden suite once
+  per merge batch.
+- **Engineering follow-ups:** GitHub issues labelled `follow-up` (case codes only) and new worktrees
+  link them with `--issue`; anything naming a client or the auditor stays in the coordinator's
+  private STATE file, outside git.
+- Agents never mark audit sections done or n/a and never make a final export (R14). Never pattern-kill
+  processes; never bypass hooks.
+- **Private names:** `scripts/check_private_terms.py` and the pre-push outgoing check read their terms
+  from `$EMA_REFERENCE/cases.toml` (local only; the check is skipped only in CI).
 ---
 
 ## 7. Roadmap (one slice = one `feature/…` branch = one Orca worktree)
