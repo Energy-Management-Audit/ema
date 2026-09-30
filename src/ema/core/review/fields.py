@@ -228,7 +228,7 @@ def _apply(
     actor: Actor,
 ) -> tuple[Field, list[Evidence]]:
     if action == "accept":
-        if field.value is None or field.confidence == "conflict":
+        if field.presence == "failed" or field.confidence == "conflict":
             raise EmaError("field_unresolved", "Câmpul nu poate fi acceptat.", field.id)
         return _changed(field, review="accepted"), []
     if action == "reject":
@@ -286,6 +286,7 @@ def _decide(  # noqa: PLR0913
     value: Any,
     alternative: str | None,
     batch_id: str | None,
+    reason: str | None = None,
 ) -> Decision:
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
@@ -299,6 +300,7 @@ def _decide(  # noqa: PLR0913
             value=value,
             alternative=alternative,
             batch_id=batch_id,
+            reason=reason,
         )
 
 
@@ -313,6 +315,7 @@ def _decide_in_tx(  # noqa: PLR0913
     value: Any,
     alternative: str | None,
     batch_id: str | None,
+    reason: str | None = None,
 ) -> Decision:
     before = load_field(db, job, field_id)
     if before.revision != on_revision:
@@ -329,6 +332,7 @@ def _decide_in_tx(  # noqa: PLR0913
         field_id=field_id,
         on_revision=on_revision,
         action=action,
+        detail=reason,
         before=before,
         after=after,
         batch_id=batch_id,
@@ -348,6 +352,7 @@ def decide(  # noqa: PLR0913
     *,
     value: Any = None,
     alternative: str | None = None,
+    reason: str | None = None,
 ) -> Decision:
     return _decide(
         ws,
@@ -359,6 +364,7 @@ def decide(  # noqa: PLR0913
         value=value,
         alternative=alternative,
         batch_id=None,
+        reason=reason,
     )
 
 
@@ -369,7 +375,6 @@ def decide_in_connection(
     on_revision: int,
     actor: Actor,
 ) -> Decision:
-    """Accept a field inside a workflow transaction with related persistence."""
     return _decide_in_tx(
         db,
         job,

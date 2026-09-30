@@ -56,7 +56,12 @@ def completeness_issues(job_fields: list[Field]) -> tuple[list[Issue], list[Issu
         if parts[1] not in Carrier._value2member_map_:
             continue
         carrier = Carrier(parts[1])
-        if parts[0] == "carrier" and field.required and field.presence == "not_found":
+        if (
+            parts[0] == "carrier"
+            and field.required
+            and field.presence == "not_found"
+            and field.review != "accepted"
+        ):
             blocking.append(
                 Issue(
                     code="carrier_incomplete",

@@ -62,6 +62,7 @@ class DecisionInput(BaseModel):
     on_revision: int
     value: Any = None
     alternative: str | None = None
+    reason: str | None = None
 
 
 class BatchInput(BaseModel):
@@ -236,6 +237,7 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
             "user",
             value=body.value,
             alternative=body.alternative,
+            reason=body.reason,
         ).model_dump(mode="json")
 
     @app.post("/jobs/{job_id}/fields/accept-batch", tags=["review"], response_model=list[Decision])

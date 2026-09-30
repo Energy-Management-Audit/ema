@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 
 import pytest
+from docx import Document
 from tests.golden.cases import case_path
+from tests.golden.piee_case_b_review import review_case_b_reconciliation
 from typer.testing import CliRunner
 
 from conftest import artifacts_path
@@ -16,14 +18,14 @@ from ema.core.errors import EmaError
 from ema.core.jobs import status, subscribe
 from ema.core.review import decide, fields
 from ema.core.workspace import Workspace
-from ema.piee.review_workflow import PieeWorkflow
+from ema.piee.review_workflow import PieeWorkflow, _latest_draft
 from ema.piee.workflow import GenerateRequest, start_generate, start_generate_for_job
 
 pytestmark = [pytest.mark.golden, pytest.mark.word]
 
 
 @pytest.mark.parametrize("case_name", ["piee-case-a", "piee-case-b"])
-def test_review_decision_and_final_gate(
+def test_review_decision_and_final_gate(  # noqa: C901, PLR0915
     reference_library: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case_name: str
 ) -> None:
     base = case_path("piee-01")
@@ -56,6 +58,8 @@ def test_review_decision_and_final_gate(
             )
 
     workflow = PieeWorkflow()
+    if case_name == "piee-case-b":
+        review_case_b_reconciliation(ws, job)
     conflict = next(field for field in fields(ws, job) if field.confidence == "conflict")
     assert any(issue.field_id == conflict.id for issue in workflow.readiness(ws, job).blocking)
     with pytest.raises(EmaError) as refused:
@@ -89,6 +93,17 @@ def test_review_decision_and_final_gate(
     assert (
         next(item for item in status(ws, job).runs if item["id"] == regenerated)["state"] == "ready"
     )
+    if case_name == "piee-case-b":
+        _, _, draft = _latest_draft(ws, job)
+        pv_year = Document(draft).tables[4].rows[2]
+        assert pv_year.cells[0].text == "2024"
+        missing_pv = pv_year.cells[1]
+        assert missing_pv.text == "n.d."
+        assert any(
+            run.text == "n.d." and run.font.color and str(run.font.color.rgb) == "FF0000"
+            for paragraph in missing_pv.paragraphs
+            for run in paragraph.runs
+        )
     assert workflow.readiness(ws, job).final_ok
 
     class StubWord:
