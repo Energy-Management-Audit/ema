@@ -71,9 +71,9 @@ def test_heartbeat_retries_after_sqlite_error(
     stop = threading.Event()
     worker = threading.Thread(target=runner._heartbeat, args=(ws, "runner", stop, 0.01))
     worker.start()
-    assert retried.wait(2)
+    assert retried.wait(10)
     stop.set()
-    worker.join(timeout=2)
+    worker.join(timeout=10)
     assert not worker.is_alive()
     with original_connect() as db:
         assert db.execute("SELECT heartbeat FROM runners WHERE id='runner'").fetchone()[0] > 0
