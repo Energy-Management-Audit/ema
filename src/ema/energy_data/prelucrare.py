@@ -5,11 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from ema.core.office.errors import OfficeError
-from ema.core.office.sheets import Book, CellRef, Sheet, open_book
+from ema.core.office.sheets import Book, CellRef, open_book
 from ema.energy_data.carriers import Carrier, carrier_for
-from ema.energy_data.factors import FactorTable
+from ema.energy_data.factors import FACTORS_2026, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
 from ema.energy_data.prelucrare_factors import read_factors
+from ema.energy_data.prelucrare_tables import (
+    coke_series,
+    physical,
+    water_tables,
+)
+from ema.energy_data.prelucrare_tables import months_in as _months
 from ema.energy_data.prelucrare_types import (
     PrelucrareData,
     cell_or_blank,
@@ -19,137 +25,21 @@ from ema.energy_data.prelucrare_types import (
 )
 from ema.energy_data.source import Located, ReaderIssue, located, normal
 
-MONTHS = (
-    "ianuarie",
-    "februarie",
-    "martie",
-    "aprilie",
-    "mai",
-    "iunie",
-    "iulie",
-    "august",
-    "septembrie",
-    "octombrie",
-    "noiembrie",
-    "decembrie",
-)
 PHYSICAL = (
-    ("Consum Electric", "[MWh]", Carrier.electricity_grid, "MWh"),
-    ("Consum Gaz", "[MWh]", Carrier.natural_gas, "MWh"),
-    ("Consum electrica fotovoltaic", "[MWh]", Carrier.electricity_pv, "MWh"),
-    ("Consum Coji floarea soarelui", "[Gcal]", Carrier.sunflower_husks, "Gcal"),
-    ("Consum Energie termica terti", "[Gcal]", Carrier.purchased_heat, "Gcal"),
-    ("Consum Carburanti", "Motorina [t]", Carrier.diesel, "t"),
-    ("Consum Carburanti", "Benzina [t]", Carrier.petrol, "t"),
-    ("Consum Carburanti", "GPL [t]", Carrier.lpg, "t"),
-    ("Consum Carburanti", "CTL [t]", Carrier.ctl, "t"),
-    ("consum apa potabila", "[m3]", Carrier.water_potable, "m3"),
-    ("consum apa industriala", "[m3]", Carrier.water_industrial, "m3"),
-    ("consum apa pluviala", "[m3]", Carrier.water_storm, "m3"),
+    ("Consum Electric", ("[MWh]",), Carrier.electricity_grid, "MWh"),
+    ("Consum Gaz", ("[MWh]",), Carrier.natural_gas, "MWh"),
+    ("Consum electrica fotovoltaic", ("[MWh]",), Carrier.electricity_pv, "MWh"),
+    ("energi electrica din cogenerar", ("[MWh]",), Carrier.electricity_cogen, "MWh"),
+    ("Consum Coji floarea soarelui", ("[Gcal]",), Carrier.sunflower_husks, "Gcal"),
+    ("Consum Energie termica terti", ("[Gcal]",), Carrier.purchased_heat, "Gcal"),
+    ("Consum Carburanti", ("Motorina [t]", "Motorina"), Carrier.diesel, "t"),
+    ("Consum Carburanti", ("Benzina [t]", "Benzina"), Carrier.petrol, "t"),
+    ("Consum Carburanti", ("GPL [t]", "GPL"), Carrier.lpg, "t"),
+    ("Consum Carburanti", ("CTL [t]",), Carrier.ctl, "t"),
+    ("consum apa potabila", ("[m3]",), Carrier.water_potable, "m3"),
+    ("consum apa industriala", ("[m3]",), Carrier.water_industrial, "m3"),
+    ("consum apa pluviala", ("[m3]",), Carrier.water_storm, "m3"),
 )
-
-
-def _months(sheet: Sheet, row: int) -> dict[int, int]:
-    result: dict[int, int] = {}
-    for col in range(1, sheet.max_col + 1):
-        label = normal(str(cell_or_blank(sheet, row, col).value or ""))
-        if label in MONTHS:
-            result[MONTHS.index(label) + 1] = col
-    return result
-
-
-def _blocks(sheet: Sheet) -> list[tuple[int, int, dict[int, int]]]:
-    blocks: list[tuple[int, int, dict[int, int]]] = []
-    for row in range(1, sheet.max_row + 1):
-        years = [
-            year_label(cell_or_blank(sheet, row, col).value)
-            for col in range(1, min(sheet.max_col, 3) + 1)
-        ]
-        months = _months(sheet, row)
-        if len(months) == 12:
-            year = next((item for item in years if item is not None), None)
-            if year is not None:
-                blocks.append((year, row, months))
-    return blocks
-
-
-def _physical(
-    sheet: Sheet, label: str, unit: str, key: str, out: PrelucrareData
-) -> dict[int, CarrierSeries]:
-    blocks = _blocks(sheet)
-    found: dict[int, CarrierSeries] = {}
-    for index, (year, start, months) in enumerate(blocks):
-        end = blocks[index + 1][1] if index + 1 < len(blocks) else sheet.max_row + 1
-        matches = [
-            row
-            for row in range(start + 1, end)
-            if any(
-                normal(str(cell_or_blank(sheet, row, col).value or "")) == normal(label)
-                for col in range(1, min(sheet.max_col, 3) + 1)
-            )
-        ]
-        if len(matches) > 1:
-            out.issues.append(
-                ReaderIssue("label_ambiguous", f"{key}.{year}", CellRef(sheet.name, matches[0], 1))
-            )
-            continue
-        if not matches:
-            continue
-        row = matches[0]
-        readings: dict[int, Reading] = {}
-        for month, col in months.items():
-            try:
-                cell = sheet.value(row, col)
-            except OfficeError as exc:
-                out.issues.append(ReaderIssue(exc.code, str(exc), CellRef(sheet.name, row, col)))
-                continue
-            value = numeric(cell.value)
-            readings[month] = Reading(value, unit)
-            if value is not None:
-                out.located[f"carrier.{key}.{year}.{month:02d}"] = located(cell, value, unit)
-        total = cell_or_blank(sheet, row, max(months.values()) + 1)
-        annual_value = numeric(total.value)
-        annual = Reading(annual_value, unit) if annual_value is not None else None
-        found[year] = CarrierSeries(readings, annual)
-        if annual_value is not None:
-            out.located[f"carrier.{key}.{year}"] = located(total, annual_value, unit)
-    return found
-
-
-def _water_table(
-    book: Book, out: PrelucrareData
-) -> tuple[Carrier, dict[int, CarrierSeries]] | None:
-    sheet = sheet_named(book, "Consum apa", out.issues)
-    if sheet is None:
-        return None
-    label = str(cell_or_blank(sheet, 2, 2).value or "")
-    carrier = carrier_for(label)
-    if carrier is None:
-        out.issues.append(ReaderIssue("carrier_unknown", label, CellRef(sheet.name, 2, 2)))
-        return None
-    for row in range(1, sheet.max_row + 1):
-        months = _months(sheet, row)
-        if len(months) != 12:
-            continue
-        result: dict[int, CarrierSeries] = {}
-        for later in range(row + 1, sheet.max_row + 1):
-            year = year_label(cell_or_blank(sheet, later, 2).value)
-            if year is None:
-                continue
-            readings: dict[int, Reading] = {}
-            for month, col in months.items():
-                cell = cell_or_blank(sheet, later, col)
-                value = numeric(cell.value)
-                readings[month] = Reading(value, "m3")
-                if value is not None:
-                    out.located[f"carrier.{carrier.value}.{year}.{month:02d}"] = located(
-                        cell, value, "m3"
-                    )
-            if any(reading.value is not None for reading in readings.values()):
-                result[year] = CarrierSeries(readings)
-        return carrier, result
-    out.issues.append(ReaderIssue("month_header_missing", sheet.name))
-    return None
 
 
 def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dict[int, Reading]]:  # noqa: C901, PLR0912
@@ -255,11 +145,15 @@ def _production(
 ) -> tuple[dict[str, dict[int, CarrierSeries]], dict[str, str]]:
     sheet = sheet_named(book, "Productii", out.issues)
     if sheet is not None:
+        tonnes = physical(sheet, ("tone",), "tone", "production", out)
+        if tonnes:
+            out.deferred_production.update(tonnes)
+            return {"main": tonnes}, {"main": "tone"}
         for label, unit, divisor in (
             ("kWh gaz vehiculat", "mii MWh gaz vehiculat", 1_000_000),
             ("tone/luna", "mii tone", 1000),
         ):
-            series = _physical(sheet, label, unit, "production", out)
+            series = physical(sheet, (label,), unit, "production", out)
             if series:
                 scaled = {
                     year: CarrierSeries(
@@ -369,7 +263,31 @@ def _filed_specific(book: Book, out: PrelucrareData) -> None:  # noqa: C901
         break
 
 
-def import_prelucrare(path: Path) -> PrelucrareData:
+def _filed_production_partial(book: Book, out: PrelucrareData) -> None:
+    """Keep the gas plus grid figure without treating it as the energy total."""
+    sheet = sheet_named(book, "Productii", out.issues)
+    if sheet is None:
+        return
+    for row in range(1, sheet.max_row + 1):
+        columns = [
+            col
+            for col in range(1, sheet.max_col + 1)
+            if normal(str(cell_or_blank(sheet, row, col).value or "")) == "consum specific total en"
+        ]
+        if len(columns) != 1:
+            continue
+        for later in range(row + 1, sheet.max_row + 1):
+            year = year_label(cell_or_blank(sheet, later, 3).value)
+            if year is None:
+                break
+            cell = cell_or_blank(sheet, later, columns[0])
+            value = numeric(cell.value)
+            if value is not None:
+                out.filed[f"specific.gas_grid_partial.{year}"] = located(cell, value, "tep/tone")
+        break
+
+
+def import_prelucrare(path: Path) -> PrelucrareData:  # noqa: C901, PLR0912
     book = open_book(path)
     try:
         empty = EnergyDataset((), {})
@@ -379,20 +297,61 @@ def import_prelucrare(path: Path) -> PrelucrareData:
             sheet = sheet_named(book, sheet_name, out.issues)
             if sheet is None:
                 continue
-            series = _physical(sheet, label, unit, carrier.value, out)
+            series = physical(sheet, label, unit, carrier.value, out)
             if series:
                 carriers[carrier] = series
-        water = _water_table(book, out)
-        if water is not None and water[1]:
-            carriers[water[0]] = water[1]
+                if carrier == Carrier.electricity_cogen:
+                    out.deferred_series.update((carrier, year) for year in series)
+        coke = sheet_named(book, "Consum Cocs", out.issues)
+        if coke is not None and (series := coke_series(coke, out)):
+            carriers[Carrier.coke] = series
+            out.deferred_series.update((Carrier.coke, year) for year in series)
+        carriers.update(water_tables(book, out))
+        for carrier, by_year in tuple(carriers.items()):
+            values = [
+                reading.value
+                for series in by_year.values()
+                for reading in (*series.months.values(), series.annual)
+                if reading is not None
+            ]
+            if any(value == 0 for value in values) and not any(
+                value not in {None, 0} for value in values
+            ):
+                carriers.pop(carrier)
+                out.issues.append(ReaderIssue("carrier_all_zero", carrier.value))
+                for field in tuple(out.located):
+                    if field.startswith(f"carrier.{carrier.value}."):
+                        out.located.pop(field)
         years = tuple(sorted({year for series in carriers.values() for year in series}))
         out.dataset = EnergyDataset(years, carriers)
         production, units = _production(book, out)
         turnover, energy_costs = _economics(book, out)
         out.dataset = EnergyDataset(years, carriers, production, units, turnover, energy_costs)
         out.factors = read_factors(book, years, out, path.name)
+        for carrier, by_year in carriers.items():
+            if carrier in {Carrier.water_potable, Carrier.water_industrial, Carrier.water_storm}:
+                continue
+            for year, series in by_year.items():
+                unit = (
+                    series.annual.unit
+                    if series.annual
+                    else next((reading.unit for reading in series.months.values()), "")
+                )
+                # PV alone has a configured fallback factor when its source row is absent.
+                if (
+                    unit
+                    and out.factors.tep_factor(carrier, unit, year) is None
+                    and (
+                        carrier != Carrier.electricity_pv
+                        or FACTORS_2026.tep_factor(carrier, unit, year) is None
+                    )
+                ):
+                    out.issues.append(
+                        ReaderIssue("factor_missing", f"{carrier.value}.{unit}.{year}")
+                    )
         _filed_tep(book, out)
         _filed_specific(book, out)
+        _filed_production_partial(book, out)
         return out
     finally:
         book.close()

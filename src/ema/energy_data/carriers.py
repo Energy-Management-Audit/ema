@@ -10,6 +10,7 @@ from enum import StrEnum
 class Carrier(StrEnum):
     electricity_grid = "electricity_grid"
     electricity_pv = "electricity_pv"
+    electricity_cogen = "electricity_cogen"
     natural_gas = "natural_gas"
     diesel = "diesel"
     petrol = "petrol"
@@ -30,7 +31,12 @@ class Carrier(StrEnum):
 
 
 WATER_CARRIERS = frozenset({Carrier.water_potable, Carrier.water_industrial, Carrier.water_storm})
+INTERNAL_GENERATION_CARRIERS = frozenset({Carrier.electricity_cogen})
 FAMILY_PARENT: dict[Carrier, Carrier] = {Carrier.sunflower_husks: Carrier.biomass}
+
+
+def counts_in_total(carrier: Carrier) -> bool:
+    return carrier not in WATER_CARRIERS and carrier not in INTERNAL_GENERATION_CARRIERS
 
 
 def _normalize(label: str) -> str:
@@ -64,6 +70,7 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
         "consum energie electrica din fotovoltaic propriu",
         "consum energie electrica FOTOVOLTAI",
     ),
+    Carrier.electricity_cogen: ("energie electrica din cogenerare", "cogenerare"),
     Carrier.natural_gas: (
         "gaz",
         "gaze",
@@ -86,6 +93,7 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
     ),
     Carrier.lpg: (
         "gpl",
+        "gpl [tep]",
         "alti comb gpl",
         "alți comb – gpl",
         "alti combustibili - gpl",
@@ -95,7 +103,7 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
     Carrier.fuel_oil: ("pacura", "păcură", "combustibil lichid greu"),
     Carrier.clu: ("clu", "combustibil lichid usor", "combustibil lichid ușor"),
     Carrier.coal: ("carbune", "cărbune", "carbune slab", "lignit"),
-    Carrier.coke: ("cocs", "coke", "carbune (cocs)"),
+    Carrier.coke: ("cocs", "coke", "carbune (cocs)", "cocs [tep]"),
     Carrier.wood: ("lemn", "lemne de foc", "biomasa lemnoasa"),
     Carrier.biomass: ("biomasa", "biomasă"),
     Carrier.sunflower_husks: (
@@ -124,6 +132,7 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
         "apă industrială",
         "consum apa industriala",
         "consum apa industriala - m3",
+        "industriala - m3",
     ),
     Carrier.water_storm: (
         "apa pluviala",

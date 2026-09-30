@@ -22,6 +22,7 @@ from ema.energy_data.prelucrare_types import PrelucrareData
 from ema.energy_data.reconcile import reconcile
 from ema.energy_data.source import Located
 from ema.piee.annual_check import AnnualCheck, annual_check
+from ema.piee.prelucrare_compat import existing_piee_readings
 from ema.piee.units import (
     Conversion,
     delivered_pie_representation,
@@ -364,6 +365,6 @@ def load(
         year,
         parse_anexa(anexa),
         parse_necesar_info(necesar) if necesar is not None else None,
-        import_prelucrare(prelucrare) if prelucrare is not None else None,
+        existing_piee_readings(import_prelucrare(prelucrare)) if prelucrare is not None else None,
         previous_piee,
     )
