@@ -130,6 +130,35 @@ test('M7 proposal, evidence, POD fill, mismatch and confirmation', async () => {
   )
 })
 
+test('M7 identity snippet uses the evidence file name and PDF fallback', async () => {
+  for (const [fileName, expected] of [
+    ['source.pdf', 'source.pdf'],
+    [null, 'PDF'],
+  ]) {
+    await withHarness(
+      {
+        path: `/app/facturi/${JOB}`,
+        routes: {
+          ...invoiceRoutes,
+          'GET /evidence/invoice-evidence-1/quote': {
+            body: {
+              ...invoiceRoutes['GET /evidence/invoice-evidence-1/quote'].body,
+              file_name: fileName,
+            },
+          },
+        },
+      },
+      async ({ page, requests }) => {
+        await page.locator('.invoice-identity__source').getByText(`${expected} · pag. 1`).waitFor()
+        assert.equal(
+          requests.some((item) => item.path.includes('/slots/')),
+          false,
+        )
+      },
+    )
+  }
+})
+
 test('3f source, outlier, missing month, failed file exits and workbook', async () => {
   let exported = false
   let serverRevision = 1
