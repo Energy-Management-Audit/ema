@@ -47,6 +47,10 @@ def test_component_completeness_conflict_and_extra_carrier() -> None:
     assert complete.annual_check.missing_carriers == ()
     assert complete.annual_check.years[-1].components[0].key == "anexa.tep.electricity_grid.2025"
 
+    anexa.annual["electricity_grid_tep"] = _cell("Date anuale", 0.0860000000001)
+    assert assemble(YEAR, anexa, necesar).annual_check.status == "match"
+    anexa.annual["electricity_grid_tep"] = _cell("Date anuale", 0.086)
+
     anexa.annual["diesel_tep"] = _cell("Date anuale", 1)
     incomplete = assemble(YEAR, anexa, necesar)
     assert incomplete.annual_check.status == "incomplete"
@@ -123,6 +127,24 @@ def test_co2_converts_through_two_factors_from_same_sheet() -> None:
         "factor.tep.coke.t",
         "factor.co2.coke.2025",
     )
+    anexa, necesar = _inputs()
+    filed = _cell("impact", 5, 0)
+    source = _cell("Consum Cocs", 10, 0, "MWh")
+    imported = PrelucrareData(
+        dataset,
+        factors,
+        {"carrier.coke.2025": source},
+        filed={"co2.coke.2025": filed},
+    )
+    [conflict] = [
+        item
+        for item in assemble(YEAR, anexa, necesar, imported).disagreements
+        if item.key == "co2.coke.2025"
+    ]
+    assert conflict.chosen.value == 4
+    assert conflict.alternative.value == 5
+    assert conflict.chosen_location is source
+    assert conflict.alternative_location is filed
     unavailable = FactorTable("synthetic", YEAR, factors.tep[:1], factors.co2)
     assert co2(dataset, unavailable, YEAR, Carrier.coke).value is None
 
