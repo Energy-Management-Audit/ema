@@ -10,6 +10,7 @@ from tests.audit_replay import (
     CH2_DRAFT,
     audit_job_with_facts,
     draft_recording,
+    render_draft_section,
     support_recording,
 )
 from tests.workspace_jobs import create_job
@@ -17,7 +18,7 @@ from typer.testing import CliRunner
 
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_agent import recorded_facts
-from ema.audit.draft_render import render_draft_section, review_payload
+from ema.audit.draft_render import review_payload
 from ema.audit.draft_stage import draft_section
 from ema.audit.sections import get_status
 from ema.cli import _app, app

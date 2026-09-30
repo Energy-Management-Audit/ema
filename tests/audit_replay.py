@@ -14,11 +14,13 @@ from ema.audit.draft_agent import (
     DraftTools,
     recorded_facts,
 )
-from ema.audit.draft_checks import SUPPORT_PROMPT, SupportResult
+from ema.audit.draft_checks import SUPPORT_PROMPT, DraftCheck, DraftReview, SupportResult
+from ema.audit.draft_render import render_section, review_payload
 from ema.audit.draft_schema import DraftText, SectionDraft
+from ema.audit.sections import mark_drafted, recompute_ready
 from ema.core.llm.replay import request_hashes
 from ema.core.review.fields import propose
-from ema.core.review.models import Evidence, Manual
+from ema.core.review.models import Evidence, Field, Manual
 from ema.core.workspace import Workspace
 
 CH2_DRAFT = SectionDraft(
@@ -159,3 +161,33 @@ def support_recording(
         "usage": {"prompt_tokens": 1, "completion_tokens": 1},
     }
     return write_recording(path, [row])
+
+
+def mark_section_drafted(ws: Workspace, job: str, draft: SectionDraft) -> None:
+    """Capture the exact fact dependency of a drafted section for staleness."""
+    if draft.status == "drafted":
+        recompute_ready(ws, job)
+        keys = {key for paragraph in draft.paragraphs for key in paragraph.fact_ids}
+        keys.update(figure.fact_id for figure in draft.figures)
+        mark_drafted(ws, job, draft.section, "agent", tuple(f"fact:{key}" for key in sorted(keys)))
+
+
+def render_draft_section(
+    ws: Workspace,
+    job: str,
+    base: Path,
+    output: Path,
+    *,
+    draft: SectionDraft,
+    facts: dict[str, Field],
+    flags: tuple[DraftReview, ...],
+) -> DraftCheck:
+    """Publish paragraph output and capture the exact fact dependency for staleness."""
+    check = render_section(base, output, draft, facts, flags, job=job)
+    review_path = output.with_suffix(".draft-review.json")
+    review_path.write_text(
+        json.dumps(review_payload(draft, check, flags), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    mark_section_drafted(ws, job, draft)
+    return check
