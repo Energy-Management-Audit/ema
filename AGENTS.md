@@ -87,8 +87,7 @@ itself. When memory and the source disagree, the source wins; say so in your rep
 
 ## Working as a dispatched agent
 
-- Your brief names the issue, the plan and a handle to notify. The plan's decisions are made; a gap
-  or a contradiction is a QUESTION, never a guess.
+- Your brief names the issue, the plan and a handle to notify.
 - Check that `echo $EMA_REFERENCE` prints the reference library path: golden tests skip without it,
   and a skipped golden is not a pass.
 - Word for Mac is shared: before anything that drives Word, ask the coordinator for the Word slot with
@@ -99,9 +98,9 @@ itself. When memory and the source disagree, the source wins; say so in your rep
 - The PR description holds the checklist table (each item Done or Blocked, and where), the golden
   command and its output (no client values), the evidence level reached (docs/PLAN.md §5.16), and
   what Vlad checks by hand. Never merge: Vlad merges.
-- When the PR is open, run `gh pr checks <n> --watch` once, then send exactly one message to the
-  handle in the brief: `orca terminal send --terminal <handle> --text "DONE PR #<n> <head sha>
-  checks=<pass|fail>" --enter`. If blocked, send one `QUESTION: ...` the same way, then stop.
+- When the PR is open and its checks have finished, send exactly one message to the handle in the
+  brief: `orca terminal send --terminal <handle> --text "DONE PR #<n> <head sha> checks=<pass|fail>"
+  --enter`; if blocked, one `QUESTION: ...` the same way.
 
 ## Packaging constraints (they shape the code)
 
