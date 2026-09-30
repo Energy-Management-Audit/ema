@@ -35,6 +35,7 @@ def test_v9_upgrade_and_fresh_workspace_have_both_tables(tmp_path: Path) -> None
         db.execute("DROP TABLE client_annexes")
         db.execute("DROP TABLE job_annotations")
         db.execute("ALTER TABLE approvals DROP COLUMN exported_at")
+        db.execute("ALTER TABLE slot_versions DROP COLUMN original_name")
         db.execute("PRAGMA user_version = 9")
     upgraded = Workspace(tmp_path / "old")
     with upgraded.connect() as db:
@@ -58,7 +59,7 @@ def test_v9_upgrade_and_fresh_workspace_have_both_tables(tmp_path: Path) -> None
     ws = Workspace(tmp_path / "fresh")
     with ws.connect() as db:
         assert {"client_annexes", "job_annotations"} <= _tables(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 11
+        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 12
 
 
 def test_annex_only_file_survives_gc_and_enters_backup(tmp_path: Path) -> None:

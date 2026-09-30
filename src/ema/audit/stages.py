@@ -15,7 +15,7 @@ from ema.audit.workflow import AuditWorkflow
 from ema.clients.registry import find_by_cui
 from ema.core.errors import EmaError
 from ema.core.jobs import create_job, get_job, run_stage
-from ema.core.workspace import Workspace
+from ema.core.workspace import Workspace, upload_name
 from ema.core.workspace.conversion import active_version
 from ema.core.workspace.slots import validate_slot
 
@@ -35,7 +35,7 @@ def add_document(ws: Workspace, job: str, source: Path, slot: str | None = None)
     if target == "cover/photo":
         checked_photo(source)
     sha = ws.add_file(str(record["client_slug"]), source)
-    return ws.set_slot(job, target, sha, origin=source.name).version
+    return ws.set_slot(job, target, sha, original_name=upload_name(source.name)).version
 
 
 def start_audit_stage(ws: Workspace, job: str, stage: str, on_revision: int) -> str:

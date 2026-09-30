@@ -12,7 +12,7 @@ from openapi_spec_validator import validate as validate_openapi
 from tests.workspace_jobs import create_job
 
 from ema.api import create_app
-from ema.api.mock import seed
+from ema.api.mock import preview_pdf, seed
 from ema.api.provisional import PROVISIONAL, REASONS
 from ema.audit.catalogue import CATALOGUE, AuditFact
 from ema.core.review import propose
@@ -48,6 +48,52 @@ def evidence(name: str) -> Evidence:
         quote="Synthetic consumption: 120 MWh.",
         highlight="exact",
     )
+
+
+def test_slot_and_quote_responses_keep_recorded_name_only_in_view(tmp_path: Path) -> None:
+    ws = Workspace(tmp_path / "ws")
+    client, headers = session(ws)
+    owner = client.post("/clients", json={"name": "Synthetic"}, headers=headers).json()["id"]
+    job = client.post(
+        "/jobs", json={"type": "audit", "client": owner, "year": 2026}, headers=headers
+    ).json()["id"]
+    upload = client.post(
+        f"/clients/{owner}/files",
+        files={"file": ("named.pdf", preview_pdf(), "application/pdf")},
+        headers=headers,
+    )
+    assert upload.status_code == 201
+    sha = upload.json()["sha"]
+    slot = f"/jobs/{job}/slots/dossier/001"
+    saved = client.put(slot, json={"file_sha": sha}, headers=headers)
+    assert saved.status_code == 200
+    assert saved.json()["original_name"] == "named.pdf"
+    assert client.get(f"{slot}/versions").json()[0]["original_name"] == "named.pdf"
+
+    named = evidence("named-evidence").model_copy(update={"file_sha": sha})
+    propose(ws, job, "synthetic_name", "value", [named], state="extracted")
+    assert client.get("/evidence/named-evidence/quote").json()["file_name"] == "named.pdf"
+    with ws.connect() as db:
+        stored = json.loads(
+            db.execute("SELECT data FROM evidence WHERE id='named-evidence'").fetchone()[0]
+        )
+    assert "file_name" not in stored
+
+    cli_path = tmp_path / "cli.pdf"
+    cli_path.write_bytes(b"cli synthetic")
+    cli_sha = ws.add_file(owner, cli_path)
+    ws.set_slot(job, "dossier/cli", cli_sha, original_name="cli.pdf")
+    cli_evidence = evidence("cli-evidence").model_copy(update={"file_sha": cli_sha})
+    propose(ws, job, "synthetic_cli", "value", [cli_evidence], state="extracted")
+    assert client.get("/evidence/cli-evidence/quote").json()["file_name"] == "cli.pdf"
+
+    unnamed_path = tmp_path / "unnamed.pdf"
+    unnamed_path.write_bytes(b"synthetic")
+    unnamed_sha = ws.add_file(owner, unnamed_path)
+    ws.set_slot(job, "dossier/002", unnamed_sha)
+    unnamed = evidence("unnamed-evidence").model_copy(update={"file_sha": unnamed_sha})
+    propose(ws, job, "synthetic_other", "value", [unnamed], state="extracted")
+    assert client.get("/evidence/unnamed-evidence/quote").json()["file_name"] is None
 
 
 def test_openapi_snapshot_and_provisional_mock(tmp_path: Path) -> None:
@@ -173,6 +219,8 @@ def test_frozen_job_slot_review_and_section_routes(tmp_path: Path) -> None:  # n
     assert first.status_code == 200
     assert client.get(f"/jobs/{job}/slots").json() == ["dossier/001"]
     assert client.get(f"{slot}/versions").json()[0]["file_sha"] == sha
+    assert first.json()["original_name"] is None
+    assert client.get(f"{slot}/versions").json()[0]["original_name"] is None
     with ws.connect() as db:
         slot_revision = db.execute(
             "SELECT revision FROM slots WHERE job_id=? AND name=?", (job, "dossier/001")

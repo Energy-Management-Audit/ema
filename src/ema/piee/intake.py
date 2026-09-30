@@ -13,7 +13,7 @@ from typing import Literal
 from ema.core.jobs import create_job
 from ema.core.review import mark_absent, propose
 from ema.core.review.models import Cell, Derivation, Evidence, FieldSpec
-from ema.core.workspace import Workspace
+from ema.core.workspace import Workspace, upload_name
 from ema.energy_data.calc import tep_total
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FACTORS_2026
@@ -342,7 +342,9 @@ def import_piee(  # noqa: PLR0913
     }
     for name, path in paths.items():
         if path is not None:
-            ws.set_slot(job, name, ws.add_file(client_slug, path))
+            ws.set_slot(
+                job, name, ws.add_file(client_slug, path), original_name=upload_name(path.name)
+            )
     return import_piee_into_job(
         ws, job, year, anexa, necesar, prelucrare, previous_piee=previous_piee
     )

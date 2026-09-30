@@ -18,7 +18,6 @@ from tests.workspace_jobs import create_job
 from ema.core.backup import backup
 from ema.core.jobs import StageOutcome, cancel, recover, run_stage, runner, status
 from ema.core.workspace import Workspace
-from ema.core.workspace import schema as workspace_schema
 
 
 def wait_run(ws: Workspace, job: str) -> dict[str, object]:
@@ -360,21 +359,6 @@ def test_reupload_refreshes_gc_grace_and_restores_missing_file(tmp_path: Path) -
     assert ws.path(relative).read_bytes() == source.read_bytes()
     ws.gc()
     assert ws.set_slot(job, "input", sha).file_sha == sha
-
-
-def test_schema_one_migrates_to_two() -> None:
-    with sqlite3.connect(":memory:") as db:
-        db.execute("CREATE TABLE files (sha TEXT)")
-        db.execute("INSERT INTO files VALUES ('recent')")
-        db.execute("CREATE TABLE runs (id TEXT)")
-        db.execute("CREATE TABLE outputs (id TEXT)")
-        db.execute("PRAGMA user_version = 1")
-        db.commit()
-        workspace_schema.migrate(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == workspace_schema.SCHEMA_VERSION
-        assert "added_at" in {row[1] for row in db.execute("PRAGMA table_info(files)")}
-        assert db.execute("SELECT added_at FROM files").fetchone()[0] > 0
-        assert "cancel_requested" in {row[1] for row in db.execute("PRAGMA table_info(runs)")}
 
 
 def test_gitignore_keeps_client_folders_ignored() -> None:

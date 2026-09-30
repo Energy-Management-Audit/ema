@@ -120,6 +120,7 @@ class StageContext:
             str(row["file_sha"]),
             str(row["origin"]),
             row["converted_from"],
+            row["original_name"],
         )
 
     def read_slots(self, prefix: str, record: bool = True) -> list[SlotVersion]:

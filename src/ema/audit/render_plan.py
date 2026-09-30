@@ -79,6 +79,7 @@ def _slot(row: dict[str, object]) -> SlotVersion:
         str(row["file_sha"]),
         str(row["origin"]),
         None if row["converted_from"] is None else str(row["converted_from"]),
+        None if row["original_name"] is None else str(row["original_name"]),
     )
 
 

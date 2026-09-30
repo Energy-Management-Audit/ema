@@ -137,6 +137,7 @@ def audit_intake(  # noqa: C901, PLR0912
                 FileKind.UNKNOWN,
                 "failed",
                 error_code=exc.code if isinstance(exc, EmaError) else type(exc).__name__,
+                file_name=version.original_name,
             )
         record = _result(version.slot, name, outcome, checklist)
         records.append(record)

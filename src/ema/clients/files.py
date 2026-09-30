@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,7 +10,7 @@ from typing import Any, BinaryIO
 from ema.clients.registry import get_client, validate_id
 from ema.core.errors import EmaError
 from ema.core.office.sniff import FileKind, sniff
-from ema.core.workspace import Workspace
+from ema.core.workspace import Workspace, upload_name
 
 LIMIT = 104857600
 _EXTENSIONS = {
@@ -39,10 +38,9 @@ def store_upload(
 ) -> dict[str, Any]:
     validate_id(client_id)
     get_client(ws, client_id)
-    basename = name.replace("\\", "/").rsplit("/", 1)[-1]
-    basename = re.sub(r"[^\w.() -]", "_", basename).strip(". ")
-    extension = Path(basename).suffix.lower()
-    if not basename or extension not in _EXTENSIONS:
+    basename = upload_name(name)
+    extension = Path(basename).suffix.lower() if basename else ""
+    if basename is None or extension not in _EXTENSIONS:
         raise EmaError("file_type", "Tipul fişierului nu este acceptat.", "")
     temporary_dir = ws.path("temp")
     temporary_dir.mkdir(exist_ok=True)

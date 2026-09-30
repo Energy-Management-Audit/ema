@@ -9,12 +9,11 @@ from typing import BinaryIO
 from ema.clients.files import store_upload
 from ema.core.errors import EmaError
 from ema.core.jobs import get_job
-from ema.core.workspace import Workspace
+from ema.core.workspace import Workspace, upload_name
 
 
-def _safe_name(name: str) -> str:
-    basename = name.replace("\\", "/").rsplit("/", 1)[-1]
-    return re.sub(r"[^\w.() -]", "_", basename).strip(". ")
+def _safe_name(name: str) -> str | None:
+    return upload_name(name)
 
 
 def add_invoice_files(
@@ -36,7 +35,7 @@ def add_invoice_files(
     rejected: list[dict[str, str]] = []
     for name, stream in files:
         safe_name = _safe_name(name)
-        if Path(safe_name).suffix.lower() != ".pdf":
+        if safe_name is None or Path(safe_name).suffix.lower() != ".pdf":
             rejected.append(
                 {"file_name": safe_name or name, "code": "file_type", "reason": "Doar facturi PDF."}
             )
@@ -47,10 +46,14 @@ def add_invoice_files(
             if error.code not in {"file_too_large", "file_type"}:
                 raise
             rejected.append(
-                {"file_name": safe_name, "code": error.code, "reason": error.user_message_ro}
+                {
+                    "file_name": safe_name or name,
+                    "code": error.code,
+                    "reason": error.user_message_ro,
+                }
             )
             continue
-        stored_files.append((safe_name, str(stored["sha"])))
+        stored_files.append((str(stored["name"]), str(stored["sha"])))
     return {"added": _attach_stored(ws, job, stored_files, replace), "rejected": rejected}
 
 
@@ -94,7 +97,7 @@ def _attach_stored(
         )
         for safe_name, sha in stored_files:
             slot = replace or f"invoices/{next_number:04d}"
-            ws.set_slot_in_connection(db, job, slot, sha, origin=safe_name)
+            ws.set_slot_in_connection(db, job, slot, sha, origin="upload", original_name=safe_name)
             added.append({"slot": slot, "file_name": safe_name, "sha": sha})
             if replace is None:
                 next_number += 1

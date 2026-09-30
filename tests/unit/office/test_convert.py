@@ -25,7 +25,7 @@ def _case(tmp_path, monkeypatch):
     source = tmp_path / "original.doc"
     source.write_bytes(b"synthetic DOC")
     sha = ws.add_file("synthetic", source)
-    original = ws.set_slot(job, "dossier/0001", sha)
+    original = ws.set_slot(job, "dossier/0001", sha, original_name="original.doc")
     monkeypatch.setattr(
         conversion_module,
         "sniff",
@@ -83,6 +83,7 @@ def test_conversion_adds_version_and_rerun_is_noop(tmp_path, monkeypatch):
     assert len(versions) == 2
     assert versions[0] == original
     assert versions[1].converted_from == original.file_sha
+    assert versions[1].original_name == "original.doc"
     assert versions[1].origin == "converted"
     assert intake_file(ctx, original.slot).status == "already_converted"
     assert ws.list_versions(job, original.slot) == versions
@@ -174,7 +175,7 @@ def test_cli_records_html_saved_as_xls(tmp_path, monkeypatch):
     source = tmp_path / "misnamed.xls"
     source.write_text("<!doctype html><html><body><table></table></body></html>", encoding="utf-8")
     sha = ws.add_file("synthetic", source)
-    ws.set_slot(job, "meters/0001", sha)
+    ws.set_slot(job, "meters/0001", sha, original_name="misnamed.xls")
     monkeypatch.setenv("EMA_WORKSPACE", str(ws.root))
 
     response = CliRunner().invoke(_app, ["intake", job, "meters"])
@@ -183,6 +184,10 @@ def test_cli_records_html_saved_as_xls(tmp_path, monkeypatch):
     assert '"kind": "html"' in response.output
     assert '"status": "html_as_xls"' in response.output
     assert '"slot": "meters/0001"' in response.output
+    assert '"file_name": "misnamed.xls"' in response.output
+    with ws.connect() as db:
+        log_path = ws.job_path(db, job) / "log.jsonl"
+    assert '"file_name"' not in log_path.read_text(encoding="utf-8")
     assert status(ws, job).runs[-1]["state"] == "ready"
 
 

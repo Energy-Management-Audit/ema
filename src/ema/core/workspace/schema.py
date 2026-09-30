@@ -3,10 +3,10 @@
 import sqlite3
 import time
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 
-def migrate(db: sqlite3.Connection) -> None:  # noqa: C901
+def migrate(db: sqlite3.Connection) -> None:  # noqa: C901, PLR0912
     version = db.execute("PRAGMA user_version").fetchone()[0]
     if version > SCHEMA_VERSION:
         raise RuntimeError(f"Workspace schema {version} is newer than Ema")
@@ -192,6 +192,28 @@ def migrate(db: sqlite3.Connection) -> None:  # noqa: C901
             BEGIN IMMEDIATE;
             ALTER TABLE approvals ADD COLUMN exported_at TEXT;
             PRAGMA user_version = 11;
+            COMMIT;
+        """)
+        version = 11
+    if version == 11:
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            ALTER TABLE slot_versions ADD COLUMN original_name TEXT;
+            UPDATE slot_versions SET original_name = origin, origin = 'upload'
+             WHERE origin NOT IN ('upload', 'converted');
+            UPDATE slot_versions SET original_name = (
+                SELECT s.original_name FROM slot_versions s
+                 WHERE s.job_id = slot_versions.job_id AND s.slot = slot_versions.slot
+                   AND s.file_sha = slot_versions.converted_from AND s.original_name IS NOT NULL
+                 ORDER BY s.version DESC LIMIT 1)
+             WHERE origin = 'converted' AND original_name IS NULL;
+            UPDATE slot_versions SET original_name = (
+                SELECT u.original_name FROM client_uploads u
+                 JOIN jobs j ON u.client_id = j.client_slug
+                 WHERE j.id = slot_versions.job_id
+                   AND u.sha = COALESCE(slot_versions.converted_from, slot_versions.file_sha))
+             WHERE original_name IS NULL;
+            PRAGMA user_version = 12;
             COMMIT;
         """)
         return

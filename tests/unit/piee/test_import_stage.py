@@ -239,6 +239,7 @@ def test_cli_start_generate_imports_then_drafts(fakes: Fakes, tmp_path: Path) ->
     record = _wait(ws, job, run)
     assert record["state"] == "ready", record["error"]
     assert fakes.imports == 1
+    assert ws.list_versions(job, "anexa")[0].original_name == "anexa.xlsx"
     stages = [item["stage"] for item in status(ws, job).runs]
     assert stages == ["piee_import", "piee_generate"]
 

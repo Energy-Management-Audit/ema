@@ -38,7 +38,7 @@ from ema.core.review import (
     log,
     undo,
 )
-from ema.core.review.evidence import get_evidence
+from ema.core.review.evidence import get_evidence_view
 from ema.core.review.models import Decision, Evidence, Field
 from ema.core.workspace import Workspace
 from ema.core.workspace.slots import slot_versions, validate_slot
@@ -258,7 +258,8 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
 
     @app.get("/evidence/{evidence_id}/quote", tags=["review"], response_model=Evidence)
     def evidence_quote(evidence_id: str) -> dict[str, Any]:
-        return get_evidence(ws, evidence_id).model_dump(mode="json")
+        evidence, name = get_evidence_view(ws, evidence_id)
+        return evidence.model_copy(update={"file_name": name}).model_dump(mode="json")
 
     @app.get("/jobs/{job_id}/sections", tags=["audit"], response_model=list[SectionState])
     def get_sections(job_id: str) -> list[dict[str, object]]:

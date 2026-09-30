@@ -292,6 +292,7 @@ def test_unreadable_source_does_not_abort_run_batch(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "workspace")
     create_client(ws, "Synthetic", "12345678")
     result = run_batch(ws, "12345678", [missing, corrupt])
+    assert ws.list_versions(result.job_id, "invoices/0002")[0].original_name == "corrupt.pdf"
     assert [outcome["status"] for outcome in result.outcomes] == ["failed", "failed"]
     assert result.outcomes[0]["metadata"]["technical_detail"]
     assert result.workbook is None

@@ -12,6 +12,11 @@ def test_schema_three_preserves_decision_order(tmp_path: Path) -> None:
         db.execute("CREATE TABLE approvals (id TEXT PRIMARY KEY)")
         db.execute("CREATE TABLE outputs (id TEXT PRIMARY KEY)")
         db.execute("CREATE TABLE decisions (id TEXT PRIMARY KEY, data TEXT)")
+        db.execute("CREATE TABLE jobs (id TEXT, client_slug TEXT, type TEXT)")
+        db.execute(
+            "CREATE TABLE slot_versions (job_id TEXT, slot TEXT, version INTEGER, "
+            "file_sha TEXT, origin TEXT, converted_from TEXT)"
+        )
         db.execute("INSERT INTO outputs VALUES ('old-output')")
         db.execute("INSERT INTO decisions VALUES ('z', '{}')")
         db.execute("INSERT INTO decisions VALUES ('a', '{}')")

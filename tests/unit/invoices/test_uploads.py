@@ -45,10 +45,11 @@ def test_upload_names_numbering_replace_and_slot_revision(tmp_path: Path) -> Non
         ("invoices/0001", "first.pdf"),
         ("invoices/0002", "second.pdf"),
     ]
-    assert [ws.list_versions(job, item["slot"])[0].origin for item in added] == [
+    assert [ws.list_versions(job, item["slot"])[0].original_name for item in added] == [
         "first.pdf",
         "second.pdf",
     ]
+    assert all(ws.list_versions(job, item["slot"])[0].origin == "upload" for item in added)
     replacement = client.post(
         f"/jobs/{job}/invoices/files?replace=invoices/0001",
         files={"files": ("updated.pdf", pdf + b"\n% updated", "application/pdf")},
@@ -74,7 +75,7 @@ def test_upload_names_numbering_replace_and_slot_revision(tmp_path: Path) -> Non
         headers=headers,
     )
     assert removed.status_code == 200
-    assert ws.list_versions(job, "invoices/0001")[-1].origin == "first.pdf"
+    assert ws.list_versions(job, "invoices/0001")[-1].original_name == "first.pdf"
     second_revision = client.get(f"/jobs/{job}/slots/invoices/0002/versions").json()[0][
         "slot_revision"
     ]

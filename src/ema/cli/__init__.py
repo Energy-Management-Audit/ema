@@ -211,6 +211,7 @@ def intake_command(job: str, collection: str) -> None:
             json.dumps(
                 {
                     "slot": item.slot,
+                    "file_name": item.file_name,
                     "version": item.version,
                     "sha": item.file_sha[:12],
                     "kind": item.kind.value,

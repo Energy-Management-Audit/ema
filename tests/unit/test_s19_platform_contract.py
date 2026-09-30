@@ -75,6 +75,7 @@ def test_audit_cli_new_add_run_status_and_generic_intake_refusal(tmp_path, monke
     _checklist(checklist)
     added = runner.invoke(_app, ["audit", "add", job, str(checklist)])
     assert added.exit_code == 0, added.output
+    assert ws.list_versions(job, f"dossier/{checklist.name}")[0].original_name == checklist.name
     refused = runner.invoke(_app, ["intake", job, "dossier"])
     assert refused.exit_code == 1
     assert isinstance(refused.exception, EmaError)
