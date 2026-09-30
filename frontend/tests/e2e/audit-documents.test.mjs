@@ -40,16 +40,17 @@ test('document errors have recovery actions and Scoate uses the slot revision', 
       )
       const failed = page.locator('.audit-doc-row').filter({ hasText: '1. Facturi.pdf' })
       assert.equal(await failed.getByRole('button', { name: 'Reîncarcă' }).count(), 1)
+      const replaced = page.waitForResponse(
+        (response) =>
+          response.url().includes('/slots/dossier/1.%20Facturi.pdf') &&
+          response.request().method() === 'PUT',
+      )
       await failed.locator('input[type=file]').setInputFiles({
         name: 'replacement.pdf',
         mimeType: 'application/pdf',
         buffer: Buffer.from('synthetic replacement'),
       })
-      await page.waitForResponse(
-        (response) =>
-          response.url().includes('/slots/dossier/1.%20Facturi.pdf') &&
-          response.request().method() === 'PUT',
-      )
+      await replaced
       assert.deepEqual(
         requests.find((item) => item.path === `${J}/slots/dossier/1.%20Facturi.pdf`).body,
         { file_sha: 'replacement-sha' },
@@ -322,8 +323,12 @@ test('document stage shows run progress and offers stop', async () => {
       await page.getByText('Citeşte documente').waitFor()
       assert.equal(await page.locator('.audit-run__steps li').count(), 1)
       await page.locator('.audit-run__steps').getByText('2/4').waitFor()
+      const cancelled = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' && response.url().endsWith(`${J}/cancel`),
+      )
       await page.getByRole('button', { name: 'Opreşte' }).click()
-      await page.waitForResponse((response) => response.url().endsWith(`${J}/cancel`))
+      await cancelled
       assert.ok(requests.some((item) => item.method === 'POST' && item.path === `${J}/cancel`))
     },
   )

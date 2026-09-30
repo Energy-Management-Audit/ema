@@ -21,8 +21,13 @@ test('chapter actions send status, confirmation, reason and section revision', a
     async ({ page, requests }) => {
       await page.getByRole('button', { name: 'Deschide' }).first().click()
       const scope = page.locator('.audit-section-row').filter({ hasText: 'Scopul auditului' })
+      const scoped = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'PATCH' &&
+          response.url().endsWith(`/sections/${drafted.id}`),
+      )
       await scope.getByRole('button', { name: 'Marchează gata' }).click()
-      await page.waitForResponse((response) => response.url().endsWith(`/sections/${drafted.id}`))
+      await scoped
       assert.deepEqual(
         requests.find((item) => item.path.endsWith(`/sections/${drafted.id}`)).body,
         { status: 'done', on_revision: drafted.revision, confirm: true },
@@ -30,8 +35,13 @@ test('chapter actions send status, confirmation, reason and section revision', a
       const proposedRow = page
         .locator('.audit-section-row')
         .filter({ hasText: 'Obiective urmărite' })
+      const proposedSaved = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'PATCH' &&
+          response.url().endsWith(`/sections/${proposed.id}`),
+      )
       await proposedRow.getByRole('button', { name: 'Confirmă „nu se aplică”' }).click()
-      await page.waitForResponse((response) => response.url().endsWith(`/sections/${proposed.id}`))
+      await proposedSaved
       assert.deepEqual(
         requests.find((item) => item.path.endsWith(`/sections/${proposed.id}`)).body,
         { status: 'n/a', on_revision: proposed.revision, reason: proposed.reason, confirm: true },
@@ -78,8 +88,13 @@ test('exclusion requires a reason, later uses allowed reason, note and deadline 
         true,
       )
       await row.getByRole('textbox', { name: 'Motiv' }).fill('Nu există procesul')
+      const excluded = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'PATCH' &&
+          response.url().endsWith('/sections/ch1.obiective'),
+      )
       await row.getByRole('button', { name: 'Confirmă „nu se aplică”' }).click()
-      await page.waitForResponse((response) => response.url().endsWith('/sections/ch1.obiective'))
+      await excluded
       assert.equal(
         requests.find((item) => item.path.endsWith('/sections/ch1.obiective')).body.reason,
         'Nu există procesul',
@@ -96,16 +111,24 @@ test('exclusion requires a reason, later uses allowed reason, note and deadline 
         { status: 'later', on_revision: rows.nodes[2].revision, reason: 'visit' },
       )
       await page.getByRole('textbox', { name: 'Notiţa ta' }).fill('Verifică')
+      const noteSaved = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'PUT' && response.url().endsWith('/audit/notes/ch1'),
+      )
       await page.getByRole('textbox', { name: 'Notiţa ta' }).blur()
-      await page.waitForResponse((response) => response.url().endsWith('/audit/notes/ch1'))
+      await noteSaved
       assert.deepEqual(requests.find((item) => item.path.endsWith('/audit/notes/ch1')).body, {
         text: 'Verifică',
         on_revision: 0,
       })
       await page.getByRole('button', { name: 'Stabileşte termenul' }).click()
       await page.getByRole('textbox', { name: 'Termen client' }).fill('01.12.2026')
+      const deadlineSaved = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'PUT' && response.url().endsWith('/audit/deadline'),
+      )
       await page.getByRole('button', { name: 'Salvează' }).click()
-      await page.waitForResponse((response) => response.url().endsWith('/audit/deadline'))
+      await deadlineSaved
       assert.deepEqual(requests.find((item) => item.path.endsWith('/audit/deadline')).body, {
         deadline: '2026-12-01',
         on_revision: 0,
