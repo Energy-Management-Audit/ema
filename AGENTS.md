@@ -35,6 +35,7 @@ Commit hooks may fix formatting. Install both with
 Golden tests are the real acceptance: they run against the reference library (`EMA_REFERENCE`) and
 compare against documents the auditor actually delivered. They stay local — client material never
 enters git, CI or a bug report.
+Reviewers may run `pytest -m "golden and not word"`.
 
 ## How work is sliced
 
