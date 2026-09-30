@@ -38,8 +38,7 @@ enters git, CI or a bug report.
 
 ## How work is sliced
 
-One slice = one `feature/<slice>` branch = one PR into `dev`; a big slice splits into one PR per
-layer (backend, frontend, …) from child worktrees under a parent. A slice carries its golden
+Work arrives as a GitHub issue labelled `small` (the issue is the plan; one PR) or `slice` (a parent issue, a reviewed plan, one `feature/<slice>` PR per layer from child worktrees; docs/PLAN.md §6.4). A slice carries its golden
 acceptance; when it merges, the code and that test are the record — slice specs are not kept as
 files. `dev` merges into `prod` as a release; `prod` is what the auditor runs. `hotfix/<issue>` starts
 from `prod` and lands in both.
@@ -87,7 +86,8 @@ itself. When memory and the source disagree, the source wins; say so in your rep
 
 ## Working as a dispatched agent
 
-- Your brief names the issue, the plan and a handle to notify.
+- Your brief names the issue, the plan and a handle to notify. Started from an issue without a brief: a `small` issue is your plan; a `slice` issue without a plan is a QUESTION. The coordinator's handle is in `~/Code/projects/ema/tools/coordinator.handle`.
+- Move your issue on the board with `~/Code/projects/ema/tools/board.sh <n> progress` when you start and `review` when the PR opens.
 - Check that `echo $EMA_REFERENCE` prints the reference library path: golden tests skip without it,
   and a skipped golden is not a pass.
 - Word for Mac is shared: before anything that drives Word, ask the coordinator for the Word slot with
@@ -98,7 +98,7 @@ itself. When memory and the source disagree, the source wins; say so in your rep
 - The PR description holds the checklist table (each item Done or Blocked, and where), the golden
   command and its output (no client values), the evidence level reached (docs/PLAN.md §5.16), and
   what Vlad checks by hand. Never merge: Vlad merges.
-- When the PR is open and its checks have finished, send exactly one message to the handle in the
+- When the PR is open, wait for its CI with one `gh run watch <run-id> --interval 90 --exit-status` (not `gh pr checks --watch`), then send exactly one message to the handle in the
   brief: `orca terminal send --terminal <handle> --text "DONE PR #<n> <head sha> checks=<pass|fail>"
   --enter`; if blocked, one `QUESTION: ...` the same way.
 
