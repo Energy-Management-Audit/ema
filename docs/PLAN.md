@@ -326,7 +326,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 | 09-18 | Anexa 2–3 commissioning date = column C (year) |
 | 09-18 | **Festival/Fest and camp dropped** for Ema; standards enforced by tools |
 | 09-18 | No backup push of ARGUS or legacy repos (accepted: ARGUS is lost when the archive is deleted) |
-| 09-18 | Working model: **Claude designs, Codex implements**, both in Conductor |
+| 09-18 | Working model: **Claude designs, Codex implements**, both in Conductor *(09-30: in Orca, §6.4)* |
 | 09-18 | Git flow: `prod` / `dev` / `feature/*` / `hotfix/*` (release branches only if needed) |
 | 09-19 | AI providers: OpenAI + Gemini |
 | 09-19 | Maps: free OSM-based source; otherwise a manual Google Maps screenshot |
@@ -357,6 +357,18 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 | 09-23 | **The handoff is implemented as made**, resizable across desktop sizes (R20); Claude draws the missing screens in its direction and checks them visually (§5.18) |
 | 09-23 | **The auditor approved the piee-case-a PIEE** (Vlad showed it to her): the S8 golden is approved, and the pies stay exactly as made |
 | 09-23 | **Mac first, Windows after** (R17): quick development to get the app working locally and well; Vlad runs the jobs with it meanwhile; then the Windows port (S18) on Vlad's Windows PC |
+| 09-27 | Client documents go to AI only when Vlad says so; until then the ai_client_disabled guards stay on (one recorded exception, for a visit-photo recording) |
+| 09-27 | Uploads accept .xls/.xlsx whose content is HTML (Excel HTML export, marked html_as_xls); other extension/content mismatches are rejected |
+| 09-27 | Energy-manager report: one row per annex/beneficiary; a CUI cell may hold two IDs; key = (year, client, normalised beneficiary), newest per key |
+| 09-27 | Audit final: cover firm text is the verbatim fixed text of the auditor's base, checked by digests (a licence renewal = a new base + a digest review); client name, address and month come from sources. 3j "Marchează ca pregătit" = one human click confirms a chapter's drafted, non-stale sections, one journal entry each; chapters are not reordered or added; "Scoate" proposes n/a |
+| 09-27 | Narrative fields the auditor writes, blocking the final until written: ch3/ch6 intros, ch6 sinteza, ch4 concluzii / eficienta / bilant_real |
+| 09-27 | PV, storm-water and several-product charts are not drawn (no source in her audits); per-fuel annual fuel series as in her audits |
+| 09-27 | The cover photo comes from a job slot (the client's own photo); missing → the marker "Fotografia sediului lipseşte" and the final is refused |
+| 09-28 | Ch. 4 written text and pies come later; 'date indisponibile' never wraps; an empty chapter refuses the final; her audits are averaged: her slips are fixed in the base and listed in the digest changes |
+| 09-28 | A missing ch. 4 table cell is a red '—' with the note '—: date indisponibile' under the table; gates count it as missing |
+| 09-28 | Big slices split into one PR per layer (backend, frontend, ...) |
+| 09-30 | The repository is public: history rewritten without client, person or place names (energy suppliers are public vendor profiles and stay); the old history is a private archive; dev and prod are protected (PR + CI) |
+| 09-30 | Working model: light workflow (one build, one cross-model review, one fix round), completion = PR head + CI (§6.4) |
 
 ---
 
@@ -1550,10 +1562,12 @@ code/ (repository root)
 - **Docs allowed:** README, AGENTS.md, PLAN.md, a few ADRs. No second architecture document: §5
   is it, and AGENTS.md only points there. No evidence files or AI artefacts.
 
-### 6.4 Working model: Claude designs, Codex builds (in Orca)
+### 6.4 Working model: Claude coordinates, Codex builds (in Orca)
 
-- **Claude** (product/design lead): this document, slice specs, acceptance, design review of
-  diffs. **Codex** (lead engineer): implementation. **The user** arbitrates and merges.
+- **Roles:** Claude is architect and coordinator (decision-complete plans, dispatch, review, merge
+  readiness); Codex engineers build (`gpt-6-sol` by default, `gpt-6-luna` for mechanical work); Opus
+  builds only a screen that needs design taste. Vlad arbitrates and merges (a merge grant is per
+  session).
 - **Slice spec template** (level 3; lives in the worker's dispatch + the PR description):
   1. **Goal**: 1–2 sentences + the requirement IDs (R…).
   2. **Context**: links to the § of this document.
@@ -1564,35 +1578,31 @@ code/ (repository root)
   7. **Unit tests required.**
   8. **Out of scope.**
   9. **Done**: `scripts/check` · the golden command · the Word check where §6.3 asks for it.
-- **Bounded review loop** (max 2 rounds each):
-  1. Codex critiques the spec before building.
-  2. Claude reviews the diff against the spec and the golden output.
-  3. Codex adversarial review for engineering risk.
-- **How the agents work together in Orca:** Claude is the coordinator, in the primary
-  checkout on `dev`; it writes specs, dispatches, reviews and prepares merges, and writes no
-  product code. The primary checkout stays on `dev` and is only read and pulled: nobody switches
-  branch or commits there. Every change, docs PRs included, is made in its own Orca worktree from
-  `dev`, so every open branch shows in Orca. Per slice, from §7:
-  1. **Spec** with the template above, narrowing this document; if the plan is wrong, this
-     document is fixed first (docs PR).
-  2. **Dispatch** one Codex worker (`orca orchestration worker-start`) in a new top-level
-     worktree from `dev`, branch `feature/<slice>`, with the spec and a preamble: read
-     `AGENTS.md`, critique the spec before coding, Conventional Commits, a PR into `dev` titled
-     with the slice id.
-  3. **Spec critique** (review round 1): Claude answers, fixes the spec and, if needed, this
-     document; then the worker builds.
-  4. **Review:** on `worker_done`, Claude runs `scripts/check` and the golden command in the
-     worker's worktree and reviews the diff against the spec; findings go back to the same
-     worker.
-  5. **Adversarial review:** a second Codex worker in the same worktree, engineering risks only.
-  6. **PR** description: the spec, the golden output with its evidence level (§5.16), the
-     review outcome, and what Vlad checks by hand in Word. No client data, file names only.
-  7. **Merge** (Vlad), then the worker is released and §1 is updated.
-
-  At most 3–4 workers at once. Only one worker at a time runs tests that drive Word for Mac
-  (§5.5): Claude serializes those golden runs. Two rounds per review step at most, then Vlad
-  decides what remains, and the PR description records the outcome.
-
+- **Coordinator home:** its own Orca worktree on a detached `origin/dev`
+  (`~/orca/workspaces/ema/coordinator`); it never commits there. Vlad's primary checkout is his;
+  agents never run, pull or write in it.
+- **One worktree per agent:** `orca orchestration worker-start --worktree new-top-level --name
+  <branch> --agent codex --model <id> --effort <level>`; tab titled `role@model`; the Orca
+  worktree status is set to `in-review` when its PR opens. Branches: `feature/<slice>`; an agent
+  or review branch tied to a PR is `PR<number>-<summary>`.
+- **Light workflow:** one build, one cross-model review (a Sonnet reviewer for a Codex build), one
+  fix round; the coordinator verifies small fixes by reading the diff. No plan critics or extra
+  experiment runs.
+- **Big slices:** split into one PR per layer (backend, frontend, ...) from child worktrees under a
+  parent worktree.
+- **Completion signal:** the PR head and its CI, waited on with one blocking call
+  (`gh pr checks <n> --watch`); no marker-line watchers. The required CI check is `checks`; the
+  Windows build and smoke run on PRs to `dev`.
+- **Word for Mac is exclusive:** one golden run that drives Word at a time, scheduled by the
+  coordinator; reviewers never run goldens or Word. The coordinator runs the full golden suite once
+  per merge batch.
+- **Engineering follow-ups:** GitHub issues labelled `follow-up` (case codes only) and new worktrees
+  link them with `--issue`; anything naming a client or the auditor stays in the coordinator's
+  private STATE file, outside git.
+- Agents never mark audit sections done or n/a and never make a final export (R14). Never pattern-kill
+  processes; never bypass hooks.
+- **Private names:** `scripts/check_private_terms.py` and the pre-push outgoing check read their terms
+  from `$EMA_REFERENCE/cases.toml` (local only; the check is skipped only in CI).
 ---
 
 ## 7. Roadmap (one slice = one `feature/…` branch = one Orca worktree)

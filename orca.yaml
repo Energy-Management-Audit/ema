@@ -1,7 +1,6 @@
 # Orca worktree setup (docs/PLAN.md §6.2). Agent instructions live in AGENTS.md, not here.
 scripts:
-  # Orca types the setup into the Setup tab's shell; hanging that shell up on success closes the
-  # tab. A failed setup leaves it open with the error.
+  # Walk past the bash wrapper to hang up the tab shell after setup succeeds.
   setup: |
     uv sync --all-groups && npm ci --prefix frontend && uv run pre-commit install --install-hooks -t pre-commit -t pre-push &&
-      case "$(ps -o comm= -p "$PPID")" in *zsh|*bash) kill -HUP "$PPID" ;; esac
+      p=$$; while [ "$p" -gt 1 ]; do pp=$(ps -o ppid= -p "$p" | tr -d " "); case "$(ps -o comm= -p "$pp")" in login|*/login) kill -HUP "$p"; break;; esac; p=$pp; done
