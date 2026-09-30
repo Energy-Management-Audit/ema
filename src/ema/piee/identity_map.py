@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from lxml import etree
 from ema.core.office.anchor_targets import hyperlink_target
 from ema.core.office.anchors import AnchorLedger, find
 from ema.core.office.base_map import BaseMap
+from ema.core.office.cell_text import set_paragraph_text
 from ema.core.office.package import R, encoded, read_parts, write_parts, xml
 from ema.core.office.run_range import TextSpan, replace_spans, visible_text
 
@@ -132,6 +134,83 @@ def build_identity_spans(
     return tuple(spans)
 
 
+def _without_bookmarks(paragraph: etree._Element) -> etree._Element:
+    clone = deepcopy(paragraph)
+    for node in list(clone.iter()):
+        if node.tag in {qn("w:bookmarkStart"), qn("w:bookmarkEnd")}:
+            parent = node.getparent()
+            if parent is not None:
+                parent.remove(node)
+    return clone
+
+
+def _site_line(paragraph: etree._Element, site: str, address: str | None, end: str) -> None:
+    suffix = "" if address is None and end == "." else end
+    text = f"- Sucursala {site}: {address or 'n.d.'}{suffix}"
+    set_paragraph_text(paragraph, text)
+    if address is None:
+        start = len(text) - len(suffix) - 4
+        replace_spans(paragraph, (TextSpan(start, start + 4, "n.d.", True),))
+
+
+def _render_site_addresses(paragraph: etree._Element, values: dict[str, str | None]) -> None:
+    second = _without_bookmarks(paragraph)
+    _site_line(paragraph, values["site_1_name"] or "n.d.", values.get("site_1_address"), ";")
+    _site_line(second, values["site_2_name"] or "n.d.", values.get("site_2_address"), ".")
+    paragraph.addnext(second)
+
+
+def _insert_production_split(root: etree._Element, values: dict[str, str | None]) -> None:
+    year = values.get("analysis_year")
+    if year is None:
+        raise ValueError("two-site production split needs the analysis year")
+    preceding = find([root], "number_629")
+    heading = preceding.getnext()
+    while heading is not None and not visible_text(heading).strip():
+        heading = heading.getnext()
+    if heading is None or visible_text(heading).strip() != "Analiza consumului de energie":
+        raise ValueError("mapped production section heading changed")
+    paragraph = _without_bookmarks(preceding)
+    first = values.get("site_1_production_share") or "n.d."
+    second = values.get("site_2_production_share") or "n.d."
+    lead = (
+        f"Din totalul producției pe anul {year}, "
+        f"sucursala {values['site_1_name']} are un procent de "
+    )
+    middle = f"% iar sucursala {values['site_2_name']} "
+    text = lead + first + middle + second + "%."
+    set_paragraph_text(paragraph, text)
+    missing: list[TextSpan] = []
+    if values.get("site_1_production_share") is None:
+        missing.append(TextSpan(len(lead), len(lead) + 4, "n.d.", True))
+    if values.get("site_2_production_share") is None:
+        start = len(lead) + len(first) + len(middle)
+        missing.append(TextSpan(start, start + 4, "n.d.", True))
+    if missing:
+        replace_spans(paragraph, tuple(missing))
+    heading.addprevious(paragraph)
+
+
+def _render_paragraph(
+    paragraph: etree._Element, items: list[IdentitySpan], values: dict[str, str | None]
+) -> None:
+    if any(item.key == "address" for item in items) and values.get("site_2_name"):
+        _render_site_addresses(paragraph, values)
+        return
+    replace_spans(
+        paragraph,
+        tuple(
+            TextSpan(
+                item.start,
+                item.end,
+                values.get(item.key) or "n.d.",
+                values.get(item.key) is None,
+            )
+            for item in items
+        ),
+    )
+
+
 def render_identity(
     stamped: Path,
     manifest: Path,
@@ -151,19 +230,12 @@ def render_identity(
     for (owner, slot), items in grouped.items():
         root = roots.setdefault(owner, xml(parts, owner))
         paragraph = find([root], slot)
-        replace_spans(
-            paragraph,
-            tuple(
-                TextSpan(
-                    item.start,
-                    item.end,
-                    values.get(item.key) or "n.d.",
-                    values.get(item.key) is None,
-                )
-                for item in items
-            ),
-        )
+        _render_paragraph(paragraph, items, values)
         ledger.record(slot)
+    if values.get("site_2_name"):
+        _insert_production_split(
+            roots.setdefault("word/document.xml", xml(parts, "word/document.xml")), values
+        )
     if mapping is not None:
         for entry in mapping.elements:
             if entry.kind != "hyperlink" or entry.slot is None:

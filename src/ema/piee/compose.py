@@ -117,7 +117,9 @@ def compose_draft(
     mapping = load_approved_base(base_directory)
     ledger = AnchorLedger(mapping.variable_slots)
     production = str(data.necesar.production[0].name.value) if data.necesar.production else None
-    values = identity_values(data.anexa, generated_on, production_name=production)
+    values = identity_values(
+        data.anexa, generated_on, production_name=production, analysis_year=data.year
+    )
     with TemporaryDirectory() as directory:
         stages = [Path(directory) / f"stage-{index}.docx" for index in range(19)]
         render_identity(

@@ -7,6 +7,7 @@ from datetime import date
 from decimal import Decimal
 from urllib.parse import urlsplit
 
+from ema.core.office.numbers_ro import format_number
 from ema.energy_data.anexa_cells import AnexaData
 from ema.energy_data.source import Located
 
@@ -58,6 +59,18 @@ def _phone(raw: str | None) -> str | None:
     return f"{digits[:4]} {digits[4:7]} {digits[7:]}" if len(digits) == 10 else raw
 
 
+def production_share(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    try:
+        value = Decimal(raw)
+    except ArithmeticError:
+        return None
+    return (
+        format_number(value, 2, grouping=False) if value.is_finite() and 0 <= value <= 100 else None
+    )
+
+
 def footer_address(anexa: AnexaData) -> str | None:
     """Use only address components explicitly present in the supplied annex."""
     source = _value(anexa.identity, "address")
@@ -82,7 +95,11 @@ def footer_address(anexa: AnexaData) -> str | None:
 
 
 def identity_values(
-    anexa: AnexaData, generated_on: date, *, production_name: str | None = None
+    anexa: AnexaData,
+    generated_on: date,
+    *,
+    production_name: str | None = None,
+    analysis_year: int | None = None,
 ) -> dict[str, str | None]:
     identity = anexa.identity
     phone, fax = _phone(_value(identity, "phone")), _phone(_value(identity, "fax"))
@@ -90,9 +107,19 @@ def identity_values(
     caen_description = _value(identity, "caen_description")
     auditor = _value(anexa.audit, "auditor")
     audit_date = _value(anexa.audit, "last_audit")
+    site_1 = _value(identity, "site_1_name")
+    site_2 = _value(identity, "site_2_name")
+    site_1_address = _value(identity, "site_1_address")
     return {
         "client_name": _value(identity, "name"),
         "address": _value(identity, "address"),
+        "site_1_name": site_1,
+        "site_1_address": site_1_address,
+        "site_2_name": site_2,
+        "site_2_address": _value(identity, "site_2_address"),
+        "site_1_production_share": production_share(_value(identity, "site_1_production_share")),
+        "site_2_production_share": production_share(_value(identity, "site_2_production_share")),
+        "analysis_year": str(analysis_year) if analysis_year is not None else None,
         "footer_address": footer_address(anexa),
         "cui": re.sub(r"^RO\s*", "", _value(identity, "cui") or "", flags=re.I) or None,
         "registrul_comertului": _value(identity, "registrul_comertului"),

@@ -20,7 +20,7 @@ from ema.core.review.models import Field, FieldSpec, Issue, Readiness
 from ema.core.workspace import Workspace
 from ema.piee.annual_check import months_check
 from ema.piee.compose import load_approved_base
-from ema.piee.identity import percent_text
+from ema.piee.identity import percent_text, production_share
 from ema.piee.workflow import base_directory, current_import
 
 
@@ -82,6 +82,30 @@ def _ownership_issues(job_fields: list[Field]) -> list[Issue]:
         if field.key in {"identity.ownership_state", "identity.ownership_private"}
         and (field.review == "rejected" or percent_text(str(field.value)) is None)
     ]
+
+
+def _site_warnings(job_fields: list[Field]) -> list[Issue]:
+    by_key = {field.key: field for field in job_fields}
+    if "identity.site_2_name" not in by_key:
+        return []
+    warnings: list[Issue] = []
+    for index in (1, 2):
+        for name in ("name", "address", "production_share"):
+            key = f"identity.site_{index}_{name}"
+            field = by_key.get(key)
+            if field is None or field.value is None or field.review == "rejected":
+                warnings.append(
+                    Issue(
+                        code="missing",
+                        field_id=field.id if field else None,
+                        message=f"Lipseşte: {key}",
+                    )
+                )
+            elif name == "production_share" and production_share(str(field.value)) is None:
+                warnings.append(
+                    Issue(code="invalid_site_share", field_id=field.id, message=f"Invalid: {key}")
+                )
+    return warnings
 
 
 def _payback_issues(job_fields: list[Field]) -> list[Issue]:
@@ -176,6 +200,7 @@ class PieeWorkflow:
             draft_ok=True,
             final_ok=not issues,
             blocking=issues,
+            warnings=_site_warnings(job_fields),
             next=[item.message for item in issues],
         )
 
