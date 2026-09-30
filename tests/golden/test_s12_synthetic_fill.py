@@ -6,7 +6,6 @@ from uuid import UUID
 import pytest
 from tests.workspace_jobs import create_job
 
-from ema.audit.fill_agent import INSTRUCTIONS, PROMPT_VERSION
 from ema.audit.fill_tools import FillDocument, FillTools
 from ema.audit.read import read_dossier
 from ema.audit.sections import record_applicability
@@ -14,6 +13,14 @@ from ema.core.llm import AgentContext, Limits, ReplayProvider, run_agent
 from ema.core.llm.agent import AgentState
 from ema.core.review.fields import fields
 from ema.core.workspace import Workspace
+
+PROMPT_VERSION = "audit-fill-v1"
+INSTRUCTIONS = (
+    "Read the dossier and dataset for this section. Record facts only with verbatim "
+    "source quotes or an exact dataset field. Mark missing facts, defer unavailable "
+    "material, and propose n/a only when the catalogue trigger is absent. "
+    "Never infer a number that is not in a source."
+)
 
 pytestmark = pytest.mark.golden
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
