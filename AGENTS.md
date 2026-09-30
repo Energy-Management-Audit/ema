@@ -85,6 +85,24 @@ itself. When memory and the source disagree, the source wins; say so in your rep
 - Before the PR, review your own diff against the checklist and fix what you find. The PR carries a
   table: each checklist item, Done or Blocked, and where (file:line or test name).
 
+## Working as a dispatched agent
+
+- Your brief names the issue, the plan and a handle to notify. The plan's decisions are made; a gap
+  or a contradiction is a QUESTION, never a guess.
+- Check that `echo $EMA_REFERENCE` prints the reference library path: golden tests skip without it,
+  and a skipped golden is not a pass.
+- Word for Mac is shared: before anything that drives Word, ask the coordinator for the Word slot with
+  a QUESTION message and wait; say when you are done with it.
+- No heartbeats or progress messages.
+- A fix round on an existing PR keeps its title and appends a short section for the round to its
+  description.
+- The PR description holds the checklist table (each item Done or Blocked, and where), the golden
+  command and its output (no client values), the evidence level reached (docs/PLAN.md §5.16), and
+  what Vlad checks by hand. Never merge: Vlad merges.
+- When the PR is open, run `gh pr checks <n> --watch` once, then send exactly one message to the
+  handle in the brief: `orca terminal send --terminal <handle> --text "DONE PR #<n> <head sha>
+  checks=<pass|fail>" --enter`. If blocked, send one `QUESTION: ...` the same way, then stop.
+
 ## Packaging constraints (they shape the code)
 
 The Windows build is a frozen one-folder PyInstaller bundle. Therefore:

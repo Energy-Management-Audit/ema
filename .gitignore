@@ -38,3 +38,4 @@ reference/
 .DS_Store
 .idea/
 .vscode/
+.coverage
