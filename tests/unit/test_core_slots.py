@@ -10,7 +10,7 @@ import pytest
 from tests.workspace_jobs import create_job
 
 from ema.core.errors import EmaError
-from ema.core.jobs import StageOutcome, get_job, latest_ready_run, run_stage, status
+from ema.core.jobs import StageContext, StageOutcome, get_job, latest_ready_run, run_stage, status
 from ema.core.workspace import Workspace
 from ema.invoices import export
 
@@ -53,6 +53,19 @@ def test_collection_slots_order_and_removed_version(ws: Workspace, tmp_path: Pat
     run_stage(ws, job, "extract", stage)
     assert wait_run(ws, job)["publication"] == "current"
     assert latest_ready_run(ws, job, "extract") == status(ws, job).runs[-1]["id"]
+
+
+def test_read_slots_can_skip_individual_slot_reads(ws: Workspace, tmp_path: Path) -> None:
+    job = create_job(ws, "invoices", "client", None)
+    sha = file(ws, tmp_path, "first")
+    ws.set_slot(job, "invoices/0001", sha)
+    ctx = StageContext(ws, job, "run", "intake")
+
+    versions = ctx.read_slots("invoices", record=False)
+
+    assert [version.slot for version in versions] == ["invoices/0001"]
+    assert ("slots.collection", f"{job}:invoices") in ctx.reads
+    assert ("slots", f"{job}:invoices/0001") not in ctx.reads
 
 
 def test_get_job_returns_client_identity(ws: Workspace) -> None:

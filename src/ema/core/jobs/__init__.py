@@ -93,7 +93,7 @@ class StageContext:
         self.outputs: list[tuple[Path, str]] = []
         self.publications: list[Callable[[sqlite3.Connection], None]] = []
 
-    def read_slot(self, slot: str) -> SlotVersion:
+    def read_slot(self, slot: str, record: bool = True) -> SlotVersion:
         with self.ws.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
@@ -110,7 +110,8 @@ class StageContext:
                 "INSERT OR IGNORE INTO run_inputs VALUES (?,?,?)",
                 (self.run_id, client, row["file_sha"]),
             )
-        self.record_read("slots", f"{self.job}:{slot}", int(row["revision"]))
+        if record:
+            self.record_read("slots", f"{self.job}:{slot}", int(row["revision"]))
         self.inputs[f"slot:{slot}"] = str(row["file_sha"])
         return SlotVersion(
             self.job,
@@ -121,10 +122,10 @@ class StageContext:
             row["converted_from"],
         )
 
-    def read_slots(self, prefix: str) -> list[SlotVersion]:
+    def read_slots(self, prefix: str, record: bool = True) -> list[SlotVersion]:
         names = self.ws.list_slots(self.job, prefix)
         self.record_read("slots.collection", f"{self.job}:{prefix}", collection_revision(names))
-        return [self.read_slot(slot) for slot in names]
+        return [self.read_slot(slot, record=record) for slot in names]
 
     def record_read(self, table: str, row_id: str, revision: int) -> None:
         key = (table, row_id)

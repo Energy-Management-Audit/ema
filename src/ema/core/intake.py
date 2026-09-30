@@ -141,10 +141,8 @@ def intake_legacy(
     on_result: Callable[[ItemOutcome], None] | None = None,
 ) -> StageOutcome:
     results: list[ItemOutcome] = []
-    versions = ctx.read_slots(collection)
+    versions = ctx.read_slots(collection, record=False)
     for version in versions:
-        # Conversion writes this slot; its pre-conversion revision is not a stale read.
-        ctx.reads.pop(("slots", f"{ctx.job}:{version.slot}"), None)
         if ctx.cancelled():
             break
         try:
