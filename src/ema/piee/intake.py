@@ -20,6 +20,9 @@ from ema.energy_data.factors import FACTORS_2026
 from ema.energy_data.model import Reading
 from ema.energy_data.source import Located
 from ema.piee.dataset import PieeData, SourceDisagreement, load
+from ema.piee.intake_sources import Method
+from ema.piee.intake_sources import file as _file
+from ema.piee.intake_sources import method as _method
 from ema.piee.payback_review import record_payback_check
 
 
@@ -27,9 +30,6 @@ from ema.piee.payback_review import record_payback_check
 class PieeJob:
     id: str
     data: PieeData
-
-
-Method = Literal["questionnaire", "anexa", "prelucrare", "calc"]
 
 
 def _evidence(location: Located | None, file_sha: str | None, method: Method, key: str) -> Evidence:
@@ -61,20 +61,6 @@ def _evidence(location: Located | None, file_sha: str | None, method: Method, ke
 
 def _sha(path: Path | None) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path is not None else None
-
-
-def _method(source: str) -> Method:
-    if source.startswith("prelucrare"):
-        return "prelucrare"
-    if source == "anexa":
-        return "anexa"
-    if source in {"calculated", "carrier_sum"}:
-        return "calc"
-    return "questionnaire"
-
-
-def _file(source: str, shas: dict[str, str | None]) -> str | None:
-    return shas.get(_method(source))
 
 
 def _record_disagreement(
