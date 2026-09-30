@@ -1542,6 +1542,7 @@ code/ (repository root)
 | Gate | Runs on | When |
 |---|---|---|
 | `scripts/check` | Linux CI + every dev machine | every push and PR |
+| Windows unit job | Windows CI runner | release tags; manual dispatch when `unit_tests` is enabled |
 | Golden | a machine with `$EMA_REFERENCE` (Vlad's Mac) | before feature and release PRs |
 | Word check: the output opens in Word with no repair prompt, charts open with Edit Data, the TOC numbers are right | Word for Mac now; Vlad's Windows PC from the port | every slice that produces a document; every release |
 | Windows build smoke: the frozen one-folder build loads its resources, starts the server, runs one headless job | Windows CI runner | from the port (S18): every push to `dev`, every tag |

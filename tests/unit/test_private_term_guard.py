@@ -97,3 +97,57 @@ def test_outgoing_commits_include_messages_and_tracked_blobs(
     assert any("commit-message:1: client name" in match for match in matches)
     assert any("client-name.txt:0: client name" in match for match in matches)
     assert any("client-name.txt:1: client name" in match for match in matches)
+
+
+@pytest.mark.parametrize(
+    ("author_email", "committer_email", "refused_fields"),
+    [
+        ("123+fixture@users.noreply.github.com", "noreply@github.com", ()),
+        ("fixture@example.test", "noreply@github.com", ("author",)),
+        ("123+fixture@users.noreply.github.com", "fixture@example.test", ("committer",)),
+        ("noreply@github.com", "noreply@github.com", ()),
+    ],
+)
+def test_outgoing_commit_email_policy(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    author_email: str,
+    committer_email: str,
+    refused_fields: tuple[str, ...],
+) -> None:
+    for name in tuple(os.environ):
+        if name.startswith("GIT_"):
+            monkeypatch.delenv(name)
+
+    def git(*args: str) -> str:
+        return subprocess.check_output(("git", *args), text=True).strip()
+
+    monkeypatch.chdir(tmp_path)
+    git("init", "-q")
+    git("config", "user.name", "Fixture")
+    git("config", "user.email", "fixture@example.test")
+    (tmp_path / "fixture.txt").write_text("safe", encoding="utf-8")
+    git("add", ".")
+    git("commit", "-qm", "baseline")
+    base = git("rev-parse", "HEAD")
+    (tmp_path / "fixture.txt").write_text("updated", encoding="utf-8")
+    git("add", ".")
+    git(
+        "-c",
+        f"user.email={committer_email}",
+        "-c",
+        f"author.email={author_email}",
+        "commit",
+        "-m",
+        "synthetic update",
+    )
+    head = git("rev-parse", "HEAD")
+
+    matches = outgoing_matches(base, head, [])
+
+    assert {
+        field for field in ("author", "committer") if any(f": {field} email" in m for m in matches)
+    } == set(refused_fields)
+    if refused_fields:
+        assert head[:12] in matches[0]
+        assert "fixture@example.test" not in "\n".join(matches)
