@@ -60,7 +60,7 @@ def _run(text: str, level: int = 2) -> Any:
     properties.append(fonts)
     for name, value in (
         ("b", level == 1),
-        ("i", level == 3),
+        ("i", False),
         ("caps", False),
         ("smallCaps", False),
     ):
@@ -218,7 +218,24 @@ def _clear_bookmarks(document: Any) -> None:
             node.getparent().remove(node)
 
 
+def _clear_toc_italics(document: Any) -> None:
+    for style in document.styles.element.findall(qn("w:style")):
+        if style.get(qn("w:styleId")) not in {"TOC1", "TOC2", "TOC3"}:
+            continue
+        properties = style.find(qn("w:rPr"))
+        if properties is None:
+            properties = OxmlElement("w:rPr")
+            style.append(properties)
+        for name in ("i", "iCs"):
+            italic = properties.find(qn("w:" + name))
+            if italic is None:
+                italic = OxmlElement("w:" + name)
+                properties.append(italic)
+            italic.set(qn("w:val"), "0")
+
+
 def refresh_toc(document: Any) -> None:
+    _clear_toc_italics(document)
     root = document.element.body
     body = list(root)
     spans = heading_spans_document(document)

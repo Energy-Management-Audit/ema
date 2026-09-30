@@ -88,6 +88,28 @@ def _complete_form(path: Path) -> Path:
     return path
 
 
+def _assert_toc_is_upright(path: Path) -> None:
+    document = Document(str(path))
+    styles = {
+        style.get(qn("w:styleId")): style
+        for style in document.styles.element.findall(qn("w:style"))
+    }
+    entries = [
+        p
+        for p in document.element.body.iter(qn("w:p"))
+        if p.find(f"{qn('w:pPr')}/{qn('w:pStyle')}") is not None
+        and p.find(f"{qn('w:pPr')}/{qn('w:pStyle')}").get(qn("w:val"), "").startswith("TOC")
+    ]
+    assert entries
+    for paragraph in entries:
+        style_id = paragraph.find(f"{qn('w:pPr')}/{qn('w:pStyle')}").get(qn("w:val"))
+        style = styles[style_id]
+        italic_nodes = style.xpath("./w:rPr/w:i | ./w:rPr/w:iCs") + paragraph.xpath(
+            ".//w:i | .//w:iCs"
+        )
+        assert all(node.get(qn("w:val")) not in {None, "1", "true", "on"} for node in italic_nodes)
+
+
 def _text(element: Any) -> str:
     return "".join(node.text or "" for node in element.iter(W + "t"))
 
@@ -187,6 +209,7 @@ def _document_checks(
     ws: Workspace, job: str, docx: Path, anchors: Path, reviewed: dict[str, str]
 ) -> None:
     """Step 5: every bound cell holds its source, her headers and titles, the reviewed cells."""
+    _assert_toc_is_upright(docx)
     document = Document(str(docx))
     today = date.today()
     address = next(field for field in fields(ws, job) if field.key == "audit.address")

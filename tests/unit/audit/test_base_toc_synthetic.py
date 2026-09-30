@@ -183,7 +183,7 @@ def test_entries_use_list_counters_catalogue_case_and_explicit_formatting(monkey
                 assert properties.find(qn("w:smallCaps")).get(qn("w:val")) == "0"
                 assert properties.find(qn("w:caps")).get(qn("w:val")) == "0"
                 assert properties.find(qn("w:b")).get(qn("w:val")) == ("1" if level == 1 else "0")
-                assert properties.find(qn("w:i")).get(qn("w:val")) == ("1" if level == 3 else "0")
+                assert properties.find(qn("w:i")).get(qn("w:val")) == "0"
             offset = 600 if level == 1 else 1000
             left = 0 if level == 1 else 300
             assert entry.pPr.ind.get(qn("w:hanging")) == str(offset)
@@ -192,6 +192,30 @@ def test_entries_use_list_counters_catalogue_case_and_explicit_formatting(monkey
         assert entries[1].pPr.spacing.get(qn("w:line")) == "360"
         assert entries[1].xpath("./w:hyperlink/w:r/w:tab")
         assert entries[1].pPr.tabs[-1].get(qn("w:leader")) == "dot"
+
+
+def test_refresh_clears_italic_toc3_style_and_generated_runs(monkeypatch):
+    document, *_ = _fixture()
+    toc3 = document.styles.add_style("TOC3", WD_STYLE_TYPE.PARAGRAPH)
+    toc3.font.italic = True
+    _headings(document, monkeypatch, [("ch4.echiv_electric", 2, "4.3.1. Energia")])
+
+    refresh_toc(document)
+
+    style = next(
+        style
+        for style in document.styles.element.findall(qn("w:style"))
+        if style.get(qn("w:styleId")) == "TOC3"
+    )
+    assert style.find(f"{qn('w:rPr')}/{qn('w:i')}").get(qn("w:val")) == "0"
+    entries = _entries(document)
+    assert any(entry.pPr.pStyle.get(qn("w:val")) == "TOC3" for entry in entries)
+    for entry in entries:
+        for run in entry.iter(qn("w:r")):
+            properties = run.find(qn("w:rPr"))
+            assert properties is not None
+            italic = properties.find(qn("w:i"))
+            assert italic is None or italic.get(qn("w:val")) != "1"
 
 
 def test_numbering_start_override_and_toc_exclusion():
