@@ -55,6 +55,7 @@ def seed(ws: Workspace) -> None:
             ("exemplu", "Exemplu", "12345678"),
         )
     for kind in ("audit", "piee", "invoices", "reporting"):
+        # Reporting overview seeding uses core because its HTTP job route was retired.
         job = create_job(ws, kind, "exemplu", 2026)
         source = Evidence(
             id=f"{kind}-example",
