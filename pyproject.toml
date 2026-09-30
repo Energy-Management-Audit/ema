@@ -116,7 +116,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
 markers = [
-    "word: reaches Word automation (requires the coordinator Word slot)",
+    "word: drives Word for Mac, directly or through a conversion",
     "golden: runs against the real reference library; needs EMA_REFERENCE (skipped without it)",
     "network: live public network acceptance; CI excludes it because the source may be unavailable",
     "live_research: pending audit-case-a equipment acceptance; requires a controlled live search API",
