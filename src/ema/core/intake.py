@@ -125,6 +125,7 @@ def _record_result(ctx: StageContext, result: ItemOutcome) -> None:
             "intake_file",
             run_id=ctx.run_id,
             slot=result.slot,
+            file_name=result.file_name,
             version=result.version,
             file_sha=result.file_sha,
             kind=result.kind.value,
