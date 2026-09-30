@@ -21,6 +21,11 @@ def outgoing_matches(
     blob_cache: dict[str, bytes] = {}
     for revision in revisions:
         label = revision[:12]
+        identities = _git("show", "-s", "--format=%H%x00%ae%x00%ce", revision)
+        _, author_email, committer_email = identities.decode().rstrip("\n").split("\0")
+        for field, email in (("author", author_email), ("committer", committer_email)):
+            if not (email.endswith("@users.noreply.github.com") or email == "noreply@github.com"):
+                matches.append(f"{label}: {field} email is not a GitHub noreply address")
         message = _git("show", "-s", "--format=%B", revision).decode("utf-8", errors="ignore")
         matches.extend(scan(f"{label}:commit-message", message, terms, allowed))
         tree = _git("ls-tree", "-r", "-z", revision)
