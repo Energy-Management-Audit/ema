@@ -79,7 +79,7 @@ def test_piee_case_b_raw_mix_pies_follow_delivered_categories_and_available_valu
     reference_library: Path, tmp_path: Path
 ) -> None:
     sources = reference_library / case_path("piee-case-b")
-    previous = _only(sources / "final", "*.docx")
+    previous = case_path("piee-case-b", "final")
     data = load(
         2025,
         _only(sources, "Anexa*.xlsx"),

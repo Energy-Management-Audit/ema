@@ -39,6 +39,8 @@ def _correction_value(field: Field, value: Any) -> Any:
             result = Decimal(str(value))
             if not result.is_finite():
                 raise InvalidOperation
+            if field.unit == "%" and not 0 <= result <= 100:
+                raise InvalidOperation
             return result
         except (InvalidOperation, ValueError) as exc:
             raise EmaError("value_invalid", "Valoarea este invalidă.", field.id) from exc

@@ -43,6 +43,7 @@ def read_identity(book: Book, result: AnexaData) -> None:
     sheet = book.sheet(name)
     _primary(sheet, result)
     _validate_name(book, result)
+    _sites(result)
     _contact_fields(sheet, result)
     _ownership(sheet, result)
     _contact_person(sheet, result)
@@ -57,6 +58,34 @@ def _primary(sheet: Sheet, result: AnexaData) -> None:
         value = right_of_label(sheet, labels, result.issues)
         if value is not None:
             result.identity[key] = value
+
+
+def _sites(result: AnexaData) -> None:
+    declaration = result.identity.get("name")
+    if declaration is None or not isinstance(declaration.value, str):
+        return
+    match = re.search(r"\bsucursalele\s+(.+?)\s+(?:și|şi|si)\s+(.+?)\s*$", declaration.value, re.I)
+    if match is None:
+        return
+    operator = declaration.value[: match.start()].strip(" ,.;")
+    if not operator:
+        return
+    result.identity["name"] = Located(operator, declaration.ref)
+    for index, site in enumerate(match.groups(), 1):
+        result.identity[f"site_{index}_name"] = Located(site.strip(" ,.;").title(), declaration.ref)
+    address = result.identity.get("address")
+    if address is None or not isinstance(address.value, str):
+        return
+    matches = [
+        index
+        for index in (1, 2)
+        if re.search(
+            rf"(?:^| ){re.escape(normal(str(result.identity[f'site_{index}_name'].value)))}(?:$| )",
+            normal(address.value),
+        )
+    ]
+    if len(matches) == 1:
+        result.identity[f"site_{matches[0]}_address"] = address
 
 
 def _validate_name(book: Book, result: AnexaData) -> None:
