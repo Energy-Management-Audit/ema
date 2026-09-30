@@ -126,14 +126,36 @@ def _record_disagreement(
 
 def _record_identity(ws: Workspace, job: str, data: PieeData, anexa_sha: str) -> None:
     for key, found in data.anexa.identity.items():
+        share = key in {"site_1_production_share", "site_2_production_share"}
         propose(
             ws,
             job,
-            FieldSpec(key=f"identity.{key}", label=key, value_type="text", required=key == "name"),
-            str(found.value),
+            FieldSpec(
+                key=f"identity.{key}",
+                label=key,
+                value_type="number" if share else "text",
+                unit="%" if share else None,
+                required=key == "name",
+            ),
+            Decimal(str(found.value)) if share else str(found.value),
             [_evidence(found, anexa_sha, "anexa", key)],
             state="extracted",
         )
+    if "site_2_name" in data.anexa.identity:
+        for index in (1, 2):
+            for name, unit in (("address", None), ("production_share", "%")):
+                if (key := f"site_{index}_{name}") not in data.anexa.identity:
+                    mark_absent(
+                        ws,
+                        job,
+                        FieldSpec(
+                            key=f"identity.{key}",
+                            label=key,
+                            value_type="number" if unit else "text",
+                            unit=unit,
+                        ),
+                        "not_found",
+                    )
     for issue in data.anexa.issues:
         if issue.code == "ownership_flag" and issue.detail not in data.anexa.identity:
             mark_absent(
