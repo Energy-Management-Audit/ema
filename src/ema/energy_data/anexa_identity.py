@@ -70,6 +70,7 @@ def _sites(result: AnexaData) -> None:
     operator = declaration.value[: match.start()].strip(" ,.;")
     if not operator:
         return
+    result.identity["declared_name"] = declaration
     result.identity["name"] = Located(operator, declaration.ref)
     for index, site in enumerate(match.groups(), 1):
         result.identity[f"site_{index}_name"] = Located(site.strip(" ,.;").title(), declaration.ref)

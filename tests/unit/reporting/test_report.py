@@ -4,6 +4,7 @@ from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 
+from ema.energy_data.anexa import parse_anexa
 from ema.reporting import collect_annexes, generate, write_report
 
 
@@ -26,13 +27,14 @@ def _annex(
     cost: float | None = 12.0,
     monthly: float | None = 25.0,
     annual: float = 24.0,
+    name: str = "Companie Exemplu",
 ) -> None:
     book = Workbook()
     general = book.active
     assert general is not None
     general.title = "Date generale"
     general["A1"] = "Denumirea operatorului economic"
-    general["B1"] = "Strada Exemplu 1" if name_is_address else "Companie Exemplu"
+    general["B1"] = "Strada Exemplu 1" if name_is_address else name
     general["A2"] = "Adresa poștală"
     general["B2"] = "Strada Exemplu 1"
     general["A3"] = "Cod CAEN"
@@ -62,6 +64,20 @@ def _annex(
         existing["E5"] = cost
         existing["G5"] = 3.5
     book.save(path)
+
+
+def test_two_branch_declaration_keeps_both_name_views(tmp_path: Path) -> None:
+    path = tmp_path / "anexa.xlsx"
+    declaration = "Operator Exemplu SRL, SUCURSALELE SITE-1 si SITE-2"
+    _annex(path, name=declaration)
+
+    identity = parse_anexa(path).identity
+    assert identity["declared_name"].value == declaration
+    assert identity["declared_name"].ref == identity["name"].ref
+    assert identity["name"].value == "Operator Exemplu SRL"
+    assert identity["site_1_name"].value == "Site-1"
+    assert identity["site_2_name"].value == "Site-2"
+    assert generate([path], (2025,)).companies[0].name == declaration
 
 
 def test_missing_cost_and_disagreement(tmp_path: Path) -> None:

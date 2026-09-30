@@ -142,7 +142,7 @@ def generate(  # noqa: C901, PLR0912, PLR0915
                 ReportException("EROARE", path, None, "Fișierul nu poate fi citit.", str(exc))
             )
             continue
-        name = _text(annex.identity.get("name"))
+        name = _text(annex.identity.get("declared_name") or annex.identity.get("name"))
         if annex.name_origin is not None:
             exceptions.append(
                 ReportException(
