@@ -337,6 +337,7 @@ def import_prelucrare(path: Path) -> PrelucrareData:  # noqa: C901, PLR0912
                     if series.annual
                     else next((reading.unit for reading in series.months.values()), "")
                 )
+                # PV alone has a configured fallback factor when its source row is absent.
                 if (
                     unit
                     and out.factors.tep_factor(carrier, unit, year) is None

@@ -199,6 +199,42 @@ def test_bare_fuel_requires_one_declared_unit(
     assert any(item.code == issue and item.detail == "diesel.2025" for item in imported.issues)
 
 
+def test_ambiguous_last_year_fuel_keeps_earlier_years_and_evidence(tmp_path: Path) -> None:
+    book = Workbook()
+    fuel = book.active
+    fuel.title = "Consum Carburanti"
+    fuel.cell(4, 3, "t")
+    fuel.cell(5, 3, "tone")
+    for year, header, label in (
+        (2023, 10, "Motorina [t]"),
+        (2024, 20, "Motorina [t]"),
+        (2025, 30, "Motorina"),
+    ):
+        _header(fuel, header, year=year)
+        fuel.cell(header + 1, 3, label)
+        fuel.cell(header + 1, 4, year - 2022)
+        fuel.cell(header + 1, 17, year - 2022)
+    electricity = book.create_sheet("Consum Electric")
+    _header(electricity, 10)
+    electricity.cell(11, 3, "[MWh]")
+    electricity.cell(11, 4, 1)
+    path = tmp_path / "three-years.xlsx"
+    book.save(path)
+
+    imported = import_prelucrare(path)
+    assert imported.dataset.years == (2023, 2024, 2025)
+    assert set(imported.dataset.carriers[Carrier.diesel]) == {2023, 2024}
+    for year, row in ((2023, 11), (2024, 21)):
+        assert imported.dataset.carriers[Carrier.diesel][year].months[1].value == year - 2022
+        assert imported.located[f"carrier.diesel.{year}.01"].ref.a1 == f"Consum Carburanti!D{row}"
+        assert imported.located[f"carrier.diesel.{year}"].ref.a1 == f"Consum Carburanti!Q{row}"
+    assert not any(key.startswith("carrier.diesel.2025") for key in imported.located)
+    assert any(
+        issue.code == "unit_ambiguous" and issue.detail == "diesel.2025"
+        for issue in imported.issues
+    )
+
+
 def test_coke_units_are_checked_within_each_year_block(tmp_path: Path) -> None:
     path = _workbook(tmp_path / "coke.xlsx")
     book = load_workbook(path)

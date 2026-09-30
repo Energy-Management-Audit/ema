@@ -170,7 +170,8 @@ def physical(
                 out.issues.append(
                     ReaderIssue(code, f"{key}.{year}", CellRef(sheet.name, matches[0], 3))
                 )
-                return {}
+                ambiguous.add(year)
+                continue
             resolved_unit = _row_unit(source_label) if key == Carrier.coke.value else unit
             if resolved_unit is None:
                 out.issues.append(
