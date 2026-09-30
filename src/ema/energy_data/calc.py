@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ema.energy_data.carriers import WATER_CARRIERS, Carrier
+from ema.energy_data.carriers import INTERNAL_GENERATION_CARRIERS, WATER_CARRIERS, Carrier
 from ema.energy_data.factors import FactorTable
 from ema.energy_data.model import (
     CarrierSeries,
@@ -151,7 +151,8 @@ def _total(
     converted = [
         _converted(ds, factors, carrier, year, month, target)
         for carrier in ds.carriers
-        if carrier not in WATER_CARRIERS and year in ds.carriers[carrier]
+        if carrier not in WATER_CARRIERS | INTERNAL_GENERATION_CARRIERS
+        and year in ds.carriers[carrier]
     ]
     inputs = tuple(key for part in converted for key in part.inputs)
     weights = tuple(weight for part in converted for weight in part.input_weights)

@@ -13,7 +13,7 @@ from ema.core.office.workbook import save_workbook
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
 from ema.energy_data.factors import FACTORS_2026, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset
-from ema.energy_data.prelucrare import MONTHS
+from ema.energy_data.prelucrare_tables import MONTHS
 
 NUMBER = "#,##0.00;[Red](#,##0.00);–"
 NAMES = {

@@ -56,7 +56,7 @@ def factors_for_output(imported: PrelucrareData, years: tuple[int, ...]) -> Fact
     return FactorTable("prelucrare:output", min(years), tuple(tep), tuple(co2), max(years))
 
 
-def read_factors(  # noqa: C901, PLR0912
+def read_factors(  # noqa: C901, PLR0912, PLR0915
     book: Book, years: tuple[int, ...], out: PrelucrareData, source_file: str
 ) -> FactorTable:
     tep: list[Factor] = []
@@ -89,19 +89,23 @@ def read_factors(  # noqa: C901, PLR0912
         ("Consum Carburanti", "tone GPL", Carrier.lpg, "t"),
         ("Consum Carburanti", "1 t (CTL", Carrier.ctl, "t"),
         ("Consum electrica fotovoltaic", "1 MWh", Carrier.electricity_pv, "MWh"),
+        ("energi electrica din cogenerar", "1 MWh", Carrier.electricity_cogen, "MWh"),
+        ("Consum Cocs", "1 tona", Carrier.coke, "t"),
+        ("Consum Cocs", "1 MWh", Carrier.coke, "MWh"),
         ("Consum Coji floarea soarelui", "1 Gcal", Carrier.sunflower_husks, "Gcal"),
         ("Consum Energie termica terti", "1 Gcal", Carrier.purchased_heat, "Gcal"),
     ):
         sheet = sheet_named(book, sheet_name, out.issues)
         if sheet is None or carrier not in out.dataset.carriers:
             continue
-        found: Located | None = None
+        candidates: list[Located] = []
         for row in range(1, sheet.max_row + 1):
             values = [cell_or_blank(sheet, row, col).value for col in range(1, sheet.max_col + 1)]
             label_columns = [
                 index
                 for index, value in enumerate(values)
-                if isinstance(value, str) and normal(label) in normal(value)
+                if isinstance(value, str)
+                and normal(label).replace(" ", "") in normal(value).replace(" ", "")
             ]
             if not label_columns:
                 continue
@@ -112,14 +116,20 @@ def read_factors(  # noqa: C901, PLR0912
             if equal is not None and equal + 2 < len(values):
                 factor_value = numeric(values[equal + 1])
                 if factor_value is not None and normal(str(values[equal + 2])) == "tep":
-                    found = Located(factor_value, CellRef(sheet.name, row, equal + 2))
-            if found:
-                break
-        if found is not None:
+                    candidates.append(Located(factor_value, CellRef(sheet.name, row, equal + 2)))
+        if len(candidates) > 1:
+            out.issues.append(
+                ReaderIssue("factor_ambiguous", f"{carrier.value}.{unit}", candidates[0].ref)
+            )
+            continue
+        if candidates:
+            found = candidates[0]
             factor_value = numeric(found.value)
             assert factor_value is not None
             tep.append(Factor(carrier, unit, factor_value, f"{source_file}:{found.ref.a1}"))
-            out.located[f"factor.tep.{carrier.value}"] = found
+            out.located[f"factor.tep.{carrier.value}.{unit}"] = found
+            if carrier != Carrier.coke:
+                out.located[f"factor.tep.{carrier.value}"] = found
     primary = sheet_named(book, "Principali factori de conversie", out.issues)
     if primary is not None:
         for carrier, needle in ((Carrier.petrol, "benzina"), (Carrier.electricity_pv, "electric")):
