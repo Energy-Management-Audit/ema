@@ -80,7 +80,8 @@ def measures_form(dest: Path) -> None:
 
 @audit_app.command("new")
 def new(
-    client: str = typer.Option(..., "--client"), year: int = typer.Option(..., "--year")
+    client: str = typer.Option(..., "--client", help="CUI-ul clientului înregistrat."),
+    year: int = typer.Option(..., "--year"),
 ) -> None:
     typer.echo(new_audit(Workspace(workspace_path()), client, year))
 

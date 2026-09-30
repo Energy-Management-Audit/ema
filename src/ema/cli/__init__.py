@@ -15,6 +15,7 @@ from ema import __version__
 from ema.api import create_app
 from ema.api.mock import seed as seed_mock
 from ema.cli.audit import audit_app
+from ema.cli.clients import clients_app
 from ema.cli.desktop import run_desktop
 from ema.cli.install_check import check_install as run_install_check
 from ema.cli.office_worker import office_worker
@@ -59,6 +60,7 @@ job_app = typer.Typer()
 invoices_app = typer.Typer()
 reporting_app = typer.Typer()
 _app.add_typer(workspace_app, name="workspace")
+_app.add_typer(clients_app, name="clients")
 _app.add_typer(job_app, name="job")
 job_app.add_typer(job_review_app)
 _app.add_typer(invoices_app, name="invoices")
@@ -129,7 +131,10 @@ def job_status(job: str) -> None:
 
 
 @invoices_app.command("extract")
-def invoices_extract(folder: Path, client: str = typer.Option(..., "--client")) -> None:
+def invoices_extract(
+    folder: Path,
+    client: str = typer.Option(..., "--client", help="CUI-ul clientului înregistrat."),
+) -> None:
     if not folder.is_dir():
         raise EmaError("invoice_folder", "Dosarul facturilor nu există.", str(folder))
     sources = sorted(

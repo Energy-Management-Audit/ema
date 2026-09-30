@@ -209,6 +209,7 @@ def run(ema: str, inputs: Path, out: Path) -> None:
     out.mkdir(parents=True)
     env = {**os.environ, "EMA_WORKSPACE": str(out / "workspace")}
     command = _command(ema)
+    _run([*command, "clients", "add", "--name", "Synthetic", "--cui", "12345678"], env)
     generated = _json_lines(
         _run(
             [
@@ -216,7 +217,7 @@ def run(ema: str, inputs: Path, out: Path) -> None:
                 "piee",
                 "generate",
                 "--client",
-                "piee-case-a",
+                "12345678",
                 "--year",
                 "2025",
                 "--anexa",

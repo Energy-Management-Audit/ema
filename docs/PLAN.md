@@ -1169,6 +1169,8 @@ POST       /settings/providers/{p}/test  (the „verificată acum 2 h" state in 
 
 ```
 ema serve
+ema clients add --name <text> [--cui <text>]
+ema clients list
 ema invoices extract <folder> --client <cui>
 ema piee generate --client <cui> --year 2025 --anexa <file> --necesar <file> [--prelucrare <file>]
                                           (job + slots + import + draft in one call; never a final)

@@ -17,7 +17,7 @@ piee_app = typer.Typer()
 
 @piee_app.command("generate")
 def generate(
-    client: str = typer.Option(..., "--client"),
+    client: str = typer.Option(..., "--client", help="CUI-ul clientului înregistrat."),
     year: int = typer.Option(..., "--year"),
     anexa: Path = typer.Option(..., "--anexa"),  # noqa: B008
     necesar: Path | None = typer.Option(None, "--necesar"),  # noqa: B008
