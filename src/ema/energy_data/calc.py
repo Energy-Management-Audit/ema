@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ema.energy_data.carriers import INTERNAL_GENERATION_CARRIERS, WATER_CARRIERS, Carrier
+from ema.energy_data.carriers import WATER_CARRIERS, Carrier, counts_in_total
 from ema.energy_data.factors import FactorTable
 from ema.energy_data.model import (
     CarrierSeries,
@@ -151,8 +151,7 @@ def _total(
     converted = [
         _converted(ds, factors, carrier, year, month, target)
         for carrier in ds.carriers
-        if carrier not in WATER_CARRIERS | INTERNAL_GENERATION_CARRIERS
-        and year in ds.carriers[carrier]
+        if counts_in_total(carrier) and year in ds.carriers[carrier]
     ]
     inputs = tuple(key for part in converted for key in part.inputs)
     weights = tuple(weight for part in converted for weight in part.input_weights)
@@ -181,7 +180,7 @@ def shares(ds: EnergyDataset, factors: FactorTable, year: int) -> dict[Carrier, 
     total = tep_total(ds, factors, year)
     result: dict[Carrier, Derived] = {}
     for carrier in ds.carriers:
-        if carrier in WATER_CARRIERS or year not in ds.carriers[carrier]:
+        if not counts_in_total(carrier) or year not in ds.carriers[carrier]:
             continue
         part = tep(ds, factors, carrier, year)
         missing = (*part.missing, *total.missing)
@@ -211,7 +210,7 @@ def specific_consumption(
                 tuple(
                     field_key("carrier_tep", name.value, year)
                     for name in ds.carriers
-                    if name not in WATER_CARRIERS and year in ds.carriers[name]
+                    if counts_in_total(name) and year in ds.carriers[name]
                 )
                 if carrier is None
                 else (field_key("carrier_tep", carrier.value, year),)
@@ -290,7 +289,7 @@ def energy_intensity(ds: EnergyDataset, factors: FactorTable, year: int) -> Deri
         inputs = tuple(
             field_key("carrier_tep", carrier.value, year)
             for carrier in ds.carriers
-            if carrier not in WATER_CARRIERS and year in ds.carriers[carrier]
+            if counts_in_total(carrier) and year in ds.carriers[carrier]
         )
         energy = Derived(filed.value, "tep", "filed.tep", inputs, "filed", year=year)
     key = field_key("turnover", None, year)
@@ -354,7 +353,7 @@ def indicators(ds: EnergyDataset, factors: FactorTable) -> Indicators:
         year: {
             carrier: tep(ds, factors, carrier, year)
             for carrier in ds.carriers
-            if carrier not in WATER_CARRIERS and year in ds.carriers[carrier]
+            if counts_in_total(carrier) and year in ds.carriers[carrier]
         }
         for year in ds.years
     }

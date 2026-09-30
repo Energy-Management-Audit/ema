@@ -35,6 +35,10 @@ INTERNAL_GENERATION_CARRIERS = frozenset({Carrier.electricity_cogen})
 FAMILY_PARENT: dict[Carrier, Carrier] = {Carrier.sunflower_husks: Carrier.biomass}
 
 
+def counts_in_total(carrier: Carrier) -> bool:
+    return carrier not in WATER_CARRIERS and carrier not in INTERNAL_GENERATION_CARRIERS
+
+
 def _normalize(label: str) -> str:
     decomposed = unicodedata.normalize("NFKD", label.casefold())
     plain = "".join(c for c in decomposed if not unicodedata.combining(c))
@@ -89,6 +93,7 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
     ),
     Carrier.lpg: (
         "gpl",
+        "gpl [tep]",
         "alti comb gpl",
         "alți comb – gpl",
         "alti combustibili - gpl",
@@ -98,7 +103,7 @@ _ALIASES: dict[Carrier, tuple[str, ...]] = {
     Carrier.fuel_oil: ("pacura", "păcură", "combustibil lichid greu"),
     Carrier.clu: ("clu", "combustibil lichid usor", "combustibil lichid ușor"),
     Carrier.coal: ("carbune", "cărbune", "carbune slab", "lignit"),
-    Carrier.coke: ("cocs", "coke", "carbune (cocs)"),
+    Carrier.coke: ("cocs", "coke", "carbune (cocs)", "cocs [tep]"),
     Carrier.wood: ("lemn", "lemne de foc", "biomasa lemnoasa"),
     Carrier.biomass: ("biomasa", "biomasă"),
     Carrier.sunflower_husks: (

@@ -6,6 +6,7 @@ import pytest
 from openpyxl import load_workbook
 
 from ema.energy_data.carriers import Carrier
+from ema.energy_data.factors import Factor, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
 from ema.energy_data.prelucrare import import_prelucrare
 from ema.energy_data.prelucrare_writer import write_prelucrare
@@ -164,3 +165,38 @@ def test_explicit_energy_carrier_with_missing_readings_survives_round_trip(
     rebuilt = import_prelucrare(path)
     assert rebuilt.dataset.carriers[carrier][2025].months == months
     assert rebuilt.dataset.carriers[carrier][2025].annual is None
+
+
+def test_writer_names_cogeneration_and_coke_and_omits_internal_generation_from_total(
+    tmp_path: Path,
+) -> None:
+    dataset = EnergyDataset(
+        (2025,),
+        {
+            Carrier.electricity_cogen: {2025: CarrierSeries(annual=Reading(20, "MWh"))},
+            Carrier.coke: {2025: CarrierSeries(annual=Reading(3, "t"))},
+        },
+        {"main": {2025: CarrierSeries(annual=Reading(100, "tone"))}},
+        {"main": "tone"},
+    )
+    factors = FactorTable(
+        "synthetic",
+        2025,
+        (
+            Factor(Carrier.electricity_cogen, "MWh", 0.086, "fixture"),
+            Factor(Carrier.coke, "t", 0.762, "fixture"),
+        ),
+        (),
+        2025,
+    )
+    path = tmp_path / "generated.xlsx"
+    write_prelucrare(dataset, (2025,), path, factors)
+    book = load_workbook(path)
+    assert "energi electrica din cogenerar" in book.sheetnames
+    assert "Consum Cocs" in book.sheetnames
+    assert _cell_for_labels(book["energi electrica din cogenerar"], "[MWh]", "TOTAL").value == 20
+    assert _cell_for_labels(book["Consum Cocs"], "[t]", "TOTAL").value == 3
+    assert _cell_for_labels(book["Productii"], "tone", "TOTAL").value == 100
+    labels = {book["TEP"].cell(row, 3).value for row in range(1, book["TEP"].max_row + 1)}
+    assert "coke [tep]" in labels
+    assert "electricity_cogen [tep]" not in labels

@@ -33,8 +33,8 @@ PHYSICAL = (
     ("Consum Coji floarea soarelui", ("[Gcal]",), Carrier.sunflower_husks, "Gcal"),
     ("Consum Energie termica terti", ("[Gcal]",), Carrier.purchased_heat, "Gcal"),
     ("Consum Carburanti", ("Motorina [t]", "Motorina"), Carrier.diesel, "t"),
-    ("Consum Carburanti", ("Benzina [t]",), Carrier.petrol, "t"),
-    ("Consum Carburanti", ("GPL [t]",), Carrier.lpg, "t"),
+    ("Consum Carburanti", ("Benzina [t]", "Benzina"), Carrier.petrol, "t"),
+    ("Consum Carburanti", ("GPL [t]", "GPL"), Carrier.lpg, "t"),
     ("Consum Carburanti", ("CTL [t]",), Carrier.ctl, "t"),
     ("consum apa potabila", ("[m3]",), Carrier.water_potable, "m3"),
     ("consum apa industriala", ("[m3]",), Carrier.water_industrial, "m3"),
@@ -140,37 +140,13 @@ def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dic
     return turnover, energy_costs
 
 
-def _production(  # noqa: C901, PLR0912
+def _production(
     book: Book, out: PrelucrareData
 ) -> tuple[dict[str, dict[int, CarrierSeries]], dict[str, str]]:
     sheet = sheet_named(book, "Productii", out.issues)
     if sheet is not None:
         tonnes = physical(sheet, ("tone",), "tone", "production", out)
         if tonnes:
-            annual_headers = [
-                (row, col)
-                for row in range(1, sheet.max_row + 1)
-                for col in range(1, sheet.max_col + 1)
-                if normal(str(cell_or_blank(sheet, row, col).value or "")) == "total anual tone"
-            ]
-            if len(annual_headers) == 1:
-                header_row, value_col = annual_headers[0]
-                for row in range(header_row + 1, sheet.max_row + 1):
-                    year = year_label(cell_or_blank(sheet, row, value_col - 1).value)
-                    if year is None:
-                        break
-                    if year not in tonnes:
-                        continue
-                    cell = cell_or_blank(sheet, row, value_col)
-                    value = numeric(cell.value)
-                    if value is not None:
-                        tonnes[year] = CarrierSeries(tonnes[year].months, Reading(value, "tone"))
-                        out.located[f"production.main.{year}"] = located(cell, value, "tone")
-            elif len(annual_headers) > 1:
-                out.issues.append(ReaderIssue("label_ambiguous", "production annual"))
-                for year, series in tonnes.items():
-                    tonnes[year] = CarrierSeries(series.months)
-                    out.located.pop(f"production.main.{year}", None)
             return {"main": tonnes}, {"main": "tone"}
         for label, unit, divisor in (
             ("kWh gaz vehiculat", "mii MWh gaz vehiculat", 1_000_000),
@@ -286,7 +262,7 @@ def _filed_specific(book: Book, out: PrelucrareData) -> None:  # noqa: C901
         break
 
 
-def import_prelucrare(path: Path) -> PrelucrareData:
+def import_prelucrare(path: Path) -> PrelucrareData:  # noqa: C901, PLR0912
     book = open_book(path)
     try:
         empty = EnergyDataset((), {})
@@ -303,6 +279,21 @@ def import_prelucrare(path: Path) -> PrelucrareData:
         if coke is not None and (series := coke_series(coke, out)):
             carriers[Carrier.coke] = series
         carriers.update(water_tables(book, out))
+        for carrier, by_year in tuple(carriers.items()):
+            values = [
+                reading.value
+                for series in by_year.values()
+                for reading in (*series.months.values(), series.annual)
+                if reading is not None
+            ]
+            if any(value == 0 for value in values) and not any(
+                value not in {None, 0} for value in values
+            ):
+                carriers.pop(carrier)
+                out.issues.append(ReaderIssue("carrier_all_zero", carrier.value))
+                for field in tuple(out.located):
+                    if field.startswith(f"carrier.{carrier.value}."):
+                        out.located.pop(field)
         years = tuple(sorted({year for series in carriers.values() for year in series}))
         out.dataset = EnergyDataset(years, carriers)
         production, units = _production(book, out)

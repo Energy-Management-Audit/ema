@@ -6,7 +6,6 @@ import pytest
 from openpyxl import load_workbook
 from tests.golden.cases import case_path
 
-from ema.energy_data.anexa import parse_anexa
 from ema.energy_data.calc import specific_consumption, tep, tep_total, water_specific
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.prelucrare import import_prelucrare
@@ -42,13 +41,11 @@ def test_piee_case_c_source_series_and_cells() -> None:
                 assert imported.located[f"carrier.{carrier.value}.{year}.{month:02d}"].ref.a1 == (
                     f"{sheet_name}!{sheet.cell(row, column).coordinate}"
                 )
-    for year, monthly_row, annual_row in zip(
-        imported.dataset.years, (7, 10, 13), (22, 23, 24), strict=True
-    ):
+    for year, monthly_row in zip(imported.dataset.years, (7, 10, 13), strict=True):
         series = imported.dataset.production["main"][year]
         assert series.annual is not None
-        assert series.annual.value == pytest.approx(book["Productii"][f"D{annual_row}"].value)
-        assert imported.located[f"production.main.{year}"].ref.a1 == f"Productii!D{annual_row}"
+        assert series.annual.value == pytest.approx(book["Productii"][f"P{monthly_row}"].value)
+        assert imported.located[f"production.main.{year}"].ref.a1 == f"Productii!P{monthly_row}"
         for month in range(1, 13):
             cell = book["Productii"].cell(monthly_row, month + 3)
             assert series.months[month].value == pytest.approx(cell.value)
@@ -84,32 +81,89 @@ def test_piee_case_c_source_series_and_cells() -> None:
 
 
 def test_piee_case_c_factors_and_annual_cross_check() -> None:
-    imported = import_prelucrare(case_path("piee-case-c", "prelucrare"))
-    anexa = parse_anexa(case_path("piee-case-c", "anexa"))
-    for carrier, unit, factor, cell in (
-        (Carrier.electricity_cogen, "MWh", 0.086, "F4"),
-        (Carrier.coke, "t", 0.762, "F4"),
-        (Carrier.coke, "MWh", 0.086, "F5"),
+    source = case_path("piee-case-c", "prelucrare")
+    imported = import_prelucrare(source)
+    book = load_workbook(source, read_only=True, data_only=True)
+    for carrier, unit, sheet, cell in (
+        (Carrier.electricity_cogen, "MWh", "energi electrica din cogenerar ", "F4"),
+        (Carrier.coke, "t", "Consum Cocs", "F4"),
+        (Carrier.coke, "MWh", "Consum Cocs", "F5"),
     ):
         actual = imported.factors.tep_factor(carrier, unit, 2025)
-        assert actual is not None and actual.per_unit == factor
+        assert actual is not None and actual.per_unit == book[sheet][cell].value
         assert actual.source.endswith(f"!{cell}")
         assert imported.located[f"factor.tep.{carrier.value}.{unit}"].ref.a1.endswith(cell)
-    for carrier, raw_cell, tep_cell in (
-        (Carrier.diesel, "E16", "E18"),
-        (Carrier.coke, "F16", "F18"),
+    assert "factor.tep.coke" not in imported.located
+    assert imported.located["factor.tep.electricity_cogen"].ref.a1.endswith("!F4")
+    for year, tep_rows, cogen_row, coke_co2_row in (
+        (
+            2023,
+            {
+                Carrier.natural_gas: 5,
+                Carrier.electricity_grid: 6,
+                Carrier.diesel: 7,
+                Carrier.coke: 9,
+            },
+            9,
+            7,
+        ),
+        (
+            2024,
+            {
+                Carrier.natural_gas: 16,
+                Carrier.electricity_grid: 17,
+                Carrier.diesel: 18,
+                Carrier.coke: 20,
+            },
+            13,
+            16,
+        ),
+        (
+            2025,
+            {
+                Carrier.natural_gas: 27,
+                Carrier.electricity_grid: 28,
+                Carrier.diesel: 29,
+                Carrier.coke: 31,
+            },
+            17,
+            26,
+        ),
     ):
-        series = imported.dataset.carriers[carrier][2025]
-        assert series.annual is not None
-        assert series.annual.value == pytest.approx(anexa.annual[f"{carrier.value}_raw"].value)
-        assert anexa.annual[f"{carrier.value}_raw"].ref.a1 == f"Date anuale!{raw_cell}"
-        assert tep(imported.dataset, imported.factors, carrier, 2025).value == pytest.approx(
-            anexa.annual[f"{carrier.value}_tep"].value
+        for carrier, row in tep_rows.items():
+            computed = tep(imported.dataset, imported.factors, carrier, year)
+            filed = book["TEP"][f"Q{row}"].value
+            assert computed.value is not None and round(computed.value, 2) == round(filed, 2)
+            assert imported.filed[f"tep.{carrier.value}.{year}"].ref.a1 == f"TEP!Q{row}"
+            for month in range(1, 13):
+                monthly = tep(imported.dataset, imported.factors, carrier, year, month)
+                cell = book["TEP"].cell(row, month + 3)
+                assert monthly.value is not None and round(monthly.value, 2) == round(cell.value, 2)
+                assert imported.filed[f"tep.{carrier.value}.{year}.{month:02d}"].ref.a1 == (
+                    f"TEP!{cell.coordinate}"
+                )
+        cogen_tep = tep(imported.dataset, imported.factors, Carrier.electricity_cogen, year)
+        assert cogen_tep.value is not None
+        assert round(cogen_tep.value, 2) == round(
+            book["energi electrica din cogenerar "][f"Q{cogen_row}"].value, 2
         )
-        assert anexa.annual[f"{carrier.value}_tep"].ref.a1 == f"Date anuale!{tep_cell}"
-    assert tep_total(imported.dataset, imported.factors, 2025).value == pytest.approx(
-        imported.filed["tep.total.2025"].value
+        total = tep_total(imported.dataset, imported.factors, year)
+        filed_total = imported.filed[f"tep.total.{year}"]
+        assert total.value is not None and round(total.value, 2) == round(filed_total.value, 2)
+        assert filed_total.ref.a1.startswith("TEP!Q")
+        coke_co2 = imported.factors.co2_factor(Carrier.coke, "t", year)
+        assert coke_co2 is not None
+        assert coke_co2.per_unit == book["impact de mediu"][f"H{coke_co2_row}"].value
+        assert imported.located[f"factor.co2.coke.{year}"].ref.a1 == (
+            f"impact de mediu!H{coke_co2_row}"
+        )
+    assert Carrier.lpg not in imported.dataset.carriers
+    assert any(
+        issue.code == "carrier_all_zero" and issue.detail == "lpg" for issue in imported.issues
     )
-    assert tep(
-        imported.dataset, imported.factors, Carrier.electricity_cogen, 2025
-    ).value == pytest.approx(1108.009724)
+    for year, row in zip(imported.dataset.years, (22, 23, 24), strict=True):
+        gas = specific_consumption(
+            imported.dataset, imported.factors, year, Carrier.natural_gas, "main"
+        )
+        assert gas.value is not None
+        assert round(gas.value * 1000, 4) == round(book["Productii"][f"E{row}"].value * 1000, 4)

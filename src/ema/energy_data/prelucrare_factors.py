@@ -128,8 +128,6 @@ def read_factors(  # noqa: C901, PLR0912, PLR0915
             assert factor_value is not None
             tep.append(Factor(carrier, unit, factor_value, f"{source_file}:{found.ref.a1}"))
             out.located[f"factor.tep.{carrier.value}.{unit}"] = found
-            if carrier != Carrier.coke:
-                out.located[f"factor.tep.{carrier.value}"] = found
     primary = sheet_named(book, "Principali factori de conversie", out.issues)
     if primary is not None:
         for carrier, needle in ((Carrier.petrol, "benzina"), (Carrier.electricity_pv, "electric")):
@@ -149,10 +147,17 @@ def read_factors(  # noqa: C901, PLR0912, PLR0915
                     if value is not None:
                         unit = "MWh" if carrier == Carrier.electricity_pv else "t"
                         tep.append(Factor(carrier, unit, value, f"{source_file}:{cell.ref.a1}"))
-                        out.located[f"factor.tep.{carrier.value}"] = located(cell, value)
+                        out.located[f"factor.tep.{carrier.value}.{unit}"] = located(cell, value)
                     break
                 if any(f.carrier == carrier for f in tep):
                     break
+    for carrier in {factor.carrier for factor in tep}:
+        factors = [factor for factor in tep if factor.carrier == carrier]
+        if len(factors) == 1:
+            factor = factors[0]
+            out.located[f"factor.tep.{carrier.value}"] = out.located[
+                f"factor.tep.{carrier.value}.{factor.unit}"
+            ]
     co2 = _co2_factors(book, years, out, source_file)
     return FactorTable(
         "prelucrare:import",

@@ -40,14 +40,14 @@ def months_in(sheet: Sheet, row: int) -> dict[int, int]:
     return result
 
 
-def _annual_column(sheet: Sheet, row: int, months: dict[int, int]) -> int:
+def _annual_column(sheet: Sheet, row: int, months: dict[int, int]) -> int | None:
     after = max(months.values())
     matches = [
         col
         for col in range(after + 1, sheet.max_col + 1)
         if normal(str(cell_or_blank(sheet, row, col).value or "")) == "total"
     ]
-    return matches[0] if len(matches) == 1 else after + 1
+    return matches[0] if len(matches) == 1 else None
 
 
 def _read_row(  # noqa: PLR0913
@@ -55,7 +55,7 @@ def _read_row(  # noqa: PLR0913
     row: int,
     year: int,
     months: dict[int, int],
-    annual_col: int,
+    annual_col: int | None,
     unit: str,
     key: str,
     out: PrelucrareData,
@@ -71,40 +71,62 @@ def _read_row(  # noqa: PLR0913
         readings[month] = Reading(value, unit)
         if value is not None:
             out.located[f"{key}.{year}.{month:02d}"] = located(cell, value, unit)
-    total = cell_or_blank(sheet, row, annual_col)
-    annual_value = numeric(total.value)
+    total = cell_or_blank(sheet, row, annual_col) if annual_col is not None else None
+    annual_value = numeric(total.value) if total is not None else None
     if annual_value == 0 and all(reading.value is None for reading in readings.values()):
         annual_value = None
     annual = Reading(annual_value, unit) if annual_value is not None else None
-    if annual_value is not None:
+    if annual_value is not None and total is not None:
         out.located[f"{key}.{year}"] = located(total, annual_value, unit)
     return CarrierSeries(readings, annual)
 
 
-def physical(  # noqa: C901
+def _row_unit(label: str) -> str | None:
+    normalized = normal(label)
+    return {"mwh": "MWh", "t": "t", "tone": "t", "m3": "m3", "gcal": "Gcal"}.get(normalized)
+
+
+def _year_blocks(sheet: Sheet) -> list[tuple[int, int, dict[int, int]]]:
+    blocks: list[tuple[int, int, dict[int, int]]] = []
+    for row in range(1, sheet.max_row + 1):
+        months = months_in(sheet, row)
+        if len(months) != 12:
+            continue
+        year = next(
+            (
+                item
+                for col in range(1, min(sheet.max_col, 3) + 1)
+                if (item := year_label(cell_or_blank(sheet, row, col).value)) is not None
+            ),
+            None,
+        )
+        if year is not None:
+            blocks.append((year, row, months))
+    return blocks
+
+
+def physical(
     sheet: Sheet,
     labels: tuple[str, ...],
     unit: str,
     key: str,
     out: PrelucrareData,
 ) -> dict[int, CarrierSeries]:
-    blocks: list[tuple[int, int, dict[int, int]]] = []
-    for row in range(1, sheet.max_row + 1):
-        months = months_in(sheet, row)
-        if len(months) == 12:
-            year = next(
-                (
-                    year_label(cell_or_blank(sheet, row, col).value)
-                    for col in range(1, min(sheet.max_col, 3) + 1)
-                    if year_label(cell_or_blank(sheet, row, col).value) is not None
-                ),
-                None,
-            )
-            if year is not None:
-                blocks.append((year, row, months))
+    blocks = _year_blocks(sheet)
     found: dict[int, CarrierSeries] = {}
     ambiguous: set[int] = set()
     targets = {normal(label) for label in labels}
+    bare_fuel = {"motorina", "benzina", "gpl"}
+    declarations: set[str] = (
+        {
+            normal(str(cell_or_blank(sheet, row, col).value or ""))
+            for row in range(1, blocks[0][1])
+            for col in range(1, min(sheet.max_col, 3) + 1)
+            if normal(str(cell_or_blank(sheet, row, col).value or "")) in {"tone", "t"}
+        }
+        if blocks
+        else set()
+    )
     for index, (year, start, months) in enumerate(blocks):
         end = blocks[index + 1][1] if index + 1 < len(blocks) else sheet.max_row + 1
         end = next((row for row in range(start + 1, end) if len(months_in(sheet, row)) == 12), end)
@@ -116,9 +138,15 @@ def physical(  # noqa: C901
                 for col in range(1, min(sheet.max_col, 3) + 1)
             )
         ]
+        row_units = {_row_unit(str(cell_or_blank(sheet, row, 3).value or "")) for row in matches}
         if len(matches) > 1 or (matches and year in found):
+            code = (
+                "unit_ambiguous"
+                if key == Carrier.coke.value and len(row_units) > 1
+                else "label_ambiguous"
+            )
             out.issues.append(
-                ReaderIssue("label_ambiguous", f"{key}.{year}", CellRef(sheet.name, matches[0], 1))
+                ReaderIssue(code, f"{key}.{year}", CellRef(sheet.name, matches[0], 1))
             )
             ambiguous.add(year)
             found.pop(year, None)
@@ -128,26 +156,29 @@ def physical(  # noqa: C901
             continue
         if matches and year not in ambiguous:
             source_label = normal(str(cell_or_blank(sheet, matches[0], 3).value or ""))
-            if key == Carrier.diesel.value and source_label == "motorina":
-                declared = {
-                    normal(str(cell_or_blank(sheet, prior, col).value or ""))
-                    for prior in range(1, start)
-                    for col in range(1, min(sheet.max_col, 3) + 1)
-                    if normal(str(cell_or_blank(sheet, prior, col).value or "")) in {"tone", "t"}
-                }
-                if len(declared) != 1:
-                    code = "unit_missing" if not declared else "unit_ambiguous"
-                    out.issues.append(
-                        ReaderIssue(code, f"{key}.{year}", CellRef(sheet.name, matches[0], 3))
-                    )
-                    continue
+            if (
+                source_label in bare_fuel
+                and key in {Carrier.diesel.value, Carrier.petrol.value, Carrier.lpg.value}
+                and len(declarations) != 1
+            ):
+                code = "unit_missing" if not declarations else "unit_ambiguous"
+                out.issues.append(
+                    ReaderIssue(code, f"{key}.{year}", CellRef(sheet.name, matches[0], 3))
+                )
+                return {}
+            resolved_unit = _row_unit(source_label) if key == Carrier.coke.value else unit
+            if resolved_unit is None:
+                out.issues.append(
+                    ReaderIssue("unit_missing", f"{key}.{year}", CellRef(sheet.name, matches[0], 3))
+                )
+                continue
             found[year] = _read_row(
                 sheet,
                 matches[0],
                 year,
                 months,
                 _annual_column(sheet, start, months),
-                unit,
+                resolved_unit,
                 f"carrier.{key}" if key != "production" else "production.main",
                 out,
             )
@@ -155,19 +186,10 @@ def physical(  # noqa: C901
 
 
 def coke_series(sheet: Sheet, out: PrelucrareData) -> dict[int, CarrierSeries]:
-    units = {
-        normal(str(cell_or_blank(sheet, row, col).value or ""))
-        for row in range(1, sheet.max_row + 1)
-        for col in range(1, min(sheet.max_col, 3) + 1)
-        if normal(str(cell_or_blank(sheet, row, col).value or "")) in {"mwh", "t", "tone"}
-    }
-    choices = {"MWh" if item == "mwh" else "t" for item in units}
-    if len(choices) != 1:
-        out.issues.append(ReaderIssue("unit_missing" if not choices else "unit_ambiguous", "coke"))
-        return {}
-    unit = choices.pop()
-    labels = ("[MWh]",) if unit == "MWh" else ("[t]", "tone")
-    return physical(sheet, labels, unit, Carrier.coke.value, out)
+    series = physical(sheet, ("[MWh]", "[t]", "tone"), "", Carrier.coke.value, out)
+    if not series and not any(issue.detail.startswith("coke.") for issue in out.issues):
+        out.issues.append(ReaderIssue("unit_missing", "coke"))
+    return series
 
 
 def water_tables(  # noqa: C901

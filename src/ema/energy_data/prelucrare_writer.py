@@ -10,7 +10,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from ema.core.office.workbook import save_workbook
-from ema.energy_data.carriers import WATER_CARRIERS, Carrier
+from ema.energy_data.carriers import Carrier, counts_in_total
 from ema.energy_data.factors import FACTORS_2026, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset
 from ema.energy_data.prelucrare_tables import MONTHS
@@ -20,6 +20,8 @@ NAMES = {
     Carrier.electricity_grid: ("Consum Electric", "[MWh]"),
     Carrier.natural_gas: ("Consum Gaz", "[MWh]"),
     Carrier.electricity_pv: ("Consum electrica fotovoltaic", "[MWh]"),
+    Carrier.electricity_cogen: ("energi electrica din cogenerar", "[MWh]"),
+    Carrier.coke: ("Consum Cocs", "[MWh]"),
     Carrier.diesel: ("Consum Carburanti", "Motorina [t]"),
     Carrier.petrol: ("Consum Carburanti", "Benzina [t]"),
     Carrier.lpg: ("Consum Carburanti", "GPL [t]"),
@@ -59,7 +61,7 @@ def _header(sheet: Worksheet, year: int, row: int) -> None:
         sheet.column_dimensions[get_column_letter(col)].width = 14
 
 
-def _physical(
+def _physical(  # noqa: C901
     book: Workbook, ds: EnergyDataset, years: tuple[int, ...]
 ) -> dict[tuple[Carrier, int, int | None], str]:
     references: dict[tuple[Carrier, int, int | None], str] = {}
@@ -75,8 +77,12 @@ def _physical(
             _header(sheet, year, header)
             for offset, (carrier, label) in enumerate(entries, 1):
                 row = header + offset
-                sheet.cell(row, 3, label)
                 series = ds.carriers.get(carrier, {}).get(year, CarrierSeries())
+                row_label = label
+                if carrier == Carrier.coke:
+                    reading = series.annual or next(iter(series.months.values()), None)
+                    row_label = "[t]" if reading is not None and reading.unit == "t" else "[MWh]"
+                sheet.cell(row, 3, row_label)
                 for month in range(1, 13):
                     reading = series.months.get(month)
                     if reading is not None and reading.value is not None:
@@ -144,7 +150,7 @@ def _tep(
 ) -> dict[tuple[Carrier | None, int], str]:
     sheet = _sheet(book, "TEP")
     annual: dict[tuple[Carrier | None, int], str] = {}
-    energy_carriers = [carrier for carrier in ds.carriers if carrier not in WATER_CARRIERS]
+    energy_carriers = [carrier for carrier in ds.carriers if counts_in_total(carrier)]
     for index, year in enumerate(years):
         start = 2 + index * (len(energy_carriers) + 4)
         sheet.cell(start, 3, year)
@@ -193,6 +199,8 @@ def _production(book: Workbook, ds: EnergyDataset, years: tuple[int, ...]) -> di
                 if unit == "mii MWh gaz vehiculat"
                 else "tone/luna"
                 if unit == "mii tone"
+                else "tone"
+                if unit == "tone"
                 else product
             )
             sheet.cell(row, 3, label)
@@ -278,7 +286,7 @@ def _impact(
     factors: FactorTable,
 ) -> None:
     sheet = _sheet(book, "impact de mediu")
-    energy_carriers = [carrier for carrier in ds.carriers if carrier not in WATER_CARRIERS]
+    energy_carriers = [carrier for carrier in ds.carriers if counts_in_total(carrier)]
     for index, year in enumerate(years):
         start = 2 + index * (len(energy_carriers) + 3)
         sheet.cell(start, 2, year)
