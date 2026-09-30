@@ -13,13 +13,16 @@ from typing import Literal
 from ema.core.jobs import create_job
 from ema.core.review import mark_absent, propose
 from ema.core.review.models import Cell, Derivation, Evidence, FieldSpec
-from ema.core.workspace import Workspace
+from ema.core.workspace import Workspace, upload_name
 from ema.energy_data.calc import tep_total
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FACTORS_2026
 from ema.energy_data.model import Reading
 from ema.energy_data.source import Located
 from ema.piee.dataset import PieeData, SourceDisagreement, load
+from ema.piee.intake_sources import Method
+from ema.piee.intake_sources import file as _file
+from ema.piee.intake_sources import method as _method
 from ema.piee.payback_review import record_payback_check
 
 
@@ -27,9 +30,6 @@ from ema.piee.payback_review import record_payback_check
 class PieeJob:
     id: str
     data: PieeData
-
-
-Method = Literal["questionnaire", "anexa", "prelucrare", "calc"]
 
 
 def _evidence(location: Located | None, file_sha: str | None, method: Method, key: str) -> Evidence:
@@ -61,20 +61,6 @@ def _evidence(location: Located | None, file_sha: str | None, method: Method, ke
 
 def _sha(path: Path | None) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path is not None else None
-
-
-def _method(source: str) -> Method:
-    if source.startswith("prelucrare"):
-        return "prelucrare"
-    if source == "anexa":
-        return "anexa"
-    if source in {"calculated", "carrier_sum"}:
-        return "calc"
-    return "questionnaire"
-
-
-def _file(source: str, shas: dict[str, str | None]) -> str | None:
-    return shas.get(_method(source))
 
 
 def _record_disagreement(
@@ -364,7 +350,9 @@ def import_piee(  # noqa: PLR0913
     }
     for name, path in paths.items():
         if path is not None:
-            ws.set_slot(job, name, ws.add_file(client_slug, path))
+            ws.set_slot(
+                job, name, ws.add_file(client_slug, path), original_name=upload_name(path.name)
+            )
     return import_piee_into_job(
         ws, job, year, anexa, necesar, prelucrare, previous_piee=previous_piee
     )

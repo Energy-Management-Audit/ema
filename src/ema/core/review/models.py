@@ -92,6 +92,7 @@ class Evidence(BaseModel):
     id: str
     provenance: Literal["document", "online", "calculated", "manual"]
     file_sha: str | None = None
+    file_name: str | None = None
     locator: Locator | None = None
     method: Literal[
         "questionnaire",

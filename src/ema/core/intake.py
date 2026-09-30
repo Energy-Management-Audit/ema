@@ -27,6 +27,7 @@ class ItemOutcome:
     warning: str | None = None
     error_code: str | None = None
     detail: str | None = None
+    file_name: str | None = None
 
 
 def intake_file(ctx: StageContext, slot: str) -> ItemOutcome:
@@ -38,10 +39,22 @@ def intake_file(ctx: StageContext, slot: str) -> ItemOutcome:
     ctx.inputs[f"slot:{slot}"] = version.file_sha
     detected = sniff(path)
     if ctx.cancelled():
-        return ItemOutcome(slot, version.version, version.file_sha, detected.kind, "cancelled")
+        return ItemOutcome(
+            slot,
+            version.version,
+            version.file_sha,
+            detected.kind,
+            "cancelled",
+            file_name=version.original_name,
+        )
     if version.converted_from is not None:
         return ItemOutcome(
-            slot, version.version, version.file_sha, detected.kind, "already_converted"
+            slot,
+            version.version,
+            version.file_sha,
+            detected.kind,
+            "already_converted",
+            file_name=version.original_name,
         )
     if detected.kind == FileKind.DOC:
         try:
@@ -55,6 +68,7 @@ def intake_file(ctx: StageContext, slot: str) -> ItemOutcome:
                 "needs_conversion" if exc.code == "needs_conversion" else "failed",
                 error_code=exc.code,
                 detail=exc.detail,
+                file_name=version.original_name,
             )
         if converted is None:
             warning = (
@@ -68,6 +82,7 @@ def intake_file(ctx: StageContext, slot: str) -> ItemOutcome:
                 detected.kind,
                 "superseded",
                 warning=warning,
+                file_name=version.original_name,
             )
         check = converted.text_check
         return ItemOutcome(
@@ -80,6 +95,7 @@ def intake_file(ctx: StageContext, slot: str) -> ItemOutcome:
             converted_words=check.converted_words,
             shape_words=check.shape_words,
             warning=check.warning,
+            file_name=version.original_name,
         )
     if detected.kind == FileKind.XLS:
         state = "readable"
@@ -98,6 +114,7 @@ def intake_file(ctx: StageContext, slot: str) -> ItemOutcome:
         detected.kind,
         state,
         warning=detected.detail if detected.mismatch else None,
+        file_name=version.original_name,
     )
 
 
@@ -108,6 +125,7 @@ def _record_result(ctx: StageContext, result: ItemOutcome) -> None:
             "intake_file",
             run_id=ctx.run_id,
             slot=result.slot,
+            file_name=result.file_name,
             version=result.version,
             file_sha=result.file_sha,
             kind=result.kind.value,
@@ -123,12 +141,12 @@ def _record_result(ctx: StageContext, result: ItemOutcome) -> None:
 
 def _summary(results: list[ItemOutcome]) -> StageOutcome:
     failures = [
-        f"{item.slot} v{item.version}: {item.error_code}: {item.detail}"
+        f"{item.file_name or f'{item.slot} v{item.version}'}: {item.error_code}: {item.detail}"
         for item in results
         if item.status == "failed"
     ]
     warnings = [
-        f"{item.slot} v{item.version}: {warning}"
+        f"{item.file_name or f'{item.slot} v{item.version}'}: {warning}"
         for item in results
         if (warning := item.warning or (item.detail if item.status == "needs_conversion" else None))
     ]
@@ -156,6 +174,7 @@ def intake_legacy(
                 "failed",
                 error_code=exc.code if isinstance(exc, EmaError) else type(exc).__name__,
                 detail=exc.detail if isinstance(exc, EmaError) else str(exc),
+                file_name=version.original_name,
             )
         results.append(result)
         _record_result(ctx, result)

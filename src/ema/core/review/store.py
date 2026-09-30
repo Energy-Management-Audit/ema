@@ -26,7 +26,7 @@ def save_field(db: sqlite3.Connection, field: Field) -> None:
 def save_evidence(db: sqlite3.Connection, job: str, evidence: list[Evidence]) -> None:
     for item in evidence:
         existing = db.execute("SELECT job_id,data FROM evidence WHERE id=?", (item.id,)).fetchone()
-        payload = item.model_dump_json()
+        payload = item.model_dump_json(exclude={"file_name"})
         if existing and (existing["data"] != payload or existing["job_id"] != job):
             raise EmaError("evidence_immutable", "Dovada nu poate fi modificată.", item.id)
         if not existing:

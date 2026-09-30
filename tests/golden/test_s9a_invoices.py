@@ -17,7 +17,7 @@ from tests.workspace_jobs import create_job
 from conftest import artifacts_path
 from ema.core.errors import EmaError
 from ema.core.jobs import run_stage, status, subscribe
-from ema.core.workspace import Workspace
+from ema.core.workspace import Workspace, upload_name
 from ema.invoices import (
     confirm_client,
     export,
@@ -79,7 +79,7 @@ def _run_case(
     job = create_job(ws, "invoices", case, None)
     for index, source in enumerate(_source_paths(case, expected), 1):
         sha = ws.add_file(case, source)
-        ws.set_slot(job, f"invoices/{index:04d}", sha, origin=source.name)
+        ws.set_slot(job, f"invoices/{index:04d}", sha, original_name=upload_name(source.name))
     run_id = run_stage(ws, job, "invoices", extract_batch)
     for _event in subscribe(ws, job):
         pass

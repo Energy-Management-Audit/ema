@@ -29,6 +29,7 @@ def active_version(ws: Workspace, job: str, slot: str) -> SlotVersion | None:
         str(row["file_sha"]),
         str(row["origin"]),
         row["converted_from"],
+        row["original_name"],
     )
 
 
@@ -86,15 +87,17 @@ def publish_conversion(
                 )
             version = int(row["next_version"])
             db.execute(
-                "INSERT INTO slot_versions VALUES (?,?,?,?,?,?)",
-                (job, slot, version, sha, "converted", original.file_sha),
+                "INSERT INTO slot_versions VALUES (?,?,?,?,?,?,?)",
+                (job, slot, version, sha, "converted", original.file_sha, original.original_name),
             )
             db.execute(
                 "UPDATE slots SET active_version=?,next_version=next_version+1, "
                 "revision=revision+1 WHERE job_id=? AND name=? AND active_version=?",
                 (version, job, slot, original.version),
             )
-        return SlotVersion(job, slot, version, sha, "converted", original.file_sha)
+        return SlotVersion(
+            job, slot, version, sha, "converted", original.file_sha, original.original_name
+        )
     except Exception:
         if created is not None:
             created.unlink(missing_ok=True)

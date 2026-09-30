@@ -23,7 +23,7 @@ from ema.core.jobs import (
 )
 from ema.core.jobs.reads import run_current
 from ema.core.review.models import Cell, Field
-from ema.core.workspace import Workspace
+from ema.core.workspace import Workspace, upload_name
 from ema.energy_data.prelucrare import import_prelucrare
 from ema.energy_data.prelucrare_writer import write_prelucrare
 from ema.piee.base import build_local_base
@@ -84,7 +84,9 @@ def start_generate(
         ("previous_piee", request.previous_piee),
     ):
         if path is not None:
-            ws.set_slot(job, slot, ws.add_file(request.client, path))
+            ws.set_slot(
+                job, slot, ws.add_file(request.client, path), original_name=upload_name(path.name)
+            )
     run = start_import_for_job(ws, job)
     for _ in subscribe(ws, job):
         pass

@@ -65,6 +65,48 @@ test('pdf source opens a fetched crop and a correction reaches the decision endp
   )
 })
 
+test('3c source reads the evidence name and keeps the unnamed fallback', async () => {
+  await withHarness(
+    {
+      path: `/app/audit/${JOB.id}/revizuire?camp=${FIELDS[1].id}`,
+      routes: {
+        ...routes,
+        'GET /evidence/evidence-2/quote': {
+          body: { ...routes['GET /evidence/evidence-2/quote'].body, file_name: 'source.xlsx' },
+        },
+      },
+    },
+    async ({ page, requests }) => {
+      const row = page.locator('.ema-review-row').filter({ hasText: FIELDS[1].label })
+      await row.getByRole('button', { name: /source.xlsx/ }).waitFor()
+      await page.getByText('source.xlsx', { exact: true }).waitFor()
+      assert.equal(
+        requests.some((item) => item.path.includes('/files/sha/versions')),
+        false,
+      )
+    },
+  )
+  await withHarness(
+    {
+      path: `/app/audit/${JOB.id}/revizuire?camp=${FIELDS[1].id}`,
+      routes: {
+        ...routes,
+        'GET /evidence/evidence-2/quote': {
+          body: { ...routes['GET /evidence/evidence-2/quote'].body, file_name: null },
+        },
+      },
+    },
+    async ({ page }) => {
+      await page
+        .locator('.ema-review-row')
+        .filter({ hasText: FIELDS[1].label })
+        .locator('.ema-source-btn')
+        .waitFor()
+      await page.getByText('Document', { exact: true }).waitFor()
+    },
+  )
+})
+
 test('online and calculated evidence present their origin without fetching a page image', async () => {
   const online = {
     ...FIELDS[0],

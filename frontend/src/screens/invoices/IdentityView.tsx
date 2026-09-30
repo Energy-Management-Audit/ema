@@ -5,7 +5,7 @@ import type { InvoiceBatchView, InvoiceIdentity } from '../../api/invoices-types
 import type { Client } from '../../api/types.ts'
 import { clientHref } from '../../app/route.ts'
 import { navigate } from '../../app/navigate.ts'
-import { jobKey, useResource } from '../../state/resource.ts'
+import { useResource } from '../../state/resource.ts'
 import { Button } from '../../ui/Button.tsx'
 import { FailureNotice } from '../../ui/Feedback.tsx'
 import { Highlight } from '../../ui/Review.tsx'
@@ -16,18 +16,8 @@ function digits(value: string | null | undefined): string {
   return value?.replace(/\D/g, '') ?? ''
 }
 
-function IdentitySnippet({ jobId, evidenceId }: { jobId: string; evidenceId: string }) {
+function IdentitySnippet({ evidenceId }: { evidenceId: string }) {
   const evidence = useResource(`evidence/${evidenceId}`, () => api.evidence(evidenceId))
-  const source = useResource(jobKey(jobId, `identity-source-${evidenceId}`), async () => {
-    const item = await api.evidence(evidenceId)
-    const slots = await api.slots(jobId)
-    const versions = await Promise.all(
-      slots
-        .filter((slot) => slot.startsWith('invoices/'))
-        .map((slot) => api.slotVersions(jobId, slot)),
-    )
-    return versions.flat().find((version) => version.file_sha === item.file_sha)?.origin ?? 'PDF'
-  })
   const quote = evidence.data?.quote ?? ''
   const name = evidence.data?.quote?.match(/Client[^:]*:\s*([^\n]+)/i)?.[1]
   const page =
@@ -37,7 +27,7 @@ function IdentitySnippet({ jobId, evidenceId }: { jobId: string; evidenceId: str
   return (
     <Paper className="invoice-identity__paper">
       <span className="invoice-identity__source">
-        {source.data ?? 'PDF'} · pag. {page}
+        {evidence.data?.file_name ?? 'PDF'} · pag. {page}
       </span>
       <strong>Client</strong>
       <span>
@@ -99,7 +89,6 @@ export function PodFillBox({ fills }: { fills: InvoiceIdentity['pod_fill'] }) {
 }
 
 export function IdentityCard({
-  jobId,
   identity,
   client,
   batch,
@@ -187,9 +176,7 @@ export function IdentityCard({
               {romanianForm(identity.reasons.other_client, 'factură', 'facturi')} cu alt client
             </p>
           </div>
-          {identity.evidence_ids[0] && (
-            <IdentitySnippet jobId={jobId} evidenceId={identity.evidence_ids[0]} />
-          )}
+          {identity.evidence_ids[0] && <IdentitySnippet evidenceId={identity.evidence_ids[0]} />}
         </div>
         <PodFillBox fills={identity.pod_fill} />
       </div>

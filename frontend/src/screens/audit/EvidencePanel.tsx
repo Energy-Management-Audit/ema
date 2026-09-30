@@ -6,7 +6,6 @@ import { formatNumber } from '../../lib/format.ts'
 import { useBlobUrl } from '../../api/blobUrl.ts'
 import { useJob } from '../../state/job.tsx'
 import { scalar } from '../../audit/review.ts'
-import { useResource } from '../../state/resource.ts'
 import { Button } from '../../ui/Button.tsx'
 import { Highlight } from '../../ui/Review.tsx'
 import { Paper, SectionKey } from '../../ui/Surface.tsx'
@@ -74,13 +73,7 @@ export function EvidencePanel({
   const inputFields = (ctx.fields.data ?? []).filter((item) =>
     field.derivation?.inputs.includes(item.id),
   )
-  const files = useResource(
-    evidence.file_sha && ctx.job.data
-      ? `file/${ctx.job.data.client_slug}/${evidence.file_sha}`
-      : null,
-    () => api.fileVersions(ctx.job.data?.client_slug ?? '', evidence.file_sha ?? ''),
-  )
-  const filename = files.data?.[0]?.name ?? 'Document'
+  const filename = evidence.file_name ?? 'Document'
   const quote = evidence.quote ?? ''
   const value = scalar(field.value)
   const text =

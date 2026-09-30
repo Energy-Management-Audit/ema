@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import sqlite3
 import time
@@ -20,6 +21,7 @@ from ema.core.workspace.cleanup import delete_job_rows
 from ema.core.workspace.gc import collect_garbage
 from ema.core.workspace.lock import workspace_lock
 from ema.core.workspace.mutations import delete_job as delete_job_impl
+from ema.core.workspace.mutations import remove_version as remove_version_impl
 from ema.core.workspace.references import referenced_files
 from ema.core.workspace.schema import migrate
 from ema.core.workspace.settings import write_settings
@@ -30,6 +32,12 @@ def _file_sha(path: Path) -> str:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def upload_name(name: str) -> str | None:
+    basename = name.replace("\\", "/").rsplit("/", 1)[-1]
+    safe = re.sub(r"[^\w.() -]", "_", basename).strip(". ")[:255]
+    return safe or None
+
+
 @dataclass(frozen=True)
 class SlotVersion:
     job_id: str
@@ -38,6 +46,7 @@ class SlotVersion:
     file_sha: str
     origin: str
     converted_from: str | None
+    original_name: str | None
 
 
 class WorkspaceConnection(sqlite3.Connection):
@@ -163,20 +172,37 @@ class Workspace:
         *,
         origin: str = "upload",
         converted_from: str | None = None,
+        original_name: str | None = None,
     ) -> SlotVersion:
         with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
             version, _revision = self.set_slot_in_connection(
-                db, job, slot, file_sha, origin=origin, converted_from=converted_from
+                db,
+                job,
+                slot,
+                file_sha,
+                origin=origin,
+                converted_from=converted_from,
+                original_name=original_name,
             )
         return version
 
     def set_slot_with_revision(
-        self, job: str, slot: str, file_sha: str, *, origin: str = "upload"
+        self,
+        job: str,
+        slot: str,
+        file_sha: str,
+        *,
+        origin: str = "upload",
+        original_name: str | None = None,
     ) -> tuple[SlotVersion, int]:
         with self.connect() as db:
-            return self.set_slot_in_connection(db, job, slot, file_sha, origin=origin)
+            db.execute("BEGIN IMMEDIATE")
+            return self.set_slot_in_connection(
+                db, job, slot, file_sha, origin=origin, original_name=original_name
+            )
 
-    def set_slot_in_connection(
+    def set_slot_in_connection(  # noqa: PLR0913
         self,
         db: sqlite3.Connection,
         job: str,
@@ -185,6 +211,7 @@ class Workspace:
         *,
         origin: str = "upload",
         converted_from: str | None = None,
+        original_name: str | None = None,
     ) -> tuple[SlotVersion, int]:
         parts = slot.split("/")
         if (
@@ -209,14 +236,20 @@ class Workspace:
             is None
         ):
             raise EmaError("file_missing", "Fişierul nu există.", file_sha)
+        if original_name is None and origin == "upload":
+            upload = db.execute(
+                "SELECT original_name FROM client_uploads WHERE client_id=? AND sha=?",
+                (job_row["client_slug"], file_sha),
+            ).fetchone()
+            original_name = str(upload["original_name"]) if upload is not None else None
         db.execute("INSERT OR IGNORE INTO slots (job_id,name) VALUES (?,?)", (job, slot))
         row = db.execute(
             "SELECT next_version FROM slots WHERE job_id=? AND name=?", (job, slot)
         ).fetchone()
         version = int(row["next_version"])
         db.execute(
-            "INSERT INTO slot_versions VALUES (?,?,?,?,?,?)",
-            (job, slot, version, file_sha, origin, converted_from),
+            "INSERT INTO slot_versions VALUES (?,?,?,?,?,?,?)",
+            (job, slot, version, file_sha, origin, converted_from, original_name),
         )
         db.execute(
             "UPDATE slots SET active_version=?,next_version=next_version+1, "
@@ -226,9 +259,9 @@ class Workspace:
         updated = db.execute(
             "SELECT revision FROM slots WHERE job_id=? AND name=?", (job, slot)
         ).fetchone()
-        return SlotVersion(job, slot, version, file_sha, origin, converted_from), int(
-            updated["revision"]
-        )
+        return SlotVersion(
+            job, slot, version, file_sha, origin, converted_from, original_name
+        ), int(updated["revision"])
 
     def list_versions(self, job: str, slot: str) -> list[SlotVersion]:
         with self.connect() as db:
@@ -244,6 +277,7 @@ class Workspace:
                 str(r["file_sha"]),
                 str(r["origin"]),
                 r["converted_from"],
+                r["original_name"],
             )
             for r in rows
         ]
@@ -272,29 +306,7 @@ class Workspace:
     def remove_version(
         self, job: str, slot: str, version: int, *, on_revision: int | None = None
     ) -> None:
-        with self.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            current = db.execute(
-                "SELECT active_version,revision FROM slots WHERE job_id=? AND name=?", (job, slot)
-            ).fetchone()
-            if on_revision is not None and (current is None or current["revision"] != on_revision):
-                raise EmaError("stale_revision", "Fişierul a fost modificat.", "")
-            cursor = db.execute(
-                "DELETE FROM slot_versions WHERE job_id=? AND slot=? AND version=?",
-                (job, slot, version),
-            )
-            if cursor.rowcount == 0:
-                raise EmaError("version_missing", "Versiunea nu există.", f"{job}/{slot}/{version}")
-            row = db.execute(
-                "SELECT MAX(version) AS active FROM slot_versions WHERE job_id=? AND slot=?",
-                (job, slot),
-            ).fetchone()
-            if current is not None and current["active_version"] != row["active"]:
-                db.execute(
-                    "UPDATE slots SET active_version=?,revision=revision+1 "
-                    "WHERE job_id=? AND name=?",
-                    (row["active"], job, slot),
-                )
+        remove_version_impl(self, job, slot, version, on_revision=on_revision)
 
     def delete_job(self, job: str, *, on_revision: int | None = None) -> None:
         delete_job_impl(self, job, on_revision=on_revision)

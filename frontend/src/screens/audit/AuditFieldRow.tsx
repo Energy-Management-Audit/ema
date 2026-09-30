@@ -33,12 +33,6 @@ export function AuditFieldRow({
   const evidence = useResource(evidenceId ? `evidence/${evidenceId}` : null, () =>
     api.evidence(evidenceId ?? ''),
   )
-  const fileName = useResource(
-    evidence.data?.file_sha && ctx.job.data
-      ? `file/${ctx.job.data.client_slug}/${evidence.data.file_sha}`
-      : null,
-    () => api.fileVersions(ctx.job.data?.client_slug ?? '', evidence.data?.file_sha ?? ''),
-  )
   const last = ctx.log.data?.filter((item) => item.field_id === field.id && !item.undone_by).at(-1)
   const status =
     field.presence !== 'found'
@@ -77,7 +71,7 @@ export function AuditFieldRow({
   }
   const source = evidence.data ? (
     <SourceButton open={open} cell={evidence.data.locator?.kind === 'cell'} onClick={onOpen}>
-      {sourceLabel(evidence.data, fileName.data?.[0]?.name)}
+      {sourceLabel(evidence.data, evidence.data.file_name ?? undefined)}
     </SourceButton>
   ) : evidenceId ? (
     <SourceButton open={open} onClick={onOpen}>

@@ -159,10 +159,22 @@ def test_cover_photo_is_exposed_as_a_documents_slot(tmp_path: Path) -> None:
     source = tmp_path / "photo.png"
     source.write_bytes(b"synthetic photo")
     sha = ws.add_file("synthetic", source)
-    ws.set_slot(job, "cover/photo", sha, origin=source.name)
+    ws.set_slot(job, "cover/photo", sha, original_name=source.name)
     photo = next((file for file in documents(ws, job).files if file.slot == "cover/photo"), None)
     assert photo is not None
     assert photo.slot == "cover/photo" and photo.sha == sha
     assert photo.name == source.name and photo.kind == "png"
     assert photo.size_bytes == source.stat().st_size
     assert photo.version == 1 and photo.slot_revision > 0
+
+
+def test_dossier_names_come_from_their_versions(tmp_path: Path) -> None:
+    ws = Workspace(tmp_path / "workspace")
+    job = create_job(ws, "audit", "synthetic", 2026)
+    source = tmp_path / "source.pdf"
+    source.write_bytes(b"synthetic")
+    sha = ws.add_file("synthetic", source)
+    ws.set_slot(job, "dossier/one", sha, original_name="recorded.pdf")
+    ws.set_slot(job, "dossier/two", sha)
+    names = {item.slot: item.name for item in documents(ws, job).files}
+    assert names == {"dossier/one": "recorded.pdf", "dossier/two": "two"}

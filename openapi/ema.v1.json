@@ -1680,6 +1680,17 @@
               }
             ]
           },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
           "file_sha": {
             "anyOf": [
               {
@@ -5105,6 +5116,17 @@
             "title": "Origin",
             "type": "string"
           },
+          "original_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Name"
+          },
           "slot": {
             "title": "Slot",
             "type": "string"
@@ -5125,6 +5147,7 @@
           "file_sha",
           "origin",
           "converted_from",
+          "original_name",
           "slot_revision"
         ],
         "title": "SlotVersion",

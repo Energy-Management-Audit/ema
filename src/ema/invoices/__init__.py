@@ -26,7 +26,7 @@ from ema.core.jobs import (
 from ema.core.jobs.reads import run_current
 from ema.core.logging import write_event
 from ema.core.review.models import Issue, Readiness
-from ema.core.workspace import Workspace
+from ema.core.workspace import Workspace, upload_name
 from ema.core.workspace.export import copy_output
 from ema.invoices.artifact import encode, exportable_drafts
 from ema.invoices.batch_identity import KEY as BATCH_CLIENT_KEY
@@ -88,7 +88,7 @@ def run_batch(ws: Workspace, client: str, sources: list[Path]) -> BatchResult:
                 )
             )
             continue
-        ws.set_slot(job, f"invoices/{index:04d}", sha, origin=source.name)
+        ws.set_slot(job, f"invoices/{index:04d}", sha, original_name=upload_name(source.name))
     run = run_stage(
         ws, job, "invoices", partial(extract_batch, preflight_failures=preflight_failures)
     )
@@ -122,7 +122,7 @@ def extract_batch(
         raise EmaError("invoices_empty", "Nu există facturi de procesat.", ctx.job)
     client = str(get_job(ctx.ws, ctx.job)["client_slug"])
     paths = [ctx.ws.file_path(client, version.file_sha) for version in versions]
-    source_names = [version.origin for version in versions]
+    source_names = [version.original_name or version.slot for version in versions]
     processor = build_invoice_processor(load_settings(ctx.ws))
     result = processor.execute(paths, source_names=source_names, cancelled=ctx.cancelled)
     outcomes = list(result.outcomes)

@@ -108,6 +108,7 @@ export type Evidence = {
   id: string
   provenance: 'document' | 'online' | 'calculated' | 'manual'
   file_sha?: string | null
+  file_name?: string | null
   locator?: { kind: string; sheet?: string; ref?: string } | null
   method: string
   retrieved_at: string
@@ -174,6 +175,7 @@ export type SlotVersion = {
   file_sha: string
   origin: string
   converted_from: string | null
+  original_name: string | null
   slot_revision: number
 }
 

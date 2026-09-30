@@ -1,5 +1,7 @@
 """Single-slot legacy intake without launching Word."""
 
+import json
+
 import pytest
 from docx import Document
 from tests.intake_helpers import intake_stage
@@ -10,6 +12,7 @@ from ema.cli import _app
 from ema.core.config import Settings
 from ema.core.intake import ItemOutcome, intake_file, intake_legacy
 from ema.core.jobs import StageContext, status
+from ema.core.jobs.failure import record_failure
 from ema.core.office import convert as conversion_module
 from ema.core.office.convert import ConversionFailed, convert_doc
 from ema.core.office.errors import OfficeError
@@ -25,7 +28,7 @@ def _case(tmp_path, monkeypatch):
     source = tmp_path / "original.doc"
     source.write_bytes(b"synthetic DOC")
     sha = ws.add_file("synthetic", source)
-    original = ws.set_slot(job, "dossier/0001", sha)
+    original = ws.set_slot(job, "dossier/0001", sha, original_name="original.doc")
     monkeypatch.setattr(
         conversion_module,
         "sniff",
@@ -83,6 +86,7 @@ def test_conversion_adds_version_and_rerun_is_noop(tmp_path, monkeypatch):
     assert len(versions) == 2
     assert versions[0] == original
     assert versions[1].converted_from == original.file_sha
+    assert versions[1].original_name == "original.doc"
     assert versions[1].origin == "converted"
     assert intake_file(ctx, original.slot).status == "already_converted"
     assert ws.list_versions(job, original.slot) == versions
@@ -174,7 +178,7 @@ def test_cli_records_html_saved_as_xls(tmp_path, monkeypatch):
     source = tmp_path / "misnamed.xls"
     source.write_text("<!doctype html><html><body><table></table></body></html>", encoding="utf-8")
     sha = ws.add_file("synthetic", source)
-    ws.set_slot(job, "meters/0001", sha)
+    ws.set_slot(job, "meters/0001", sha, original_name="misnamed.xls")
     monkeypatch.setenv("EMA_WORKSPACE", str(ws.root))
 
     response = CliRunner().invoke(_app, ["intake", job, "meters"])
@@ -183,7 +187,33 @@ def test_cli_records_html_saved_as_xls(tmp_path, monkeypatch):
     assert '"kind": "html"' in response.output
     assert '"status": "html_as_xls"' in response.output
     assert '"slot": "meters/0001"' in response.output
+    assert '"file_name": "misnamed.xls"' in response.output
+    with ws.connect() as db:
+        log_path = ws.job_path(db, job) / "log.jsonl"
+    events = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    intake_events = [event for event in events if event["event"] == "intake_file"]
+    assert len(intake_events) == 1
+    assert intake_events[0]["file_name"] == "misnamed.xls"
     assert status(ws, job).runs[-1]["state"] == "ready"
+
+
+def test_app_log_for_intake_job_excludes_file_name(tmp_path, monkeypatch):
+    ws = Workspace(tmp_path / "workspace")
+    job = create_job(ws, "piee", "synthetic", 2026)
+    source = tmp_path / "misnamed.xls"
+    source.write_text("<html></html>", encoding="utf-8")
+    sha = ws.add_file("synthetic", source)
+    ws.set_slot(job, "meters/0001", sha, original_name="misnamed.xls")
+    intake_legacy(StageContext(ws, job, "synthetic", "intake"), "meters")
+
+    def denied_job_log(*_args):
+        raise OSError("synthetic job log failure")
+
+    monkeypatch.setattr(ws, "job_log", denied_job_log)
+    record_failure(ws, job, OSError("synthetic intake failure"))
+    app_log = (ws.root / "logs" / "ema.jsonl").read_text(encoding="utf-8")
+    assert "synthetic intake failure" in app_log
+    assert "misnamed.xls" not in app_log
 
 
 def test_collection_reports_each_item_and_keeps_failed_file_local(tmp_path, monkeypatch):

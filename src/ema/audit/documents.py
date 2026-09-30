@@ -73,7 +73,7 @@ def documents(ws: Workspace, job: str) -> AuditDocuments:  # noqa: C901
         if job_row["type"] != "audit":
             raise EmaError("wrong_job_type", "Lucrarea nu este un audit.", job)
         slots = db.execute(
-            "SELECT v.*,s.revision AS slot_revision,u.original_name,u.kind,"
+            "SELECT v.*,v.original_name AS version_name,s.revision AS slot_revision,u.kind,"
             "COALESCE(u.size_bytes,f.size) AS size_bytes FROM slots s "
             "JOIN slot_versions v ON v.job_id=s.job_id AND v.slot=s.name "
             "AND v.version=s.active_version "
@@ -178,11 +178,11 @@ def documents(ws: Workspace, job: str) -> AuditDocuments:  # noqa: C901
         code = str(record["error_code"]) if record and record.get("error_code") else None
         return DocFile(
             slot=slot,
-            name=str(row["original_name"] or (row["origin"] if photo else Path(slot).name)),
+            name=str(row["version_name"] or Path(slot).name),
             kind=str(
                 row["kind"]
                 or (record.get("kind") if record else None)
-                or (Path(str(row["origin"])).suffix.lstrip(".") if photo else "unknown")
+                or (Path(str(row["version_name"] or "")).suffix.lstrip(".") if photo else "unknown")
             ),
             size_bytes=int(row["size_bytes"] or 0),
             version=int(row["version"]),
@@ -211,6 +211,7 @@ def documents(ws: Workspace, job: str) -> AuditDocuments:  # noqa: C901
             str(row["file_sha"]),
             str(row["origin"]),
             row["converted_from"],
+            row["version_name"],
         )
         for row in slots
         if str(row["slot"]).startswith("visit/")

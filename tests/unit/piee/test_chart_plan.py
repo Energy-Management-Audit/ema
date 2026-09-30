@@ -167,6 +167,10 @@ def test_intake_records_located_sources_and_flags_unlocated_values(
     workspace = Workspace(tmp_path / "workspace")
     register_client(workspace, "synthetic")
     job = import_piee(workspace, "synthetic", 2025, anexa, necesar, prelucrare)
+    assert [
+        workspace.list_versions(job.id, slot)[0].original_name
+        for slot in ("anexa", "questionnaire", "prelucrare")
+    ] == ["anexa.xlsx", "necesar.xls", "prelucrare.xlsx"]
     found = {field.key: field for field in fields(workspace, job.id)}
     assert found["identity.name"].value == "Synthetic Client"
     assert found["carrier.electricity_grid.2025.01"].value == Decimal("10")

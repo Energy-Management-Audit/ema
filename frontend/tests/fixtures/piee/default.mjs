@@ -306,7 +306,15 @@ for (const [slot, file] of Object.entries(files)) {
   defaultRoutes[`GET ${J}/slots/${slot}/versions`] = {
     status: 200,
     body: [
-      { job_id: JOB, slot, version: 1, file_sha: file.sha, origin: 'upload', converted_from: null },
+      {
+        job_id: JOB,
+        slot,
+        version: 1,
+        file_sha: file.sha,
+        origin: 'upload',
+        converted_from: null,
+        original_name: file.name,
+      },
     ],
   }
   defaultRoutes[`GET /clients/${CLIENT}/files/${file.sha}/versions`] = {
@@ -315,7 +323,11 @@ for (const [slot, file] of Object.entries(files)) {
   }
 }
 for (const item of Object.values(EVIDENCE)) {
-  defaultRoutes[`GET /evidence/${item.id}/quote`] = { status: 200, body: item }
+  const file = Object.values(files).find((source) => source.sha === item.file_sha)
+  defaultRoutes[`GET /evidence/${item.id}/quote`] = {
+    status: 200,
+    body: { ...item, file_name: file?.name ?? null },
+  }
 }
 
 /** A server-sent stream for one run, as `GET /jobs/{id}/events` writes it. */

@@ -168,6 +168,7 @@ export const invoiceRoutes = {
       id: 'invoice-evidence-1',
       provenance: 'document',
       file_sha: 'sha-identity',
+      file_name: 'identity.pdf',
       locator: { kind: 'pdf_text', page: 1 },
       method: 'invoice',
       retrieved_at: at,

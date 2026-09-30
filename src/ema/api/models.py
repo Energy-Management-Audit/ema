@@ -98,6 +98,7 @@ class SlotVersion(BaseModel):
     file_sha: str
     origin: str
     converted_from: str | None
+    original_name: str | None
     slot_revision: int
 
 
