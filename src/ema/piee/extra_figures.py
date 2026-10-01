@@ -72,14 +72,13 @@ def _specific_mix(data: PieeData, year: int) -> Series | None:
     if production is None or production <= 0:
         return None
     labels, amounts = mixture
-    return Series("Pondere", list(labels), [amount / production for amount in amounts])
+    unit = data.dataset.production_unit.get(product, "")
+    scale = 1000 if unit == "tone" else 1
+    return Series("Pondere", list(labels), [scale * amount / production for amount in amounts])
 
 
 def render_extra_figures(source: Path, data: PieeData, output: Path) -> None:  # noqa: C901
     """Clone matching native prototypes for filed biomass and authored figure kinds."""
-    if data.pie_representation_source != "previous_piee":
-        output.write_bytes(source.read_bytes())
-        return
     with TemporaryDirectory() as directory:
         current = source
         step = 0
@@ -97,6 +96,7 @@ def render_extra_figures(source: Path, data: PieeData, output: Path) -> None:  #
                 following,
                 after_part=after,
                 caption=numbered_caption(current, caption),
+                generated_layout=True,
             )
             current = following
             step += 1
@@ -104,7 +104,7 @@ def render_extra_figures(source: Path, data: PieeData, output: Path) -> None:  #
 
         annual_fuel = _annual_fuel(data)
         fuel_after = "word/charts/chart20.xml"
-        if annual_fuel:
+        if annual_fuel and data.layout.annual_fuel_by_type:
             fuel_after = (
                 add(
                     "word/charts/chart17.xml",
@@ -129,7 +129,11 @@ def render_extra_figures(source: Path, data: PieeData, output: Path) -> None:  #
                     f"Fig. Consumul {'anual' if annual else 'lunar'} de {label}"
                     + ("" if annual else f" în {data.year + offset}"),
                 )
-            specific = _specific_biomass(data, carrier, label)
+            specific = (
+                _specific_biomass(data, carrier, label)
+                if data.layout.specific_carriers is None or carrier in data.layout.specific_carriers
+                else None
+            )
             if specific is not None:
                 add(
                     "word/charts/chart26.xml",
@@ -142,7 +146,7 @@ def render_extra_figures(source: Path, data: PieeData, output: Path) -> None:  #
             (data.year - 1, "pie_rId37"),
             (data.year - 2, "pie_rId36"),
         ):
-            series = _specific_mix(data, year)
+            series = _specific_mix(data, year) if data.layout.specific_mix_pies else None
             if series is None:
                 continue
             part = chart_target(read_parts(current), slot).part
@@ -155,7 +159,7 @@ def render_extra_figures(source: Path, data: PieeData, output: Path) -> None:  #
                 f"Fig. Ponderea consumului specific de energie în {year}",
             )
         share = chart_series(data, ChartBinding("extra_energy_share", "energy_share"))[0]
-        if share is not None:
+        if share is not None and data.layout.energy_share_figure:
             add(
                 "word/charts/chart30.xml",
                 "word/charts/chart30.xml",

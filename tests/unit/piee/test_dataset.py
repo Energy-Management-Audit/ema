@@ -60,6 +60,26 @@ def test_necesar_wins_over_annex_alternative() -> None:
     assert result.dataset.carriers[Carrier.electricity_grid][2025].annual.value == 1.0
 
 
+def test_annex_annual_unit_suffix_is_equivalent_but_value_difference_is_not() -> None:
+    anexa, necesar = _inputs(0.086)
+    necesar.carriers[Carrier.diesel] = Consumption(
+        _source("Cons energetice", 1.0),
+        {2025: YearValues((None,) * 12, _source("Cons energetice", 1.0, "t"))},
+    )
+    anexa.annual["diesel_raw"] = _source("Date anuale", 1.0, " t / an ")
+    assert not any(
+        item.key == "carrier.diesel.2025" for item in assemble(2025, anexa, necesar).disagreements
+    )
+    anexa.annual["diesel_raw"] = _source("Date anuale", 1.01, " t / an ")
+    assert any(
+        item.key == "carrier.diesel.2025" for item in assemble(2025, anexa, necesar).disagreements
+    )
+    anexa.annual["diesel_raw"] = _source("Date anuale", 1.0, "Gcal/an")
+    assert any(
+        item.key == "carrier.diesel.2025" for item in assemble(2025, anexa, necesar).disagreements
+    )
+
+
 def test_annex_annual_fills_gap_without_erasing_necesar_months() -> None:
     anexa, necesar = _inputs(0.086)
     months = (_source("Cons energetice", 1.0, "MWh"),) + (None,) * 11

@@ -1,7 +1,25 @@
 """Prelucrare source precedence with explicit conflicts."""
 
+import math
+import re
+
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
 from ema.energy_data.prelucrare_types import PrelucrareData, SourceConflict
+
+
+def annual_readings_match(left: Reading, right: Reading) -> bool:
+    """Ignore a per-year unit suffix while preserving real value and unit conflicts."""
+    left_unit = re.sub(r"\s*/\s*an\s*$", "", left.unit, flags=re.I).strip().casefold()
+    right_unit = re.sub(r"\s*/\s*an\s*$", "", right.unit, flags=re.I).strip().casefold()
+    if left_unit != right_unit:
+        return False
+    if left.value == right.value:
+        return True
+    return (
+        left.value is not None
+        and right.value is not None
+        and math.isclose(left.value, right.value, rel_tol=1e-9, abs_tol=1e-9)
+    )
 
 
 def _series_conflicts(
@@ -17,7 +35,7 @@ def _series_conflicts(
     if (
         selected.annual is not None
         and previous.annual is not None
-        and selected.annual != previous.annual
+        and not annual_readings_match(selected.annual, previous.annual)
     ):
         result.append(SourceConflict(field, selected.annual, previous.annual))
     return result
@@ -89,4 +107,5 @@ def merge_prelucrare(
         {**units, **chosen.production_unit},
         turnover,
         costs,
+        production_name={**chosen.production_name, **other.production_name},
     ), conflicts

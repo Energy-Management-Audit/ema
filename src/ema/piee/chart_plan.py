@@ -8,7 +8,7 @@ from typing import Literal
 from ema.consumption_analysis.analysis import Metric, value
 from ema.core.office.chart_series import Series
 from ema.energy_data.calc import co2
-from ema.energy_data.carriers import WATER_CARRIERS, Carrier
+from ema.energy_data.carriers import CARRIER_NAMES_RO, WATER_CARRIERS, Carrier
 from ema.energy_data.model import EnergyDataset
 from ema.piee.dataset import PieeData
 
@@ -85,6 +85,10 @@ def _production(ds: EnergyDataset) -> tuple[str, str] | None:
 
 
 def _water(data: PieeData, carrier: Carrier, year: int, month: int | None) -> float | None:
+    sourced = data.dataset.carriers.get(carrier, {}).get(year)
+    if sourced is not None:
+        reading = sourced.annual if month is None else sourced.months.get(month)
+        return reading.value if reading is not None else None
     block = data.necesar.water.get(carrier)
     values = block.years.get(year) if block else None
     if values is None:
@@ -129,6 +133,7 @@ def _fuel_value(data: PieeData, kind: Kind, year: int) -> float | None:
     production = _production(data.dataset)
     if production is None:
         return None
+    scale = 1000 if production[1] == "tone" else 1
     if data.production_conversion is not None and data.prelucrare is not None:
         output = value(
             data.dataset, data.factors, Metric("production", product=production[0]), year
@@ -137,7 +142,7 @@ def _fuel_value(data: PieeData, kind: Kind, year: int) -> float | None:
         if output and all(
             item is not None and isinstance(item.value, int | float) for item in filed
         ):
-            return (
+            return scale * (
                 sum(
                     float(item.value)
                     for item in filed
@@ -150,7 +155,7 @@ def _fuel_value(data: PieeData, kind: Kind, year: int) -> float | None:
         for carrier in fuels
     ]
     return (
-        sum(item for item in values if item is not None)
+        scale * sum(item for item in values if item is not None)
         if all(item is not None for item in values)
         else None
     )
@@ -194,7 +199,7 @@ def _metric(  # noqa: C901, PLR0911, PLR0912
         key = binding.carrier.value if binding.carrier is not None else "total"
         chosen = data.prelucrare.filed.get(f"specific.{key}.{year}")
         if chosen is not None and isinstance(chosen.value, int | float):
-            return float(chosen.value) / data.production_conversion.multiplier
+            return float(chosen.value)
     production = _production(data.dataset)
     if binding.kind in {"production", "specific"} and production is None:
         return None
@@ -208,7 +213,8 @@ def _metric(  # noqa: C901, PLR0911, PLR0912
         metric = Metric("tep_total")
     elif binding.kind == "specific":
         assert production is not None
-        if binding.carrier == Carrier.water_potable:
+        if binding.carrier in WATER_CARRIERS:
+            assert binding.carrier is not None
             water = _water(data, binding.carrier, year, None)
             output = value(
                 data.dataset, data.factors, Metric("production", product=production[0]), year
@@ -221,10 +227,19 @@ def _metric(  # noqa: C901, PLR0911, PLR0912
         return _co2_total(data, year)
     else:
         raise ValueError("fuel series must specify its carrier")
-    return value(data.dataset, data.factors, metric, year)[0]
+    result = value(data.dataset, data.factors, metric, year)[0]
+    if (
+        result is not None
+        and binding.kind == "specific"
+        and binding.carrier not in WATER_CARRIERS
+        and production is not None
+        and production[1] == "tone"
+    ):
+        return result * 1000
+    return result
 
 
-def _series_name(  # noqa: PLR0911
+def _series_name(  # noqa: C901, PLR0911
     data: PieeData,
     binding: ChartBinding,
     carrier: Carrier | None,
@@ -242,16 +257,28 @@ def _series_name(  # noqa: PLR0911
         return "Impact de mediu, t CO₂/an"
     if binding.kind == "fuel_total":
         return "total tone"
+    unit = (
+        "mii tone"
+        if production is not None and production[1] == "tone"
+        else (production[1] if production is not None else "")
+    )
     if binding.kind == "specific_fuel" and production is not None:
-        return f"consum specific anual de carburant, tep/{production[1]}"
+        return f"consum specific anual de carburant, tep/{unit}"
     if binding.kind == "specific" and production is not None:
+        if binding.carrier in WATER_CARRIERS:
+            assert binding.carrier is not None
+            return (
+                f"consum specific anual de {CARRIER_NAMES_RO[binding.carrier]}, m3/{production[1]}"
+            )
         if binding.carrier == Carrier.electricity_grid:
             subject = "de energie electrica"
         elif binding.carrier == Carrier.natural_gas:
             subject = "de gaz natural"
+        elif binding.carrier is not None:
+            subject = f"de {CARRIER_NAMES_RO[binding.carrier]}"
         else:
             subject = "total"
-        return f"consum specific anual {subject}, tep/{production[1]}"
+        return f"consum specific anual {subject}, tep/{unit}"
     return ""
 
 
@@ -293,7 +320,7 @@ def _series(data: PieeData, binding: ChartBinding, carrier: Carrier | None = Non
 
 def chart_series(data: PieeData, binding: ChartBinding) -> tuple[Series | None, ...]:
     """Return None for an absent figure or absent fuel series; missing cells remain gaps."""
-    if binding.carrier == Carrier.electricity_pv and not data.separate_pv_figures:
+    if binding.carrier == Carrier.electricity_pv and not data.layout.separate_pv_figures:
         return (None,)
     if binding.kind == "fuel":
         return tuple(

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import copy
 import json
-import re
 from pathlib import Path
 
 from docx.oxml.ns import qn
@@ -16,18 +15,18 @@ from ema.core.office.anchors import AnchorLedger, find
 from ema.core.office.bookmark_region import remove_following
 from ema.core.office.cell_text import set_paragraph_text
 from ema.core.office.package import encoded, read_parts, write_parts, xml
-from ema.core.office.run_range import TextSpan, replace_spans, visible_text
 from ema.energy_data.carriers import Carrier
 from ema.piee.dataset import PieeData
 
 INDUSTRIAL_BOOKMARK = "_TocEmaWaterIndustrial"
-FIGURE_REFERENCE = re.compile(
-    r"\b(?:figura|figurii|figurile|fig\.)\s+(?:(?:cu\s+)?numărul\s+|nr\.\s*)?(\d+)\b",
-    re.I,
-)
 
 
 def _has_water(data: PieeData, carrier: Carrier) -> bool:
+    if any(
+        series.annual is not None and series.annual.value is not None
+        for series in data.dataset.carriers.get(carrier, {}).values()
+    ):
+        return True
     block = data.necesar.water.get(carrier)
     return bool(
         block
@@ -42,7 +41,9 @@ def _has_water(data: PieeData, carrier: Carrier) -> bool:
 
 def water_missing(data: PieeData) -> bool:
     return not (
-        _has_water(data, Carrier.water_potable) or _has_water(data, Carrier.water_industrial)
+        _has_water(data, Carrier.water_potable)
+        or _has_water(data, Carrier.water_industrial)
+        or _has_water(data, Carrier.water_storm)
     )
 
 
@@ -109,15 +110,5 @@ def render_missing_water(
         _clone(specific_intro, f"Apă industrială: {missing}", missing=True),
     )
     ledger.record(groups["specific_water"][0])
-    for paragraph in root.iter(qn("w:p")):
-        content = visible_text(paragraph)
-        spans: list[TextSpan] = []
-        for match in FIGURE_REFERENCE.finditer(content):
-            number = int(match.group(1))
-            replacement = number - 1 if 8 <= number <= 12 else 12 if number == 14 else None
-            if replacement is not None:
-                spans.append(TextSpan(match.start(1), match.end(1), str(replacement)))
-        if spans:
-            replace_spans(paragraph, tuple(spans))
     parts["word/document.xml"] = encoded(root)
     write_parts(parts, output)

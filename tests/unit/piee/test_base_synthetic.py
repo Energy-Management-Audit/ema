@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from docx import Document
+from docx.oxml import OxmlElement
 
 from ema.core.office.anchors import AnchorLedger
 from ema.core.office.base_map import classify, inventory, stamp_base
@@ -29,6 +30,7 @@ from ema.piee.body_spans import (
     render_body_spans,
 )
 from ema.piee.body_text import remove_unsourced_recommendation, render_body_text
+from ema.piee.compose import DraftStatus
 from ema.piee.dataset import PieeData
 from ema.piee.identity_map import build_identity_spans, render_identity
 from ema.piee.number_spans import (
@@ -39,8 +41,18 @@ from ema.piee.number_spans import (
     render_number_spans,
     render_year_spans,
 )
+from ema.piee.section_clone_tools import _track
 from ema.piee.trends import OTHER_TREND_CHARTS, TREND_CHARTS, build_trend_spans, render_trends
 from ema.piee.water import render_missing_water
+
+
+def test_untouched_clone_slot_blocks_final_ready(tmp_path: Path) -> None:
+    ledger = AnchorLedger(frozenset())
+    _track(OxmlElement("w:p"), "coke_heading", ledger, [1])
+    ledger.expected |= {"coke_annual_intro"}
+    status = DraftStatus(tmp_path / "draft.docx", tuple(sorted(ledger.untouched)), (), ())
+    assert status.untouched == ("coke_annual_intro",)
+    assert not status.final_ready
 
 
 def _base(path: Path) -> None:  # noqa: C901, PLR0912

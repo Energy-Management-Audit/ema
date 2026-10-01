@@ -78,7 +78,7 @@ def test_gap_in_one_series_removes_every_trendline(tmp_path):
     assert root.find(f".//{{{C}}}trendline") is None
 
 
-def test_authored_rewrite_resets_value_layout_and_clone_preserves_all_with_a_gap(tmp_path):
+def test_authored_rewrite_and_clone_reset_value_layout_with_a_gap(tmp_path):
     parts, _ = _source(tmp_path)
     root = xml(parts, "word/charts/chart1.xml")
     category = root.find(f".//{{{C}}}catAx")
@@ -87,7 +87,6 @@ def test_authored_rewrite_resets_value_layout_and_clone_preserves_all_with_a_gap
     title = etree.SubElement(root.find(f"{{{C}}}chart"), f"{{{C}}}title")
     etree.SubElement(etree.SubElement(title, f"{{{C}}}layout"), f"{{{C}}}manualLayout")
     parts["word/charts/chart1.xml"] = encoded(root)
-    original_layouts = [encoded(node) for node in root.iter(f"{{{C}}}manualLayout")]
     document = xml(parts, "word/document.xml")
     bookmark = document.find(
         ".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bookmarkStart"
@@ -100,16 +99,22 @@ def test_authored_rewrite_resets_value_layout_and_clone_preserves_all_with_a_gap
     source = tmp_path / "authored.docx"
     write_parts(parts, source)
     output = tmp_path / "clone.docx"
-    cloned_part = clone_chart(source, "word/charts/chart1.xml", series, None, output)
+    cloned_part = clone_chart(
+        source, "word/charts/chart1.xml", series, None, output, generated_layout=True
+    )
     cloned = xml(read_parts(output), cloned_part)
     rewritten_part = rewrite_bar_chart(parts, "chart_1", tuple(series))
     rewritten = xml(parts, rewritten_part)
-    assert [encoded(node) for node in cloned.iter(f"{{{C}}}manualLayout")] == original_layouts
+    assert cloned.find(f".//{{{C}}}plotArea/{{{C}}}layout/{{{C}}}manualLayout") is None
+    assert cloned.find(f".//{{{C}}}valAx/{{{C}}}title/{{{C}}}layout") is None
+    assert cloned.find(f".//{{{C}}}catAx/{{{C}}}title/{{{C}}}layout/{{{C}}}manualLayout") is None
+    assert cloned.find(f"{{{C}}}chart/{{{C}}}title/{{{C}}}layout") is not None
+    assert cloned.find(f".//{{{C}}}valAx/{{{C}}}scaling/{{{C}}}min").get("val") == "0"
     assert rewritten.find(f".//{{{C}}}plotArea/{{{C}}}layout") is None
     assert rewritten.find(f".//{{{C}}}valAx/{{{C}}}title/{{{C}}}layout") is None
     assert rewritten.find(f".//{{{C}}}catAx/{{{C}}}title/{{{C}}}layout") is not None
     assert rewritten.find(f"{{{C}}}chart/{{{C}}}title/{{{C}}}layout") is not None
-    assert cloned.find(f".//{{{C}}}trendline") is not None
+    assert cloned.find(f".//{{{C}}}trendline") is None
     assert rewritten.find(f".//{{{C}}}trendline") is not None
 
 

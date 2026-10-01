@@ -13,7 +13,7 @@ from typing import cast
 from lxml import etree
 
 from ema.core.office.chart_ids import refresh_unique_ids
-from ema.core.office.chart_layout import automatic_layout, column_axes
+from ema.core.office.chart_layout import automatic_layout, column_axes, value_axis
 from ema.core.office.chart_location import cloned_caption, source_paragraph
 from ema.core.office.chart_series import Series, SeriesRefs, _ref, read_series
 from ema.core.office.errors import OfficeError
@@ -299,6 +299,7 @@ def clone_chart(  # noqa: PLR0913
     *,
     after_part: str | None = None,
     caption: str | None = None,
+    generated_layout: bool = False,
 ) -> str:
     parts = read_parts(docx)
     root = copy.deepcopy(xml(parts, part))
@@ -312,6 +313,11 @@ def clone_chart(  # noqa: PLR0913
             axis = "column" if len(cells) > 1 and cells[0][0] == cells[-1][0] else "row"
             formula_node.text = formula_at(formula_node.text, *cells[0], size, axis)
     _set_series(root, series, title)
+    if generated_layout and list(root.iter(f"{{{C}}}barChart")):
+        automatic_layout(root, series)
+        column_axes(root, series)
+        for axis in root.iter(f"{{{C}}}valAx"):
+            value_axis(axis)
     new_part, _ = _new_chart(parts, part, after_part or part, root)
     if caption is not None:
         _, _, original_paragraph, _ = source_paragraph(parts, part)

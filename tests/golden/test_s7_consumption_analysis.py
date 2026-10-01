@@ -176,7 +176,7 @@ def test_equivalent_chart_cache_exceptions_are_pinned() -> None:
 
 
 @pytest.mark.parametrize("name,expected_generated", [("audit-01", 63), ("audit-02", 39)])
-def test_whole_chapter_roundtrip_with_reported_block_coverage(  # noqa: PLR0915
+def test_whole_chapter_roundtrip_with_reported_block_coverage(
     name: str, expected_generated: int
 ) -> None:
     source = _source(name)
@@ -229,9 +229,7 @@ def test_whole_chapter_roundtrip_with_reported_block_coverage(  # noqa: PLR0915
     assert list(regenerated.sections) == list(case.sections)
     for section_id in case.sections:
         before, after = case.sections[section_id], regenerated.sections[section_id]
-        for table_index, ((_, source_table), (_, result_table)) in enumerate(
-            zip(before.tables, after.tables, strict=True)
-        ):
+        for (_, source_table), (_, result_table) in zip(before.tables, after.tables, strict=True):
             original_cells = [
                 [
                     _text(cell)
@@ -264,12 +262,7 @@ def test_whole_chapter_roundtrip_with_reported_block_coverage(  # noqa: PLR0915
                 )
                 if left != right
             ]
-            allowed = (
-                [(1, 2)]
-                if name == "audit-02" and section_id == "ch4.echiv_electric" and table_index == 0
-                else []
-            )
-            assert differences == allowed
+            assert differences == []
         assert len(before.charts) == len(after.charts)
         for source_chart, result_chart in zip(before.charts, after.charts, strict=True):
             assert _chart_types(source_parts, source_chart.part) == _chart_types(

@@ -8,6 +8,7 @@ from lxml import etree
 
 from ema.core.office.anchor_targets import chart_target
 from ema.core.office.anchors import find
+from ema.core.office.chart_layout import value_axis
 from ema.core.office.chart_series import Series, _ref, _series
 from ema.core.office.charts import _embed, _set_series, _write_cache
 from ema.core.office.package import C, encoded, rels_path, xml
@@ -23,30 +24,7 @@ def _axes(root: etree._Element) -> None:
     if layout is not None:
         plot.remove(layout)
     for axis in plot.findall(f"{{{C}}}valAx"):
-        _value_axis(axis)
-
-
-def _value_axis(axis: etree._Element) -> None:
-    for tag in ("majorUnit", "minorUnit"):
-        node = axis.find(f"{{{C}}}{tag}")
-        if node is not None:
-            axis.remove(node)
-    scaling = axis.find(f"{{{C}}}scaling")
-    if scaling is None:
-        scaling = etree.Element(f"{{{C}}}scaling")
-        axis.insert(1, scaling)
-    maximum = scaling.find(f"{{{C}}}max")
-    if maximum is not None:
-        scaling.remove(maximum)
-    minimum = scaling.find(f"{{{C}}}min")
-    if minimum is None:
-        minimum = etree.SubElement(scaling, f"{{{C}}}min")
-    minimum.set("val", "0")
-    title = axis.find(f"{{{C}}}title")
-    if title is not None:
-        fixed = title.find(f"{{{C}}}layout")
-        if fixed is not None:
-            title.remove(fixed)
+        value_axis(axis)
 
 
 def rewrite_bar_chart(

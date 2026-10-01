@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from lxml import etree
 
@@ -18,6 +19,8 @@ CAPTION = re.compile(r"^(Fig\.\s*(?:nr\.\s*)?)(\d+)(?:\s+([a-z])\))?", re.I)
 REFERENCE = re.compile(
     r"(figur(?:a|ii|ile|ilor)(?:\s+cu)?(?:\s+numărul)?\s+)(\d+)(?:\s+([a-z])\))?", re.I
 )
+TABLE_CAPTION = re.compile(r"^(Tabelul\s+)(\d+(?:[.,]\d+)?)", re.I)
+TABLE_REFERENCE = re.compile(r"(tabelul(?:ui)?\s+(?:numărul\s+)?)(\d+(?:[.,]\d+)?)", re.I)
 
 
 @dataclass(frozen=True)
@@ -71,6 +74,19 @@ def renumber_figures(source: Path, output: Path) -> None:
     captions = _captions(paragraphs)
     by_index = {item.index: item for item in captions}
     for index, paragraph in enumerate(paragraphs):
+        following = paragraph.getnext()
+        if (
+            following is not None
+            and following.tag == qn("w:p")
+            and CAPTION.match(visible_text(following))
+            and any(node.tag.endswith("}chart") for node in paragraph.iter())
+        ):
+            properties = paragraph.find(qn("w:pPr"))
+            if properties is None:
+                properties = OxmlElement("w:pPr")
+                paragraph.insert(0, properties)
+            if properties.find(qn("w:keepNext")) is None:
+                properties.append(OxmlElement("w:keepNext"))
         text = visible_text(paragraph)
         if index in by_index:
             item = by_index[index]
@@ -94,6 +110,46 @@ def renumber_figures(source: Path, output: Path) -> None:
                     match.start(2),
                     match.end(),
                     nearest.number + suffix if nearest else "n.d.",
+                    missing=nearest is None,
+                )
+            )
+        replace_spans(paragraph, tuple(spans))
+    parts["word/document.xml"] = encoded(root)
+    write_parts(parts, output)
+
+
+def renumber_tables(source: Path, output: Path) -> None:
+    """Number authored table captions and resolve references to their nearest caption."""
+    parts = read_parts(source)
+    root = xml(parts, "word/document.xml")
+    paragraphs = list(root.iter(qn("w:p")))
+    captions: list[tuple[int, str, int]] = []
+    for index, paragraph in enumerate(paragraphs):
+        match = TABLE_CAPTION.match(visible_text(paragraph))
+        if match is not None:
+            captions.append((index, match.group(2), len(captions) + 1))
+    for index, paragraph in enumerate(paragraphs):
+        content = visible_text(paragraph)
+        caption = TABLE_CAPTION.match(content)
+        if caption is not None:
+            ordinal = next(number for position, _, number in captions if position == index)
+            replace_spans(
+                paragraph,
+                (TextSpan(caption.start(2), caption.end(2), str(ordinal)),),
+            )
+            continue
+        spans: list[TextSpan] = []
+        for match in TABLE_REFERENCE.finditer(content):
+            nearest = min(
+                (item for item in captions if item[1] == match.group(2)),
+                key=lambda item: abs(item[0] - index),
+                default=None,
+            )
+            spans.append(
+                TextSpan(
+                    match.start(2),
+                    match.end(2),
+                    str(nearest[2]) if nearest else "n.d.",
                     missing=nearest is None,
                 )
             )

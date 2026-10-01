@@ -16,21 +16,23 @@ from ema.core.office.base_map import BaseMap
 from ema.core.office.base_map import load as load_map
 from ema.core.office.cell_text import set_paragraph_text
 from ema.core.office.package import check_standalone, encoded, read_parts, write_parts, xml
+from ema.energy_data.carriers import Carrier
 from ema.piee.body_spans import render_body_spans
 from ema.piee.body_text import remove_unsourced_recommendation, render_body_text
 from ema.piee.charts import render_bar_charts
 from ema.piee.dataset import PieeData
 from ema.piee.extra_figures import render_extra_figures
-from ema.piee.figure_numbering import renumber_figures
+from ema.piee.figure_numbering import renumber_figures, renumber_tables
 from ema.piee.identity import identity_values
 from ema.piee.identity_map import render_identity
 from ema.piee.measure_tables import render_measure_tables
 from ema.piee.monthly_figures import render_missing_monthly_figures
 from ema.piee.number_spans import render_number_spans, render_year_spans
 from ema.piee.pies import render_pies
+from ema.piee.section_clones import render_section_clones
 from ema.piee.signature import render_signature
 from ema.piee.tables import render_tables
-from ema.piee.toc import render_toc
+from ema.piee.toc import render_toc, render_toc_from_headings
 from ema.piee.trends import render_trends
 from ema.piee.water import render_missing_water, water_missing
 
@@ -116,12 +118,16 @@ def compose_draft(
     """Render a draft and report all remaining base slots before final export."""
     mapping = load_approved_base(base_directory)
     ledger = AnchorLedger(mapping.variable_slots)
-    production = str(data.necesar.production[0].name.value) if data.necesar.production else None
+    production = (
+        str(data.necesar.production[0].name.value)
+        if data.necesar.production
+        else data.dataset.production_name.get("main")
+    )
     values = identity_values(
         data.anexa, generated_on, production_name=production, analysis_year=data.year
     )
     with TemporaryDirectory() as directory:
-        stages = [Path(directory) / f"stage-{index}.docx" for index in range(19)]
+        stages = [Path(directory) / f"stage-{index}.docx" for index in range(21)]
         render_identity(
             base_directory / "piee-master.docx",
             base_directory / "identity-spans.json",
@@ -162,22 +168,35 @@ def compose_draft(
         render_missing_water(
             stages[13], data, base_directory / "section-groups.json", stages[14], ledger
         )
-        render_toc(
-            stages[14],
-            base_directory / "toc-manifest.json",
-            stages[15],
-            water_missing=water_missing(data),
+        render_section_clones(
+            stages[14], base_directory / "carrier-prototypes.json", data, stages[15], ledger
         )
+        if any(
+            carrier in data.dataset.carriers
+            for carrier in (Carrier.electricity_cogen, Carrier.coke)
+        ):
+            render_toc_from_headings(stages[15], stages[16])
+        else:
+            render_toc(
+                stages[15],
+                base_directory / "toc-manifest.json",
+                stages[16],
+                water_missing=water_missing(data),
+            )
         toc_slots = frozenset(
             json.loads((base_directory / "toc-manifest.json").read_text(encoding="utf-8"))[
                 "number_slots"
             ]
         )
-        _mark_unresolved(stages[15], stages[16], ledger, toc_slots)
-        _strip_bookmarks(stages[16], stages[17])
-        renumber_figures(stages[17], stages[18])
+        if not water_missing(data):
+            for slot in toc_slots:
+                ledger.record(slot)
+        _mark_unresolved(stages[16], stages[17], ledger, toc_slots)
+        _strip_bookmarks(stages[17], stages[18])
+        renumber_figures(stages[18], stages[19])
+        renumber_tables(stages[19], stages[20])
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(stages[18].read_bytes())
+        output.write_bytes(stages[20].read_bytes())
     denylist = tuple(
         json.loads((base_directory / "base-identity.json").read_text(encoding="utf-8"))
     )

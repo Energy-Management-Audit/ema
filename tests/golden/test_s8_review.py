@@ -59,7 +59,7 @@ def test_piee_case_b_conflicts_require_shared_review_decisions(
     )
 
 
-def test_piee_case_a_unit_disagreements_are_review_conflicts(
+def test_piee_case_a_per_year_unit_suffixes_do_not_create_review_conflicts(
     reference_library: Path, tmp_path: Path
 ) -> None:
     folder = reference_library / case_path("piee-case-a")
@@ -75,9 +75,8 @@ def test_piee_case_a_unit_disagreements_are_review_conflicts(
     )
     conflicts = fields(ws, job.id, status="conflict")
     assert conflicts
-    assert any(item.key.endswith(".unit") for item in conflicts)
     assert any(item.key.endswith(".payback_years") for item in conflicts)
-    assert all(item.key.endswith((".unit", ".payback_years")) for item in conflicts)
+    assert all(item.key.endswith(".payback_years") for item in conflicts)
     first = conflicts[0]
     preferred = next(
         candidate for candidate in first.alternatives if candidate.value == first.value

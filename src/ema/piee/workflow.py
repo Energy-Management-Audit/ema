@@ -278,7 +278,7 @@ def start_generate_for_job(
                         "source": data.pie_representation_source,
                     },
                     "separate_pv_figures": {
-                        "value": data.separate_pv_figures,
+                        "value": data.layout.separate_pv_figures,
                         "source": "previous_piee" if "previous_piee" in source_shas else "base",
                     },
                 }

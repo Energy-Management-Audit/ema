@@ -155,7 +155,7 @@ def _unit(data: PieeData, key: str) -> str:
     if key == "production":
         return f"{unit}/an" if unit else ""
     if key.startswith("specific_"):
-        return f"tep/{unit}" if unit else ""
+        return f"tep/{'mii tone' if unit == 'tone' else unit}" if unit else ""
     return "tone/an" if key == "fuel" else "MWh/an"
 
 
