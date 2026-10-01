@@ -1583,9 +1583,11 @@ code/ (repository root)
   (`~/orca/workspaces/ema/coordinator`); it never commits there. Vlad's primary checkout is his;
   agents never run, pull or write in it.
 - **One worktree per agent:** `orca orchestration worker-start --worktree new-top-level --name
-  <branch> --agent codex --model <id> --effort <level>`; tab titled `role@model`; the Orca
-  worktree status is set to `in-review` when its PR opens. Branches: `feature/<slice>`; an agent
-  or review branch tied to a PR is `PR<number>-<summary>`.
+  <name> --agent codex --model <id> --effort <level>`, where `<name>` is the work's name in
+  kebab-case without a prefix (`piee-complex-composer`); then `git -C <worktree> branch -m <name>
+  feature/<name>` before the agent's first commit, so the worktree is `<name>` and the branch
+  `feature/<name>`. Tab titled `role@model`; the Orca worktree status is set to `in-review` when
+  its PR opens. An agent or review branch tied to a PR is `PR<number>-<summary>`.
 - **Two tracks, chosen per issue by label.** `small`: one module or config, no change to a
   deliverable's numbers, format or content rules, no API or data-model change, roughly 200 changed
   lines at most. The issue's acceptance is the plan; one engineer (`gpt-6-luna`, or `gpt-6-sol` at
