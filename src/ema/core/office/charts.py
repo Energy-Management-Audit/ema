@@ -299,6 +299,7 @@ def clone_chart(  # noqa: PLR0913
     *,
     after_part: str | None = None,
     caption: str | None = None,
+    generated_layout: bool = False,
 ) -> str:
     parts = read_parts(docx)
     root = copy.deepcopy(xml(parts, part))
@@ -312,7 +313,7 @@ def clone_chart(  # noqa: PLR0913
             axis = "column" if len(cells) > 1 and cells[0][0] == cells[-1][0] else "row"
             formula_node.text = formula_at(formula_node.text, *cells[0], size, axis)
     _set_series(root, series, title)
-    if list(root.iter(f"{{{C}}}barChart")):
+    if generated_layout and list(root.iter(f"{{{C}}}barChart")):
         automatic_layout(root, series)
         column_axes(root, series)
         for axis in root.iter(f"{{{C}}}valAx"):

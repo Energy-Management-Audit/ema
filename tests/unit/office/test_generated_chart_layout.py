@@ -99,7 +99,9 @@ def test_authored_rewrite_and_clone_reset_value_layout_with_a_gap(tmp_path):
     source = tmp_path / "authored.docx"
     write_parts(parts, source)
     output = tmp_path / "clone.docx"
-    cloned_part = clone_chart(source, "word/charts/chart1.xml", series, None, output)
+    cloned_part = clone_chart(
+        source, "word/charts/chart1.xml", series, None, output, generated_layout=True
+    )
     cloned = xml(read_parts(output), cloned_part)
     rewritten_part = rewrite_bar_chart(parts, "chart_1", tuple(series))
     rewritten = xml(parts, rewritten_part)

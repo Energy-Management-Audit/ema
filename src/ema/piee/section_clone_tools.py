@@ -179,6 +179,7 @@ def _clone_figures(
             following,
             after_part=item.part,
             caption=numbered_caption(current, _figure_caption(data, item)),
+            generated_layout=True,
         )
         generated[item] = part
         current = following

@@ -96,6 +96,7 @@ def render_extra_figures(source: Path, data: PieeData, output: Path) -> None:  #
                 following,
                 after_part=after,
                 caption=numbered_caption(current, caption),
+                generated_layout=True,
             )
             current = following
             step += 1
