@@ -239,3 +239,8 @@ def test_romanian_format_without_grouping() -> None:
 def test_romanian_format_rounds_negative_zero_and_large_values() -> None:
     assert format_number(-0.001, 2) == "0,00"
     assert format_number(1e30, 2) == "1.000.000.000.000.000.000.000.000.000.000,00"
+
+
+def test_romanian_format_uses_excel_display_precision_for_floats() -> None:
+    assert format_number(13357.304999999998, 2) == "13.357,31"
+    assert format_number(1234.5, 2) == "1.234,50"

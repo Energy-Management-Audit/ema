@@ -13,7 +13,7 @@ def format_number(
 ) -> str:
     if decimals < 0:
         raise ValueError("decimals must be nonnegative")
-    decimal_value = Decimal(str(value))
+    decimal_value = Decimal(f"{value:.15g}") if isinstance(value, float) else Decimal(str(value))
     quantum = Decimal(1).scaleb(-decimals)
     precision = max(
         28, len(decimal_value.as_tuple().digits) + abs(decimal_value.adjusted()) + decimals + 2
