@@ -28,7 +28,8 @@ interfaces (api, cli, mcp) -> workflows (invoices, piee, audit, reporting)
 
 `scripts/check` is the non-mutating gate run by CI and the pre-push hook: ruff format and check,
 the 400-line file limit, pyright strict on `src/`, import contracts, and non-golden unit tests.
-Client, person and place names never appear in code, commits, branch names, PR text or issues; use case codes only.
+Client, person and place names never appear in code, commits, branch names, PR text or issues; use
+case codes only.
 Commit hooks may fix formatting. Install both with
 `uv run pre-commit install --install-hooks -t pre-commit -t pre-push`.
 
@@ -40,10 +41,12 @@ Reviewers may run `pytest -m "golden and not word"`.
 ## How work is sliced
 
 Work arrives as a GitHub issue labelled `small` (the issue is the plan; one PR) or `slice` (a parent
-issue, a reviewed plan, one `feature/<slice>` PR per layer from child worktrees; docs/PLAN.md §6.4).
+issue, a reviewed plan, one `feature/<slice>` PR per layer from child worktrees;
+docs/PLAN.md §6.4).
 A slice carries its golden acceptance; when it merges, the code and that test are the record —
 slice specs are not kept as
-files. `dev` merges into `prod` as a release; `prod` is what the auditor runs. `hotfix/<issue>` starts
+files. `dev` merges into `prod` as a release; `prod` is what the auditor runs;
+`hotfix/<issue>` starts
 from `prod` and lands in both.
 
 Commits follow Conventional Commits. Frontend commits and component names carry the design id they
@@ -65,10 +68,11 @@ traces back to the handoff.
 
 ## Verify, don't recall
 
-Anything that feeds a decision, the code or a deliverable is read from its source in this session: the code, the
-contract, the spec, a reference document, a number, a path, an environment value. Memory from earlier sessions
-(yours or a tool's) is a pointer to where to look and a record of preferences and past mistakes, never the fact
-itself. When memory and the source disagree, the source wins; say so in your report.
+Anything that feeds a decision, the code or a deliverable is read from its source in this
+session: the code, the contract, the spec, a reference document, a number, a path, an environment
+value. Memory from earlier sessions (yours or a tool's) is a pointer to where to look and a record
+of preferences and past mistakes, never the fact itself. When memory and the source disagree, the
+source wins; say so in your report.
 
 ## Building from a slice plan
 
@@ -96,7 +100,8 @@ itself. When memory and the source disagree, the source wins; say so in your rep
   start and `review` when the PR opens.
 - Check that `echo $EMA_REFERENCE` prints the reference library path: golden tests skip without it,
   and a skipped golden is not a pass.
-- Word for Mac is shared: before anything that drives Word, ask the coordinator for the Word slot with
+- Word for Mac is shared: before anything that drives Word, ask the coordinator for the Word slot
+  with
   a QUESTION message and wait; say when you are done with it.
 - No heartbeats or progress messages.
 - A fix round on an existing PR keeps its title and appends a short section for the round to its
