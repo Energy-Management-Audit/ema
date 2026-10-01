@@ -1579,9 +1579,11 @@ code/ (repository root)
   7. **Unit tests required.**
   8. **Out of scope.**
   9. **Done**: `scripts/check` · the golden command · the Word check where §6.3 asks for it.
-- **Coordinator home:** its own Orca worktree on a detached `origin/dev`
-  (`~/orca/workspaces/ema/coordinator`); it never commits there. Vlad's primary checkout is his;
-  agents never run, pull or write in it.
+- **Coordinator home:** its own Orca worktree (`~/orca/workspaces/ema/coordinator`) on the local
+  branch `orca/orchestrator` (the `orca/` namespace marks branches Orca keeps and never opens a PR
+  from). It tracks `origin/dev`, is refreshed with `git pull --ff-only` and is never pushed
+  (`branch.orca/orchestrator.pushRemote=no-push`); the coordinator never commits there. Vlad's
+  primary checkout is his; agents never run, pull or write in it.
 - **One worktree per agent:** `orca orchestration worker-start --worktree new-top-level --name
   <name> --agent codex --model <id> --effort <level>`, where `<name>` is the work's name in
   kebab-case without a prefix (`piee-complex-composer`); then `git -C <worktree> branch -m <name>
