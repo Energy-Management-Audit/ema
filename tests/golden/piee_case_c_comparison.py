@@ -4,23 +4,68 @@ from __future__ import annotations
 
 import math
 import re
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 import pytest
 from docx import Document
+from docx.oxml.ns import qn
 from openpyxl import load_workbook
 from tests.golden.cases import case_path
 
 from ema.consumption_analysis.analysis import Metric, value
 from ema.core.office.chart_series import read_series
 from ema.core.office.package import REL_CHART, C, R, read_parts, relationships, target_part, xml
+from ema.core.office.run_range import visible_text
 from ema.energy_data.calc import tep
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.source import normal
 from ema.piee.chart_plan import MONTHS
 from ema.piee.dataset import PieeData
 
-S16 = frozenset({10, 18, 22, 24, 33, 34})
+S16 = frozenset(
+    {(10, index) for index in (0, 1, 2, 5, 6, 7, 8, 9)}
+    | {(18, index) for index in range(12)}
+    | {(22, index) for index in (0, 7, 8, 10, 11)}
+    | {(24, 1), (33, 1), (34, 1)}
+)
+CAPTION_KINDS = {
+    "production": r"produc",
+    "electricity": r"electric",
+    "gas": r"gaz",
+    "fuel": r"carbur|motorin|benzin|gpl",
+    "cogen": r"cogener",
+    "coke": r"cocs",
+    "water": r"apa",
+    "specific": r"specific",
+    "intensity": r"intensit",
+    "mix": r"ponder",
+    "total": r"total",
+    "impact": r"impact|mediu|co2",
+    "potable": r"potabil",
+    "industrial": r"industrial",
+    "storm": r"meteoric",
+}
+
+
+def _caption_kinds(path: Path) -> list[frozenset[str]]:
+    root = xml(read_parts(path), "word/document.xml")
+    kinds = []
+    for paragraph in root.iter(qn("w:p")):
+        if not list(paragraph.iter(f"{{{C}}}chart")):
+            continue
+        following = paragraph.getnext()
+        assert following is not None
+        caption = normal(visible_text(following))
+        assert re.match(r"^(?:fig(?: nr)?|figura numarul) \d+", caption)
+        found = {kind for kind, pattern in CAPTION_KINDS.items() if re.search(pattern, caption)}
+        ordinal = len(kinds) + 1
+        if ordinal <= 4 and "cantitatea" in caption:
+            found.add("production")
+        if ordinal == 34 and "specific" in caption and "energie" in caption:
+            found.add("total")
+        kinds.append(frozenset(found))
+    return kinds
 
 
 def _order(path: Path) -> list[str]:
@@ -67,6 +112,7 @@ def _compare_figures(actual: Path, final: Path, data: PieeData) -> None:
     assert (
         sum(bool(list(xml(chart_parts, part).iter(f"{{{C}}}pie3DChart"))) for part in produced) == 3
     )
+    differences: set[tuple[int, int]] = set()
     for ordinal, (actual_part, delivered_part) in enumerate(
         zip(produced, delivered, strict=True), 1
     ):
@@ -87,49 +133,65 @@ def _compare_figures(actual: Path, final: Path, data: PieeData) -> None:
             if ordinal == 30:
                 # S17: the authored 2025 pie retains a zero-only GPL category.
                 assert len(actual_values) == 4 and len(delivered_values) == 5
-                assert sum(value == 0 for value in delivered_values) == 1
-                delivered_values = [value for value in delivered_values if value != 0]
+                zero = [index for index, value in enumerate(delivered_values) if value == 0]
+                assert len(zero) == 1
+                assert normal(delivered_item.categories[zero[0]]) == "gpl"
+                delivered_values = [
+                    value for index, value in enumerate(delivered_values) if index != zero[0]
+                ]
+                _zero_gpl_source()
             assert len(actual_values) == len(delivered_values), ordinal
             for index, (actual_value, delivered_value) in enumerate(
                 zip(actual_values, delivered_values, strict=True)
             ):
                 if actual_value is None or delivered_value is None:
                     assert actual_value is delivered_value, (ordinal, index)
+                # 1e-8 absorbs OOXML floating-point cache noise, not a display-precision slip.
                 elif math.isclose(actual_value, delivered_value, rel_tol=1e-8, abs_tol=1e-8):
                     continue
                 else:
-                    assert ordinal in S16, (ordinal, index)
-                    assert math.isclose(
-                        actual_value, _source(data, ordinal, index), rel_tol=1e-9, abs_tol=1e-9
-                    )
+                    pair = (ordinal, index)
+                    assert pair in S16, pair
+                    source = _source(data, ordinal, index)
+                    assert math.isclose(actual_value, source, rel_tol=1e-9, abs_tol=1e-9)
+                    assert not math.isclose(delivered_value, source, rel_tol=1e-8, abs_tol=1e-8)
+                    differences.add(pair)
+    assert differences == S16
 
 
 def _zero_gpl_source() -> None:
     book = load_workbook(case_path("piee-case-c", "prelucrare"), read_only=True, data_only=True)
     for sheet_name in ("Consum Carburanti", "TEP"):
         sheet = book[sheet_name]
-        rows = [
-            row
-            for row in sheet.iter_rows()
-            if any(
-                normal(cell.value) == "gpl" or normal(cell.value).startswith("gpl ")
-                for cell in row
-                if isinstance(cell.value, str)
+        rows = list(sheet.iter_rows())
+        found: set[int] = set()
+        labels = {"gpl"} if sheet_name == "Consum Carburanti" else {"gpl", "gpl tep"}
+        for index, row in enumerate(rows):
+            year_cell = next(
+                (
+                    (column, cell.value)
+                    for column, cell in enumerate(row)
+                    if cell.value in (2023, 2024, 2025)
+                ),
+                None,
             )
-        ]
-        assert (
-            len(
-                [
-                    row
-                    for row in rows
-                    if sum(isinstance(cell.value, int | float) for cell in row) >= 12
-                ]
-            )
-            >= 3
-        )
-        assert all(
-            cell.value == 0 for row in rows for cell in row if isinstance(cell.value, int | float)
-        )
+            if year_cell is None:
+                continue
+            column, year = year_cell
+            if year in found:
+                continue
+            candidates = [
+                later
+                for later in rows[index + 1 : index + 11]
+                if isinstance(later[column].value, str) and normal(later[column].value) in labels
+            ]
+            assert len(candidates) == 1, (sheet_name, year)
+            assert all(
+                cell.value == 0 for cell in candidates[0] if isinstance(cell.value, int | float)
+            ), (sheet_name, year)
+            found.add(year)
+        assert found == {2023, 2024, 2025}, sheet_name
+    book.close()
 
 
 def _number(text: str) -> float:
@@ -247,3 +309,52 @@ def _compare_centralizer(actual: Path, final: Path, data: PieeData) -> None:
         reference = _number(authored_rows["total"].cells[year_index].text)
         assert round(output, 2) == round(total, 2)
         assert (round(reference, 2) == round(total, 2)) != (year == 2024)  # S3
+
+
+def _display(value: float, decimals: int) -> Decimal:
+    quantum = Decimal(1).scaleb(-decimals)
+    return Decimal(f"{value:.15g}").quantize(quantum, rounding=ROUND_HALF_UP)
+
+
+def _compare_numbered_tables(actual: Path, final: Path, data: PieeData) -> None:
+    produced, authored = Document(actual).tables, Document(final).tables
+    assert len(produced) == 18 and len(authored) == 15
+    # T8, T9 and T11 are outside the sourced comparison pending #48.
+    for half in range(2):
+        for row in range(1, 4):
+            for column in range(7):
+                left = produced[half].cell(row, column).text
+                right = authored[half + 1].cell(row, column).text
+                if column == 0:
+                    assert left.strip() == right.strip() == str(data.dataset.years[row - 1])
+                else:
+                    assert _number(left) == _number(right)  # T1
+    series = (
+        Carrier.electricity_grid,
+        Carrier.natural_gas,
+        Carrier.electricity_cogen,
+        Carrier.diesel,
+        Carrier.coke,
+    )
+    production = next(iter(data.dataset.production.values()))
+    for group, by_year in enumerate((production, *(data.dataset.carriers[c] for c in series))):
+        for half in range(2):
+            table = produced[group * 2 + half]
+            for row, year in enumerate(data.dataset.years, 1):
+                assert int(table.cell(row, 0).text) == year
+                for column in range(1, 7):
+                    month = half * 6 + column
+                    source = by_year[year].months[month].value
+                    assert source is not None
+                    output = Decimal(str(_number(table.cell(row, column).text)))
+                    assert output == _display(source, 2), (group, year, month)
+    for row, year in enumerate(data.dataset.years, 1):
+        assert int(produced[15].cell(row, 0).text) == year
+        assert int(authored[11].cell(row, 0).text) == year
+        assert data.prelucrare is not None
+        filed = data.prelucrare.filed[f"co2.total.{year}"]
+        assert isinstance(filed.value, int | float)
+        output = _number(produced[15].cell(row, 1).text)
+        reference = _number(authored[11].cell(row, 1).text)
+        assert Decimal(str(output)) == _display(float(filed.value), 0)
+        assert (round(reference) == round(output)) == (year != 2023)  # S11

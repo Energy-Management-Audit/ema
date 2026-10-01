@@ -227,8 +227,13 @@ def _add_chart(
     next_id: list[int],
 ) -> None:
     label = carrier.value if carrier is not None else "total_energy"
-    nodes.append(_track(chart[0], f"{label}_{name}_chart", ledger, next_id))
-    nodes.append(_track(chart[1], f"{label}_{name}_caption", ledger, next_id))
+    if name.startswith("monthly_"):
+        index = name.removeprefix("monthly_")
+        nodes.append(_track(chart[0], f"{label}_monthly_chart_{index}", ledger, next_id))
+        nodes.append(_track(chart[1], f"{label}_monthly_caption_{index}", ledger, next_id))
+    else:
+        nodes.append(_track(chart[0], f"{label}_{name}_chart", ledger, next_id))
+        nodes.append(_track(chart[1], f"{label}_{name}_caption", ledger, next_id))
 
 
 def _monthly_table(  # noqa: PLR0913

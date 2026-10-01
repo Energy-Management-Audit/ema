@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from ema.core.office.errors import OfficeError
-from ema.core.office.sheets import Book, CellRef, open_book
+from ema.core.office.sheets import Book, CellRef, Sheet, open_book
 from ema.energy_data.carriers import Carrier, carrier_for
 from ema.energy_data.factors import FACTORS_2026, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
@@ -144,11 +145,27 @@ def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dic
     return turnover, energy_costs
 
 
+def _production_name(sheet: Sheet, out: PrelucrareData) -> None:
+    for row in range(1, sheet.max_row + 1):
+        for col in range(1, sheet.max_col + 1):
+            if normal(str(cell_or_blank(sheet, row, col).value or "")) != "productie":
+                continue
+            for value_col in range(col + 1, sheet.max_col + 1):
+                cell = cell_or_blank(sheet, row, value_col)
+                if not isinstance(cell.value, str) or not cell.value.strip():
+                    continue
+                name = re.sub(r"^produc(?:ția|ţia|tia)\s+de\s+", "", cell.value.strip(), flags=re.I)
+                out.dataset.production_name["main"] = name
+                out.located["production_name.main"] = located(cell, name, label="Productie")
+                return
+
+
 def _production(
     book: Book, out: PrelucrareData
 ) -> tuple[dict[str, dict[int, CarrierSeries]], dict[str, str]]:
     sheet = sheet_named(book, "Productii", out.issues)
     if sheet is not None:
+        _production_name(sheet, out)
         tonnes = physical(sheet, ("tone",), "tone", "production", out)
         if tonnes:
             out.deferred_production.update(tonnes)
@@ -330,7 +347,15 @@ def import_prelucrare(path: Path) -> PrelucrareData:  # noqa: C901, PLR0912
         out.dataset = EnergyDataset(years, carriers)
         production, units = _production(book, out)
         turnover, energy_costs = _economics(book, out)
-        out.dataset = EnergyDataset(years, carriers, production, units, turnover, energy_costs)
+        out.dataset = EnergyDataset(
+            years,
+            carriers,
+            production,
+            units,
+            turnover,
+            energy_costs,
+            production_name=out.dataset.production_name,
+        )
         out.factors = read_factors(book, years, out, path.name)
         for carrier, by_year in carriers.items():
             if carrier in {Carrier.water_potable, Carrier.water_industrial, Carrier.water_storm}:

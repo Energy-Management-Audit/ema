@@ -1,11 +1,40 @@
 """Synthetic precedence, unit conversion, and factor coverage checks."""
 
+from pathlib import Path
+
+import pytest
+from openpyxl import Workbook
+
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FACTORS_2026, Factor, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
+from ema.energy_data.prelucrare import import_prelucrare
 from ema.energy_data.prelucrare_factors import factors_for_output
 from ema.energy_data.prelucrare_merge import merge_prelucrare
 from ema.energy_data.prelucrare_types import PrelucrareData
+
+
+@pytest.mark.parametrize("prefix", ("Producția de", "Productia de", "Producţia de"))
+def test_production_name_follows_shifted_label_with_cell_evidence(
+    tmp_path: Path, prefix: str
+) -> None:
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "Productii"
+    sheet["E6"] = "Productie"
+    sheet["G6"] = f"{prefix} Test Product"
+    path = tmp_path / "prelucrare.xlsx"
+    book.save(path)
+    imported = import_prelucrare(path)
+    assert imported.dataset.production_name == {"main": "Test Product"}
+    assert imported.located["production_name.main"].ref.a1 == "Productii!G6"
+
+
+def test_necesar_production_name_wins_over_prelucrare() -> None:
+    other = EnergyDataset((2025,), {}, production_name={"main": "Necesar Product"})
+    chosen = EnergyDataset((2025,), {}, production_name={"main": "Prelucrare Product"})
+    merged, _ = merge_prelucrare(other, PrelucrareData(chosen, FACTORS_2026))
+    assert merged.production_name == {"main": "Necesar Product"}
 
 
 def test_factor_coverage_is_bounded_to_document_data_years() -> None:

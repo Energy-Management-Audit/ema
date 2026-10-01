@@ -107,4 +107,5 @@ def merge_prelucrare(
         {**units, **chosen.production_unit},
         turnover,
         costs,
+        production_name={**chosen.production_name, **other.production_name},
     ), conflicts

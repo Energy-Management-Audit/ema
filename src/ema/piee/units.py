@@ -163,6 +163,7 @@ def presentation_dataset(
             dataset.energy_costs_lei,
             dataset.filed_indicators,
             dataset.energy_inventory_complete,
+            dataset.production_name,
         ),
         conversion,
     )

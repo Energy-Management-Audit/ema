@@ -24,6 +24,7 @@ from ema.piee.extra_figures import _annual_fuel, _biomass, _specific_mix
 from ema.piee.intake import import_piee
 from ema.piee.pies import _mix, _pv, expanded_mix
 from ema.piee.tables import _equivalent, _monthly
+from ema.piee.units import Conversion
 
 
 def _data() -> PieeData:
@@ -109,6 +110,30 @@ def test_missing_figures_and_fuel_series_are_explicit() -> None:
     assert chart_series(data, ChartBinding("share", "energy_share")) == (None,)
     hidden_pv = replace(data, layout=replace(data.layout, separate_pv_figures=False))
     assert chart_series(hidden_pv, ChartBinding("pv", "carrier", Carrier.electricity_pv)) == (None,)
+
+
+def test_tonne_specific_keeps_filed_value_and_scales_computed_value() -> None:
+    data = _data()
+    assert data.prelucrare is not None
+    data.prelucrare.filed["specific.electricity_grid.2025"] = Located(0.123, CellRef("Filed", 3, 1))
+    data = replace(
+        data,
+        dataset=replace(
+            data.dataset,
+            production={
+                "output": {
+                    year: CarrierSeries({1: Reading(100, "tone")}, Reading(1000, "tone"))
+                    for year in data.dataset.years
+                }
+            },
+            production_unit={"output": "tone"},
+        ),
+        production_conversion=Conversion("tone", "tone", 1, "source"),
+    )
+    filed = chart_series(data, ChartBinding("grid", "specific", Carrier.electricity_grid))[0]
+    computed = chart_series(data, ChartBinding("gas", "specific", Carrier.natural_gas))[0]
+    assert filed is not None and filed.values[-1] == 0.123
+    assert computed is not None and computed.values[-1] == pytest.approx(4.3)
 
 
 def test_pie_shares_use_only_present_sourced_carriers() -> None:

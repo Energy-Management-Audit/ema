@@ -122,7 +122,7 @@ def _coke_centralizer(
             else "n.d."
         )
         set_cell_text(cloned, content, missing=content == "n.d.")
-        _track(cloned, f"coke_centralizer_{row_index}", ledger=ledger, next_id=next_id)
+        _track(cloned, f"coke_coke_centralizer_{row_index}", ledger=ledger, next_id=next_id)
         row.insert(len(cells) - 1, cloned)
 
 
