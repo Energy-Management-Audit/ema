@@ -39,6 +39,8 @@ test('home orders in-progress jobs, links by type and shows one backup prompt', 
     async ({ page, requests }) => {
       await page.getByRole('heading', { name: 'Bine ai revenit.' }).waitFor()
       const rows = page.locator('.home-job-row')
+      // Jobs load after the heading renders; counting at once raced the fetch in CI.
+      await rows.nth(2).waitFor()
       assert.equal(await rows.count(), 3)
       assert.match(await rows.first().innerText(), /Facturi 2026/)
       assert.equal(
