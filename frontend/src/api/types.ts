@@ -266,6 +266,7 @@ export type DecisionInput = {
   on_revision: number
   value?: unknown
   alternative?: string | null
+  reason?: string | null
 }
 
 export type PieeImport = {

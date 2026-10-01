@@ -1425,6 +1425,17 @@
             "title": "On Revision",
             "type": "integer"
           },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
           "value": {
             "title": "Value"
           }

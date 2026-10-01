@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -9,8 +10,8 @@ from typing import cast
 from ema.core.errors import EmaError
 from ema.energy_data.anexa import parse_anexa
 from ema.energy_data.anexa_cells import AnexaData
-from ema.energy_data.calc import tep
-from ema.energy_data.carriers import FAMILY_PARENT, Carrier
+from ema.energy_data.calc import co2, tep
+from ema.energy_data.carriers import FAMILY_PARENT, Carrier, counts_in_total
 from ema.energy_data.factors import FACTORS_2026, FactorTable
 from ema.energy_data.model import CarrierSeries, Derived, EnergyDataset, Reading
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
@@ -161,7 +162,9 @@ def _family_evidence(
             for key in derived.inputs
         )
         if unknown:
-            matches = float(aggregate.value) == derived.value
+            matches = math.isclose(
+                float(aggregate.value), derived.value, rel_tol=1e-9, abs_tol=1e-9
+            )
         else:
             checked = reconcile(
                 float(aggregate.value),
@@ -197,54 +200,65 @@ def _necesar_locations(info: NecesarInfo) -> dict[str, Located]:
     return result
 
 
-def _internal_disagreements(
-    imported: PrelucrareData, dataset: EnergyDataset, factors: FactorTable
+def _internal_disagreements(  # noqa: C901
+    imported: PrelucrareData | None,
+    dataset: EnergyDataset,
+    factors: FactorTable,
+    annual: AnnualCheck,
+    locations: dict[str, Located],
 ) -> list[SourceDisagreement]:
     conflicts: list[SourceDisagreement] = []
-    for year in imported.dataset.years:
-        selected_total = imported.filed.get(f"tep.total.{year}")
-        total_parts: list[float] = []
-        for carrier in dataset.carriers:
-            if year not in dataset.carriers[carrier]:
+    for yearly in annual.years:
+        for check in (*yearly.components, *yearly.totals):
+            if check.status != "conflict" or check.computed.value is None:
                 continue
-            computed = tep(dataset, factors, carrier, year)
-            selected = imported.filed.get(f"tep.{carrier.value}.{year}")
-            if selected is not None and isinstance(selected.value, int | float):
-                total_parts.append(float(selected.value))
-                if computed.value is not None and not _same_filed(
-                    selected, computed, imported.located
-                ):
-                    conflicts.append(
-                        SourceDisagreement(
-                            f"tep.carrier.{carrier.value}.{year}",
-                            Reading(float(selected.value), "tep"),
-                            Reading(computed.value, "tep"),
-                            "prelucrare_filed",
-                            "calculated",
-                            selected,
-                            imported.located.get(computed.inputs[0]) if computed.inputs else None,
-                        )
-                    )
-            elif computed.value is not None:
-                total_parts.append(computed.value)
-        if (
-            selected_total is not None
-            and isinstance(selected_total.value, int | float)
-            and total_parts
-            and not _same_filed(
-                selected_total,
-                Derived(sum(total_parts), "tep", "tep.carrier_sum", year=year),
-                {},
+            if not isinstance(check.filed.value, int | float):
+                raise ValueError(f"numeric filing required: {check.key}")
+            computed_location = (
+                locations.get(check.computed.inputs[0]) if check.computed.inputs else None
             )
-        ):
+            if check.source == "prelucrare_filed":
+                chosen = Reading(float(check.filed.value), "tep")
+                alternative = Reading(check.computed.value, "tep")
+                chosen_source, alternative_source = "prelucrare_filed", "calculated"
+                chosen_location, alternative_location = check.filed, computed_location
+            else:
+                chosen = Reading(check.computed.value, "tep")
+                alternative = Reading(float(check.filed.value), "tep")
+                chosen_source, alternative_source = "calculated", "anexa"
+                chosen_location, alternative_location = computed_location, check.filed
             conflicts.append(
                 SourceDisagreement(
-                    f"tep.internal_total.{year}",
-                    Reading(float(selected_total.value), "tep"),
-                    Reading(sum(total_parts), "tep"),
+                    check.key,
+                    chosen,
+                    alternative,
+                    chosen_source,
+                    alternative_source,
+                    chosen_location,
+                    alternative_location,
+                )
+            )
+    if imported is None:
+        return conflicts
+    for year in range(annual.years[0].year, annual.years[-1].year + 1):
+        for carrier in dataset.carriers:
+            if not counts_in_total(carrier) or year not in dataset.carriers[carrier]:
+                continue
+            filed = imported.filed.get(f"co2.{carrier.value}.{year}")
+            if filed is None or not isinstance(filed.value, int | float):
+                continue
+            computed = co2(dataset, factors, year, carrier)
+            if computed.value is None or _same_filed(filed, computed, locations):
+                continue
+            conflicts.append(
+                SourceDisagreement(
+                    f"co2.{carrier.value}.{year}",
+                    Reading(computed.value, "t CO₂"),
+                    Reading(float(filed.value), "t CO₂"),
+                    "calculated",
                     "prelucrare_filed",
-                    "carrier_sum",
-                    selected_total,
+                    locations.get(computed.inputs[0]) if computed.inputs else None,
+                    filed,
                 )
             )
     return conflicts
@@ -262,7 +276,7 @@ def _same_filed(filed: Located, computed: Derived, locations: dict[str, Located]
         or len(input_decimals) != len(computed.inputs)
         or any(value is None for value in input_decimals)
     ):
-        return float(filed.value) == computed.value
+        return math.isclose(float(filed.value), computed.value, rel_tol=1e-9, abs_tol=1e-9)
     return (
         reconcile(
             float(filed.value), decimals, computed, [cast(int, value) for value in input_decimals]
@@ -315,7 +329,7 @@ def assemble(
                 item.prelucrare,
                 item.other,
                 "prelucrare",
-                "necesar/anexa",
+                "anexa" if item.field in anexa_locations else "necesar",
                 prelucrare.located.get(item.field),
                 locations.get(item.field),
             )
@@ -323,15 +337,15 @@ def assemble(
         )
         locations.update(prelucrare.located)
         factors = factors_for_output(prelucrare, dataset.years)
-        disagreements.extend(_internal_disagreements(prelucrare, dataset, factors))
     annual = annual_check(
         anexa,
         year,
         dataset,
         factors,
         locations,
-        prelucrare.filed.get(f"tep.total.{year}") if prelucrare is not None else None,
+        prelucrare.filed if prelucrare is not None else None,
     )
+    disagreements.extend(_internal_disagreements(prelucrare, dataset, factors, annual, locations))
     presented, conversion = presentation_dataset(dataset, previous_piee)
     pie_representation = (
         delivered_pie_representation(previous_piee) if previous_piee is not None else "normalized"

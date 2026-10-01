@@ -6,10 +6,14 @@ from pathlib import Path
 
 import pytest
 from tests.golden.cases import case_path
+from tests.golden.piee_case_b_review import review_case_b_reconciliation
+from tests.workspace_jobs import register_client
 
 from ema.core.office.sheets import open_book
+from ema.core.workspace import Workspace
 from ema.energy_data.carriers import Carrier
 from ema.piee.dataset import load
+from ema.piee.intake import import_piee
 
 pytestmark = pytest.mark.golden
 
@@ -38,15 +42,23 @@ def test_piee_case_a_sources_reconcile_to_filed_annual(reference_library: Path) 
 
 def test_piee_case_b_prelucrare_covers_missing_necesar_and_exposes_internal_conflict(
     reference_library: Path,
+    tmp_path: Path,
 ) -> None:
     folder = reference_library / case_path("piee-case-b")
-    result = load(2025, _only(folder, "Anexa*.xlsx"), None, _only(folder, "*Prelucrare*.xlsx"))
+    anexa = _only(folder, "Anexa*.xlsx")
+    prelucrare = _only(folder, "*Prelucrare*.xlsx")
+    result = load(2025, anexa, None, prelucrare)
     assert result.dataset.years == (2023, 2024, 2025)
     assert result.necesar_status.startswith("not needed: covered by Prelucrare")
-    assert result.annual_check.status == "match"
+    assert result.annual_check.status == "conflict"
+    assert Carrier.electricity_pv in result.annual_check.years[1].missing_carriers
     assert Carrier.biomass not in result.dataset.carriers
     assert Carrier.sunflower_husks in result.dataset.carriers
     assert any(item.key.startswith("tep.internal_total.") for item in result.disagreements)
+    ws = Workspace(tmp_path / "workspace")
+    register_client(ws, "piee-case-b")
+    job = import_piee(ws, "piee-case-b", 2025, anexa, None, prelucrare)
+    review_case_b_reconciliation(ws, job.id)
 
 
 def test_piee_case_b_delivered_unit_converts_every_production_reading(

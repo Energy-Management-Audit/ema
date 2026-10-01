@@ -34,6 +34,29 @@ WATER_CARRIERS = frozenset({Carrier.water_potable, Carrier.water_industrial, Car
 INTERNAL_GENERATION_CARRIERS = frozenset({Carrier.electricity_cogen})
 FAMILY_PARENT: dict[Carrier, Carrier] = {Carrier.sunflower_husks: Carrier.biomass}
 
+CARRIER_NAMES_RO: dict[Carrier, str] = {
+    Carrier.electricity_grid: "energie electrică din SEN",
+    Carrier.electricity_pv: "energie electrică fotovoltaică",
+    Carrier.electricity_cogen: "energie electrică produsă prin cogenerare",
+    Carrier.natural_gas: "gaze naturale",
+    Carrier.diesel: "motorină",
+    Carrier.petrol: "benzină",
+    Carrier.lpg: "GPL",
+    Carrier.fuel_oil: "păcură",
+    Carrier.clu: "combustibil lichid ușor",
+    Carrier.coal: "cărbune",
+    Carrier.coke: "cocs",
+    Carrier.wood: "lemn",
+    Carrier.biomass: "biomasă",
+    Carrier.sunflower_husks: "coji de floarea-soarelui",
+    Carrier.biogas: "biogaz",
+    Carrier.ctl: "combustibil termic lichid",
+    Carrier.purchased_heat: "energie termică achiziționată",
+    Carrier.water_potable: "apă potabilă",
+    Carrier.water_industrial: "apă industrială",
+    Carrier.water_storm: "apă meteorică",
+}
+
 
 def counts_in_total(carrier: Carrier) -> bool:
     return carrier not in WATER_CARRIERS and carrier not in INTERNAL_GENERATION_CARRIERS

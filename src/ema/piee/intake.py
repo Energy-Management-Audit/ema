@@ -14,11 +14,10 @@ from ema.core.jobs import create_job
 from ema.core.review import mark_absent, propose
 from ema.core.review.models import Cell, Derivation, Evidence, FieldSpec
 from ema.core.workspace import Workspace, upload_name
-from ema.energy_data.calc import tep_total
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FACTORS_2026
-from ema.energy_data.model import Reading
 from ema.energy_data.source import Located
+from ema.piee.completeness_review import record_completeness
 from ema.piee.dataset import PieeData, SourceDisagreement, load
 from ema.piee.intake_sources import Method
 from ema.piee.intake_sources import file as _file
@@ -310,23 +309,6 @@ def _record_annual(ws: Workspace, job: str, data: PieeData, shas: dict[str, str 
             [_evidence(chosen, shas["prelucrare"], "prelucrare", spec.key)],
             state="extracted",
         )
-    if data.annual_check.status == "conflict" and chosen is None:
-        calculated = tep_total(data.dataset, data.factors, data.year)
-        if calculated.value is not None:
-            _record_disagreement(
-                ws,
-                job,
-                SourceDisagreement(
-                    spec.key,
-                    Reading(calculated.value, "tep"),
-                    Reading(float(filed.value), "tep"),
-                    "calculated",
-                    "anexa",
-                    None,
-                    filed,
-                ),
-                shas,
-            )
 
 
 def import_piee(  # noqa: PLR0913
@@ -382,6 +364,7 @@ def import_piee_into_job(  # noqa: PLR0913
     _record_identity(ws, job, data, shas["anexa"])
     _record_measures(ws, job, data, shas["anexa"])
     _record_dataset(ws, job, data, shas)
+    record_completeness(ws, job, data)
     _record_annual(ws, job, data, shas)
     for item in data.disagreements:
         _record_disagreement(ws, job, item, shas)
