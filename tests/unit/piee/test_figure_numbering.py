@@ -4,7 +4,7 @@ from pathlib import Path
 
 from docx import Document
 
-from ema.piee.figure_numbering import numbered_caption, renumber_figures
+from ema.piee.figure_numbering import numbered_caption, renumber_figures, renumber_tables
 
 
 def test_renumbers_groups_subfigures_additions_and_references(tmp_path: Path) -> None:
@@ -74,3 +74,27 @@ def test_pv_reference_changes_when_an_earlier_group_is_removed(tmp_path: Path) -
     doc.save(source)
     renumber_figures(source, output)
     assert Document(output).paragraphs[-1].text == "Conform figurilor 2 ponderea este redusă."
+
+
+def test_tables_resolve_inserted_removed_and_unresolved_references(tmp_path: Path) -> None:
+    source, output = tmp_path / "tables.docx", tmp_path / "numbered.docx"
+    document = Document()
+    for content in (
+        "Tabelul 1 Date inițiale",
+        "Tabelul 7 Date adăugate",
+        "Conform tabelului numărul 7 sunt trei ani.",
+        "Tabelul 4 Date finale",
+        "Conform tabelului numărul 9 lipsesc datele.",
+    ):
+        document.add_paragraph(content)
+    document.save(source)
+    renumber_tables(source, output)
+    paragraphs = Document(output).paragraphs
+    assert [paragraph.text for paragraph in paragraphs] == [
+        "Tabelul 1 Date inițiale",
+        "Tabelul 2 Date adăugate",
+        "Conform tabelului numărul 2 sunt trei ani.",
+        "Tabelul 3 Date finale",
+        "Conform tabelului numărul n.d. lipsesc datele.",
+    ]
+    assert any(run.font.color.rgb is not None for run in paragraphs[-1].runs)

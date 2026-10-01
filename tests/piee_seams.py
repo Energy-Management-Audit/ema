@@ -23,7 +23,7 @@ def _data(*_args: object) -> SimpleNamespace:
         production_conversion=None,
         pie_representation="synthetic",
         pie_representation_source="base",
-        separate_pv_figures=False,
+        layout=SimpleNamespace(separate_pv_figures=False),
     )
 
 

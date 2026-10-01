@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -18,16 +18,16 @@ from ema.energy_data.necesar import parse_necesar_info, to_dataset
 from ema.energy_data.necesar_model import NecesarInfo
 from ema.energy_data.prelucrare import import_prelucrare
 from ema.energy_data.prelucrare_factors import factors_for_output
-from ema.energy_data.prelucrare_merge import merge_prelucrare
+from ema.energy_data.prelucrare_merge import annual_readings_match, merge_prelucrare
 from ema.energy_data.prelucrare_types import PrelucrareData
 from ema.energy_data.reconcile import reconcile
 from ema.energy_data.source import Located
 from ema.piee.annual_check import AnnualCheck, annual_check
+from ema.piee.layout import LayoutProfile, delivered_layout
 from ema.piee.prelucrare_compat import existing_piee_readings
 from ema.piee.units import (
     Conversion,
     delivered_pie_representation,
-    delivered_separate_pv_figures,
     presentation_dataset,
 )
 
@@ -57,7 +57,7 @@ class PieeData:
     production_conversion: Conversion | None = None
     pie_representation: str = "normalized"
     pie_representation_source: str = "base"
-    separate_pv_figures: bool = True
+    layout: LayoutProfile = field(default_factory=LayoutProfile)
 
 
 def _anexa_series(anexa: AnexaData, year: int) -> dict[Carrier, tuple[CarrierSeries, Located]]:
@@ -110,7 +110,7 @@ def _merge_anexa(
         elif current.annual is None:
             carriers[carrier][year] = CarrierSeries(current.months, candidate.annual)
             selected[key] = located
-        elif current.annual != candidate.annual:
+        elif not annual_readings_match(current.annual, candidate.annual):
             disagreements.append(
                 SourceDisagreement(
                     key,
@@ -350,7 +350,7 @@ def assemble(
     pie_representation = (
         delivered_pie_representation(previous_piee) if previous_piee is not None else "normalized"
     )
-    separate_pv = delivered_separate_pv_figures(previous_piee) if previous_piee else True
+    layout = delivered_layout(previous_piee)
     return PieeData(
         year,
         anexa,
@@ -364,7 +364,7 @@ def assemble(
         conversion,
         pie_representation,
         "previous_piee" if previous_piee is not None else "base",
-        separate_pv,
+        layout,
     )
 
 

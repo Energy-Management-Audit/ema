@@ -37,10 +37,6 @@ EXCEPTIONS = {
     16: "authored annual fuel chart treats missing months as zero",
     17: "authored annual fuel total treats missing months as zero",
     23: "prior-year PV category lacks a source reading",
-    **{
-        number: "authored specific values use mii tone beneath a per-tonne label"
-        for number in range(25, 33)
-    },
 }
 CAPTION_KINDS = {
     "production": r"produc",
@@ -128,7 +124,7 @@ def test_piee_case_b_figure_inventory_and_numbers_match_or_have_pinned_reason(
     # F16 keeps the base's fuel a/b/c/d group together, then adds the annual breakdown.
     assert produced[15] == "word/charts/chart20.xml"
     comparison_order = [*produced[:15], produced[16], produced[15], *produced[17:]]
-    assert len(EXCEPTIONS) == 14
+    assert len(EXCEPTIONS) == 6
     for ordinal, (actual_part, reference_part) in enumerate(
         zip(comparison_order, authored, strict=True), 1
     ):
@@ -160,7 +156,7 @@ def test_piee_case_b_figure_inventory_and_numbers_match_or_have_pinned_reason(
             assert len(actual) == len(expected) == 1
             assert len(actual[0].values) == len(expected[0].values) or ordinal == 32
             assert all(
-                _number(left * 1000 if left is not None else None, right)
+                _number(left, right)
                 for left, right in zip(actual[0].values, expected[0].values, strict=False)
             ), f"figure {ordinal}"
         else:

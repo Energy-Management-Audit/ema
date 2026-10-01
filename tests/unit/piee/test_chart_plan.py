@@ -107,7 +107,7 @@ def test_missing_figures_and_fuel_series_are_explicit() -> None:
     assert fuel[0] is not None and fuel[0].values[0] == 2
     assert fuel[1:] == (None, None)
     assert chart_series(data, ChartBinding("share", "energy_share")) == (None,)
-    hidden_pv = PieeData(**{**vars(data), "separate_pv_figures": False})
+    hidden_pv = replace(data, layout=replace(data.layout, separate_pv_figures=False))
     assert chart_series(hidden_pv, ChartBinding("pv", "carrier", Carrier.electricity_pv)) == (None,)
 
 
@@ -115,7 +115,7 @@ def test_pie_shares_use_only_present_sourced_carriers() -> None:
     data = _data()
     assert _pv(data, 2025) == pytest.approx((100 / 120, 20 / 120))
     assert _pv(data, 2024) is None
-    assert _pv(replace(data, separate_pv_figures=False), 2025) is None
+    assert _pv(replace(data, layout=replace(data.layout, separate_pv_figures=False)), 2025) is None
     assert _pv(replace(data, pie_representation="raw"), 2025) == (100, 20)
 
     mix = _mix(data, 2025)

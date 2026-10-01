@@ -13,7 +13,15 @@ from docx.oxml.ns import qn
 from lxml import etree
 
 from ema.core.office.base_map import BaseElement, BaseMap, classify, inventory, save, stamp_base
-from ema.core.office.package import REL_CHART, R, read_parts, relationships, target_part, xml
+from ema.core.office.package import (
+    REL_CHART,
+    R,
+    read_parts,
+    relationships,
+    target_part,
+    xml,
+)
+from ema.piee.base_prototypes import _build_carrier_prototypes
 from ema.piee.body_spans import build_body_spans, build_unsourced_slots
 from ema.piee.identity_map import build_identity_spans
 from ema.piee.monthly_figures import build_figure_groups
@@ -371,5 +379,8 @@ def build_local_base(base: Path, workspace_directory: Path) -> BaseMap:
         json.dumps(_groups(parts, mapping)), encoding="utf-8"
     )
     stamp_base(base, mapping, workspace_directory / "piee-master.docx")
+    _build_carrier_prototypes(
+        workspace_directory / "piee-master.docx", workspace_directory / "carrier-prototypes.json"
+    )
     stamp_base(base, mapping, workspace_directory / "piee-preview.docx", preview=True)
     return mapping

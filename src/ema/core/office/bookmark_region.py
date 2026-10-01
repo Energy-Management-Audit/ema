@@ -22,6 +22,6 @@ def remove_following(first: etree._Element, last: etree._Element, ledger: Anchor
     for node in children[start + 1 : end + 1]:
         for bookmark in node.iter(qn("w:bookmarkStart")):
             name = bookmark.get(qn("w:name")) or ""
-            if name.startswith("_ema_"):
+            if name.startswith("_ema_") and name.removeprefix("_ema_") in ledger.expected:
                 ledger.record(name.removeprefix("_ema_"), removed=True)
         parent.remove(node)

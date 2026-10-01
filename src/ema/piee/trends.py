@@ -78,7 +78,7 @@ def build_trend_spans(parts: dict[str, bytes], mapping: BaseMap, output: Path) -
     output.write_text(json.dumps([asdict(item) for item in result]), encoding="utf-8")
 
 
-def render_trends(  # noqa: C901
+def render_trends(  # noqa: C901, PLR0912
     source: Path, manifest: Path, data: PieeData, output: Path, ledger: AnchorLedger
 ) -> None:
     parts = read_parts(source)
@@ -121,11 +121,21 @@ def render_trends(  # noqa: C901
                     spans.append(TextSpan(item.year_start, item.year_end, str(maximum)))
             replace_spans(paragraph, tuple(spans))
         ledger.record(item.slot)
-    body = root.find(qn("w:body"))
-    if body is None:
-        raise ValueError("PIEE body is missing")
     for index, chart_number in OTHER_TREND_CHARTS.items():
-        paragraph = list(body)[index - 1]
+        body = root.find(qn("w:body"))
+        if body is None:
+            raise ValueError("PIEE body is missing")
+        if f"chart_{chart_number}" in ledger.expected:
+            chart = find([root], f"chart_{chart_number}")
+            paragraph = chart
+            for _ in range(3):
+                paragraph = paragraph.getnext()
+                if paragraph is None:
+                    break
+        else:
+            paragraph = list(body)[index - 1]
+        if paragraph is None:
+            raise ValueError(f"trend paragraph for chart {chart_number} missing")
         content = visible_text(paragraph)
         trend = re.search(r"\b(?:creștere|scădere)\b", content, re.I)
         if trend is None:

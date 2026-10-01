@@ -42,7 +42,7 @@ PHYSICAL = (
 )
 
 
-def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dict[int, Reading]]:  # noqa: C901, PLR0912
+def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dict[int, Reading]]:  # noqa: C901, PLR0912, PLR0915
     sheet = sheet_named(book, "Chelt-Cifra afaceri", out.issues)
     if sheet is None:
         out.issues.append(ReaderIssue("sheet_missing", "Chelt-Cifra afaceri"))
@@ -76,6 +76,7 @@ def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dic
                 and (
                     "cifra de afaceri" in normal(value)
                     or "veniturilor din exploatare" in normal(value)
+                    or "cheltuieli de productie" in normal(value)
                     or "cheltuieli energetice totale" in normal(value)
                     or "cheltuieli cu energia" in normal(value)
                 )
@@ -90,6 +91,8 @@ def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dic
                 turnover_rows["turnover"] = row
             elif "veniturilor din exploatare" in label:
                 turnover_rows.setdefault("revenue", row)
+            elif "cheltuieli de productie" in label:
+                turnover_rows.setdefault("production_costs", row)
             elif "cheltuieli energetice totale" in label or "cheltuieli cu energia" in label:
                 costs_row = row
         if any("intensitate energetica tep 1000 lei" in label for label in labels):
@@ -129,9 +132,10 @@ def _economics(book: Book, out: PrelucrareData) -> tuple[dict[int, Reading], dic
 
     primary = values(turnover_rows.get("turnover"))
     fallback = values(turnover_rows.get("revenue"))
+    production_costs = values(turnover_rows.get("production_costs"))
     turnover: dict[int, Reading] = {}
     for year in columns:
-        selected = primary.get(year) or fallback.get(year)
+        selected = primary.get(year) or fallback.get(year) or production_costs.get(year)
         if selected is not None:
             turnover[year], out.located[f"turnover.{year}"] = selected
     costs = values(costs_row)

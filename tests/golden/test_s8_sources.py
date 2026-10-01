@@ -37,7 +37,7 @@ def test_piee_case_a_sources_reconcile_to_filed_annual(reference_library: Path) 
     result = load(2025, _only(folder, "Anexa*.xlsx"), necesar, _only(folder, "*Prelucrare*.xls"))
     assert result.annual_check.status == "match"
     assert result.necesar_status == "received"
-    assert result.disagreements
+    assert not result.disagreements
 
 
 def test_piee_case_b_prelucrare_covers_missing_necesar_and_exposes_internal_conflict(

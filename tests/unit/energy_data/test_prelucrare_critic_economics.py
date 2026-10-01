@@ -10,7 +10,13 @@ from ema.energy_data.prelucrare import import_prelucrare
 from ema.energy_data.prelucrare_writer import write_prelucrare
 
 
-def _book(path: Path, *, label_column: int = 3, turnover: int | None = 100) -> Path:
+def _book(
+    path: Path,
+    *,
+    label_column: int = 3,
+    turnover: int | None = 100,
+    revenue: int | None = 200,
+) -> Path:
     book = Workbook()
     electric = book.active
     electric.title = "Consum Electric"
@@ -40,8 +46,9 @@ def _book(path: Path, *, label_column: int = 3, turnover: int | None = 100) -> P
     economic.cell(2, label_column + 1, 2025)
     for row, label, value in (
         (3, "Cifra de afaceri [lei]", turnover),
-        (4, "Valoarea veniturilor din exploatare [lei]", 200),
+        (4, "Valoarea veniturilor din exploatare [lei]", revenue),
         (5, "CHELTUIELI ENERGETICE TOTALE [lei]", 30),
+        (6, "Cheltuieli de productie [lei]", 300),
     ):
         economic.cell(row, label_column, label)
         economic.cell(row, label_column + 1, value)
@@ -59,6 +66,12 @@ def test_empty_turnover_falls_back_and_records_source_label(tmp_path: Path) -> N
     imported = import_prelucrare(_book(tmp_path / "economic.xlsx", turnover=None))
     assert imported.dataset.turnover_lei[2025].value == 200
     assert imported.located["turnover.2025"].label == "Valoarea veniturilor din exploatare [lei]"
+
+
+def test_production_costs_third_fallback_preserves_source_label(tmp_path: Path) -> None:
+    imported = import_prelucrare(_book(tmp_path / "economic.xlsx", turnover=None, revenue=None))
+    assert imported.dataset.turnover_lei[2025].value == 300
+    assert imported.located["turnover.2025"].label == "Cheltuieli de productie [lei]"
 
 
 def test_energy_costs_imported_from_labeled_row(tmp_path: Path) -> None:

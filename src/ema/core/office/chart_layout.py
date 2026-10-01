@@ -81,3 +81,27 @@ def column_axes(root: etree._Element, series: list[Series]) -> None:
         )
         number.set("formatCode", "#,##0.00" if maximum < 10 else "#,##0")
         number.set("sourceLinked", "0")
+
+
+def value_axis(axis: etree._Element) -> None:
+    """Keep zero as the minimum and let Word choose the remaining scale."""
+    for tag in ("majorUnit", "minorUnit"):
+        node = axis.find(f"{{{C}}}{tag}")
+        if node is not None:
+            axis.remove(node)
+    scaling = axis.find(f"{{{C}}}scaling")
+    if scaling is None:
+        scaling = etree.Element(f"{{{C}}}scaling")
+        axis.insert(1, scaling)
+    maximum = scaling.find(f"{{{C}}}max")
+    if maximum is not None:
+        scaling.remove(maximum)
+    minimum = scaling.find(f"{{{C}}}min")
+    if minimum is None:
+        minimum = etree.SubElement(scaling, f"{{{C}}}min")
+    minimum.set("val", "0")
+    title = axis.find(f"{{{C}}}title")
+    if title is not None:
+        fixed = title.find(f"{{{C}}}layout")
+        if fixed is not None:
+            title.remove(fixed)

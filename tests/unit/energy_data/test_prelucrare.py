@@ -38,6 +38,26 @@ def test_prelucrare_wins_with_conflict_and_production_unit_conversion() -> None:
     assert merged.production["main"][2025].months[1] == Reading(1, "mii MWh gaz vehiculat")
 
 
+def test_annual_source_units_ignore_only_per_year_suffix() -> None:
+    other = EnergyDataset(
+        (2025,),
+        {Carrier.diesel: {2025: CarrierSeries(annual=Reading(1, "t / an"))}},
+    )
+    chosen = EnergyDataset(
+        (2025,),
+        {Carrier.diesel: {2025: CarrierSeries(annual=Reading(1, "t"))}},
+    )
+    factors = FactorTable("case", 2025, (), ())
+    assert not merge_prelucrare(other, PrelucrareData(chosen, factors))[1]
+    different = EnergyDataset(
+        (2025,),
+        {Carrier.diesel: {2025: CarrierSeries(annual=Reading(1, "MWh/an"))}},
+    )
+    assert [
+        item.field for item in merge_prelucrare(other, PrelucrareData(different, factors))[1]
+    ] == ["carrier.diesel.2025"]
+
+
 def test_output_factors_use_filed_years_and_documented_defaults_elsewhere() -> None:
     imported = PrelucrareData(
         EnergyDataset((2025,), {}),

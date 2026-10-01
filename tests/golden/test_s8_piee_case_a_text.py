@@ -72,7 +72,7 @@ def _body(document: DocxDocument) -> list[etree._Element]:
 def _slot(paragraph: etree._Element, index: int) -> str:
     for bookmark in paragraph.iter(qn("w:bookmarkStart")):
         name = bookmark.get(qn("w:name"), "")
-        if name.startswith("_ema_"):
+        if name.startswith("_ema_") and not name.startswith("_ema_prototype_"):
             return name.removeprefix("_ema_")
     return f"body_child_{index}"
 
