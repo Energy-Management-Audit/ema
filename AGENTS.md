@@ -110,9 +110,13 @@ source wins; say so in your report.
   command and its output (no client values), the evidence level reached (docs/PLAN.md §5.16), and
   what Vlad checks by hand. Never merge: Vlad merges.
 - When the PR is open, wait for its CI with one `gh run watch <run-id> --interval 90 --exit-status`
-  (not `gh pr checks --watch`), then send exactly one message to the handle in the
-  brief: `orca terminal send --terminal <handle> --text "DONE PR #<n> <head sha> checks=<pass|fail>"
-  --enter`; if blocked, one `QUESTION: ...` the same way.
+  (not `gh pr checks --watch`), then report once with the `worker_done` command from your
+  preamble: `orca orchestration send --type worker_done --subject "DONE PR #<n> <head sha>
+  checks=<pass|fail>" --outcome <succeeded|failed> ...` with the preamble's IDs. If blocked, ask
+  with the preamble's `orca orchestration ask` and wait for the answer.
+- Your last message is the complete report, because Orca folds each finished turn to its last
+  message: what was done, decisions and why, evidence (tests and goldens, PR, head sha, checks)
+  and anything blocked. Send it after `worker_done`, and nothing after it.
 
 ## Packaging constraints (they shape the code)
 
