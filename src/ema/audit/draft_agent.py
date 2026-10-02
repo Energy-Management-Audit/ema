@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
+from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_checks import DraftCheck, DraftReview, check_draft, support_pass
 from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
 from ema.core.errors import EmaError
 from ema.core.llm import AgentContext, Limits, ReplayProvider, run_agent
 from ema.core.llm.agent import AgentState, Tool
-from ema.core.llm.types import ToolSpec
+from ema.core.llm.types import Provider, ToolSpec
 from ema.core.resources import resource_path
 from ema.core.review.models import Field
 from ema.core.workspace import Workspace
@@ -95,29 +96,43 @@ class DraftTools:
         }
 
 
-def draft_section_replay(  # noqa: PLR0913
+def draft_task(section: str) -> str:
+    """The turn that opens a live draft pass; without it the model has to guess the section id."""
+    title = next(item.title for item in CATALOGUE if item.id == section)
+    return (
+        f"Redactează secţiunea {section} „{title}”. "
+        f"Câmpul section din write_section_draft este exact „{section}”."
+    )
+
+
+def draft_section_run(  # noqa: PLR0913
     ws: Workspace,
     job: str,
     section: str,
-    draft_recording: Path,
-    support_recording: Path,
+    draft_provider: Provider,
+    support_provider: Provider,
     limits: Limits,
     *,
-    model_id: str | None = None,
+    model_id: str,
+    support_model_id: str | None = None,
     facts: dict[str, Field] | None = None,
+    synthetic: bool = False,
+    client_live: bool = False,
+    task: str | None = None,
 ) -> tuple[AgentState, SectionDraft, DraftCheck, tuple[DraftReview, ...]]:
-    """Run request-bound Draft and support replay; real client use is disabled."""
+    """Run the Draft pass and the support pass against the given providers."""
     tools = DraftTools(ws, job, section, facts)
     context = AgentContext(
         ws,
         job,
         f"draft:{section}",
-        ReplayProvider(draft_recording),
-        model_id or ReplayProvider(draft_recording).model_id,
+        draft_provider,
+        model_id,
         PROMPT_VERSION,
-        synthetic=True,
+        synthetic=synthetic,
+        client_live=client_live,
     )
-    state = run_agent(context, INSTRUCTIONS, tools.tools(), limits)
+    state = run_agent(context, INSTRUCTIONS, tools.tools(), limits, task=task)
     if state.status == "done" and tools.draft is None:
         accepted = {
             message["tool_call_id"]
@@ -134,19 +149,45 @@ def draft_section_replay(  # noqa: PLR0913
                     tools.write_section_draft(call["arguments"])
     if state.status != "done" or tools.draft is None or tools.check is None:
         raise EmaError("draft_incomplete", "Redactarea secţiunii nu s-a încheiat.", section)
-    facts = tools.facts
     support_context = AgentContext(
         ws,
         job,
         f"support:{section}",
-        ReplayProvider(support_recording),
-        model_id or ReplayProvider(support_recording).model_id,
+        support_provider,
+        support_model_id or model_id,
         PROMPT_VERSION + "-support",
-        synthetic=True,
+        synthetic=synthetic,
+        client_live=client_live,
     )
-    flags = support_pass(support_context, tools.draft, facts)
+    flags = support_pass(support_context, tools.draft, tools.facts)
     return state, tools.draft, tools.check, flags
 
 
-def draft_section_live(*_args: object, **_kwargs: object) -> NoReturn:
-    raise EmaError("ai_client_disabled", "Redactarea pe documente reale aşteaptă aprobarea.", "")
+def draft_section_replay(  # noqa: PLR0913
+    ws: Workspace,
+    job: str,
+    section: str,
+    draft_recording: Path,
+    support_recording: Path,
+    limits: Limits,
+    *,
+    model_id: str | None = None,
+    facts: dict[str, Field] | None = None,
+) -> tuple[AgentState, SectionDraft, DraftCheck, tuple[DraftReview, ...]]:
+    """Run request-bound Draft and support replay; replay recordings never reach a provider."""
+    draft_provider, support_provider = (
+        ReplayProvider(draft_recording),
+        ReplayProvider(support_recording),
+    )
+    return draft_section_run(
+        ws,
+        job,
+        section,
+        draft_provider,
+        support_provider,
+        limits,
+        model_id=model_id or draft_provider.model_id,
+        support_model_id=model_id or support_provider.model_id,
+        facts=facts,
+        synthetic=True,
+    )

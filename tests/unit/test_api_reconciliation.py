@@ -134,8 +134,8 @@ def test_unavailable_audit_agents_create_no_run_or_event(tmp_path: Path) -> None
     response = client.post(
         f"/jobs/{job}/stages/draft", json={"on_revision": revision}, headers=headers
     )
-    assert response.status_code == 501
-    assert response.json()["type"] == "urn:ema:error:provisional_contract"
+    assert response.status_code == 403
+    assert response.json()["type"] == "urn:ema:error:ai_client_disabled"
     draft = client.post(
         f"/jobs/{job}/export/draft", json={"on_revision": revision}, headers=headers
     )

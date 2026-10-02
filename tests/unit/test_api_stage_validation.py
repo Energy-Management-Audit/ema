@@ -20,7 +20,7 @@ from ema.core.workspace import Workspace
     ("job_type", "stage", "human_session", "code"),
     [
         ("audit", "missing", False, "invalid_stage"),
-        ("audit", "draft", False, "provisional_contract"),
+        ("audit", "draft", False, "ai_client_disabled"),
         ("invoices", "invoices_workbook", False, "human_required"),
         ("invoices", "invoices", False, "not_ready"),
         ("piee", "intake", False, "invalid_stage"),

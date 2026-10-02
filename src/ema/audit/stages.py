@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ema.audit.chapter_five import start_measurements
+from ema.audit.draft_live import start_draft
 from ema.audit.fill_stage import start_fill
 from ema.audit.intake import audit_intake, select_checklist
 from ema.audit.measures import compose_measures, validate_measures_form
@@ -47,8 +48,6 @@ def start_audit_stage(ws: Workspace, job: str, stage: str, on_revision: int) -> 
         raise EmaError("job_running", "Lucrarea rulează deja.", job)
     if record["revision"] != on_revision:
         raise EmaError("stale_revision", "Lucrarea s-a modificat.", job)
-    if stage == "draft":
-        raise EmaError("provisional_contract", "Agentul de audit nu este disponibil.", stage)
     if stage == "readings":
         raise EmaError("ai_client_disabled", "Citirea fotografiilor aşteaptă aprobarea.", stage)
     if stage in {"intake", "read"}:
@@ -63,6 +62,7 @@ def start_audit_stage(ws: Workspace, job: str, stage: str, on_revision: int) -> 
         )
     if starter := {
         "fill": start_fill,
+        "draft": start_draft,
         "visit": start_visit,
         "measurements": start_measurements,
         "audit_final": AuditWorkflow().start_final,
