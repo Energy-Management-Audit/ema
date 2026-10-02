@@ -249,3 +249,64 @@ def test_a_carrier_filed_but_not_read_is_carrier_incomplete(tmp_path: Path) -> N
         (i.code, i.message) for i in totals_issues(facts) if i.code == "carrier_incomplete"
     ] == [("carrier_incomplete", "Lipseşte consumul de GPL pentru 2025.")]
     assert "tep_total.2025" not in facts
+
+
+def test_factor_notes_keep_a_url_as_text_without_its_hyperlink(tmp_path: Path) -> None:
+    from docx import Document  # noqa: PLC0415
+    from docx.oxml.ns import qn  # noqa: PLC0415
+
+    from ema.audit.chapter_four import factor_notes  # noqa: PLC0415
+
+    document = Document()
+    document.add_paragraph("Pentru emisii, s-au utilizat următorii factori de emisii:")
+    note = document.add_paragraph("pentru motorină: ")
+    link = note.part.relate_to(
+        "https://example.org/guide",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+        is_external=True,
+    )
+    from docx.oxml import OxmlElement  # noqa: PLC0415
+
+    anchor = OxmlElement("w:hyperlink")
+    anchor.set(qn("r:id"), link)
+    run = OxmlElement("w:r")
+    text = OxmlElement("w:t")
+    text.text = "https://example.org/guide"
+    run.append(text)
+    anchor.append(run)
+    note._p.append(anchor)
+    field = document.add_paragraph("pentru benzină: ")
+    for kind, content in (
+        ("begin", None),
+        (None, ' HYPERLINK "https://example.org/g" '),
+        ("separate", None),
+    ):
+        item = OxmlElement("w:r")
+        if kind:
+            mark = OxmlElement("w:fldChar")
+            mark.set(qn("w:fldCharType"), kind)
+        else:
+            mark = OxmlElement("w:instrText")
+            mark.text = content
+        item.append(mark)
+        field._p.append(item)
+    shown = field.add_run("https://example.org/g")
+    closing = OxmlElement("w:r")
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    closing.append(end)
+    field._p.append(closing)
+    assert shown.text
+    source = tmp_path / "source.docx"
+    document.save(str(source))
+
+    notes = factor_notes(source)
+    assert len(notes) == 3
+    assert not any(
+        item.iter(qn("w:hyperlink")) and list(item.iter(qn("w:hyperlink"))) for item in notes
+    )
+    assert not any(
+        list(item.iter(qn("w:instrText"))) or list(item.iter(qn("w:fldChar"))) for item in notes
+    )
+    assert "https://example.org/g" in "".join(t.text or "" for t in notes[2].iter(qn("w:t")))
+    assert "https://example.org/guide" in "".join(t.text or "" for t in notes[1].iter(qn("w:t")))

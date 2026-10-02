@@ -381,7 +381,11 @@ def test_audit_case_a_final_charts(
         "ch4.apa:water_potable:2024:no_data",
         "ch4.apa:water_potable:2025:no_data",
         "ch4.apa:water_potable:annual:no_data",
+        # her GPL has no reading, so every total derived from the components stays missing
+        "ch4.echiv_total:annual:no_data",
+        "ch4.specific_total:annual:no_data",
         "ch4.specific_apa:water_potable:annual:no_data",
+        "ch4.intensitate:annual:no_data",
         "ch4.mediu:annual:no_data",
     ]
     for action, carrier, point in (("correct", "electricitate", 1234.5), ("reject", "gaz", None)):

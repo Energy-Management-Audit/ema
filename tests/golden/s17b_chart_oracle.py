@@ -17,6 +17,8 @@ from tests.golden.s17c_chart_layout_oracle import (
 )
 
 from ema.audit.chapter_four import MONTHS
+from ema.audit.chapter_four_blocks import emission_carriers
+from ema.audit.chapter_four_chart_text import readable_unit
 from ema.consumption_analysis.analysis import Metric, value
 from ema.core.office.chart_series import Series, read_series
 from ema.core.office.package import C, R, inspect, read_parts, relationships, target_part, xml
@@ -133,6 +135,13 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
         number += 1
         charts: list[tuple[int | None, list[Series]]] = []
         unit, scale = expected_unit(unit, specific)
+        if specific and metrics[0][1].kind == "specific":
+            shown = (
+                value(dataset, FACTORS_2026, metric, year, filed=False)[0]
+                for _, metric in metrics
+                for year in years
+            )
+            unit, scale = readable_unit(unit, scale, shown)
         if monthly_subject is not None:
             for year in years:
                 series = [
@@ -140,7 +149,13 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
                         name,
                         list(MONTHS),
                         [
-                            value(dataset, FACTORS_2026, replace(metric, month=month), year)[0]
+                            value(
+                                dataset,
+                                FACTORS_2026,
+                                replace(metric, month=month),
+                                year,
+                                filed=False,
+                            )[0]
                             for month in range(1, 13)
                         ],
                     )
@@ -154,7 +169,7 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
             Series(
                 name,
                 [str(year) for year in years],
-                [value(dataset, FACTORS_2026, metric, year)[0] for year in years],
+                [value(dataset, FACTORS_2026, metric, year, filed=False)[0] for year in years],
             )
             for name, metric in metrics
         ]
@@ -280,7 +295,7 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
         elif section == "ch4.intensitate":
             metrics = [("Intensitate energetică", Metric("intensity"))]
         else:
-            metrics = [("Emisii", Metric("co2"))]
+            metrics = [("Emisii", Metric("co2", emission_carriers(dataset)))]
         years = tuple(
             year
             for year in dataset.years

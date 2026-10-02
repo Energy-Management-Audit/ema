@@ -118,8 +118,27 @@ def factor_notes(source: Path) -> list[etree._Element]:
     for item in paragraphs[start:]:
         if not _text(item).strip():
             break
-        notes.append(deepcopy(item))
+        note = deepcopy(item)
+        _unlink(note)
+        notes.append(note)
     return notes
+
+
+def _unlink(paragraph: etree._Element) -> None:
+    """Keep a URL as plain text: a link field or hyperlink would need a relationship."""
+    for link in list(paragraph.iter(W + "hyperlink")):
+        parent = link.getparent()
+        assert parent is not None
+        index = parent.index(link)
+        for run in list(link):
+            parent.insert(index, run)
+            index += 1
+        parent.remove(link)
+    for run in list(paragraph.iter(W + "r")):
+        if run.find(W + "fldChar") is not None or run.find(W + "instrText") is not None:
+            parent = run.getparent()
+            assert parent is not None
+            parent.remove(run)
 
 
 def _text(element: etree._Element) -> str:
