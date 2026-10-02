@@ -6,21 +6,15 @@ from uuid import UUID
 import pytest
 from tests.workspace_jobs import create_job
 
-from ema.audit.fill_tools import FillDocument, FillTools
+from ema.audit.catalogue import CATALOGUE
+from ema.audit.fill_stage import fill_section
+from ema.audit.fill_tools import FillDocument
 from ema.audit.read import read_dossier
 from ema.audit.sections import record_applicability
-from ema.core.llm import AgentContext, Limits, ReplayProvider, run_agent
+from ema.core.llm import Limits, ReplayProvider
 from ema.core.llm.agent import AgentState
 from ema.core.review.fields import fields
 from ema.core.workspace import Workspace
-
-PROMPT_VERSION = "audit-fill-v1"
-INSTRUCTIONS = (
-    "Read the dossier and dataset for this section. Record facts only with verbatim "
-    "source quotes or an exact dataset field. Mark missing facts, defer unavailable "
-    "material, and propose n/a only when the catalogue trigger is absent. "
-    "Never infer a number that is not in a source."
-)
 
 pytestmark = pytest.mark.golden
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
@@ -33,16 +27,13 @@ def fill_section_replay(
     documents: dict[str, FillDocument],
     replay: ReplayProvider,
     limits: Limits,
-    *,
-    model_id: str | None = None,
-) -> tuple[AgentState, FillTools]:
-    """Run only on a synthetic dossier; S11 persists the resumable transcript."""
+) -> AgentState:
+    """The production per-section Fill run, on a synthetic dossier over a replay."""
     record_applicability(ws, job, section)
-    tools = FillTools(ws, job, section, documents)
-    context = AgentContext(
-        ws, job, section, replay, model_id or replay.model_id, PROMPT_VERSION, synthetic=True
+    entry = next(item for item in CATALOGUE if item.id == section)
+    return fill_section(
+        ws, job, entry, documents, provider=replay, model_id=replay.model_id, limits=limits
     )
-    return run_agent(context, INSTRUCTIONS, tools.tools(), limits), tools
 
 
 def test_synthetic_fill_rejects_fabrication_and_resumes(
@@ -65,9 +56,9 @@ def test_synthetic_fill_rejects_fabrication_and_resumes(
         ),
     }
     replay = ReplayProvider(FIXTURES / "llm/fill_synthetic_openai.json")
-    state, _ = fill_section_replay(ws, job, "ch2.date_generale", docs, replay, Limits(1))
+    state = fill_section_replay(ws, job, "ch2.date_generale", docs, replay, Limits(1))
     assert state.status == "step_limit"
-    state, _ = fill_section_replay(ws, job, "ch2.date_generale", docs, replay, Limits(4))
+    state = fill_section_replay(ws, job, "ch2.date_generale", docs, replay, Limits(4))
     assert state.status == "done"
     assert replay.calls == 3
     found = {item.key: item for item in fields(ws, job)}
@@ -89,7 +80,7 @@ def test_fill_optional_spend_cap_stops_before_provider(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "audit", "made-up", 2026)
     replay = ReplayProvider(FIXTURES / "llm/fill_synthetic_openai.json")
-    state, _ = fill_section_replay(
+    state = fill_section_replay(
         ws, job, "ch2.date_generale", {}, replay, Limits(5, spend_cap_usd=0.000000001)
     )
     assert state.status == "spend_cap"

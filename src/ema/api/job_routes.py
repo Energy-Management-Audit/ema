@@ -35,8 +35,8 @@ def install_job_routes(app: FastAPI, ws: Workspace) -> None:
         response_model=RunStart,
         status_code=202,
         description=(
-            "Bound stages start real runs. fill and draft return 501 because "
-            "live audit agents do not exist (S14 has replay only)."
+            "Bound stages start real runs. draft returns 501 because "
+            "live audit drafting does not exist yet."
         ),
     )
     def start_stage(job_id: str, stage: str, body: StageInput, request: Request) -> dict[str, str]:

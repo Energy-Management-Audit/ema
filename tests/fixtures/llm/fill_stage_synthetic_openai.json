@@ -54,7 +54,7 @@
       "request_hashes": {
         "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
         "prompt_version": "95b6ff8429349138428207e14d21d1483650d726c5ff985b377ce139cfe4f673",
-        "messages": "e1465ccb72ad8c9b562273cfe30200b55bd54187818db8f8aff9ee3610b22507",
+        "messages": "b39769e93ac9b2ee90b69fe0f068f70e96bd3628d2713171c98e37ac19b5152a",
         "tools": "43726eb8452501587c8e86ce1072bc5aea9f444bd8fe352e0be1c18074ee9fc4",
         "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
         "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"
@@ -86,7 +86,7 @@
                 "type": "function",
                 "function": {
                   "name": "record_fact",
-                  "arguments": "{\"key\": \"audit.employees\", \"value\": 700, \"name\": \"permit.pdf\", \"quote\": \"500 m²\"}"
+                  "arguments": "{\"key\": \"audit.employees\", \"value\": 700, \"name\": \"permit.pdf\", \"quote\": \"500 m2\"}"
                 }
               }
             ]
@@ -102,7 +102,7 @@
       "request_hashes": {
         "model": "1b22c6c0548bb32bebe6a71bade496786a55534f5d758b7a58693ac82d964e1d",
         "prompt_version": "95b6ff8429349138428207e14d21d1483650d726c5ff985b377ce139cfe4f673",
-        "messages": "415526f507c959d7b3ed064a1e8026bd9e8822c9a42f3bf0b17749c966e73e0c",
+        "messages": "d866bc8d8cc6b3bc81227e3baaacfdef10af439a30e0790ee01e23c492367069",
         "tools": "43726eb8452501587c8e86ce1072bc5aea9f444bd8fe352e0be1c18074ee9fc4",
         "schema": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
         "max_output_tokens": "8b926d75599a618e21f1341318e66517be26e18cc7496783d2b59758c1333be8"

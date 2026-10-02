@@ -15798,7 +15798,7 @@
     },
     "/jobs/{job_id}/stages/{stage}": {
       "post": {
-        "description": "Bound stages start real runs. fill and draft return 501 because live audit agents do not exist (S14 has replay only).",
+        "description": "Bound stages start real runs. draft returns 501 because live audit drafting does not exist yet.",
         "operationId": "start_stage_jobs__job_id__stages__stage__post",
         "parameters": [
           {

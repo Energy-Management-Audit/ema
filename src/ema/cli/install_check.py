@@ -22,6 +22,7 @@ if sys.platform == "win32":
 RESOURCE_FILES = (
     ("audit", "measurement_norms.json"),
     ("audit", "measurement_phrases.json"),
+    ("audit", "prompts", "fill_v1.txt"),
     ("audit", "prompts", "style_guide_v1.json"),
     ("consumption_analysis", "phrases.jsonl"),
     ("consumption_analysis", "trend_rules.json"),

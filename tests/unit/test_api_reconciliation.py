@@ -92,7 +92,7 @@ def test_inventory_and_generated_contract(tmp_path: Path) -> None:
         assert f"`{method} {path}`" in diff
     stage = new[("POST", "/jobs/{job_id}/stages/{stage}")]
     assert "x-provisional" not in stage
-    assert "fill and draft return 501" in stage["description"]
+    assert "draft returns 501" in stage["description"]
     binary = new[("GET", "/jobs/{job_id}/outputs/{output_id}")]["responses"]["200"]["content"]
     assert set(binary) == {
         "application/pdf",
@@ -131,12 +131,11 @@ def test_unavailable_audit_agents_create_no_run_or_event(tmp_path: Path) -> None
     headers = {"X-Ema-CSRF": token}
     with ws.connect() as db:
         revision = db.execute("SELECT revision FROM jobs WHERE id=?", (job,)).fetchone()[0]
-    for stage in ("fill", "draft"):
-        response = client.post(
-            f"/jobs/{job}/stages/{stage}", json={"on_revision": revision}, headers=headers
-        )
-        assert response.status_code == 501
-        assert response.json()["type"] == "urn:ema:error:provisional_contract"
+    response = client.post(
+        f"/jobs/{job}/stages/draft", json={"on_revision": revision}, headers=headers
+    )
+    assert response.status_code == 501
+    assert response.json()["type"] == "urn:ema:error:provisional_contract"
     draft = client.post(
         f"/jobs/{job}/export/draft", json={"on_revision": revision}, headers=headers
     )
