@@ -109,7 +109,11 @@ test('X3: approving posts exactly the listed final and the readiness shown', asy
       path,
       routes: {
         ...withFinal,
-        [`POST ${J}/export`]: { status: 200, body: EXPORTED },
+        // The receipt is stamped now: a fixed date ages out of the 'acum …' range within a week.
+        [`POST ${J}/export`]: {
+          status: 200,
+          body: { ...EXPORTED, approved_at: new Date().toISOString() },
+        },
       },
     },
     async ({ page, requests, setRoute }) => {
