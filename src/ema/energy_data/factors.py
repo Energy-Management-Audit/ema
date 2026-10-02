@@ -74,6 +74,7 @@ class FactorTable:
 
 
 _PLAN_2026 = "docs/PLAN.md §5.10: 2026 document factors for 2023-2025 data"
+_BIOMASS_CO2_SOURCE = "Commission Implementing Regulation (EU) 2018/2066, Article 38"
 FACTORS_2026 = FactorTable(
     version="2026",
     valid_from_year=2023,
@@ -90,6 +91,9 @@ FACTORS_2026 = FactorTable(
         Factor(Carrier.natural_gas, "MWh", 0.1787, _PLAN_2026),
         Factor(Carrier.diesel, "t", 3.259, _PLAN_2026),
         Factor(Carrier.petrol, "t", 3.068, _PLAN_2026),
+        Factor(Carrier.biomass, "Gcal", 0, _BIOMASS_CO2_SOURCE),
+        Factor(Carrier.sunflower_husks, "Gcal", 0, _BIOMASS_CO2_SOURCE),
+        Factor(Carrier.wood, "Gcal", 0, _BIOMASS_CO2_SOURCE),
     ),
     valid_to_year=2025,
 )
