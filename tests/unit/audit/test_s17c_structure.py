@@ -104,7 +104,7 @@ def _chapter_prototypes():
 
 def test_added_headings_borrow_only_the_named_sibling():
     positions, body = _chapter_prototypes()
-    prototypes = _prototypes(positions, body, 0, len(body))
+    prototypes = _prototypes(positions, body, 0, len(body), (2025,))
     for section, sibling in {
         "ch4.electricitate_pv": "ch4.electricitate",
         "ch4.echiv_pv": "ch4.echiv_electric",
@@ -121,7 +121,7 @@ def test_added_heading_without_its_sibling_fails_loudly(missing):
     positions, body = _chapter_prototypes()
     del positions[missing]
     with pytest.raises(EmaError) as error:
-        _prototypes(positions, body, 0, len(body))
+        _prototypes(positions, body, 0, len(body), (2025,))
     assert error.value.code == "heading_prototype_missing"
     assert error.value.detail == missing
 

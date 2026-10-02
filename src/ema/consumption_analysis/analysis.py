@@ -5,32 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from ema.consumption_analysis.metric_kind import MetricKind
+from ema.consumption_analysis.derive import carriers, derived, production
+from ema.consumption_analysis.metric_kind import Metric
 from ema.consumption_analysis.phrases import phrase_bank, trend_direction, trend_phrase
 from ema.core.office.blocks import Block, NativeChart, Num, Paragraph, Segment, Table
 from ema.core.office.chart_series import Series
-from ema.energy_data.calc import (
-    annual,
-    co2,
-    energy_intensity,
-    specific_consumption,
-    tep,
-    tep_total,
-    water_specific,
-)
-from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FactorTable
-from ema.energy_data.model import EnergyDataset, FiledValue, field_key
-
-
-@dataclass(frozen=True)
-class Metric:
-    kind: MetricKind
-    carriers: tuple[Carrier, ...] = ()
-    product: str | None = None
-    month: int | None = None
-    decimals: int | None = None
-    grouping: bool | None = None
+from ema.energy_data.model import EnergyDataset, FiledValue
 
 
 @dataclass(frozen=True)
@@ -105,89 +86,6 @@ class AnalysisSection:
     blocks: tuple[Block, ...]
 
 
-def _production(ds: EnergyDataset, metric: Metric, year: int) -> tuple[float | None, str]:
-    if metric.product is None:
-        raise ValueError("production metric needs a product")
-    series = ds.production.get(metric.product, {}).get(year)
-    key = field_key("production", metric.product, year, metric.month)
-    if series is None:
-        return None, key
-    if metric.month is None:
-        return annual(series, "production", metric.product, year).value, key
-    reading = series.months.get(metric.month)
-    return (reading.value if reading else None), key
-
-
-def _carrier_value(
-    ds: EnergyDataset, carrier: Carrier, year: int, month: int | None
-) -> tuple[float | None, str]:
-    series = ds.carriers.get(carrier, {}).get(year)
-    if series is None:
-        return None, ""
-    if month is None:
-        result = annual(series, "carrier", carrier.value, year)
-        return result.value, result.unit
-    reading = series.months.get(month)
-    return (reading.value, reading.unit) if reading else (None, "")
-
-
-def _carriers(ds: EnergyDataset, metric: Metric, year: int) -> tuple[float | None, str]:
-    if not metric.carriers:
-        raise ValueError("carrier metric needs at least one carrier")
-    readings = [_carrier_value(ds, carrier, year, metric.month) for carrier in metric.carriers]
-    keys = "+".join(
-        field_key("carrier", carrier.value, year, metric.month) for carrier in metric.carriers
-    )
-    if any(number is None for number, _ in readings):
-        return None, keys
-    if len({unit for _, unit in readings}) != 1:
-        raise ValueError("combined carrier readings have different units")
-    return sum(number for number, _ in readings if number is not None), keys
-
-
-def _derived(  # noqa: C901, PLR0912
-    ds: EnergyDataset, factors: FactorTable, metric: Metric, year: int
-) -> tuple[float | None, str | None]:
-    if metric.kind == "tep_total":
-        result = tep_total(ds, factors, year, metric.month)
-    elif metric.kind == "tep_monthly_sum":
-        if len(metric.carriers) != 1 or metric.month is not None:
-            raise ValueError("annual monthly tep metric needs one carrier and no month")
-        parts = [tep(ds, factors, metric.carriers[0], year, month) for month in range(1, 13)]
-        return (
-            sum(part.value for part in parts if part.value is not None)
-            if all(part.value is not None for part in parts)
-            else None,
-            "+".join(key for part in parts for key in part.inputs),
-        )
-    elif metric.kind == "intensity":
-        result = energy_intensity(ds, factors, year)
-    elif metric.kind == "specific":
-        if metric.product is None:
-            raise ValueError("specific metric needs a product")
-        if len(metric.carriers) > 1:
-            raise ValueError("specific metric accepts at most one carrier")
-        result = specific_consumption(
-            ds, factors, year, metric.carriers[0] if metric.carriers else None, metric.product
-        )
-    elif metric.kind == "water_specific":
-        if metric.product is None or len(metric.carriers) != 1:
-            raise ValueError("water-specific metric needs a product and water carrier")
-        result = water_specific(ds, year, metric.carriers[0], metric.product)
-    elif metric.kind in {"tep", "co2"}:
-        if len(metric.carriers) != 1 and (metric.kind == "tep" or metric.carriers):
-            raise ValueError(f"{metric.kind} metric needs one carrier or total CO2")
-        carrier = metric.carriers[0] if metric.carriers else None
-        if metric.kind == "tep":
-            assert carrier is not None
-            result = tep(ds, factors, carrier, year, metric.month)
-        else:
-            result = co2(ds, factors, year, carrier, metric.month)
-    else:
-        raise ValueError("derived metric kind is invalid")
-    return result.value, "+".join(result.inputs) or result.formula_id
-
-
 @dataclass(frozen=True)
 class ResolvedValue:
     value: float | None
@@ -205,55 +103,65 @@ def _filed_key(metric: Metric) -> str | None:
         return f"tep.{metric.carriers[0].value}"
     if metric.kind in {"intensity", "tep_total"}:
         return metric.kind
-    if metric.kind == "co2":
+    if metric.kind == "co2" and len(metric.carriers) <= 1:
         return f"co2.{metric.carriers[0].value}" if metric.carriers else "co2.total"
     return None
 
 
 def resolve_value(
-    ds: EnergyDataset, factors: FactorTable, metric: Metric, year: int
+    ds: EnergyDataset, factors: FactorTable, metric: Metric, year: int, *, filed: bool = True
 ) -> ResolvedValue:
-    """Keep the filed alternative; prefer a complete calculation and flag a disagreement."""
+    """Keep the filed alternative; prefer a complete calculation and flag a disagreement.
+
+    With ``filed=False`` (the audit) a value that cannot be calculated stays missing: a filed
+    figure never stands in for it, so a printed total always matches its printed components.
+    """
     if year not in ds.years:
         raise ValueError("metric year is outside the dataset")
     key = _filed_key(metric)
-    filed: FiledValue | None = ds.filed_indicators.get(key, {}).get(year) if key else None
+    filed_value: FiledValue | None = ds.filed_indicators.get(key, {}).get(year) if key else None
     if metric.kind == "filed":
         return (
-            ResolvedValue(filed.value, f"filed:{filed.source}", "filed")
-            if filed
+            ResolvedValue(filed_value.value, f"filed:{filed_value.source}", "filed")
+            if filed_value
             else ResolvedValue(None, key, "missing")
         )
-    if not ds.energy_inventory_complete and (
-        metric.kind in {"tep_total", "intensity"} or (metric.kind == "co2" and not metric.carriers)
+    if (
+        filed
+        and not ds.energy_inventory_complete
+        and (
+            metric.kind in {"tep_total", "intensity"}
+            or (metric.kind == "co2" and not metric.carriers)
+        )
     ):
         return (
-            ResolvedValue(filed.value, f"filed:{filed.source}", "filed")
-            if filed
+            ResolvedValue(filed_value.value, f"filed:{filed_value.source}", "filed")
+            if filed_value
             else ResolvedValue(None, key, "missing")
         )
     if metric.kind == "production":
-        computed = _production(ds, metric, year)
+        computed = production(ds, metric, year)
     elif metric.kind == "carrier":
-        computed = _carriers(ds, metric, year)
+        computed = carriers(ds, metric, year)
     else:
-        computed = _derived(ds, factors, metric, year)
+        computed = derived(ds, factors, metric, year, filed=filed)
     if computed[0] is None:
         return (
-            ResolvedValue(filed.value, f"filed:{filed.source}", "filed")
-            if filed
+            ResolvedValue(filed_value.value, f"filed:{filed_value.source}", "filed")
+            if filed and filed_value
             else ResolvedValue(None, computed[1], "missing")
         )
     conflict = bool(
-        filed and abs(computed[0] - filed.value) > 0.5 * 10 ** (-filed.decimals) + 1e-12
+        filed_value
+        and abs(computed[0] - filed_value.value) > 0.5 * 10 ** (-filed_value.decimals) + 1e-12
     )
     return ResolvedValue(computed[0], computed[1], "recomputed", conflict)
 
 
 def value(
-    ds: EnergyDataset, factors: FactorTable, metric: Metric, year: int
+    ds: EnergyDataset, factors: FactorTable, metric: Metric, year: int, *, filed: bool = True
 ) -> tuple[float | None, str | None]:
-    resolved = resolve_value(ds, factors, metric, year)
+    resolved = resolve_value(ds, factors, metric, year, filed=filed)
     return resolved.value, resolved.fact
 
 

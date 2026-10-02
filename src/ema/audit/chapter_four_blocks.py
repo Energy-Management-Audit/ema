@@ -6,7 +6,8 @@ from collections.abc import Mapping
 from dataclasses import replace
 
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.chapter_four_chart_text import is_turnover_unit, scaled_unit
+from ema.audit.chapter_four_chart_text import is_turnover_unit
+from ema.audit.chapter_four_chart_values import display_unit
 from ema.consumption_analysis.analysis import Metric, SectionPlan, TablePlan, analyze, value
 from ema.core.office.blocks import (
     Block,
@@ -19,7 +20,7 @@ from ema.core.office.blocks import (
     Table,
 )
 from ema.core.office.missing_text import MISSING_TEXT, TABLE_MISSING_NOTE, TABLE_MISSING_TEXT
-from ema.energy_data.carriers import WATER_CARRIERS, Carrier
+from ema.energy_data.carriers import CARRIER_NAMES_RO, WATER_CARRIERS, Carrier, counts_in_total
 from ema.energy_data.factors import FactorTable
 from ema.energy_data.model import EnergyDataset
 
@@ -44,6 +45,9 @@ TITLES = {
     Carrier.water_industrial: "Consumul de apă industrială",
     Carrier.water_storm: "Consumul de apă pluvială",
 }
+EMISSIONS_MISSING = "n.d."
+# a carrier the client has no series for in that year is not part of that year's total
+NO_SERIES = "–"
 ELECTRIC = frozenset({Carrier.electricity_grid})
 PV = frozenset({Carrier.electricity_pv})
 GAS = frozenset({Carrier.natural_gas})
@@ -61,10 +65,10 @@ def _annual(  # noqa: PLR0913
     product_name: str | None = None,
 ) -> list[Block]:
     result: list[Block] = []
-    for year in years:
-        number, fact = value(dataset, factors, metric, year)
+    numbers = [value(dataset, factors, metric, year, filed=False) for year in years]
+    shown_unit, scale = display_unit(dataset, factors, (metric,), unit, years)
+    for year, (number, fact) in zip(years, numbers, strict=True):
         if metric.kind in {"specific", "water_specific", "intensity"}:
-            display_unit, scale = scaled_unit(unit, metric.kind)
             if number is None:
                 product = f"{product_name or MISSING_TEXT}: " if product_name is not None else ""
                 result.append(Missing("body", f"{product}pentru anul {year}: {MISSING_TEXT};"))
@@ -78,7 +82,7 @@ def _annual(  # noqa: PLR0913
                     [
                         *prefix,
                         f"pentru anul {year} s-a înregistrat o valoare de ",
-                        Num(number * scale, 2, display_unit, fact, scale=scale),
+                        Num(number * scale, 2, shown_unit, fact, scale=scale),
                         ";",
                     ],
                 )
@@ -240,6 +244,55 @@ def _specific(
     return result or [Missing("body", "[de completat]")]
 
 
+def emission_carriers(dataset: EnergyDataset) -> tuple[Carrier, ...]:
+    """Purchased energy only: self-generated PV has no emission factor and no row in her table."""
+    return tuple(
+        sorted(
+            (
+                carrier
+                for carrier in dataset.carriers
+                if counts_in_total(carrier) and carrier != Carrier.electricity_pv
+            ),
+            key=list(Carrier).index,
+        )
+    )
+
+
+def _emissions(dataset: EnergyDataset, factors: FactorTable, notes: tuple[str, ...]) -> list[Block]:
+    carriers = emission_carriers(dataset)
+    if not carriers:
+        return [Missing("body", "[de completat]")]
+    years = dataset.years
+    rows: list[list[list[Segment]]] = []
+    for label, metric in (
+        *((CARRIER_NAMES_RO[carrier], Metric("co2", (carrier,))) for carrier in carriers),
+        ("Total", Metric("co2", carriers)),
+    ):
+        cells: list[list[Segment]] = [[label[:1].upper() + label[1:]]]
+        for year in years:
+            if label != "Total" and not all(
+                year in dataset.carriers.get(c, {}) for c in metric.carriers
+            ):
+                cells.append([NO_SERIES])
+                continue
+            number, fact = value(dataset, factors, metric, year, filed=False)
+            cells.append([Num(number, 2, fact=fact, grouping=True)])
+        rows.append(cells)
+    caption = Caption(
+        "caption",
+        "tab",
+        "ch4.mediu",
+        ["Tabelul ", Ref("tab", "ch4.mediu"), ". Emisii de gaze cu efect de seră – t CO₂"],
+    )
+    table = Table(
+        "emissions", rows, header=[["Sursa", *map(str, years)]], missing_text=EMISSIONS_MISSING
+    )
+    factor_list: list[Block] = [
+        Paragraph(f"emission_note:{i}", [text]) for i, text in enumerate(notes)
+    ] or [Missing("body", "[de completat]")]
+    return [caption, table, *factor_list]
+
+
 def _written(text: str | None) -> list[Block]:
     paragraphs = [part.strip() for part in (text or "").split("\n\n") if part.strip()]
     if not paragraphs:
@@ -253,6 +306,7 @@ def chapter_four_blocks(  # noqa: C901
     *,
     texts: Mapping[str, str] | None = None,
     client: str = "",
+    notes: tuple[str, ...] = (),
 ) -> list[Block]:
     blocks: list[Block] = []
     raw = {
@@ -320,9 +374,7 @@ def chapter_four_blocks(  # noqa: C901
                 )
             )
         elif section.id == "ch4.mediu":
-            blocks.extend(
-                _annual(dataset, factors, Metric("co2"), dataset.years, "t CO₂", "Emisii")
-            )
+            blocks.extend(_emissions(dataset, factors, notes))
         elif section.id in {"ch4.concluzii", "ch4.eficienta", "ch4.bilant_real"}:
             blocks.extend(_written((texts or {}).get(section.id)))
     return blocks

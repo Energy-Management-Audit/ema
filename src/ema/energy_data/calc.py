@@ -5,6 +5,7 @@ from __future__ import annotations
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier, counts_in_total
 from ema.energy_data.co2_units import converted_co2
 from ema.energy_data.factors import FactorTable
+from ema.energy_data.filed_tep import filed_tep
 from ema.energy_data.model import (
     CarrierSeries,
     Derived,
@@ -205,23 +206,17 @@ def shares(ds: EnergyDataset, factors: FactorTable, year: int) -> dict[Carrier, 
 
 
 def specific_consumption(
-    ds: EnergyDataset, factors: FactorTable, year: int, carrier: Carrier | None, product: str
+    ds: EnergyDataset,
+    factors: FactorTable,
+    year: int,
+    carrier: Carrier | None,
+    product: str,
+    *,
+    filed: bool = True,
 ) -> Derived:
     energy = tep_total(ds, factors, year) if carrier is None else tep(ds, factors, carrier, year)
-    if energy.value is None:
-        filed_key = "tep_total" if carrier is None else f"tep.{carrier.value}"
-        filed = ds.filed_indicators.get(filed_key, {}).get(year)
-        if filed is not None:
-            inputs = (
-                tuple(
-                    field_key("carrier_tep", name.value, year)
-                    for name in ds.carriers
-                    if counts_in_total(name) and year in ds.carriers[name]
-                )
-                if carrier is None
-                else (field_key("carrier_tep", carrier.value, year),)
-            )
-            energy = Derived(filed.value, "tep", "filed.tep", inputs, "filed", year=year)
+    if energy.value is None and filed:
+        energy = filed_tep(ds, carrier, year) or energy
     key = field_key("production", product, year)
     series = ds.production.get(product, {}).get(year)
     output_unit = f"tep/{ds.production_unit.get(product, '')}"
@@ -289,15 +284,12 @@ def water_specific(ds: EnergyDataset, year: int, carrier: Carrier, product: str)
     )
 
 
-def energy_intensity(ds: EnergyDataset, factors: FactorTable, year: int) -> Derived:
+def energy_intensity(
+    ds: EnergyDataset, factors: FactorTable, year: int, *, filed: bool = True
+) -> Derived:
     energy = tep_total(ds, factors, year)
-    if energy.value is None and (filed := ds.filed_indicators.get("tep_total", {}).get(year)):
-        inputs = tuple(
-            field_key("carrier_tep", carrier.value, year)
-            for carrier in ds.carriers
-            if counts_in_total(carrier) and year in ds.carriers[carrier]
-        )
-        energy = Derived(filed.value, "tep", "filed.tep", inputs, "filed", year=year)
+    if energy.value is None and filed:
+        energy = filed_tep(ds, None, year) or energy
     key = field_key("turnover", None, year)
     turnover = ds.turnover_lei.get(year)
     missing = list(energy.missing)

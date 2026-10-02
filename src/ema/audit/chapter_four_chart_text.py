@@ -1,6 +1,7 @@
 """Verbatim caption templates for the supported chapter-four charts."""
 
 import re
+from collections.abc import Iterable
 
 from ema.consumption_analysis.metric_kind import MetricKind
 from ema.energy_data.carriers import Carrier
@@ -22,6 +23,17 @@ def scaled_unit(unit: str, kind: MetricKind) -> tuple[str, float]:
     if separator and denominator == "1000 lei":
         return numerator + "/mil lei", 1000.0
     return unit, 1.0
+
+
+def readable_unit(unit: str, scale: float, values: Iterable[float | None]) -> tuple[str, float]:
+    """Per thousand tonnes when a per-tonne figure would print below 0,10 (her PIEE convention)."""
+    numerator, _, denominator = unit.partition("/")
+    word, _, tail = denominator.partition(" ")
+    if numerator != "tep" or word not in {"t", "tone"}:
+        return unit, scale
+    if not any(number and round(abs(number * scale), 2) < 0.1 for number in values):
+        return unit, scale
+    return "tep/mii tone" + (" " + tail if tail else ""), scale * 1000
 
 
 MONTHS = (

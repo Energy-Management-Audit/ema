@@ -19,6 +19,7 @@ from docx.oxml.ns import qn
 from tests.audit_replay import CH2_DRAFT, draft_recording, support_recording
 from tests.conftest import artifacts_path
 from tests.golden.cases import case_path
+from tests.golden.gpl_review import confirm_missing_gpl
 from tests.golden.s17b_audit_ui_fixture import prepare_all_but
 from tests.golden.test_s10b_audit_base import _references
 from tests.golden.test_s15b_chapter_six_base import _synthetic_form
@@ -131,14 +132,12 @@ def _settings(root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tu
 
 
 def review_inputs(ws: Workspace, job: str) -> dict[str, str]:
-    """Step 2 of the final (D8): her texts written, one reading corrected and one rejected.
-
-    Returns the two reviewed keys; their ch. 4 cells are what the final golden checks.
-    """
+    """Step 2 (D8): texts written, GPL confirmed missing, one reading corrected, one rejected."""
     for field in fields(ws, job):
         if field.key.startswith("narrative.") and field.value is None:
             decide(ws, job, field.id, "correct", field.revision, "user", value="Text verificat.")
     run_measures(ws, job)  # ch. 6 is composed again with the texts just written
+    confirm_missing_gpl(ws, job)
     reviewed: dict[str, str] = {}
     for carrier, action in (("electricity_grid", "correct"), ("natural_gas", "reject")):
         field = min(
