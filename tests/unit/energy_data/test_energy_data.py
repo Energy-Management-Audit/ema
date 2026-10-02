@@ -213,10 +213,20 @@ def test_change_requires_consecutive_years() -> None:
         ([1, 1, 1], "constantă"),
         ([1.001, 1.002, 1.003], "constantă"),
         ([1, 2, 1], "constantă"),
+        ([1000, 1000, 1000.4], "constantă"),
+        ([1000, 1000, 1002], "creștere"),
+        ([1002, 1000, 1000], "scădere"),
+        ([-1000, -1000, -1002], "scădere"),
     ],
 )
 def test_trend(values: list[float], expected: str) -> None:
     assert trend(values) == expected
+
+
+def test_trend_threshold_edges() -> None:
+    # fitted change / mean is d / 10000 for [10000, 10000, 10000 + d]
+    assert trend([10000, 10000, 10005]) == "constantă"
+    assert trend([10000, 10000, 10006]) == "creștere"
 
 
 def test_trend_uses_prototype_precision() -> None:
