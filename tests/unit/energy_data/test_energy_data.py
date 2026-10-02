@@ -14,7 +14,7 @@ from ema.energy_data.calc import (
     trend,
 )
 from ema.energy_data.carriers import ALIASES, Carrier, carrier_for
-from ema.energy_data.factors import Factor, FactorTable
+from ema.energy_data.factors import FACTORS_2026, Factor, FactorTable
 from ema.energy_data.model import CarrierSeries, Derived, EnergyDataset, Reading, field_key
 from ema.energy_data.reconcile import reconcile
 
@@ -280,6 +280,19 @@ def test_co2_total_stays_missing_without_carrier_factor() -> None:
     result = co2(ds, table(), 2024)
     assert result.value is None
     assert "factor.co2.sunflower_husks.Gcal.2024" in result.missing
+
+
+@pytest.mark.parametrize("carrier", [Carrier.biomass, Carrier.sunflower_husks, Carrier.wood])
+def test_biomass_co2_factor_is_zero_and_traceable(carrier: Carrier) -> None:
+    ds = EnergyDataset((2025,), {carrier: {2025: CarrierSeries(annual=Reading(20, "Gcal"))}})
+
+    factor = FACTORS_2026.co2_factor(carrier, "Gcal", 2025)
+    result = co2(ds, FACTORS_2026, 2025, carrier)
+
+    assert factor is not None and factor.per_unit == 0
+    assert "2018/2066" in factor.source
+    assert result.value == 0
+    assert result.inputs == ("carrier." + carrier.value + ".2025",)
 
 
 def test_monthly_co2_uses_monthly_reading() -> None:
