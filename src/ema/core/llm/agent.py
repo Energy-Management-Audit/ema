@@ -38,6 +38,7 @@ class AgentContext:
     model_id: str
     prompt_version: str
     synthetic: bool = False
+    client_live: bool = False
 
 
 class AgentState(BaseModel):
@@ -145,7 +146,7 @@ def _cap_exceeded(
 
 
 def _validate(context: AgentContext, limits: Limits) -> None:
-    if context.provider.name != "replay" and not context.synthetic:
+    if context.provider.name != "replay" and not (context.synthetic or context.client_live):
         raise EmaError("ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", "")
     if limits.steps <= 0 or (limits.spend_cap_usd is not None and limits.spend_cap_usd <= 0):
         raise EmaError("ai_limits", "Limitele AI sunt invalide.", "")
@@ -156,6 +157,7 @@ def run_agent(  # noqa: C901
     instructions: str,
     tools: Mapping[str, Tool],
     limits: Limits,
+    task: str | None = None,
 ) -> AgentState:
     _validate(context, limits)
     model = selected_model(
@@ -165,7 +167,10 @@ def run_agent(  # noqa: C901
         context.model_id,
     )
     state = agent_state(context.ws, context.job, context.section) or AgentState(
-        messages=[{"role": "system", "content": instructions}],
+        messages=[
+            {"role": "system", "content": instructions},
+            *([{"role": "user", "content": task}] if task is not None else []),
+        ],
         model_id=context.model_id,
         provider_name=context.provider.name,
         prompt_version=context.prompt_version,

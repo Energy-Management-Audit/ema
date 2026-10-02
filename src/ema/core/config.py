@@ -95,6 +95,7 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     brave_api_key: SecretStr | None = None
     llm_live: bool = False
+    ai_client_live: bool = False
     research_live: bool = False
 
     def provider_key(self, provider: str) -> SecretStr | None:
@@ -139,6 +140,7 @@ class Settings(BaseSettings):
                 "openai_api_key",
                 "brave_api_key",
                 "llm_live",
+                "ai_client_live",
                 "research_live",
             }
         }

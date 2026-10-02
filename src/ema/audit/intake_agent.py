@@ -14,7 +14,6 @@ from ema.core.llm import (
     Limits,
     ReplayProvider,
     agent_state,
-    curated_models,
     run_agent,
 )
 from ema.core.office.convert import stored_file
@@ -72,12 +71,7 @@ def classify_unplaced(
         _, path = stored_file(ctx.ws, ctx.job, version.file_sha)
         documents[name] = _document(name, path)
     tools = IntakeTools(documents, {item.number: item.text for item in checklist})
-    model = next(
-        model.id
-        for model in curated_models()
-        if model.provider == "gemini" and model.tier == "standard"
-    )
-    context = AgentContext(ctx.ws, ctx.job, "intake", replay, model, "audit-intake-v1")
+    context = AgentContext(ctx.ws, ctx.job, "intake", replay, replay.model_id, "audit-intake-v1")
     previous = agent_state(ctx.ws, ctx.job, "intake")
     if previous is not None:
         tools.restore(previous.messages)

@@ -1563,12 +1563,27 @@ code/ (repository root)
 - **Docs allowed:** README, AGENTS.md, PLAN.md, a few ADRs. No second architecture document: §5
   is it, and AGENTS.md only points there. No evidence files or AI artefacts.
 
-### 6.4 Working model: Claude coordinates, Codex builds (in Orca)
+### 6.4 Working model: Claude coordinates, engineers build by tier (in Orca)
 
 - **Roles:** Claude is architect and coordinator (decision-complete plans, dispatch, review, merge
-  readiness); Codex engineers build (`gpt-6-sol` by default, `gpt-6-luna` for mechanical work); Opus
-  builds only a screen that needs design taste. Vlad arbitrates and merges (a merge grant is per
-  session).
+  readiness); engineers build on the model of the work's tier (below). Vlad arbitrates and merges
+  (a merge grant is per session).
+- **Model routing by tier.** Work is dispatched to a tier, never to a model by name. The table is
+  the only place in this document that names a model, so a model release changes one row:
+
+  | tier | work | current model (since, evidence) |
+  |---|---|---|
+  | `deep` | slice builds that change a deliverable, a contract, the API or the data model; screens that need design taste; plan critiques | Claude Opus 5.5, high (2026-09-25, S16/S17a head-to-head) |
+  | `standard` | `small` issues with logic; cross-model PR reviews; fix rounds that need judgement | Codex `gpt-6-sol`, low or medium; Claude Sonnet 5.5 to review a Codex build |
+  | `light` | mechanical `small` issues, fix rounds from a findings list, docs and tests; coordinator errands (code search, CI waits, golden runs) | Codex `gpt-6-luna`, medium; Claude Haiku 4.5 for subagents |
+
+  The coordinator is Opus by Vlad's decision and is not a tier. A worker keeps one model for its
+  session (switching model drops the prompt cache; changing effort does not). A row changes only on
+  evidence: when a provider releases a model, or two PRs in a row from a tier need more than one
+  fix round, the coordinator runs one trial: candidate and current model on the same issue at the
+  same `dev` commit, a blind cross-model review, cost from the coordinator's usage report. The
+  cheapest model that matches the current one's review wins, and the row records the date and the
+  trial. Trial notes stay in the coordinator's private docs.
 - **Slice spec template** (level 3; lives in the worker's dispatch + the PR description):
   1. **Goal**: 1–2 sentences + the requirement IDs (R…).
   2. **Context**: links to the § of this document.
@@ -1592,17 +1607,18 @@ code/ (repository root)
   its PR opens. An agent or review branch tied to a PR is `PR<number>-<summary>`.
 - **Two tracks, chosen per issue by label.** `small`: one module or config, no change to a
   deliverable's numbers, format or content rules, no API or data-model change, roughly 200 changed
-  lines at most. The issue's acceptance is the plan; one engineer (`gpt-6-luna`, or `gpt-6-sol` at
-  low effort for logic), one PR that closes the issue; review is CI plus the coordinator's diff
-  read; related small issues in one area are bundled into one PR, so they pay for CI once. `slice`:
-  anything that changes a deliverable, a contract, the API or the data model, spans layers, or Vlad
-  marks as high importance. A parent issue with one sub-issue per PR, then: (1) a decision-complete
-  plan (a private spec, case codes, the template above); (2) one plan review by a cross-model critic
-  and one revision; (3) one PR per layer from child worktrees, built from the plan; (4) one
-  cross-model reviewer per PR (a Sonnet reviewer for a Codex build), findings as one list; (5) one fix
-  round, the coordinator verifying small fixes from the diff; (6) the coordinator runs the slice's
-  goldens (Word slot) before merging. The parent issue closes with its last sub-issue. A `small`
-  issue that turns out to need a decision is relabelled `slice`, and the agent stops with a QUESTION.
+  lines at most. The issue's acceptance is the plan; one engineer (`light`, or `standard` for
+  logic), one PR that closes the issue; review is CI plus the coordinator's diff read; related small
+  issues in one area are bundled into one PR, so they pay for CI once. `slice`: anything that
+  changes a deliverable, a contract, the API or the data model, spans layers, or Vlad marks as high
+  importance. A parent issue with one sub-issue per PR, then: (1) a decision-complete plan (a
+  private spec, case codes, the template above); (2) one plan review by a cross-model critic and one
+  revision; (3) one PR per layer from child worktrees, built from the plan; (4) one cross-model
+  reviewer per PR (`standard`, from the provider that did not build it), findings as one list; (5)
+  one fix round, the coordinator verifying small fixes from the diff; (6) the coordinator runs the
+  slice's goldens (Word slot) before merging. The parent issue closes with its last sub-issue. A
+  `small` issue that turns out to need a decision is relabelled `slice`, and the agent stops with a
+  QUESTION.
 - **Board and landing:** the GitHub Project "Ema" shows Todo → In Progress → In Review → Done.
   Agents move their issue with `tools/board.sh <n> progress|review`; the coordinator lands a PR with
   `tools/land.sh <pr>` (merge, close its issues as completed, Done, remove the worktree). Both live
