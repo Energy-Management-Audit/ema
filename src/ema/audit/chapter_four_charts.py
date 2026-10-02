@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.chapter_four_blocks import FUEL, TITLES
+from ema.audit.chapter_four_blocks import FUEL, TITLES, emission_carriers
 from ema.audit.chapter_four_chart_text import (
     ANNUAL,
     MONTHS,
@@ -13,9 +13,8 @@ from ema.audit.chapter_four_chart_text import (
     SUBJECT,
     WATER_ANNUAL,
     is_turnover_unit,
-    scaled_unit,
 )
-from ema.audit.chapter_four_chart_values import chart_series, has_chart_data
+from ema.audit.chapter_four_chart_values import chart_series, display_unit, has_chart_data
 from ema.consumption_analysis.analysis import Metric
 from ema.consumption_analysis.metric_kind import MetricKind
 from ema.core.office.blocks import Block, Missing, NativeChart, Paragraph
@@ -266,7 +265,7 @@ def _specs(dataset: EnergyDataset) -> tuple[list[_Spec], list[str]]:  # noqa: C9
             _Spec(
                 "ch4.mediu",
                 None,
-                (("Emisii", Metric("co2")),),
+                (("Emisii", Metric("co2", emission_carriers(dataset))),),
                 dataset.years,
                 "t CO₂",
                 annual_text=ANNUAL["ch4.mediu"],
@@ -322,11 +321,12 @@ def _group(
     key = spec.section
     if spec.section in {"ch4.apa", "ch4.specific_apa"}:
         key += ":" + spec.series[0][1].carriers[0].value
-    unit, _ = scaled_unit(spec.unit, spec.series[0][1].kind)
+    metrics = tuple(metric for _, metric in spec.series)
+    unit, scale = display_unit(dataset, factors, metrics, spec.unit, spec.years)
     letter = 0
     if spec.monthly:
         for year in spec.years:
-            series = chart_series(dataset, factors, spec.series, spec.unit, list(MONTHS), year)
+            series = chart_series(dataset, factors, spec.series, scale, list(MONTHS), year)
             caption = _caption(spec, client, k, chr(ord("a") + letter), year)
             letter += 1
             if not has_chart_data(series):
@@ -343,7 +343,7 @@ def _group(
                 )
             )
     annual_series = chart_series(
-        dataset, factors, spec.series, spec.unit, [str(year) for year in spec.years], None
+        dataset, factors, spec.series, scale, [str(year) for year in spec.years], None
     )
     annual: list[Block] = []
     caption = _caption(spec, client, k, chr(ord("a") + letter) if letter else None, None)

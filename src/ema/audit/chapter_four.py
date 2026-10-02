@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -29,10 +29,11 @@ from ema.core.office.blocks import ElementLocator, NativeChart, Prototypes, Rend
 from ema.core.office.chart_blocks import chart_caption_prototype, import_chart_style
 from ema.core.office.package import encoded, read_parts, write_parts, xml
 from ema.core.office.region import replace_region
-from ema.energy_data.factors import FACTORS_2026, FactorTable
+from ema.energy_data.factors import AUDIT_FACTORS_2026, FactorTable
 from ema.energy_data.model import EnergyDataset
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+FACTOR_LEAD_IN = "s-au utilizat următorii factori de emisii"
 MONTHS = (
     "Ianuarie",
     "Februarie",
@@ -78,8 +79,60 @@ def _table_proto(source: etree._Element, first: int) -> etree._Element:
     return result
 
 
+def _emissions_proto(source: etree._Element, years: tuple[int, ...]) -> etree._Element:
+    """The month table cut to a source column and one column per year, at the same width."""
+    result = deepcopy(source)
+    keep = 1 + len(years)
+    rows = result.findall(W + "tr")
+    if not 2 <= keep <= len(rows[0].findall(W + "tc")):
+        raise ValueError("emissions table needs one to six years")
+    for row in rows:
+        cells = row.findall(W + "tc")
+        for cell in cells[keep:]:
+            row.remove(cell)
+        width = sum(int(w.get(W + "w", "0")) for c in cells for w in c.iter(W + "tcW"))
+        for cell in cells[:keep]:
+            for node in cell.iter(W + "tcW"):
+                node.set(W + "w", str(width // keep))
+    grid = result.find(W + "tblGrid")
+    if grid is not None:
+        columns = grid.findall(W + "gridCol")
+        total = sum(int(column.get(W + "w", "0")) for column in columns)
+        for column in columns[keep:]:
+            grid.remove(column)
+        for column in columns[:keep]:
+            column.set(W + "w", str(total // keep))
+    return result
+
+
+def factor_notes(source: Path) -> list[etree._Element]:
+    """Her fixed lead-in and bullets naming the emission factors, as authored in the source."""
+    body = xml(read_parts(source), "word/document.xml").find(W + "body")
+    if body is None:
+        return []
+    paragraphs = [item for item in body if item.tag == W + "p"]
+    start = next(
+        (i for i, item in enumerate(paragraphs) if FACTOR_LEAD_IN in _text(item)), len(paragraphs)
+    )
+    notes: list[etree._Element] = []
+    for item in paragraphs[start:]:
+        if not _text(item).strip():
+            break
+        notes.append(deepcopy(item))
+    return notes
+
+
+def _text(element: etree._Element) -> str:
+    return "".join(node.text or "" for node in element.iter(W + "t"))
+
+
 def _prototypes(
-    positions: dict[str, int], body: list[etree._Element], chapter: int, following: int
+    positions: dict[str, int],
+    body: list[etree._Element],
+    chapter: int,
+    following: int,
+    years: tuple[int, ...],
+    notes: Sequence[etree._Element] = (),
 ) -> Prototypes:
     electric = positions.get("ch4.electricitate")
     if electric is None:
@@ -114,6 +167,8 @@ def _prototypes(
         "caption": caption,
         "months_first": _table_proto(table, 1),
         "months_second": _table_proto(table, 7),
+        "emissions": _emissions_proto(table, years),
+        **{f"emission_note:{i}": note for i, note in enumerate(notes)},
     }
     siblings = {
         "ch4.electricitate_pv": "ch4.electricitate",
@@ -143,7 +198,7 @@ def render_chapter_four(  # noqa: PLR0913
     *,
     chart_source: Path,
     client: str,
-    factors: FactorTable = FACTORS_2026,
+    factors: FactorTable = AUDIT_FACTORS_2026,
     texts: Mapping[str, str] | None = None,
 ) -> tuple[RenderReport, list[str]]:
     """Write all catalogue ch. 4 sections using S7 blocks and sourced values."""
@@ -153,10 +208,14 @@ def render_chapter_four(  # noqa: PLR0913
         raise ValueError("base identity denylist is required")
     chapter, following, positions, body = _located(base)
     groups, skipped = chapter_chart_groups(dataset, factors, client)
+    notes = factor_notes(chart_source)
     blocks = place_chart_groups(
-        chapter_four_blocks(dataset, factors, texts=texts, client=client), groups
+        chapter_four_blocks(
+            dataset, factors, texts=texts, client=client, notes=tuple(_text(n) for n in notes)
+        ),
+        groups,
     )
-    prototypes = _prototypes(positions, body, chapter, following)
+    prototypes = _prototypes(positions, body, chapter, following, dataset.years, notes)
     blocks = heading_blocks(blocks, prototypes)
     with TemporaryDirectory() as directory:
         working = base

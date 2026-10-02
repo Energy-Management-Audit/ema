@@ -13,6 +13,7 @@ from ema.audit.catalogue import CATALOGUE, fact_spec
 from ema.audit.catalogue_labels import CEDILLA
 from ema.audit.intake import select_checklist
 from ema.audit.sections import recompute_ready, record_applicability
+from ema.audit.totals_review import record_totals_review
 from ema.consumption_analysis.analysis import Metric, resolve_value
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, get_job
@@ -302,6 +303,7 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
                 derivation=derivation,
             )
         )
+    record_totals_review(ws, job, dataset, FACTORS_2026, sha)
     recompute_ready(ws, job)
     for section in CATALOGUE:
         if section.id.startswith("ch4."):
