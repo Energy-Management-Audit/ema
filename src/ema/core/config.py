@@ -93,12 +93,19 @@ class Settings(BaseSettings):
     model: str | None = None
     gemini_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
+    brave_api_key: SecretStr | None = None
     llm_live: bool = False
+    research_live: bool = False
 
     def provider_key(self, provider: str) -> SecretStr | None:
         if provider not in {"gemini", "openai"}:
             raise ValueError(f"Unknown provider: {provider}")
-        name = f"{provider}_api_key"
+        return self._secret(f"{provider}_api_key")
+
+    def brave_key(self) -> SecretStr | None:
+        return self._secret("brave_api_key")
+
+    def _secret(self, name: str) -> SecretStr | None:
         if key := getattr(self, name):
             return key
         try:
@@ -126,7 +133,14 @@ class Settings(BaseSettings):
         workspace = {
             key: value
             for key, value in cls._workspace_values.items()
-            if key not in {"gemini_api_key", "openai_api_key", "llm_live"}
+            if key
+            not in {
+                "gemini_api_key",
+                "openai_api_key",
+                "brave_api_key",
+                "llm_live",
+                "research_live",
+            }
         }
         return (
             env_settings,

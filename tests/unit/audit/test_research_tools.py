@@ -240,3 +240,50 @@ def test_search_cache_reused_for_client(tmp_path: Path) -> None:
         ws, second_job, "ch2.localizare", OutboundGuard(ws, second_job), NoSearch()
     )
     assert repeated.search({"query": "Exampleville location"}) == first
+
+
+class MixedSearch:
+    def __init__(self, urls: list[str]) -> None:
+        self.urls = urls
+
+    def search(self, query: str) -> list[dict[str, str]]:
+        return [{"title": "t", "url": url, "snippet": "s"} for url in self.urls]
+
+
+def _mixed(tmp_path: Path, urls: list[str]) -> tuple[ResearchTools, Workspace, str]:
+    ws = Workspace(tmp_path / "workspace")
+    job = create_job(ws, "audit", "synthetic", 2026)
+    guard = OutboundGuard(ws, job, ("Contact: secret@example.org",))
+    return ResearchTools(ws, job, "ch2.date_generale", guard, MixedSearch(urls)), ws, job
+
+
+def test_refused_result_url_is_dropped_and_logged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tools, ws, job = _mixed(
+        tmp_path,
+        [
+            "https://example.org/a",
+            "https://example.org/secret@example.org",
+            "https://example.org/b",
+        ],
+    )
+    fetched: list[str] = []
+    monkeypatch.setattr("ema.audit.research_tools.fetch", lambda *a, **k: fetched.append("x"))
+
+    results = tools.search({"query": "public query"})
+
+    assert [row["url"] for row in results] == ["https://example.org/a", "https://example.org/b"]  # type: ignore[union-attr]
+    assert fetched == []
+    with ws.connect() as db:
+        log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
+    assert '"verdict": "private_value"' in log
+    assert "secret@example.org" not in log
+    assert "secret@example.org" not in (ws.root / "clients").rglob(
+        "search-*.json"
+    ).__next__().read_text(encoding="utf-8")
+
+
+def test_all_refused_result_urls_give_an_empty_list(tmp_path: Path) -> None:
+    tools, _, _ = _mixed(tmp_path, ["https://example.org/secret@example.org"])
+    assert tools.search({"query": "public query"}) == []
