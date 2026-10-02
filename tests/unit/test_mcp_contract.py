@@ -60,7 +60,7 @@ TOOLS: dict[str, tuple[str, dict[str, Any], list[str], list[str]]] = {
     "audit_sections": ("Status of every audit section.", READ, ["job"], ["job"]),
     "audit_draft_section": (
         "Draft one audit section of chapter 2 or 3 from recorded facts, using recorded AI "
-        "responses; live AI drafting is not enabled.",
+        "responses, or the live model when none are given and the live-AI switch is on.",
         WRITE,
         ["job", "section", "draft_recording", "support_recording"],
         ["job", "section"],

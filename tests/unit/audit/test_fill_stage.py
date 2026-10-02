@@ -19,7 +19,6 @@ from ema.audit.fill_stage import FillSummary, fill_sections, fill_task, settings
 from ema.audit.fill_tools import FillTools
 from ema.audit.read import read_dossier
 from ema.audit.sections import get_status
-from ema.audit.stages import start_audit_stage
 from ema.core.config import Settings
 from ema.core.errors import EmaError
 from ema.core.jobs import get_job, status, subscribe
@@ -229,9 +228,7 @@ def test_fill_instructions_are_the_s12_text_verbatim() -> None:
     )
 
 
-def test_fill_is_a_job_stage_and_draft_stays_provisional(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_fill_is_a_job_stage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ws, job = synthetic_dossier(tmp_path, monkeypatch)
     use_provider(monkeypatch, LiveProvider({}), OPENAI_MODEL)
     revision = int(str(get_job(ws, job)["revision"]))
@@ -242,9 +239,6 @@ def test_fill_is_a_job_stage_and_draft_stays_provisional(
         pass
 
     assert next(item for item in status(ws, job).runs if item["id"] == run)["state"] == "ready"
-    with pytest.raises(EmaError) as refused:
-        start_audit_stage(ws, job, "draft", int(str(get_job(ws, job)["revision"])))
-    assert refused.value.code == "provisional_contract"
 
 
 def test_switch_off_fails_each_section_with_client_disabled(
