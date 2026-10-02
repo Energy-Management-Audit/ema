@@ -23,7 +23,7 @@ from ema.core.review.fields import fields
 from ema.core.review.models import FieldSpec
 from ema.core.workspace import Workspace
 from ema.core.workspace.conversion import active_version
-from ema.energy_data.factors import FACTORS_2026
+from ema.energy_data.factors import AUDIT_FACTORS_2026
 from ema.energy_data.measure_calc import measure_co2, measure_tep, payback_years
 
 
@@ -90,11 +90,11 @@ def _measure(
             row.saving_amount,
         )
     else:
-        tep = measure_tep(amount, unit, carrier, year, FACTORS_2026)
+        tep = measure_tep(amount, unit, carrier, year, AUDIT_FACTORS_2026)
         saving = calculated(
             ws, job, prefix + "saving_tep", replace(tep, inputs=(prefix + "saving_amount",))
         )
-    co2 = measure_co2(amount, unit, carrier, year, FACTORS_2026)
+    co2 = measure_co2(amount, unit, carrier, year, AUDIT_FACTORS_2026)
     emissions = calculated(
         ws, job, prefix + "co2_t", replace(co2, inputs=(prefix + "saving_amount",))
     )
@@ -143,7 +143,7 @@ def compose_measures(ctx: StageContext) -> StageOutcome:
     path = ctx.ws.file_path(str(record["client_slug"]), slot.file_sha)
     form = _checked_form(path, ctx.job)
     year = int(str(record["year"])) - 1
-    ctx.record_input(factors=FACTORS_2026.version)
+    ctx.record_input(factors=AUDIT_FACTORS_2026.version)
     count = supplied(
         ctx.ws,
         ctx.job,
@@ -225,7 +225,7 @@ def run_measures(ws: Workspace, job: str) -> MeasuresResult:
         run,
         len(plan.measures),
         sum(item.payback_years is None for item in plan.measures),
-        FACTORS_2026.version,
+        AUDIT_FACTORS_2026.version,
         sum(item.narrative is None for item in plan.measures),
         path,
     )

@@ -22,7 +22,7 @@ from ema.core.review.models import Cell, Derivation, Evidence, Field, FieldSpec,
 from ema.core.workspace import Workspace
 from ema.energy_data.anexa import parse_anexa
 from ema.energy_data.carriers import Carrier
-from ema.energy_data.factors import FACTORS_2026
+from ema.energy_data.factors import AUDIT_FACTORS_2026, FACTORS_2026
 from ema.energy_data.model import EnergyDataset, field_key
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
 from ema.energy_data.necesar_model import NecesarInfo
@@ -256,13 +256,13 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
     if Carrier.electricity_pv in dataset.carriers:
         issues.append("PV sections in audits taken from the PIEE pattern; confirm")
     for year in dataset.years[-1:]:
-        total = resolve_value(dataset, FACTORS_2026, Metric("tep_total"), year)
+        total = resolve_value(dataset, AUDIT_FACTORS_2026, Metric("tep_total"), year)
         if total.value is None:
             issues.append(f"tep_class_missing:{year}")
             continue
         key = "audit.tep_class"
         evidence_id = hashlib.sha256(
-            f"{job}:{sha}:{key}:{FACTORS_2026.version}".encode()
+            f"{job}:{sha}:{key}:{AUDIT_FACTORS_2026.version}".encode()
         ).hexdigest()
         with ws.connect() as db:
             previous = db.execute(
@@ -275,7 +275,7 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
                 if total.origin == "filed"
                 else [field_key("carrier", carrier.value, year) for carrier in info.carriers]
             ),
-            factor_version="filed" if total.origin == "filed" else FACTORS_2026.version,
+            factor_version="filed" if total.origin == "filed" else AUDIT_FACTORS_2026.version,
         )
         evidence = Evidence(
             id=evidence_id,
