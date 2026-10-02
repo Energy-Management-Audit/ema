@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import base64
 import json
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from typing import Any, cast
 
 from google import genai
@@ -14,6 +15,7 @@ from openai.types.chat import ChatCompletion
 from pydantic import SecretStr
 
 from ema.core.errors import EmaError
+from ema.core.llm.gemini_retry import call_with_retries
 from ema.core.llm.models import selected_model
 from ema.core.llm.types import Exchange, ToolCall, ToolSpec
 
@@ -77,8 +79,11 @@ def _openai_messages(
 class OpenAIProvider:
     name = "openai"
 
-    def __init__(self, key: SecretStr | None, llm_live: bool) -> None:
+    _client_live = False
+
+    def __init__(self, key: SecretStr | None, llm_live: bool, client_live: bool = False) -> None:
         self._client = OpenAI(api_key=_live_key(key, llm_live, "EMA_OPENAI_API_KEY"))
+        self._client_live = client_live
 
     def respond(  # noqa: PLR0913
         self,
@@ -93,7 +98,7 @@ class OpenAIProvider:
         attachments: Mapping[str, bytes] | None = None,
     ) -> Exchange:
         del prompt_version
-        if not synthetic:
+        if not synthetic and not self._client_live:
             raise EmaError(
                 "ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", ""
             )
@@ -142,8 +147,19 @@ class OpenAIProvider:
 class GeminiProvider:
     name = "gemini"
 
-    def __init__(self, key: SecretStr | None, llm_live: bool) -> None:
+    _client_live = False
+    _sleep: Callable[[float], None] = staticmethod(time.sleep)
+
+    def __init__(
+        self,
+        key: SecretStr | None,
+        llm_live: bool,
+        client_live: bool = False,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
         self._client = genai.Client(api_key=_live_key(key, llm_live, "EMA_GEMINI_API_KEY"))
+        self._client_live = client_live
+        self._sleep = sleep
 
     def respond(  # noqa: PLR0913, PLR0912, C901
         self,
@@ -158,7 +174,7 @@ class GeminiProvider:
         attachments: Mapping[str, bytes] | None = None,
     ) -> Exchange:
         del prompt_version
-        if not synthetic:
+        if not synthetic and not self._client_live:
             raise EmaError(
                 "ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", ""
             )
@@ -219,8 +235,14 @@ class GeminiProvider:
         if schema is not None:
             config["response_mime_type"] = "application/json"
             config["response_json_schema"] = schema
-        response = self._client.models.generate_content(
-            model=model, contents=cast(Any, contents), config=types.GenerateContentConfig(**config)
+        response = call_with_retries(
+            lambda: self._client.models.generate_content(
+                model=model,
+                contents=cast(Any, contents),
+                config=types.GenerateContentConfig(**config),
+            ),
+            model,
+            self._sleep,
         )
         calls = tuple(
             ToolCall(call.id or str(index), call.name or "", dict(call.args or {}))

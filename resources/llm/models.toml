@@ -7,6 +7,16 @@
 #                 https://developers.openai.com/api/docs/models/gpt-6-sol
 # Gemini 3.6 Flash prices shown apply through 2026-12-31; review before release.
 # Gemini 3.1 Pro uses the long rates when a prompt exceeds 200k tokens.
+# prices through 2026-12-31; $1.50/$7.50 from 2027-01-01
+[[models]]
+provider = "gemini"
+id = "gemini-3.8-flash"
+tier = "standard"
+vision = true
+input_usd = 0.75
+cached_input_usd = 0.075
+output_usd = 3.75
+
 [[models]]
 provider = "gemini"
 id = "gemini-3.6-flash"

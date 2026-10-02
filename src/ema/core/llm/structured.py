@@ -22,7 +22,7 @@ def complete_json[T: BaseModel](
     *,
     images: tuple[ImageInput, ...] = (),
 ) -> T:
-    if context.provider.name != "replay" and not context.synthetic:
+    if context.provider.name != "replay" and not (context.synthetic or context.client_live):
         raise EmaError("ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", "")
     model = selected_model(
         context.provider.name if context.provider.name != "replay" else "gemini",
