@@ -52,7 +52,11 @@ test('B19 B20 B21 S6 X3/X4: approving binds the listed final and the readiness s
   const routes = {
     [`GET ${J}/outputs`]: { status: 200, body: FINAL_OUTPUTS },
     [`GET ${J}/export/checks`]: { status: 200, body: FINAL_CHECKS },
-    [`POST ${J}/export`]: { status: 200, body: EXPORTED },
+    // The receipt is stamped now: a fixed date ages out of the 'acum …' range within a week.
+    [`POST ${J}/export`]: {
+      status: 200,
+      body: { ...EXPORTED, approved_at: new Date().toISOString() },
+    },
   }
   await withHarness(
     { path: `/app/piee/${JOB}/predare`, routes },
