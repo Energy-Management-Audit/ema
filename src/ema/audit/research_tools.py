@@ -79,10 +79,18 @@ class ResearchTools:
             if cache.exists()
             else self.search_backend.search(query)
         )
+        allowed: list[dict[str, str]] = []
         for row in results:
             if not {"title", "url", "snippet"} <= row.keys():
                 raise EmaError("search_replay", "Rezultatul căutării este invalid.", "fields")
-            self.guard.check("url", row["url"])
+            try:
+                self.guard.check("url", row["url"])
+            except EmaError as exc:
+                if exc.code != "outbound_refused":
+                    raise
+                continue  # the guard already logged the refusal; the URL goes no further
+            allowed.append(row)
+        results = allowed
         if not cache.exists():
             cache.parent.mkdir(parents=True, exist_ok=True)
             cache.write_text(json.dumps(results, ensure_ascii=False), encoding="utf-8")
