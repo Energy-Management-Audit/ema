@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Protocol
 
@@ -22,6 +24,15 @@ class WordOffice(Protocol):
     def doc_text(self, doc: Path) -> DocText: ...
 
     def open_check(self, docx: Path) -> None: ...
+
+
+@contextmanager
+def word_session(office: WordOffice) -> Generator[WordOffice]:
+    if isinstance(office, WordMac):
+        with office.word_session():
+            yield office
+    else:
+        yield office
 
 
 def word_available(settings: Settings) -> bool:

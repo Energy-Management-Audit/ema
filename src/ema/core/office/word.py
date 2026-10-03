@@ -7,6 +7,7 @@ import subprocess
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -59,16 +60,20 @@ def _apple_string(value: str) -> str:
 
 class WordMac:
     _lock = threading.Lock()
+    _session_lock = threading.RLock()
+    _session_depth = 0
 
     def __init__(
         self,
         app: Path = Path("/Applications/Microsoft Word.app"),
         timeout_s: float = 120,
         runner: OsaRunner | None = None,
+        process_probe: Callable[[], bool] | None = None,
     ) -> None:
         self.app = app
         self.timeout_s = timeout_s
         self.runner = runner or _run_osa
+        self.process_probe = process_probe or self.word_running
         self.work_root = Path.home() / "Library/Containers/com.microsoft.Word/Data/Ema"
 
     @contextmanager
@@ -76,6 +81,57 @@ class WordMac:
         self.work_root.mkdir(parents=True, exist_ok=True)
         with FileLock(self.work_root / ".word.lock"):
             yield
+
+    @staticmethod
+    def word_running() -> bool:
+        probe = subprocess.run(
+            ["/usr/bin/pgrep", "-x", "Microsoft Word"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if probe.returncode not in (0, 1):
+            raise OfficeError("word_automation", f"Word process probe failed: {probe.stderr}")
+        return probe.returncode == 0
+
+    def quit_if_idle(self) -> None:
+        result = self.runner(
+            'tell application "Microsoft Word" to count of documents', self.timeout_s + 5
+        )
+        if result.returncode:
+            raise OfficeError("word_automation", result.stderr or result.stdout)
+        try:
+            count = int(result.stdout.strip())
+        except ValueError as exc:
+            raise OfficeError(
+                "word_automation", f"Invalid Word document count: {result.stdout!r}"
+            ) from exc
+        if count:
+            return
+        result = self.runner(
+            'tell application "Microsoft Word" to quit saving no', self.timeout_s + 5
+        )
+        deadline = time.monotonic() + 10
+        while self.process_probe():
+            if time.monotonic() >= deadline:
+                self._force_quit()
+                return
+            time.sleep(0.1)
+        if result.returncode:
+            raise OfficeError("word_automation", result.stderr or result.stdout)
+
+    @contextmanager
+    def word_session(self):
+        with self._session_lock:
+            outermost = WordMac._session_depth == 0
+            was_running = self.process_probe() if outermost else True
+            WordMac._session_depth += 1
+            try:
+                yield self
+            finally:
+                WordMac._session_depth -= 1
+                if outermost and not was_running and self.process_probe():
+                    self.quit_if_idle()
 
     def _force_quit(self) -> None:
         kill = subprocess.run(

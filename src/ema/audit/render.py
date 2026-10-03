@@ -54,7 +54,7 @@ from ema.core.config import Settings, load_settings
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, get_job, run_stage
 from ema.core.jobs.reads import revision
-from ema.core.office.word_api import word_automation, word_available
+from ema.core.office.word_api import word_automation, word_available, word_session
 from ema.core.review.models import Field
 from ema.core.review.section_transition import SectionState, Status
 from ema.core.workspace import Workspace
@@ -325,9 +325,10 @@ def _render(  # noqa: C901, PLR0912, PLR0915
     pages: dict[int, int] = {}
     if word_available(settings):
         office = word_automation(settings)
-        office.update_toc_pages(docx)
-        office.render_pdf(docx, pdf)
-        office.open_check(docx)
+        with word_session(office):
+            office.update_toc_pages(docx)
+            office.render_pdf(docx, pdf)
+            office.open_check(docx)
         pages = toc_pages(docx)
     elif kind == "final":
         raise EmaError("word_unavailable", "Microsoft Word nu este disponibil.", "")

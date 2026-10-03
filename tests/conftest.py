@@ -8,6 +8,7 @@ EMA_ARTIFACTS overrides local artifacts (default: ~/Code/projects/ema/artifacts)
 from __future__ import annotations
 
 import os
+import sys
 from functools import wraps
 from pathlib import Path
 
@@ -15,6 +16,23 @@ import pytest
 
 from ema.core.office.word import WordMac
 from ema.core.office.word_child import WordChild
+
+
+@pytest.fixture(scope="session", autouse=True)
+def clean_word_after_goldens(request: pytest.FixtureRequest):
+    if sys.platform != "darwin" or not any(
+        item.get_closest_marker("golden") and item.get_closest_marker("word")
+        for item in request.session.items
+    ):
+        yield
+        return
+    word = WordMac()
+    was_running = word.process_probe()
+    try:
+        yield
+    finally:
+        if not was_running and word.process_probe():
+            word.quit_if_idle()
 
 
 @pytest.fixture(autouse=True)
