@@ -8,6 +8,7 @@ from dataclasses import replace
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four_chart_text import is_turnover_unit
 from ema.audit.chapter_four_chart_values import display_unit
+from ema.audit.chapter_four_water import without_empty_water
 from ema.consumption_analysis.analysis import Metric, SectionPlan, TablePlan, analyze, value
 from ema.core.office.blocks import (
     Block,
@@ -329,7 +330,11 @@ def chapter_four_blocks(  # noqa: C901
         "ch4.specific_carburant": FUEL,
         "ch4.specific_apa": WATER_CARRIERS,
     }
+    dataset = without_empty_water(dataset)
+    no_water = not any(carrier in WATER_CARRIERS for carrier in dataset.carriers)
     for section in (item for item in CATALOGUE if item.id.startswith("ch4.")):
+        if no_water and section.id in {"ch4.apa", "ch4.specific_apa"}:
+            continue
         blocks.append(Paragraph("heading:" + section.id, [section.title]))
         if section.id == "ch4.productie":
             blocks.extend(_production(dataset, factors, client))

@@ -22,6 +22,7 @@ from ema.audit.chapter_four_blocks import chapter_four_blocks
 from ema.audit.chapter_four_chart_placement import place_chart_groups
 from ema.audit.chapter_four_charts import STYLE_PART, chapter_chart_groups
 from ema.audit.chapter_four_format import format_chapter_four
+from ema.audit.chapter_four_water import without_empty_water
 from ema.audit.heading_titles import heading_blocks
 from ema.core.errors import EmaError
 from ema.core.office.block_text import set_text
@@ -226,6 +227,7 @@ def render_chapter_four(  # noqa: PLR0913
     if not base_identity:
         raise ValueError("base identity denylist is required")
     chapter, following, positions, body = _located(base)
+    dataset = without_empty_water(dataset)
     groups, skipped = chapter_chart_groups(dataset, factors, client)
     notes = factor_notes(chart_source)
     blocks = place_chart_groups(
