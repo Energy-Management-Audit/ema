@@ -36,7 +36,9 @@ Commit hooks may fix formatting. Install both with
 Golden tests are the real acceptance: they run against the reference library (`EMA_REFERENCE`) and
 compare against documents the auditor actually delivered. They stay local — client material never
 enters git, CI or a bug report.
-Reviewers may run `pytest -m "golden and not word"`.
+They are slow and heavy (OCR, Word), so they are not run per edit, per branch or per PR. Work and
+review rely on the unit tests, `scripts/check` and CI. Agents and the coordinator never run them:
+Vlad runs the golden suite at the gates he sets, and each failure becomes an issue.
 
 ## How work is sliced
 
@@ -106,9 +108,9 @@ source wins; say so in your report.
 - No heartbeats or progress messages.
 - A fix round on an existing PR keeps its title and appends a short section for the round to its
   description.
-- The PR description holds the checklist table (each item Done or Blocked, and where), the golden
-  command and its output (no client values), the evidence level reached (docs/PLAN.md §5.16), and
-  what Vlad checks by hand. Never merge: Vlad merges.
+- The PR description holds the checklist table (each item Done or Blocked, and where), the unit
+  tests that cover the change, and what Vlad checks by hand. Goldens are not run for a PR (see
+  Gates). Never merge.
 - When the PR is open, wait for its CI with one `gh run watch <run-id> --interval 90 --exit-status`
   (not `gh pr checks --watch`), then report once with the `worker_done` command from your
   preamble: `orca orchestration send --type worker_done --subject "DONE PR #<n> <head sha>
