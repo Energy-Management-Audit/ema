@@ -234,6 +234,50 @@ def _clear_toc_italics(document: Any) -> None:
             italic.set(qn("w:val"), "0")
 
 
+def _follow_measures_chapter(body: list[Any], spans: list[Any], numbers: dict[Any, str]) -> None:
+    """The funding chapter's "Capitolului N" names the measures chapter as it is numbered now."""
+    measures = next((body[start] for item, start, _ in spans if item.section_id == "ch6"), None)
+    label = numbers.get(measures) if measures is not None else None
+    if label is None:
+        return
+    for item, start, end in spans:
+        if item.section_id != "ch7":
+            continue
+        for paragraph in body[start:end]:
+            nodes = list(paragraph.iter(qn("w:t")))
+            text = "".join(node.text or "" for node in nodes)
+            for match in reversed(list(re.finditer(r"(?<=Capitolului )\d+", text))):
+                if match.group() == label.rstrip("."):
+                    continue
+                offset = 0
+                for node in nodes:
+                    value = node.text or ""
+                    left, right = offset, offset + len(value)
+                    offset = right
+                    if left < match.end() and right > match.start():
+                        node.text = (
+                            value[: max(0, match.start() - left)]
+                            + (label.rstrip(".") if left <= match.start() < right else "")
+                            + value[max(0, match.end() - left) :]
+                        )
+
+
+def _drop_blank_before_first_chapter(entries: list[Any], body: list[Any], spans: list[Any]) -> None:
+    """Blank paragraphs after the TOC can spill onto a page of their own before the chapter
+    heading's own page break."""
+    first_heading = body[spans[0][1]] if spans else None
+    for element in list(entries[-1].itersiblings()):
+        if element is first_heading:
+            return
+        if (
+            element.tag != qn("w:p")
+            or _text(element)
+            or element.xpath(".//w:br | .//w:drawing | .//w:sectPr | .//w:fldChar")
+        ):
+            return
+        element.getparent().remove(element)
+
+
 def refresh_toc(document: Any) -> None:
     _clear_toc_italics(document)
     root = document.element.body
@@ -290,3 +334,5 @@ def refresh_toc(document: Any) -> None:
         if not element.xpath('.//w:br[@w:type="page"]'):
             root.remove(element)
     _wrap_in_field(entries, instruction)
+    _drop_blank_before_first_chapter(entries, body, spans)
+    _follow_measures_chapter(body, spans, numbers)

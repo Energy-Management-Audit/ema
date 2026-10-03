@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from copy import deepcopy
 from typing import Any
 
 from docx.oxml import OxmlElement
@@ -118,6 +119,75 @@ def _cover_shape(document: Any) -> list[str]:
     return changes
 
 
+def _transport_funding(document: Any) -> list[str]:
+    """Cut the transport-sector funding guide the base's own client had: found by its words."""
+    body = document.element.body
+    changes: list[str] = []
+    for start in list(body.iter(qn("w:p"))):
+        text = "".join(node.text or "" for node in start.iter(qn("w:t")))
+        if start.getparent() is not body or not all(
+            word in text for word in ("naval", "aerian", "feroviar")
+        ):
+            continue
+        # the guide runs to the blank paragraph that closes it
+        block = [start]
+        for follower in start.itersiblings():
+            block.append(follower)
+            if follower.tag == qn("w:p") and not "".join(
+                node.text or "" for node in follower.iter(qn("w:t"))
+            ):
+                break
+        if block[-1].tag != qn("w:p"):
+            raise EmaError(
+                "funding_block_unbounded",
+                "Paragraful despre finanţarea transporturilor nu are sfârşit.",
+                "transport funding guide has no closing blank paragraph",
+            )
+        before = hashlib.sha256(
+            "".join("".join(n.text or "" for n in item.iter(qn("w:t"))) for item in block).encode()
+        ).hexdigest()
+        for item in block:
+            body.remove(item)
+        changes.append(
+            f"G4 fixed text: transport funding guide, {len(block)} paragraphs, {before} → removed"
+        )
+    return changes
+
+
+def _sibling_spacing(groups: dict[str, list[Any]]) -> list[str]:
+    """A flow section's sub-headings (processes, equipment) share the first one's line spacing."""
+    changes: list[str] = []
+    for parent, headings in groups.items():
+        reference = next(
+            (
+                h.pPr.find(qn("w:spacing"))
+                for h in headings
+                if h.pPr.find(qn("w:spacing")) is not None
+            ),
+            None,
+        )
+        if reference is None:
+            continue
+        for heading in headings:
+            properties = heading.get_or_add_pPr()
+            current = properties.find(qn("w:spacing"))
+            if current is not None and _digest(current) == _digest(reference):
+                continue
+            if current is not None:
+                properties.remove(current)
+            copied = deepcopy(reference)
+            # schema order: spacing sits before ind, jc
+            anchor = next(
+                (c for c in properties if c.tag in {qn("w:ind"), qn("w:jc"), qn("w:rPr")}), None
+            )
+            if anchor is None:
+                properties.append(copied)
+            else:
+                anchor.addprevious(copied)
+            changes.append(f"G2/G3 {parent} sibling heading spacing: {_digest(copied)}")
+    return changes
+
+
 def _heading_values(properties: Any) -> str:
     indent = properties.find(qn("w:ind"))
     alignment = properties.find(qn("w:jc"))
@@ -132,7 +202,9 @@ def clean_base(document: Any) -> list[str]:
     changes = _correct_law(document) + _cover_shape(document)
     changes.extend(_normalise_headings(document))
     changes.extend(_normalise_fixed_text(document))
+    changes.extend(_transport_funding(document))
     numbers = printed_numbers(document)
+    groups: dict[str, list[Any]] = {}
     for item, start, _ in heading_spans_document(document):
         paragraph = document.element.body[start]
         label = numbers.get(paragraph)
@@ -141,6 +213,8 @@ def clean_base(document: Any) -> list[str]:
         level = len(label.rstrip(".").split("."))
         if level not in HEADING_INDENTS:
             continue
+        if item.section_id in {"ch3.process", "ch3.equipment"}:
+            groups.setdefault(".".join(label.split(".")[:2]), []).append(paragraph)
         properties = paragraph.get_or_add_pPr()
         before = _digest(properties)
         old_values = _heading_values(properties)
@@ -165,6 +239,7 @@ def clean_base(document: Any) -> list[str]:
                 f"effective left {old_left} → {left}, hanging {old_hanging} → {hanging}, "
                 f"number position {old_left - old_hanging} → {left - hanging}"
             )
+    changes.extend(_sibling_spacing(groups))
     return changes
 
 
