@@ -8,6 +8,10 @@ import { eventStream } from '../fixtures/piee/default.mjs'
 import { withHarness } from './helpers.mjs'
 
 const J = `/jobs/${JOB.id}`
+const documentRoutes = {
+  ...routes,
+  [`GET ${J}/events`]: { status: 200, contentType: 'text/event-stream', body: eventStream([]) },
+}
 
 test('document errors have recovery actions and Scoate uses the slot revision', async () => {
   const slot = 'dossier/3. Protejat.pdf'
@@ -17,7 +21,7 @@ test('document errors have recovery actions and Scoate uses the slot revision', 
     {
       path: `/app/audit/${JOB.id}/documente`,
       routes: {
-        ...routes,
+        ...documentRoutes,
         [`GET ${J}/audit/documents`]: { body: documents },
         [`DELETE ${J}/slots/${encodeURIComponent(slot)}/versions/1`]: { body: { deleted: true } },
         [`POST /clients/${CLIENT.id}/files`]: { body: { sha: 'replacement-sha' } },
@@ -71,7 +75,7 @@ test('document next step and accepted-field rerun are explicit', async () => {
     {
       path: `/app/audit/${JOB.id}/documente`,
       routes: {
-        ...routes,
+        ...documentRoutes,
         [`GET ${J}/audit/documents`]: { body: stale },
         [`GET ${J}/fields`]: { body: [{ ...FIELDS[0], review: 'accepted' }] },
         [`POST ${J}/stages/read`]: { body: { run_id: 'run-read' } },
@@ -100,7 +104,7 @@ test('upload dialog sends each dossier file to its own slot and continues after 
     {
       path: `/app/audit/${JOB.id}/documente`,
       routes: {
-        ...routes,
+        ...documentRoutes,
         [`POST /clients/${CLIENT.id}/files`]: () => ({ body: { sha: `sha-${++upload}` } }),
         [`PUT ${J}/slots/dossier/first.pdf`]: { body: { version: 1 } },
         [`PUT ${J}/slots/dossier/second.pdf`]: { body: { version: 1 } },
@@ -136,7 +140,7 @@ test('scanned copy follows OCR setting; two visit panels and the measures form a
     {
       path: `/app/audit/${JOB.id}/documente`,
       routes: {
-        ...routes,
+        ...documentRoutes,
         'GET /settings': { body: off },
         'GET /audit/forms/masuri-propuse.xlsx': {
           body: 'synthetic workbook',
@@ -164,7 +168,7 @@ test('document activity shows terminal runs and opens the files to verify', asyn
     {
       path: `/app/audit/${JOB.id}/documente`,
       routes: {
-        ...routes,
+        ...documentRoutes,
         [`GET ${J}/status`]: {
           body: {
             id: JOB.id,
@@ -209,7 +213,7 @@ test('visit folder upload uses its first child as the meter panel', async () => 
       {
         path: `/app/audit/${JOB.id}/documente`,
         routes: {
-          ...routes,
+          ...documentRoutes,
           [`POST /clients/${CLIENT.id}/files`]: { body: { sha: 'visit-sha' } },
           [`PUT ${J}/slots/visit/meter/Panel%20A/one.jpg`]: { body: { version: 1 } },
         },
@@ -234,7 +238,7 @@ test('upload lists one file failure and still assigns the next file', async () =
     {
       path: `/app/audit/${JOB.id}/documente`,
       routes: {
-        ...routes,
+        ...documentRoutes,
         [`POST /clients/${CLIENT.id}/files`]: () =>
           ++uploads === 1
             ? {
@@ -298,13 +302,14 @@ test('document stage shows run progress and offers stop', async () => {
     {
       path: `/app/audit/${JOB.id}/documente`,
       routes: {
-        ...routes,
+        ...documentRoutes,
         [`GET ${J}/audit/documents`]: { body: stale },
         [`POST ${J}/stages/read`]: {
           status: 202,
           body: { run_id: 'audit-read', stage: 'read', state: 'running' },
         },
         [`GET ${J}/events`]: {
+          status: 200,
           contentType: 'text/event-stream',
           body: eventStream([
             {
@@ -339,7 +344,7 @@ test('cover/photo upload accepts one JPEG/PNG and uses the approved cover copy',
     {
       path: `/app/audit/${JOB.id}/documente`,
       routes: {
-        ...routes,
+        ...documentRoutes,
         [`POST /clients/${JOB.client_slug}/files`]: { body: { sha: 'cover-sha' } },
         [`PUT ${J}/slots/cover/photo`]: { body: {} },
       },

@@ -297,6 +297,10 @@ def run_agent(  # noqa: C901
                 ),
             )
         except EmaError as exc:
+            if exc.code == "ai_credits":
+                state.status = "ai_credits"
+                _save(context.ws, context.job, context.section, state)
+                raise
             if exc.code == "ai_budget":
                 state.status = "ai_budget"
                 _save(context.ws, context.job, context.section, state)

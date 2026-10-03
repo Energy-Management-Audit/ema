@@ -8,7 +8,13 @@ from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_agent import PROMPT_VERSION, recorded_facts
 from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.draft_write import live_passes, write_section
-from ema.audit.fill_stage import STOPPING, log_spend, settings_provider, stopped_warning
+from ema.audit.fill_stage import (
+    STOPPING,
+    _provider_failure,  # pyright: ignore[reportPrivateUsage]
+    log_spend,
+    settings_provider,
+    stopped_warning,
+)
 from ema.audit.sections import get_status
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
@@ -83,7 +89,14 @@ def _draft_all(
         except EmaError as exc:
             code = failed[section] = failure_code(exc)
             with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
-                write_event(handle, "draft_failed", run=ctx.run_id, section=section, code=code)
+                write_event(
+                    handle,
+                    "draft_failed",
+                    run=ctx.run_id,
+                    section=section,
+                    code=code,
+                    **_provider_failure(exc),
+                )
             if code in STOPPING:
                 return DraftSummary(
                     ctx.run_id,

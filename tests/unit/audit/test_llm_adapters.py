@@ -90,6 +90,32 @@ def test_openai_rebuilds_function_messages_for_sdk() -> None:
     assert messages[1]["content"] == '{"text": "synthetic"}'
 
 
+def test_openai_maps_provider_402_without_exposing_response_body() -> None:
+    class Completions:
+        def create(self, **kwargs: object) -> object:
+            raise type(
+                "ProviderError",
+                (Exception,),
+                {"status_code": 402, "code": "insufficient_quota", "body": "private body"},
+            )("payment required")
+
+    provider = OpenAIProvider.__new__(OpenAIProvider)
+    provider._client = SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
+    with pytest.raises(EmaError) as error:
+        provider.respond(
+            next(model.id for model in curated_models() if model.provider == "openai"),
+            [{"role": "user", "content": "synthetic"}],
+            (),
+            synthetic=True,
+        )
+    assert error.value.code == "ai_credits"
+    assert error.value.user_message_ro == "Creditul furnizorului AI s-a epuizat."
+    assert error.value.detail == next(
+        model.id for model in curated_models() if model.provider == "openai"
+    )
+    assert error.value.__cause__.code == "insufficient_quota"
+
+
 @pytest.mark.parametrize("provider_type", [GeminiProvider, OpenAIProvider])
 def test_live_adapters_refuse_unmarked_content(provider_type: type[object]) -> None:
     provider = provider_type.__new__(provider_type)
