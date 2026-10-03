@@ -34,9 +34,9 @@ def _fact(key: str, value: str | int, kind: str = "text") -> Field:
     )
 
 
-def _draft(text: str, ids: list[str]) -> SectionDraft:
+def _draft(text: str, ids: list[str], section: str = "ch2.date_generale") -> SectionDraft:
     return SectionDraft(
-        section="ch2.date_generale",
+        section=section,
         status="drafted",
         paragraphs=[DraftText(text=text, fact_ids=ids)],
     )
@@ -101,18 +101,18 @@ def test_sentence_start_after_a_sentence_fact_is_not_a_name() -> None:
             "Producţia include {{f:audit.business_activity}} şi Aceştia Inventati.",
             {"Aceştia Inventati"},
         ),
+        ("Produce piese.", "{{f:audit.business_activity}} ANRE avizează. CUI și CAEN apar.", set()),
     ],
 )
 def test_name_rule_at_fact_boundaries(value: str, text: str, names: set[str]) -> None:
     facts = {"audit.business_activity": _fact("audit.business_activity", value)}
     found = {
-        issue.detail
+        (issue.code, issue.detail)
         for issue in check_draft(
-            _draft(text, ["audit.business_activity"]), facts, "synthetic"
+            _draft(text, ["audit.business_activity"], "ch2.activitate"), facts, "synthetic"
         ).fatal
-        if issue.code == "literal_name"
     }
-    assert found == names
+    assert found == {("literal_name", name) for name in names}
 
 
 def test_uncited_and_nonrenderable_items_are_reviewed() -> None:

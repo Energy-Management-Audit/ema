@@ -45,6 +45,16 @@ NAME_COMMON = frozenset(
         "Din",
         "Aceasta",
         "Etapa",
+        # Regulator, register and legal-form acronyms and units an audit uses as plain words.
+        "ANRE",
+        "CAEN",
+        "CUI",
+        "SRL",
+        "SA",
+        "GJ",
+        "TEP",
+        "MWh",
+        "kWh",
     }
 )
 
