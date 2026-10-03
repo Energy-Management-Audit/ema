@@ -19,6 +19,7 @@ from ema.audit.base_package import package_issues, scrub_package, unreviewed_bul
 from ema.audit.base_toc import refresh_toc
 from ema.audit.base_units import heading_spans_document
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.chapter_tables_data import FAMILIES
 from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.render_bindings import binding_values, cover_labels, cover_photo, fill_bindings
 from ema.audit.render_plan import JobUnitPlan, ProcessesSource, unit_plan
@@ -40,6 +41,7 @@ from ema.audit.render_writers import (
     drafted_sections,
     ready_runs,
     text_of,
+    write_chapter_tables,
     write_draft,
     write_five,
     write_four,
@@ -119,7 +121,7 @@ def _plan_view(plan: JobUnitPlan) -> RenderUnitPlan:
 
 # The field families the render iterates (the reviewed ch. 4 dataset, the unit plan's carriers,
 # the texts and the AI gate) and the single keys it looks up (the unit plan, ch. 2-3 facts).
-ITERATED = ("carrier.", "carrier_tep.", "production.", "turnover.", "energy_costs.", "narrative.")
+ITERATED = ("carrier.", "carrier_tep.", "production.", "energy_costs.", "narrative.", *FAMILIES)
 LOOKED_UP = ("audit.company_name", "audit.address", "audit_measure.count")
 
 
@@ -271,6 +273,7 @@ def _render(  # noqa: C901, PLR0912, PLR0915
                             ctx=ctx,
                         ),
                     )
+            write_chapter_tables(chain, chapter_id, job_fields, base.document)
         elif chapter_id == "ch4":
             chain.apply(
                 "ch4",

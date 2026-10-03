@@ -6,12 +6,14 @@ import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
 
 from ema.audit import measure_fields
 from ema.audit.catalogue import CATALOGUE, fact_spec
 from ema.audit.catalogue_labels import CEDILLA
 from ema.audit.intake import select_checklist
+from ema.audit.read_equipment import equipment_fields
 from ema.audit.sections import recompute_ready, record_applicability
 from ema.audit.totals_review import record_totals_review
 from ema.consumption_analysis.analysis import Metric, resolve_value
@@ -25,6 +27,7 @@ from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import AUDIT_FACTORS_2026, FACTORS_2026
 from ema.energy_data.model import EnergyDataset, field_key
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
+from ema.energy_data.necesar_equipment import read_equipment
 from ema.energy_data.necesar_model import NecesarInfo
 from ema.energy_data.source import Located, normal
 
@@ -70,6 +73,8 @@ def _record(  # noqa: PLR0913
     *,
     value_type: str | None = None,
     unit: str | None = None,
+    chapter: str | None = None,
+    decimals: int | None = None,
 ) -> Field:
     ref = source.ref
     evidence_id = hashlib.sha256(f"{job}:{sha}:{ref.a1}:{key}".encode()).hexdigest()
@@ -100,8 +105,8 @@ def _record(  # noqa: PLR0913
         key,
         value_type,  # type: ignore[arg-type]
         unit=unit or source.unit,
-        chapter="ch2" if key.startswith("audit.") else "ch4",
-        decimals=source.displayed_decimals,
+        chapter=chapter or ("ch2" if key.startswith("audit.") else "ch4"),
+        decimals=source.displayed_decimals if decimals is None else decimals,
         source_label=source.label,
     )
     value = (
@@ -244,6 +249,7 @@ def read_dossier(ws: Workspace, job: str, necesar: Path, anexa: Path | None = No
     info = parse_necesar_info(necesar)
     sha = _sha(necesar)
     result = [*_read_series(ws, job, info, sha), *_read_details(ws, job, info, sha)]
+    result += equipment_fields(read_equipment(info), partial(_record, ws, job), sha)
     issues = [issue.code for issue in info.issues]
     if anexa is not None:
         data = parse_anexa(anexa)

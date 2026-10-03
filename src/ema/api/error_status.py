@@ -94,6 +94,8 @@ STATUS: dict[str, int] = {
     "formula_uncached": 409,
     "hash_mismatch": 403,
     "heading_prototype_missing": 500,
+    "table_shape": 500,
+    "chart_slot": 500,
     "human_required": 403,
     "image_missing": 404,
     "image_type": 400,
