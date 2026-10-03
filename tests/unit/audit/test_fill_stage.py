@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from google.genai import errors as genai_errors
 from tests.workspace_jobs import create_job
 
 from ema.api.job_routes import start_named_stage
@@ -228,6 +229,40 @@ def test_a_provider_failure_fails_each_applicable_section_and_is_logged_once(
         log = (ws.job_path(db, job) / "log.jsonl").read_text("utf-8")
     assert log.count('"event": "fill_failed"') == 1
     assert '"sections": ["ch2.date_generale", "ch2.localizare"], "code": "ai_quota_day"' in log
+
+
+def test_gemini_credit_failure_logs_provider_status_without_body(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EMA_AI_CLIENT_LIVE", "1")
+    ws, job = synthetic_dossier(tmp_path, monkeypatch)
+    failure = genai_errors.APIError(
+        402,
+        {
+            "error": {
+                "code": 402,
+                "status": "RESOURCE_EXHAUSTED",
+                "message": "Your prepayment credits are depleted",
+            }
+        },
+    )
+    credit_error = EmaError(
+        "ai_credits", "Creditul furnizorului AI s-a epuizat.", "gemini-3.8-flash"
+    )
+    credit_error.__cause__ = failure
+    provider = LiveProvider(credit_error)
+    provider.name = "gemini"
+    use_provider(monkeypatch, provider, "gemini-3.8-flash")
+
+    summary = fill_sections(ws, job, [SECTION, "ch2.localizare"])
+
+    assert set(summary.failed.values()) == {"ai_credits"}
+    with ws.connect() as db:
+        log = (ws.job_path(db, job) / "log.jsonl").read_text("utf-8")
+    assert '"event": "fill_failed"' in log
+    assert '"provider_code": "RESOURCE_EXHAUSTED"' in log
+    assert '"provider_status": 402' in log
+    assert "Your prepayment credits are depleted" not in log
 
 
 def test_unknown_section_is_refused_before_the_stage(tmp_path: Path) -> None:

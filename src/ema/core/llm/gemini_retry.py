@@ -54,6 +54,10 @@ def call_with_retries[T](call: Callable[[], T], model: str, sleep: Callable[[flo
             return call()
         except errors.APIError as exc:
             if exc.code == 429:
+                if "monthly spending cap" in str(exc.message).lower():
+                    raise EmaError(
+                        "ai_credits", "Creditul furnizorului AI s-a epuizat.", model
+                    ) from exc
                 if _per_day(exc):
                     raise EmaError(
                         "ai_quota_day", "Cota zilnică a furnizorului AI s-a epuizat.", model

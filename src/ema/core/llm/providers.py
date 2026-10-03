@@ -31,12 +31,19 @@ def _live_key(key: SecretStr | None, llm_live: bool, environment: str) -> str:
 def _credit_error(exc: Exception, model: str) -> EmaError | None:
     status = getattr(exc, "status_code", None)
     code = getattr(exc, "code", None)
-    if status == 402 or code in {
-        "insufficient_quota",
-        "billing_not_active",
-        "credits_exhausted",
-        "payment_required",
-    }:
+    message = getattr(exc, "message", "")
+    if (
+        status == 402
+        or code == 402
+        or "monthly spending cap" in str(message).lower()
+        or code
+        in {
+            "insufficient_quota",
+            "billing_not_active",
+            "credits_exhausted",
+            "payment_required",
+        }
+    ):
         return EmaError("ai_credits", "Creditul furnizorului AI s-a epuizat.", model)
     return None
 
