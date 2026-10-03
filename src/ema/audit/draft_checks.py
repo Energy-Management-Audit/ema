@@ -81,6 +81,7 @@ class DraftReview:
     code: str
     location: str
     detail: str
+    sentence: str | None = None
 
 
 @dataclass(frozen=True)
@@ -223,10 +224,19 @@ def support_pass(
     )
     known = {location: item.text for location, item in items}
     if any(
-        flag.location not in known or flag.sentence not in known[flag.location]
+        flag.location not in known
+        or flag.sentence
+        not in {
+            part.strip()
+            for part in re.split(r"(?<=[.!?])\s+", known[flag.location])
+            if part.strip()
+        }
         for flag in result.flags
     ):
         raise EmaError(
             "support_invalid", "Verificarea afirmaţiilor a returnat o poziţie invalidă.", ""
         )
-    return tuple(DraftReview("unsupported", flag.location, flag.reason) for flag in result.flags)
+    return tuple(
+        DraftReview("unsupported", flag.location, flag.reason, flag.sentence)
+        for flag in result.flags
+    )
