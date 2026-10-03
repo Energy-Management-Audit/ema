@@ -90,6 +90,7 @@ STATUS: dict[str, int] = {
     "file_missing": 404,
     "file_too_large": 413,
     "file_type": 415,
+    "fill_failed": 500,
     "formula_uncached": 409,
     "hash_mismatch": 403,
     "heading_prototype_missing": 500,

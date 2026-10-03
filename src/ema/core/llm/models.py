@@ -49,3 +49,11 @@ def selected_model(provider: str, model_id: str) -> Model:
         if (model.provider, model.id) == (provider, model_id):
             return model
     raise EmaError("model_unknown", "Modelul ales nu este disponibil.", provider)
+
+
+def default_model(provider: str) -> Model:
+    """The provider's first standard-tier model in the release list."""
+    for model in curated_models():
+        if model.provider == provider and model.tier == "standard":
+            return model
+    raise EmaError("model_unknown", "Modelul ales nu este disponibil.", provider)

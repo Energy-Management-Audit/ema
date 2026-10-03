@@ -1,7 +1,7 @@
 """Public LLM boundary."""
 
 from ema.core.llm.agent import AgentContext, Limits, Tool, agent_state, run_agent
-from ema.core.llm.models import curated_models, selected_model
+from ema.core.llm.models import curated_models, default_model, selected_model
 from ema.core.llm.providers import GeminiProvider, OpenAIProvider
 from ema.core.llm.recording import RecordingProvider
 from ema.core.llm.replay import ReplayProvider
@@ -18,6 +18,7 @@ __all__ = [
     "agent_state",
     "complete_json",
     "curated_models",
+    "default_model",
     "run_agent",
     "selected_model",
 ]
