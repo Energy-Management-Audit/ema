@@ -20,9 +20,14 @@ from ema.core.review.models import Field
 
 TOKEN = re.compile(r"\{\{f:([a-z][a-z0-9_.:-]*)\}\}")
 NUMBER = re.compile(r"\d")
+UPPER = "A-ZĂÂÎȘȚŞŢ"
+LOWER = "a-zăâîșțşţ"
 NAME = re.compile(
-    r"(?<![.!?]\s)(?<!\w)[A-ZĂÂÎȘȚ][A-Za-zĂÂÎȘȚăâîșț]{1,}(?:\s+[A-ZĂÂÎȘȚ][A-Za-zĂÂÎȘȚăâîșț]{2,})*"
+    rf"(?<![.!?]\s)(?<!\w)[{UPPER}][{UPPER}{LOWER}]{{1,}}(?:\s+[{UPPER}][{UPPER}{LOWER}]{{2,}})*"
 )
+ACRONYM = re.compile(rf"(?<!\w)[{UPPER}]{{2,}}(?!\w)")
+SENTENCE_WORD = re.compile(rf"[{UPPER}][{LOWER}]+(?!\w)")
+FACT_GAP = re.compile(TOKEN.pattern + r"(\s*)")
 NAME_COMMON = frozenset(
     {
         "Societatea",
@@ -40,8 +45,35 @@ NAME_COMMON = frozenset(
         "Din",
         "Aceasta",
         "Etapa",
+        # Regulator, register and legal-form acronyms and units an audit uses as plain words.
+        "ANRE",
+        "CAEN",
+        "CUI",
+        "SRL",
+        "SA",
+        "GJ",
+        "TEP",
+        "MWh",
+        "kWh",
     }
 )
+
+
+def _sentence_marked(text: str, facts: dict[str, Field]) -> str:
+    """The text for the name check, without fact references.
+
+    A title-case word that opens the paragraph, or follows a fact whose value ends a sentence,
+    starts a sentence, as one after a full stop always did: its capital is not taken for a
+    proper name. Acronyms are checked separately, wherever they stand.
+    """
+
+    def marker(match: re.Match[str]) -> str:
+        fact = facts.get(match.group(1))
+        value = "" if fact is None else str(fact.value).rstrip().rstrip("\"'”’»").rstrip()
+        return ". " if value.endswith((".", "!", "?")) else match.group(2)
+
+    marked = FACT_GAP.sub(marker, text)
+    return ". " + marked if SENTENCE_WORD.match(marked) else marked
 
 
 @dataclass(frozen=True)
@@ -111,7 +143,12 @@ def check_draft(  # noqa: C901, PLR0912
             fatal.append(DraftReview("ai_mention", location, "AI or disclaimer wording"))
         common = {name.casefold() for name in NAME_COMMON}
         candidates = {
-            candidate for candidate in NAME.findall(plain) if candidate.casefold() not in common
+            candidate
+            for candidate in (
+                *NAME.findall(_sentence_marked(item.text, facts)),
+                *ACRONYM.findall(plain),
+            )
+            if candidate.casefold() not in common
         }
         normal_plain = unicodedata.normalize("NFKC", plain).casefold()
         candidates.update(name for name in known_names if name and name in normal_plain)

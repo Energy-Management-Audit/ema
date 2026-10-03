@@ -1,5 +1,7 @@
 """Draft trust boundary: references, missing facts and names (rendering: test_section_body)."""
 
+import pytest
+
 from ema.audit.draft_checks import check_draft
 from ema.audit.draft_schema import DraftFigure, DraftTable, DraftText, SectionDraft
 from ema.core.review.models import Field
@@ -32,9 +34,9 @@ def _fact(key: str, value: str | int, kind: str = "text") -> Field:
     )
 
 
-def _draft(text: str, ids: list[str]) -> SectionDraft:
+def _draft(text: str, ids: list[str], section: str = "ch2.date_generale") -> SectionDraft:
     return SectionDraft(
-        section="ch2.date_generale",
+        section=section,
         status="drafted",
         paragraphs=[DraftText(text=text, fact_ids=ids)],
     )
@@ -59,6 +61,58 @@ def test_rejects_literal_number_name_ai_and_unknown_fact() -> None:
         assert code in {
             issue.code for issue in check_draft(_draft(text, ids), facts, "synthetic").fatal
         }
+
+
+def test_sentence_start_after_a_sentence_fact_is_not_a_name() -> None:
+    facts = {
+        "audit.company_name": _fact("audit.company_name", "Atelier Exemplu"),
+        "audit.business_activity": _fact("audit.business_activity", "Produce piese turnate."),
+    }
+    names = {
+        issue.detail
+        for issue in check_draft(
+            _draft(
+                "Dotările sunt noi. {{f:audit.business_activity}} Aceste etape sunt continue. "
+                "Societatea {{f:audit.company_name}} Inventata are sediul aici.",
+                ["audit.business_activity", "audit.company_name"],
+            ),
+            facts,
+            "synthetic",
+        ).fatal
+        if issue.code == "literal_name"
+    }
+    assert names == {"Inventata"}
+
+
+@pytest.mark.parametrize(
+    ("value", "text", "names"),
+    [
+        ("„Produce piese.”  ", "{{f:audit.business_activity}} Aceste etape continuă.", set()),
+        ("Produce piese.", "{{f:audit.business_activity}}Aceste etape continuă.", set()),
+        ("Produce piese.", "{{f:audit.business_activity}}  Aceste etape continuă.", set()),
+        ("Produce piese.", "{{f:audit.business_activity}} ACME are sediul aici.", {"ACME"}),
+        (
+            "piese turnate",
+            "Societatea produce {{f:audit.business_activity}} Inventata.",
+            {"Inventata"},
+        ),
+        (
+            "piese",
+            "Producţia include {{f:audit.business_activity}} şi Aceştia Inventati.",
+            {"Aceştia Inventati"},
+        ),
+        ("Produce piese.", "{{f:audit.business_activity}} ANRE avizează. CUI și CAEN apar.", set()),
+    ],
+)
+def test_name_rule_at_fact_boundaries(value: str, text: str, names: set[str]) -> None:
+    facts = {"audit.business_activity": _fact("audit.business_activity", value)}
+    found = {
+        (issue.code, issue.detail)
+        for issue in check_draft(
+            _draft(text, ["audit.business_activity"], "ch2.activitate"), facts, "synthetic"
+        ).fatal
+    }
+    assert found == {("literal_name", name) for name in names}
 
 
 def test_uncited_and_nonrenderable_items_are_reviewed() -> None:
