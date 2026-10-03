@@ -17,10 +17,10 @@ from ema.audit.base import build_base
 from ema.audit.base_units import UnitPlan
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_agent import (
-    DraftTools,
     draft_section_replay,
     recorded_facts,
 )
+from ema.audit.draft_checks import check_draft
 from ema.audit.draft_render import render_section
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.sections import get_status, refresh_staleness
@@ -104,7 +104,7 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
             ],
         ),
     ]
-    rejected = DraftTools(ws, job, "ch2.date_generale").write_section_draft(
+    rejected = check_draft(
         SectionDraft(
             section="ch2.date_generale",
             status="drafted",
@@ -114,9 +114,11 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
                     fact_ids=["audit.company_name"],
                 )
             ],
-        ).model_dump()
+        ),
+        recorded_facts(ws, job, "ch2.date_generale"),
+        job,
     )
-    assert rejected == {"accepted": False, "errors": ["literal_number"]}
+    assert [issue.code for issue in rejected.fatal] == ["literal_number"]
     rendered = _base(tmp_path)
     coverage = []
     for index, draft in enumerate(drafts):

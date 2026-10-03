@@ -23,7 +23,7 @@ from ema.cli import app
 from ema.core.errors import EmaError
 from ema.core.jobs import get_job, status, subscribe
 from ema.core.llm.models import default_model
-from ema.core.llm.types import Exchange, ToolCall, ToolSpec
+from ema.core.llm.types import Exchange, ToolSpec
 from ema.core.review.fields import propose
 from ema.core.review.models import Evidence, Manual
 from ema.core.workspace import Workspace
@@ -31,7 +31,7 @@ from ema.core.workspace import Workspace
 SECTION = "ch2.date_generale"
 TASK = (
     "Redactează secţiunea ch2.date_generale „Date generale”. "
-    "Câmpul section din write_section_draft este exact „ch2.date_generale”."
+    "Câmpul section este exact „ch2.date_generale”."
 )
 TITLES = {section.id: section.title for section in CATALOGUE}
 
@@ -61,26 +61,24 @@ class FakeLive:
     ) -> Exchange:
         self.models.append(model)
         self.synthetic.append(synthetic)
-        if schema is not None:
+        if prompt_version.endswith("-support"):
             return Exchange(json.dumps({"flags": []}), (), 1, 1)
-        task = str(messages[1]["content"])
+        request = json.loads(str(messages[1]["content"]))
+        task = request["task"]
         self.tasks.append(task)
         section = re.findall("„([^”]+)”", task)[-1]
         mode = self.modes.get(section, "ok")
         if mode == "quota":
             raise EmaError("ai_quota_day", "Cota zilnică.", model)
-        results = [message for message in messages if message["role"] == "tool"]
-        if not results:
-            return Exchange(None, (ToolCall("1", "read_facts", {}),), 1, 1)
-        if len(results) == 1 and mode != "empty":
-            key = next(item["id"] for item in results[0]["content"] if item["presence"] == "found")
-            draft = SectionDraft(
-                section=section,
-                status="drafted",
-                paragraphs=[DraftText(text=f"valoarea este {{{{f:{key}}}}}.", fact_ids=[key])],
-            )
-            return Exchange(None, (ToolCall("2", "write_section_draft", draft.model_dump()),), 1, 1)
-        return Exchange("Gata", (), 1, 1)
+        if mode == "empty":
+            return Exchange(json.dumps({"flags": []}), (), 1, 1)
+        key = next(item["key"] for item in request["facts"] if item["presence"] == "found")
+        draft = SectionDraft(
+            section=section,
+            status="drafted",
+            paragraphs=[DraftText(text=f"valoarea este {{{{f:{key}}}}}.", fact_ids=[key])],
+        )
+        return Exchange(draft.model_dump_json(), (), 1, 1)
 
 
 @pytest.fixture
@@ -130,7 +128,7 @@ def test_live_draft_section_runs_on_settings_and_records_both_passes(
         assert recorded["source"] == "recorded" and recorded["responses"]
     assert json.loads((folder / f"{SECTION}.draft.json").read_text("utf-8"))["responses"][0][
         "choices"
-    ][0]["message"]["tool_calls"]
+    ][0]["message"]["content"]
 
 
 def test_live_switch_off_sends_nothing(
@@ -183,7 +181,7 @@ def test_one_failed_section_does_not_fail_the_others(tmp_path: Path, live: FakeL
     summary, state = _run(ws, job)
 
     assert summary.drafted == {SECTION: "drafted"}
-    assert summary.failed == {other: "draft_incomplete"}
+    assert summary.failed == {other: "ai_schema"}
     assert state == "ready"
 
 
@@ -199,9 +197,8 @@ def test_day_quota_stops_the_remaining_sections(tmp_path: Path, live: FakeLive) 
     summary, _ = _run(ws, job)
 
     assert summary.failed == {first: "ai_quota_day"}
-    assert summary.stopped
-    assert second in summary.stopped or second in summary.drafted or first == second
-    assert len(live.tasks) == 1
+    assert second in summary.drafted
+    assert len(live.tasks) == 3
 
 
 def test_job_budget_spent_earlier_stops_the_stage_before_any_call(
@@ -221,9 +218,7 @@ def test_job_budget_spent_earlier_stops_the_stage_before_any_call(
 
     summary, _ = _run(ws, job)
 
-    first, *rest = [*summary.failed, *summary.stopped]
-    assert summary.failed == {first: "ai_budget"}
-    assert rest and summary.stopped == tuple(rest)
+    assert set(summary.failed.values()) == {"ai_budget"}
     assert live.tasks == []
     with ws.connect() as db:
         log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
