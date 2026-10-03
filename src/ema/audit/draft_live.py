@@ -9,7 +9,13 @@ from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_agent import PROMPT_VERSION, recorded_facts
 from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.draft_write import live_passes, write_section
-from ema.audit.fill_stage import STOPPING, log_spend, settings_provider, stopped_warning
+from ema.audit.fill_stage import (
+    STOPPING,
+    log_spend,
+    provider_failure,
+    settings_provider,
+    stopped_warning,
+)
 from ema.audit.sections import get_status, recompute_ready
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
@@ -76,28 +82,30 @@ def _draft_all(
     ctx.record_input(prompt=PROMPT_VERSION, model=model_id)
     recompute_ready(ctx.ws, ctx.job)
 
-    def run_one(section: str) -> tuple[str, str, bool]:
+    def run_one(section: str) -> tuple[str, str, dict[str, str | int] | None]:
         try:
             result = write_section(
                 ctx, section, live_passes(provider, model_id, directory, section), ready=True
             )
-            return section, result.draft.status, True
+            return section, result.draft.status, None
         except EmaError as exc:
-            return section, failure_code(exc), False
+            return section, failure_code(exc), provider_failure(exc)
 
     stopped: tuple[str, ...] = ()
     with ThreadPoolExecutor(max_workers=4) as pool:
         for offset in range(0, len(sections), 4):
             batch = sections[offset : offset + 4]
             results = list(pool.map(run_one, batch))
-            for section, value, success in results:
-                if success:
+            for section, value, cause in results:
+                if cause is None:
                     drafted[section] = value
                     continue
                 failed[section] = value
                 with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
-                    write_event(handle, "draft_failed", run=ctx.run_id, section=section, code=value)
-            if any(value in STOPPING for _, value, success in results if not success):
+                    write_event(
+                        handle, "draft_failed", run=ctx.run_id, section=section, code=value, **cause
+                    )
+            if any(value in STOPPING for _, value, cause in results if cause is not None):
                 stopped = tuple(sections[offset + len(batch) :])
                 break
     return DraftSummary(ctx.run_id, drafted, failed, tuple(skipped), tuple(absent), stopped)

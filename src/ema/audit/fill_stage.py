@@ -65,17 +65,21 @@ def _failure_code(exc: EmaError) -> str:
     return cause.code if exc.code == "ai_provider" and isinstance(cause, EmaError) else exc.code
 
 
-def _provider_failure(exc: EmaError) -> dict[str, str | int]:
+def provider_failure(exc: EmaError) -> dict[str, str | int]:
     cause = exc.__cause__
     provider_error = cause.__cause__ if isinstance(cause, EmaError) else cause
     fields: dict[str, str | int] = {}
     if provider_error is not None:
         code = getattr(provider_error, "code", None)
         status = getattr(provider_error, "status_code", None)
-        if isinstance(code, str):
-            fields["provider_code"] = code
-        if isinstance(status, int):
-            fields["provider_status"] = status
+        provider_status = status if isinstance(status, int) else code
+        provider_code = getattr(provider_error, "status", None)
+        if not isinstance(provider_code, str):
+            provider_code = code
+        if isinstance(provider_code, str):
+            fields["provider_code"] = provider_code
+        if isinstance(provider_status, int):
+            fields["provider_status"] = provider_status
     return fields
 
 
@@ -89,7 +93,7 @@ def _log_failure(
             run=ctx.run_id,
             **where,
             code=code,
-            **(_provider_failure(exc) if exc is not None else {}),
+            **(provider_failure(exc) if exc is not None else {}),
         )
 
 

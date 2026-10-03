@@ -188,6 +188,45 @@ def test_per_day_quota_fails_at_once() -> None:
     assert sleeps == [] and len(calls) == 1
 
 
+def test_provider_maps_gemini_402_credit_error() -> None:
+    failure = errors.APIError(
+        402,
+        {
+            "error": {
+                "code": 402,
+                "status": "RESOURCE_EXHAUSTED",
+                "message": "Your prepayment credits are depleted",
+            }
+        },
+    )
+    provider, sleeps, calls = _gemini([failure])
+    with pytest.raises(EmaError) as error:
+        provider.respond("gemini-3.8-flash", MESSAGES, ())
+    assert error.value.code == "ai_credits"
+    assert error.value.detail == "gemini-3.8-flash"
+    assert error.value.__cause__ is failure
+    assert sleeps == [] and len(calls) == 1
+
+
+def test_spending_cap_429_fails_at_once_as_credit_error() -> None:
+    failure = errors.APIError(
+        429,
+        {
+            "error": {
+                "code": 429,
+                "status": "RESOURCE_EXHAUSTED",
+                "message": "exceeded its monthly spending cap",
+            }
+        },
+    )
+    provider, sleeps, calls = _gemini([failure])
+    with pytest.raises(EmaError) as error:
+        provider.respond("gemini-3.8-flash", MESSAGES, ())
+    assert error.value.code == "ai_credits"
+    assert error.value.__cause__ is failure
+    assert sleeps == [] and len(calls) == 1
+
+
 def test_per_minute_quota_is_retried() -> None:
     provider, sleeps, _ = _gemini(
         [_api_error(429, _quota("GenerateRequestsPerMinutePerProjectPerModel"), _delay("3s")), OK]
