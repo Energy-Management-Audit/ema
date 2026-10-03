@@ -3,6 +3,7 @@
 STATUS: dict[str, int] = {
     "action_invalid": 400,
     "ai_budget": 429,
+    "ai_credits": 402,
     "ai_client_disabled": 403,
     "ai_context_changed": 409,
     "ai_key_missing": 409,
