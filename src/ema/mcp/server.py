@@ -192,7 +192,7 @@ def build_server(ws: Workspace, import_roots: tuple[Path, ...]) -> FastMCP:  # n
     @server.tool(
         description=(
             "Draft one audit section of chapter 2 or 3 from recorded facts, using recorded AI "
-            "responses; live AI drafting is not enabled."
+            "responses, or the live model when none are given and the live-AI switch is on."
         ),
         annotations=WRITE,
     )

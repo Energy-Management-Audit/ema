@@ -1,4 +1,4 @@
-"""Audit section drafting over recorded AI responses."""
+"""Audit stage commands: section drafting by replay or live, and the job stages."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def draft(
     draft_recording: Path | None = typer.Option(None, "--draft-recording"),  # noqa: B008
     support_recording: Path | None = typer.Option(None, "--support-recording"),  # noqa: B008
 ) -> None:
-    """Draft one chapter 2-3 section by replay; live AI drafting is not enabled."""
+    """Draft one chapter 2-3 section: by replay with both recordings, live with neither."""
     ws = Workspace(workspace_path())
     recover(ws)
     result = draft_section(

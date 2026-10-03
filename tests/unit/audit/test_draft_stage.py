@@ -81,7 +81,7 @@ def test_replay_draft_is_a_ready_run_with_artifacts_and_reads(tmp_path: Path) ->
     ]
 
 
-def test_no_recordings_refuses_before_any_write_even_when_live(
+def test_live_switch_off_or_half_a_recording_refuses_before_any_write(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     constructed: list[str] = []
@@ -97,12 +97,16 @@ def test_no_recordings_refuses_before_any_write_even_when_live(
     drafts, _ = _recordings(ws, job, tmp_path / "rec")
     before = _counts(ws, job)
 
-    for recordings in ((None, None), (drafts, None), (None, drafts)):
+    for recordings, code in (
+        ((None, None), "ai_client_disabled"),
+        ((drafts, None), "replay_invalid"),
+        ((None, drafts), "replay_invalid"),
+    ):
         with pytest.raises(EmaError) as refused:
             draft_section(
                 ws, job, SECTION, draft_recording=recordings[0], support_recording=recordings[1]
             )
-        assert refused.value.code == "ai_client_disabled"
+        assert refused.value.code == code
 
     assert _counts(ws, job) == before
     assert constructed == []
@@ -212,7 +216,7 @@ def test_cli_prints_the_draft_in_contract_order(
     ]
 
 
-def test_cli_without_recordings_exits_with_the_disabled_message(
+def test_cli_without_recordings_and_live_switch_off_exits_with_the_disabled_message(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     ws = Workspace(tmp_path / "ws")
@@ -224,7 +228,7 @@ def test_cli_without_recordings_exits_with_the_disabled_message(
         app()
 
     assert exited.value.code == 1
-    assert "Redactarea pe documente reale aşteaptă aprobarea." in capsys.readouterr().err
+    assert "Documentele clientului nu pot fi trimise la AI." in capsys.readouterr().err
 
 
 def test_cli_with_a_missing_recording_exits_with_the_invalid_message(
