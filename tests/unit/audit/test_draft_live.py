@@ -118,7 +118,7 @@ def test_live_draft_section_runs_on_settings_and_records_both_passes(
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
 
-    result = draft_section(ws, job, SECTION, draft_recording=None, support_recording=None)
+    result = draft_section(ws, job, SECTION)
 
     assert (result.draft_status, result.section_status) == ("drafted", "drafted")
     assert live.tasks and set(live.tasks) == {TASK}
