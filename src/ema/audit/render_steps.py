@@ -191,7 +191,7 @@ def body_counts(docx: Path, labels: Mapping[str, str] | None = None) -> Counts:
     return Counts(markers, tables, charts)
 
 
-def toc_pages(docx: Path) -> dict[int, int]:
+def toc_pages(docx: Path) -> dict[int, int]:  # noqa: C901
     """Printed chapter number -> page, from the TOC1 entries Word has numbered."""
     pages: dict[int, int] = {}
     document: Any = Document(str(docx))
@@ -199,9 +199,29 @@ def toc_pages(docx: Path) -> dict[int, int]:
         style = element.find(f"./{qn('w:pPr')}/{qn('w:pStyle')}")
         if style is None or style.get(qn("w:val")) != "TOC1":
             continue
-        match = re.match(r"^\s*(\d+)\..*?(\d+)\s*$", _text(element), flags=re.S)
-        if match and int(match.group(2)) > 0:
-            pages[int(match.group(1))] = int(match.group(2))
+        chapter = re.match(r"^\s*(\d+)\.", _text(element))
+        page = ""
+        after_tab = False
+        field_result = False
+        pageref = False
+        for run in element.iter(qn("w:r")):
+            instruction = "".join(node.text or "" for node in run.iter(qn("w:instrText")))
+            pageref = pageref or "PAGEREF" in instruction
+            for node in run.iter():
+                if node.tag == qn("w:tab"):
+                    page, after_tab = "", True
+                elif node.tag == qn("w:fldChar"):
+                    kind = node.get(qn("w:fldCharType"))
+                    if kind == "separate" and pageref:
+                        field_result = True
+                        if not after_tab:
+                            page = ""
+                    elif kind == "end":
+                        field_result = False
+                elif node.tag == qn("w:t") and (after_tab or field_result):
+                    page += node.text or ""
+        if chapter and page.strip().isdigit() and int(page.strip()) > 0:
+            pages[int(chapter.group(1))] = int(page.strip())
     return pages
 
 

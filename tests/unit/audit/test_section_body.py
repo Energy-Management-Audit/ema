@@ -196,3 +196,125 @@ def test_an_intro_is_her_text_or_one_marker(tmp_path: Path) -> None:
     assert texts[1:4] == ["Primul paragraf.", "Al doilea.", TITLES["ch2.date_generale"]]
     write_intro(base, output, section_id="ch2", text=None)
     assert _texts(output)[1:3] == ["[de completat]", TITLES["ch2.date_generale"]]
+
+
+def test_draft_creates_absent_activity_section(tmp_path: Path) -> None:
+    base, output = _base(tmp_path / "base.docx"), tmp_path / "out.docx"
+    draft = SectionDraft(
+        section="ch2.activitate",
+        status="drafted",
+        paragraphs=[
+            DraftText(
+                text="activitatea {{f:audit.business_activity}}.",
+                fact_ids=["audit.business_activity"],
+            )
+        ],
+    )
+    render_section(
+        base,
+        output,
+        draft,
+        {"audit.business_activity": _fact("audit.business_activity", "industrială")},
+        (),
+        job="synthetic",
+    )
+    texts = _texts(output)
+    assert texts.index(TITLES["ch2.activitate"]) < texts.index(TITLES["ch2.istorie"])
+    assert texts[texts.index(TITLES["ch2.activitate"]) + 1] == "activitatea industrială."
+
+
+def test_two_absent_sections_clone_sibling_heading_and_body(tmp_path: Path) -> None:
+    document = Document()
+    document.add_paragraph(TITLES["ch2"], style="Heading 1")
+    sibling = document.add_paragraph(TITLES["ch2.date_generale"], style="Heading 2")
+    _numbered(sibling)
+    sibling.runs[0].bold = True
+    body = document.add_paragraph("original", style="Body Text")
+    body.runs[0].italic = True
+    history_heading = document.add_paragraph(TITLES["ch2.istorie"], style="Heading 2")
+    _numbered(history_heading)
+    history_heading.runs[0].bold = True
+    document.add_paragraph("history")
+    document.add_paragraph(TITLES["ch3"], style="Heading 1")
+    document.add_paragraph(TITLES["ch3.flux"], style="Heading 2")
+    document.add_paragraph("flow")
+    document.add_paragraph(TITLES["ch4"], style="Heading 1")
+    base = tmp_path / "base.docx"
+    document.save(str(base))
+    current = base
+    for section_id in ("ch2.manager", "ch2.activitate"):
+        output = tmp_path / f"{section_id}.docx"
+        draft = SectionDraft(
+            section=section_id,
+            status="drafted",
+            paragraphs=[DraftText(text="filled")],
+        )
+        render_section(current, output, draft, FACTS, (), job="synthetic")
+        current = output
+    result = Document(str(current))
+    headings = [paragraph for paragraph in result.paragraphs if paragraph.text in TITLES.values()]
+    chapter_two = [
+        paragraph.text
+        for paragraph in headings
+        if paragraph.text
+        in {
+            TITLES[key]
+            for key in ("ch2", "ch2.date_generale", "ch2.manager", "ch2.activitate", "ch2.istorie")
+        }
+    ]
+    assert chapter_two == [
+        TITLES[key]
+        for key in ("ch2", "ch2.date_generale", "ch2.manager", "ch2.activitate", "ch2.istorie")
+    ]
+    original = next(paragraph for paragraph in headings if paragraph.text == TITLES["ch2.istorie"])
+    for section_id in ("ch2.manager", "ch2.activitate"):
+        inserted = next(paragraph for paragraph in headings if paragraph.text == TITLES[section_id])
+        assert inserted.style.style_id == original.style.style_id
+        assert inserted._p.pPr.xml == original._p.pPr.xml
+        assert inserted._p.pPr.numPr.xml == original._p.pPr.numPr.xml
+        assert inserted._p.r_lst[0].rPr.xml == original._p.r_lst[0].rPr.xml
+        marker = result.paragraphs[
+            [paragraph.text for paragraph in result.paragraphs].index(TITLES[section_id]) + 1
+        ]
+        assert marker.style.name == "Normal"
+    assert [paragraph.style.name for paragraph in headings] == [
+        "Heading 1",
+        "Heading 2",
+        "Heading 2",
+        "Heading 2",
+        "Heading 2",
+        "Heading 1",
+        "Heading 2",
+        "Heading 1",
+    ]
+
+
+def test_process_draft_fills_every_repeated_subsection(tmp_path: Path) -> None:
+    document = Document()
+    document.add_paragraph(TITLES["ch3"], style="Heading 1")
+    document.add_paragraph(TITLES["ch3.flux"], style="Heading 2")
+    document.add_paragraph("[de completat]", style="Body Text")
+    for name in ("Alpha", "Beta"):
+        document.add_paragraph(f"DESCRIEREA SECȚIEI {name}", style="Heading 3")
+        document.add_paragraph("[de completat]", style="Body Text")
+    document.add_paragraph(TITLES["ch4"], style="Heading 1")
+    base, output = tmp_path / "base.docx", tmp_path / "out.docx"
+    document.save(str(base))
+    draft = SectionDraft(
+        section="ch3.process",
+        status="drafted",
+        paragraphs=[
+            DraftText(
+                text="proces {{f:audit.process_sections}}.", fact_ids=["audit.process_sections"]
+            )
+        ],
+    )
+    render_section(
+        base,
+        output,
+        draft,
+        {"audit.process_sections": _fact("audit.process_sections", "test")},
+        (),
+        job="synthetic",
+    )
+    assert _texts(output).count("proces test.") == 2
