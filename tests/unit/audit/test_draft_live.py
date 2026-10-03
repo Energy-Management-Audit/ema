@@ -204,6 +204,35 @@ def test_day_quota_stops_the_remaining_sections(tmp_path: Path, live: FakeLive) 
     assert len(live.tasks) == 1
 
 
+def test_job_budget_spent_earlier_stops_the_stage_before_any_call(
+    tmp_path: Path, live: FakeLive, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", "0.5")
+    ws = Workspace(tmp_path / "ws")
+    job = audit_job_with_facts(ws)
+    for section in [item for item in SECTION_FACTS if item != SECTION][:2]:
+        _found(ws, job, section)
+    with ws.connect() as db:
+        db.execute(
+            "INSERT INTO llm_calls(job_id,section,provider,model,prompt_version,input_tokens,"
+            "output_tokens,estimated_cost_usd,duration_ms) VALUES(?,?,?,?,?,?,?,?,?)",
+            (job, SECTION, "openai", "earlier", "audit-fill-v1", 1, 1, 0.75, 1),
+        )
+
+    summary, _ = _run(ws, job)
+
+    first, *rest = [*summary.failed, *summary.stopped]
+    assert summary.failed == {first: "ai_budget"}
+    assert rest and summary.stopped == tuple(rest)
+    assert live.tasks == []
+    with ws.connect() as db:
+        log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
+    spend = [json.loads(line) for line in log.splitlines() if '"ai_spend"' in line]
+    assert [(item["stage"], item["usd"], item["job_usd"]) for item in spend] == [
+        ("draft", 0.0, 0.75)
+    ]
+
+
 def test_cli_run_draft_takes_the_stage_path(
     tmp_path: Path,
     live: FakeLive,

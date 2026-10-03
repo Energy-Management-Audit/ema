@@ -92,8 +92,10 @@ def test_agent_replay_rejects_fabricated_quote_and_resumes(tmp_path: Path, fixtu
         "photo.txt": 4,
     }
     assert tools.missing == {6}
-    assert {"error": "evidence_quote"} in [
-        message["content"] for message in state.messages if message["role"] == "tool"
+    assert "evidence_quote" in [
+        message["content"].get("error")
+        for message in state.messages
+        if message["role"] == "tool" and isinstance(message["content"], dict)
     ]
     with ws.connect() as db:
         count = db.execute("SELECT count(*) FROM llm_calls WHERE job_id=?", (job,)).fetchone()[0]

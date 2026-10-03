@@ -12,3 +12,9 @@ def workspace_lock(root: Path) -> Generator[None]:
     lock = FileLock(str(root / ".workspace.lock"))
     with lock:
         yield
+
+
+@contextmanager
+def job_ai_lock(job_root: Path) -> Generator[None]:
+    with FileLock(str(job_root / ".ai-budget.lock")):
+        yield

@@ -11,6 +11,7 @@ from tests.workspace_jobs import create_job
 
 from ema.core.errors import EmaError
 from ema.core.llm import AgentContext, ReplayProvider, complete_json
+from ema.core.llm.models import selected_model
 from ema.core.llm.replay import request_hashes
 from ema.core.workspace import Workspace
 
@@ -76,6 +77,30 @@ def test_complete_json_surfaces_second_schema_error(tmp_path: Path) -> None:
     with pytest.raises(EmaError) as error:
         complete_json(context, Classification, "Classify", "Synthetic permit")
     assert error.value.code == "ai_schema"
+
+
+def test_complete_json_checks_budget_before_initial_call_and_schema_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = Workspace(tmp_path / "workspace")
+    job = create_job(ws, "audit", "synthetic", 2026)
+    provider = _replay(tmp_path / "responses.json", ['{"item": "wrong"}', '{"item": 2}'])
+    context = AgentContext(ws, job, "classification", provider, "gemini-3.6-flash", "v1")
+    monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", "0")
+    with pytest.raises(EmaError) as initial:
+        complete_json(context, Classification, "Classify", "Synthetic permit")
+    assert initial.value.code == "ai_budget"
+    assert provider.calls == 0
+
+    first_cost = selected_model("gemini", "gemini-3.6-flash").cost(5, 5)
+    monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", str(first_cost))
+    with pytest.raises(EmaError) as retry:
+        complete_json(context, Classification, "Classify", "Synthetic permit")
+    assert (retry.value.code, retry.value.user_message_ro) == (
+        "ai_budget",
+        "Bugetul AI al lucrării s-a epuizat.",
+    )
+    assert provider.calls == 1
 
 
 def test_live_provider_cannot_receive_client_content(tmp_path: Path) -> None:

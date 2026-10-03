@@ -7,9 +7,12 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from functools import cached_property
 from typing import Any
 
+from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import CATALOGUE, AuditFact, fact_spec
+from ema.audit.fill_files import file_ids, resolve_name, search, windows
 from ema.audit.sections import recompute_ready, set_status
 from ema.core.errors import EmaError
 from ema.core.llm.agent import Tool
@@ -34,6 +37,48 @@ _STRUCTURED_SOURCE = {
     "audit.ownership_private": "audit.ownership_private",
 }
 
+# Every argument is described: the first live run filled `name` and `source_key` by guessing.
+_NAME = {
+    "type": "string",
+    "description": "exact dossier file name or its id from the task (e.g. F3)",
+}
+_FACT_KEY = {"type": "string", "description": "a fact key listed in the task"}
+_REASON = {"type": "string", "description": "one sentence explaining the decision"}
+_ARGUMENTS: dict[str, dict[str, dict[str, Any]]] = {
+    "read_file": {
+        "name": _NAME,
+        "page": {"type": "integer", "description": "page number from 1; defaults to 1"},
+    },
+    "search_files": {
+        "query": {"type": "string", "description": "words to find in the dossier files"}
+    },
+    "read_dataset": {
+        "key": {
+            "type": "string",
+            "description": "one dataset field key; omit it to read all of this section's fields",
+        }
+    },
+    "record_fact": {
+        "key": _FACT_KEY,
+        "value": {
+            "type": ["string", "number"],
+            "description": "the fact's value as stated in the quote",
+        },
+        "source_key": {
+            "type": "string",
+            "description": "only for a dataset field key from read_dataset; never a file name",
+        },
+        "name": _NAME,
+        "quote": {
+            "type": "string",
+            "description": "verbatim excerpt of that file, 10-400 characters",
+        },
+    },
+    "mark_missing": {"key": _FACT_KEY},
+    "mark_later": {"reason": _REASON},
+    "propose_na": {"reason": _REASON},
+}
+
 
 @dataclass(frozen=True)
 class FillDocument:
@@ -52,6 +97,12 @@ class FillDocument:
                 "\n".join((self.text, self.ocr_text, *self.page_texts)).encode("utf-8")
             ).hexdigest()
         )
+
+    @cached_property
+    def pages(self) -> tuple[str, ...]:
+        """What read_file serves: the PDF pages, else the text, each cut to bounded windows."""
+        sources = self.page_texts or tuple(text for text in (self.text, self.ocr_text) if text)
+        return tuple(part for source in sources for part in windows(source)) or ("",)
 
 
 def _number_in_quote(value: object, quote: str) -> bool:
@@ -81,21 +132,48 @@ class FillTools:
             raise EmaError("section_missing", "Secţiunea lipseşte.", section)
         self.ws, self.job, self.section, self.documents = ws, job, section, documents
 
-    def read_file(self, args: dict[str, Any]) -> object:
-        name = str(args["name"])
-        document = self.documents.get(name)
-        if document is None:
+    def _document(self, name: str) -> tuple[str, FillDocument]:
+        found = resolve_name(name, list(self.documents))
+        if found is None:
             raise EmaError("file_missing", "Fişierul cerut lipseşte.", name)
+        file_id = next(key for key, value in file_ids(self.documents).items() if value == found)
+        return file_id, self.documents[found]
+
+    def read_file(self, args: dict[str, Any]) -> object:
+        file_id, document = self._document(str(args["name"]))
+        page = int(args.get("page", 1))
+        if not 1 <= page <= len(document.pages):
+            raise EmaError("page_missing", "Pagina cerută lipseşte.", f"{file_id}: {page}")
         return {
-            "text": document.text,
-            "ocr_text": document.ocr_text,
-            "page_texts": document.page_texts,
-            "page_images": document.page_images,
+            "file": file_id,
+            "name": document.name,
+            "page": page,
+            "page_count": len(document.pages),
+            "text": document.pages[page - 1],
         }
 
+    def search_files(self, args: dict[str, Any]) -> object:
+        query = str(args["query"]).strip()
+        if not query:
+            raise EmaError("query_missing", "Căutarea nu are text.", self.section)
+        pages = {
+            file_id: self.documents[name].pages
+            for file_id, name in file_ids(self.documents).items()
+        }
+        return {"passages": search(pages, query)}
+
     def read_dataset(self, args: dict[str, Any]) -> object:
+        # Only the section's own fields: the whole dataset is ~150k tokens on a real dossier.
         key = str(args.get("key", ""))
-        available = [item for item in fields(self.ws, self.job) if not key or item.key == key]
+        dataset = {item.key: item for item in fields(self.ws, self.job)}
+        section = next(item for item in CATALOGUE if item.id == self.section)
+        scope = {item.key for ref in section.facts for item in fact_fields(ref, dataset)}
+        scope |= {
+            _STRUCTURED_SOURCE[str(ref)] for ref in section.facts if str(ref) in _STRUCTURED_SOURCE
+        }
+        available = [
+            item for item in dataset.values() if item.key in scope and key in {"", item.key}
+        ]
         return [
             {
                 "key": item.key,
@@ -134,9 +212,7 @@ class FillTools:
             raise EmaError("fact_section", "Faptul nu aparţine secţiunii active.", key)
 
     def _document_evidence(self, name: str, quote: str, value: object) -> Evidence:
-        document = self.documents.get(name)
-        if document is None:
-            raise EmaError("file_missing", "Fişierul cerut lipseşte.", name)
+        _, document = self._document(name)
         if not quote or not any(
             quote in text for text in (document.text, document.ocr_text, *document.page_texts)
         ):
@@ -222,64 +298,43 @@ class FillTools:
         return {"section": self.section, "status": state.status.value, "reason": reason}
 
     def tools(self) -> dict[str, Tool]:
-        string = {"type": "string"}
+        def spec(name: str, description: str, required: tuple[str, ...] = ()) -> ToolSpec:
+            parameters: dict[str, Any] = {"type": "object", "properties": _ARGUMENTS[name]}
+            return ToolSpec(
+                name, description, parameters | ({"required": list(required)} if required else {})
+            )
+
         return {
             "read_file": Tool(
-                ToolSpec(
-                    "read_file",
-                    "Read dossier text/OCR/page images",
-                    {"type": "object", "properties": {"name": string}, "required": ["name"]},
+                spec(
+                    "read_file", "Read one page of a dossier file, with its page_count", ("name",)
                 ),
                 self.read_file,
             ),
-            "read_dataset": Tool(
-                ToolSpec(
-                    "read_dataset",
-                    "Read a located dataset field",
-                    {"type": "object", "properties": {"key": string}},
+            "search_files": Tool(
+                spec(
+                    "search_files",
+                    "Find passages of the dossier files that contain the query",
+                    ("query",),
                 ),
+                self.search_files,
+            ),
+            "read_dataset": Tool(
+                spec("read_dataset", "Read this section's located dataset fields"),
                 self.read_dataset,
             ),
             "record_fact": Tool(
-                ToolSpec(
-                    "record_fact",
-                    "Record a fact with verified evidence",
-                    {
-                        "type": "object",
-                        "properties": {
-                            "key": string,
-                            "value": {"type": ["string", "number"]},
-                            "source_key": string,
-                            "name": string,
-                            "quote": string,
-                        },
-                        "required": ["key", "value"],
-                    },
-                ),
+                spec("record_fact", "Record a fact with verified evidence", ("key", "value")),
                 self.record_fact,
             ),
             "mark_missing": Tool(
-                ToolSpec(
-                    "mark_missing",
-                    "Record a missing fact",
-                    {"type": "object", "properties": {"key": string}, "required": ["key"]},
-                ),
-                self.mark_missing,
+                spec("mark_missing", "Record a missing fact", ("key",)), self.mark_missing
             ),
             "mark_later": Tool(
-                ToolSpec(
-                    "mark_later",
-                    "Defer a section with a reason",
-                    {"type": "object", "properties": {"reason": string}, "required": ["reason"]},
-                ),
-                self.mark_later,
+                spec("mark_later", "Defer a section with a reason", ("reason",)), self.mark_later
             ),
             "propose_na": Tool(
-                ToolSpec(
-                    "propose_na",
-                    "Propose n/a for an absent trigger",
-                    {"type": "object", "properties": {"reason": string}, "required": ["reason"]},
-                ),
+                spec("propose_na", "Propose n/a for an absent trigger", ("reason",)),
                 self.propose_na,
             ),
         }

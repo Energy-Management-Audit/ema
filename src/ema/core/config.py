@@ -96,6 +96,7 @@ class Settings(BaseSettings):
     brave_api_key: SecretStr | None = None
     llm_live: bool = False
     ai_client_live: bool = False
+    ai_job_budget_usd: float = 2.0
     research_live: bool = False
 
     def provider_key(self, provider: str) -> SecretStr | None:

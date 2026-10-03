@@ -8,11 +8,12 @@ from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_agent import PROMPT_VERSION, recorded_facts
 from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.draft_write import live_passes, write_section
-from ema.audit.fill_stage import settings_provider
+from ema.audit.fill_stage import STOPPING, log_spend, settings_provider, stopped_warning
 from ema.audit.sections import get_status
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, run_stage
+from ema.core.llm.agent import job_spend
 from ema.core.llm.types import Provider
 from ema.core.logging import write_event
 from ema.core.review.section_transition import Status
@@ -83,7 +84,7 @@ def _draft_all(
             code = failed[section] = failure_code(exc)
             with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
                 write_event(handle, "draft_failed", run=ctx.run_id, section=section, code=code)
-            if code == "ai_quota_day":
+            if code in STOPPING:
                 return DraftSummary(
                     ctx.run_id,
                     drafted,
@@ -108,17 +109,16 @@ def start_draft(
     sections, skipped, absent = draftable(ws, job)
 
     def stage(ctx: StageContext) -> StageOutcome:
-        summary = _draft_all(ctx, provider, model_id, sections, skipped, absent)
+        before = job_spend(ctx.ws, ctx.job)
+        try:
+            summary = _draft_all(ctx, provider, model_id, sections, skipped, absent)
+        finally:
+            log_spend(ctx, "draft", before)
         if summaries is not None:
             summaries.append(summary)
         return StageOutcome(
             item_failures=[f"{key}: {code}" for key, code in summary.failed.items()],
-            warnings=[
-                f"Cota zilnică a furnizorului AI s-a epuizat: {len(summary.stopped)} "
-                "secţiuni rămase."
-            ]
-            if summary.stopped
-            else [],
+            warnings=stopped_warning(summary.failed, summary.stopped),
         )
 
     return run_stage(ws, job, "draft", stage, on_revision=on_revision)
