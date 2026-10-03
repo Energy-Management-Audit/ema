@@ -223,6 +223,72 @@ def test_draft_creates_absent_activity_section(tmp_path: Path) -> None:
     assert texts[texts.index(TITLES["ch2.activitate"]) + 1] == "activitatea industrială."
 
 
+def test_two_absent_sections_clone_sibling_heading_and_body(tmp_path: Path) -> None:
+    document = Document()
+    document.add_paragraph(TITLES["ch2"], style="Heading 1")
+    sibling = document.add_paragraph(TITLES["ch2.date_generale"], style="Heading 2")
+    _numbered(sibling)
+    sibling.runs[0].bold = True
+    body = document.add_paragraph("original", style="Body Text")
+    body.runs[0].italic = True
+    history_heading = document.add_paragraph(TITLES["ch2.istorie"], style="Heading 2")
+    _numbered(history_heading)
+    history_heading.runs[0].bold = True
+    document.add_paragraph("history")
+    document.add_paragraph(TITLES["ch3"], style="Heading 1")
+    document.add_paragraph(TITLES["ch3.flux"], style="Heading 2")
+    document.add_paragraph("flow")
+    document.add_paragraph(TITLES["ch4"], style="Heading 1")
+    base = tmp_path / "base.docx"
+    document.save(str(base))
+    current = base
+    for section_id in ("ch2.manager", "ch2.activitate"):
+        output = tmp_path / f"{section_id}.docx"
+        draft = SectionDraft(
+            section=section_id,
+            status="drafted",
+            paragraphs=[DraftText(text="filled")],
+        )
+        render_section(current, output, draft, FACTS, (), job="synthetic")
+        current = output
+    result = Document(str(current))
+    headings = [paragraph for paragraph in result.paragraphs if paragraph.text in TITLES.values()]
+    chapter_two = [
+        paragraph.text
+        for paragraph in headings
+        if paragraph.text
+        in {
+            TITLES[key]
+            for key in ("ch2", "ch2.date_generale", "ch2.manager", "ch2.activitate", "ch2.istorie")
+        }
+    ]
+    assert chapter_two == [
+        TITLES[key]
+        for key in ("ch2", "ch2.date_generale", "ch2.manager", "ch2.activitate", "ch2.istorie")
+    ]
+    original = next(paragraph for paragraph in headings if paragraph.text == TITLES["ch2.istorie"])
+    for section_id in ("ch2.manager", "ch2.activitate"):
+        inserted = next(paragraph for paragraph in headings if paragraph.text == TITLES[section_id])
+        assert inserted.style.style_id == original.style.style_id
+        assert inserted._p.pPr.xml == original._p.pPr.xml
+        assert inserted._p.pPr.numPr.xml == original._p.pPr.numPr.xml
+        assert inserted._p.r_lst[0].rPr.xml == original._p.r_lst[0].rPr.xml
+        marker = result.paragraphs[
+            [paragraph.text for paragraph in result.paragraphs].index(TITLES[section_id]) + 1
+        ]
+        assert marker.style.name == "Normal"
+    assert [paragraph.style.name for paragraph in headings] == [
+        "Heading 1",
+        "Heading 2",
+        "Heading 2",
+        "Heading 2",
+        "Heading 2",
+        "Heading 1",
+        "Heading 2",
+        "Heading 1",
+    ]
+
+
 def test_process_draft_fills_every_repeated_subsection(tmp_path: Path) -> None:
     document = Document()
     document.add_paragraph(TITLES["ch3"], style="Heading 1")

@@ -4,12 +4,15 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, cast
+from typing import Any
 
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 from ema.audit.base_anchor import MARKER
 from ema.audit.base_units import heading_spans_document
@@ -69,6 +72,70 @@ def draft_blocks(draft: SectionDraft, facts: dict[str, Field], blocked: set[str]
     return blocks
 
 
+def _clone_paragraph(prototype: Any, text: str) -> Any:
+    cloned = deepcopy(prototype)
+    for child in list(cloned):
+        if child.tag != qn("w:pPr"):
+            cloned.remove(child)
+    run = next((item for item in prototype if item.tag == qn("w:r")), None)
+    copied_run = deepcopy(run) if run is not None else OxmlElement("w:r")
+    for child in list(copied_run):
+        if child.tag != qn("w:rPr"):
+            copied_run.remove(child)
+    value = OxmlElement("w:t")
+    value.text = text
+    copied_run.append(value)
+    cloned.append(copied_run)
+    return cloned
+
+
+def _insert_absent_section(document: Any, section_id: str, spans: list[Any]) -> bool:
+    catalogue = {section.id: section for section in CATALOGUE}
+    target = catalogue[section_id]
+    if target.chapter not in {2, 3} or target.parent is None:
+        return False
+    if any(item.section_id == section_id for item, _, _ in spans):
+        return False
+    order = {section.id: index for index, section in enumerate(CATALOGUE)}
+    siblings = [
+        (item, start, end)
+        for item, start, end in spans
+        if item.section_id in catalogue and catalogue[item.section_id].parent == target.parent
+    ]
+    following = next(
+        (
+            (item, start, end)
+            for item, start, end in siblings
+            if order[item.section_id] > order[section_id]
+        ),
+        None,
+    )
+    preceding = next(
+        (
+            (item, start, end)
+            for item, start, end in reversed(siblings)
+            if order[item.section_id] < order[section_id]
+        ),
+        None,
+    )
+    sibling = following or preceding
+    if sibling is None:
+        raise EmaError("draft_prototype", "Secţiunea lipseşte din bază.", section_id)
+    body = list(document.element.body)
+    _, start, end = sibling
+    body_prototype = next(
+        (element for element in body[start + 1 : end] if element.tag == qn("w:p")),
+        None,
+    )
+    if body_prototype is None:
+        raise EmaError("draft_prototype", "Secţiunea nu are model de paragraf.", section_id)
+    anchor_index = following[1] if following else end
+    anchor = body[anchor_index]
+    anchor.addprevious(_clone_paragraph(body[start], target.title))
+    anchor.addprevious(_clone_paragraph(body_prototype, MARKER))
+    return True
+
+
 def render_section(
     base: Path,
     output: Path,
@@ -90,32 +157,7 @@ def render_section(
         source = base
         document = Document(str(base))
         spans = heading_spans_document(document)
-        if draft.section == "ch2.activitate" and not any(
-            item.section_id == draft.section for item, _, _ in spans
-        ):
-            # This catalogue section is absent from some bases; add its own heading
-            # before the next chapter-two heading so its draft has a real region.
-            order = [section.id for section in CATALOGUE]
-            following = next(
-                (
-                    start
-                    for item, start, _ in spans
-                    if item.section_id.startswith("ch2.")
-                    and order.index(item.section_id) > order.index(draft.section)
-                ),
-                None,
-            )
-            if following is None:
-                raise EmaError("draft_prototype", "Secţiunea lipseşte din bază.", draft.section)
-            body = list(cast(Any, document.element).body)
-            paragraph = next(
-                paragraph for paragraph in document.paragraphs if paragraph._p is body[following]
-            )
-            paragraph.insert_paragraph_before(
-                next(section.title for section in CATALOGUE if section.id == draft.section),
-                style="Heading 2",
-            )
-            paragraph.insert_paragraph_before(MARKER, style="Body Text")
+        if _insert_absent_section(document, draft.section, spans):
             source = Path(directory) / "with-section.docx"
             document.save(str(source))
         replace_section_body(source, output, draft.section, draft_blocks(draft, facts, blocked))
