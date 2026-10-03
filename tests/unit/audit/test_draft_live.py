@@ -14,7 +14,7 @@ import pytest
 from tests.audit_replay import audit_job_with_facts
 
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.draft_agent import draft_task
+from ema.audit.draft_agent import FACT_RULE, REFERENCE_RULE, WORDING_RULE, draft_task
 from ema.audit.draft_live import DraftSummary, start_draft
 from ema.audit.draft_schema import SECTION_FACTS, DraftText, SectionDraft
 from ema.audit.draft_stage import draft_section
@@ -22,6 +22,7 @@ from ema.audit.stages import start_audit_stage
 from ema.cli import app
 from ema.core.errors import EmaError
 from ema.core.jobs import get_job, status, subscribe
+from ema.core.llm.agent import job_spend
 from ema.core.llm.models import default_model
 from ema.core.llm.types import Exchange, ToolSpec
 from ema.core.review.fields import propose
@@ -31,7 +32,8 @@ from ema.core.workspace import Workspace
 SECTION = "ch2.date_generale"
 TASK = (
     "Redactează secţiunea ch2.date_generale „Date generale”. "
-    "Câmpul section este exact „ch2.date_generale”."
+    "Câmpul section este exact „ch2.date_generale”. "
+    f"{FACT_RULE} {REFERENCE_RULE} {WORDING_RULE}"
 )
 TITLES = {section.id: section.title for section in CATALOGUE}
 
@@ -46,6 +48,7 @@ class FakeLive:
         self.tasks: list[str] = []
         self.models: list[str] = []
         self.synthetic: list[bool] = []
+        self.support_response = '{"flags": []}'
 
     def respond(
         self,
@@ -62,8 +65,10 @@ class FakeLive:
         self.models.append(model)
         self.synthetic.append(synthetic)
         if prompt_version.endswith("-support"):
-            return Exchange(json.dumps({"flags": []}), (), 1, 1)
+            return Exchange(self.support_response, (), 1, 1)
         request = json.loads(str(messages[1]["content"]))
+        if "request" in request:
+            request = json.loads(request["request"])
         task = request["task"]
         self.tasks.append(task)
         section = re.findall("„([^”]+)”", task)[-1]
@@ -72,6 +77,11 @@ class FakeLive:
             raise EmaError("ai_quota_day", "Cota zilnică.", model)
         if mode == "empty":
             return Exchange(json.dumps({"flags": []}), (), 1, 1)
+        if mode == "retry" and self.tasks.count(task) == 1:
+            invalid = SectionDraft(
+                section=section, status="drafted", paragraphs=[DraftText(text="Atelier Exemplu.")]
+            )
+            return Exchange(invalid.model_dump_json(), (), 1, 1)
         key = next(item["key"] for item in request["facts"] if item["presence"] == "found")
         draft = SectionDraft(
             section=section,
@@ -129,6 +139,17 @@ def test_live_draft_section_runs_on_settings_and_records_both_passes(
     assert json.loads((folder / f"{SECTION}.draft.json").read_text("utf-8"))["responses"][0][
         "choices"
     ][0]["message"]["content"]
+
+
+def test_support_error_keeps_written_and_queued_draft(tmp_path: Path, live: FakeLive) -> None:
+    live.support_response = '{"flags": [{"location": "bad", "sentence": "x", "reason": "x"}]}'
+    ws = Workspace(tmp_path / "ws")
+    job = audit_job_with_facts(ws)
+    result = draft_section(ws, job, SECTION)
+    assert result.draft_status == "drafted"
+    assert result.draft_path.is_file()
+    assert any(flag.code == "support_unavailable" for flag in result.review)
+    assert result.section_status == "drafted"
 
 
 def test_live_switch_off_sends_nothing(
@@ -199,6 +220,65 @@ def test_day_quota_stops_the_remaining_sections(tmp_path: Path, live: FakeLive) 
     assert summary.failed == {first: "ai_quota_day"}
     assert second in summary.drafted
     assert len(live.tasks) == 3
+
+
+def test_quota_stops_sections_after_first_batch(tmp_path: Path, live: FakeLive) -> None:
+    ws = Workspace(tmp_path / "ws")
+    job = audit_job_with_facts(ws)
+    order = list(SECTION_FACTS)[:5]
+    for section in order:
+        if section != SECTION:
+            _found(ws, job, section)
+    live.modes[order[0]] = "quota"
+    summary, _ = _run(ws, job)
+    assert summary.failed[order[0]] == "ai_quota_day"
+    assert summary.stopped == (order[4],)
+    assert order[4] not in summary.drafted
+    assert len(live.tasks) == 4
+
+
+def test_parallel_budget_keeps_order_and_caps_calls(
+    tmp_path: Path, live: FakeLive, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FixedCost:
+        def cost(self, *_args: Any) -> float:
+            return 0.2
+
+    monkeypatch.setattr("ema.core.llm.structured.selected_model", lambda *_a: FixedCost())
+    monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", "0.5")
+    order = list(SECTION_FACTS)[:4]
+    for index in range(3):
+        ws = Workspace(tmp_path / f"ws-{index}")
+        job = audit_job_with_facts(ws)
+        for section in order:
+            if section != SECTION:
+                _found(ws, job, section)
+        summary, _ = _run(ws, job)
+        assert len(summary.drafted) == 1
+        assert list(summary.drafted) == [section for section in order if section in summary.drafted]
+        assert list(summary.failed) == [section for section in order if section in summary.failed]
+        assert set(summary.failed.values()) == {"ai_budget"}
+        assert job_spend(ws, job) == pytest.approx(0.4)
+        assert len(live.tasks) == index + 1
+
+
+def test_checker_retry_is_budgeted(
+    tmp_path: Path, live: FakeLive, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FixedCost:
+        def cost(self, *_args: Any) -> float:
+            return 0.2
+
+    monkeypatch.setattr("ema.core.llm.structured.selected_model", lambda *_a: FixedCost())
+    monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", "0.5")
+    ws = Workspace(tmp_path / "ws")
+    job = audit_job_with_facts(ws)
+    live.modes[SECTION] = "retry"
+    summary, _ = _run(ws, job)
+    assert summary.drafted == {SECTION: "drafted"}
+    assert summary.failed == {}
+    assert len(live.tasks) == 2
+    assert job_spend(ws, job) == pytest.approx(0.4)
 
 
 def test_job_budget_spent_earlier_stops_the_stage_before_any_call(

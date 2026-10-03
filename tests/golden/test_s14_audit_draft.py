@@ -24,7 +24,6 @@ from ema.audit.draft_checks import check_draft
 from ema.audit.draft_render import render_section
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.sections import get_status, refresh_staleness
-from ema.core.llm import Limits
 from ema.core.office.anchors import find
 from ema.core.review.fields import propose
 from ema.core.review.models import Evidence, Field, Manual
@@ -130,7 +129,6 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
             support_recording(
                 ws, job, draft, tmp_path / f"support-{index}.json", 1 if index == 0 else None
             ),
-            Limits(8),
         )
         assert state.status == "done" and not checked.fatal
         assert len(flags) == (1 if index == 0 else 0)

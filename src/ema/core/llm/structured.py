@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -25,6 +26,7 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
     max_output_tokens: int = 4096,
     estimate_tokens: Callable[[list[dict[str, Any]]], int] | None = None,
     on_estimate: Callable[[int, float, float], None] | None = None,
+    schema_retries: int = 1,
 ) -> T:
     if context.provider.name != "replay" and not (context.synthetic or context.client_live):
         raise EmaError("ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", "")
@@ -51,7 +53,27 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
         },
     ]
     attachments = {image.sha256: image.data for image in images}
-    for attempt in range(2):
+    draft_call = context.section.startswith(("draft:", "support:"))
+    output_limit = 8000 if draft_call and context.provider.name != "replay" else max_output_tokens
+    budget_estimate_tokens = estimate_tokens
+    if draft_call and estimate_tokens is None:
+        schema_size = len(json.dumps(schema.model_json_schema()).encode("utf-8"))
+
+        def draft_estimate_tokens(messages: list[dict[str, Any]]) -> int:
+            size = len(json.dumps(messages, ensure_ascii=False).encode("utf-8"))
+            return (size + schema_size + 3) // 4
+
+        budget_estimate_tokens = draft_estimate_tokens
+    budget_on_estimate = on_estimate
+    if draft_call and on_estimate is None:
+
+        def log_draft_estimate(_tokens: int, projected: float, spent: float) -> None:
+            logging.getLogger(__name__).info(
+                "draft preflight estimated_cost_usd=%.6f spent_usd=%.6f", projected, spent
+            )
+
+        budget_on_estimate = log_draft_estimate
+    for attempt in range(schema_retries + 1):
         kwargs: dict[str, Any] = {"attachments": attachments} if images else {}
         response = call_with_budget(
             context,
@@ -61,7 +83,7 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
                 messages,
                 (),
                 schema.model_json_schema(),
-                max_output_tokens,
+                output_limit,
                 synthetic=context.synthetic,
                 prompt_version=context.prompt_version,
                 **kwargs,
@@ -69,19 +91,19 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
             estimate=(
                 (
                     lambda: (
-                        (tokens := estimate_tokens(messages)),
-                        model.cost(tokens, max_output_tokens),
+                        (tokens := budget_estimate_tokens(messages)),
+                        model.cost(tokens, output_limit),
                     )
                 )
-                if estimate_tokens is not None
+                if budget_estimate_tokens is not None
                 else None
             ),
-            on_estimate=on_estimate,
+            on_estimate=budget_on_estimate,
         )
         try:
             return schema.model_validate(json.loads(response.text or ""))
         except (ValidationError, ValueError) as exc:
-            if attempt:
+            if attempt == schema_retries:
                 raise EmaError(
                     "ai_schema", "Răspunsul AI nu respectă formatul cerut.", type(exc).__name__
                 ) from exc

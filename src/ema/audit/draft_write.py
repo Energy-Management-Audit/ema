@@ -13,10 +13,8 @@ from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
 from ema.audit.publication import queue_sections
 from ema.audit.sections import recompute_ready
 from ema.core.jobs import StageContext
-from ema.core.llm import Limits, RecordingProvider, ReplayProvider
+from ema.core.llm import RecordingProvider, ReplayProvider
 from ema.core.llm.types import Provider
-
-DRAFT_STEPS = 8
 
 
 @dataclass(frozen=True)
@@ -69,7 +67,6 @@ def write_section(ctx: StageContext, section: str, passes: Passes) -> Drafted:
         section,
         passes.draft,
         passes.support,
-        Limits(DRAFT_STEPS),
         model_id=passes.model_id,
         support_model_id=passes.support_model_id,
         facts=facts,

@@ -9,11 +9,10 @@ import pytest
 from docx import Document
 from tests.audit_replay import CH2_DRAFT, audit_job_with_facts
 
-from ema.audit.draft_agent import draft_section_run
+from ema.audit.draft_agent import FACT_RULE, draft_section_run
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.draft_style import style_example
 from ema.core.errors import EmaError
-from ema.core.llm import Limits
 from ema.core.llm.models import default_model
 from ema.core.llm.types import Exchange
 from ema.core.workspace import Workspace
@@ -37,31 +36,40 @@ class DraftProvider:
 class SupportProvider:
     name = "openai"
 
+    def __init__(self, response: str = '{"flags": []}') -> None:
+        self.response = response
+        self.calls = 0
+
     def respond(self, *args: Any, **kwargs: Any) -> Exchange:
-        return Exchange('{"flags": []}', (), 1, 1)
+        self.calls += 1
+        return Exchange(self.response, (), 1, 1)
 
 
-def _run(tmp_path: Path, drafts: list[SectionDraft]) -> tuple[DraftProvider, SectionDraft]:
+def _run(
+    tmp_path: Path, drafts: list[SectionDraft]
+) -> tuple[DraftProvider, SupportProvider, SectionDraft]:
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
     provider = DraftProvider(drafts)
+    support = SupportProvider()
     _, accepted, _, _ = draft_section_run(
         ws,
         job,
         SECTION,
         provider,
-        SupportProvider(),
-        Limits(8),
+        support,
         model_id=default_model("openai").id,
         synthetic=True,
     )
-    return provider, accepted
+    return provider, support, accepted
 
 
 def test_accepted_draft_uses_one_structured_call(tmp_path: Path) -> None:
-    provider, accepted = _run(tmp_path, [CH2_DRAFT])
+    provider, support, accepted = _run(tmp_path, [CH2_DRAFT])
     assert accepted == CH2_DRAFT
     assert len(provider.requests) == 1
+    assert support.calls == 1
+    assert FACT_RULE in provider.requests[0]["task"]
     assert provider.requests[0]["task"].startswith(f"Redactează secţiunea {SECTION}")
 
 
@@ -71,10 +79,64 @@ def test_literal_name_retry_carries_rule(tmp_path: Path) -> None:
         status="drafted",
         paragraphs=[DraftText(text="Atelier Exemplu are activitate.")],
     )
-    provider, accepted = _run(tmp_path, [invalid, CH2_DRAFT])
+    provider, support, accepted = _run(tmp_path, [invalid, CH2_DRAFT])
     assert accepted == CH2_DRAFT
     assert len(provider.requests) == 2
+    assert support.calls == 1
     assert any(error["rule"] == "literal_name" for error in provider.requests[1]["errors"])
+    assert all(error["rule_text"] == FACT_RULE for error in provider.requests[1]["errors"])
+    assert FACT_RULE in json.loads(provider.requests[1]["request"])["task"]
+
+
+def test_second_fatal_draft_stops_after_two_calls(tmp_path: Path) -> None:
+    invalid = SectionDraft(
+        section=SECTION, status="drafted", paragraphs=[DraftText(text="Atelier Exemplu.")]
+    )
+    ws = Workspace(tmp_path / "ws")
+    job = audit_job_with_facts(ws)
+    provider, support = DraftProvider([invalid, invalid]), SupportProvider()
+    with pytest.raises(EmaError) as error:
+        draft_section_run(
+            ws, job, SECTION, provider, support, model_id=default_model("openai").id, synthetic=True
+        )
+    assert error.value.code == "draft_incomplete"
+    assert len(provider.requests) == 2
+    assert support.calls == 0
+
+
+def test_bad_support_keeps_accepted_draft(tmp_path: Path) -> None:
+    ws = Workspace(tmp_path / "ws")
+    job = audit_job_with_facts(ws)
+    provider = DraftProvider([CH2_DRAFT])
+    support = SupportProvider(
+        '{"flags": [{"location": "elsewhere", "sentence": "x", "reason": "x"}]}'
+    )
+    _, accepted, _, flags = draft_section_run(
+        ws, job, SECTION, provider, support, model_id=default_model("openai").id, synthetic=True
+    )
+    assert accepted == CH2_DRAFT
+    assert [(flag.code, flag.location, flag.detail) for flag in flags] == [
+        ("support_unavailable", "section", "support_invalid")
+    ]
+    assert len(provider.requests) == support.calls == 1
+
+
+def test_invalid_json_has_no_hidden_retry(tmp_path: Path) -> None:
+    class InvalidProvider(DraftProvider):
+        def respond(self, *args: Any, **kwargs: Any) -> Exchange:
+            self.requests.append({})
+            return Exchange("not json", (), 1, 1)
+
+    ws = Workspace(tmp_path / "ws")
+    job = audit_job_with_facts(ws)
+    provider, support = InvalidProvider([]), SupportProvider()
+    with pytest.raises(EmaError) as error:
+        draft_section_run(
+            ws, job, SECTION, provider, support, model_id=default_model("openai").id, synthetic=True
+        )
+    assert error.value.code == "ai_schema"
+    assert len(provider.requests) == 1
+    assert support.calls == 0
 
 
 def test_style_example_masks_identity_and_every_number(tmp_path: Path) -> None:
@@ -91,6 +153,23 @@ def test_style_example_masks_identity_and_every_number(tmp_path: Path) -> None:
     assert example.count("{{…}}") == 3
 
 
+def test_style_example_masks_unlisted_names_variants_and_acronyms(tmp_path: Path) -> None:
+    base = tmp_path / "synthetic.docx"
+    doc = Document()
+    doc.add_paragraph("DESCRIEREA ȘI ISTORICUL SOCIETĂȚII", style="Heading 1")
+    doc.add_paragraph("Date generale", style="Heading 2")
+    doc.add_paragraph(
+        "Clientul Ştefan\nIonescu lucrează cu Ana Popescu în Brașov la ACME. "
+        "În 2026-02-03 avea 12,5%."
+    )
+    doc.add_paragraph("Istoria companiei", style="Heading 2")
+    doc.save(base)
+    example = style_example(base, ("Ștefan Ionescu",), SECTION)
+    for leaked in ("Ştefan", "Ionescu", "Ana", "Popescu", "Brașov", "ACME", "2026", "12,5"):
+        assert leaked not in example
+    assert example.count("{{…}}") >= 7
+
+
 def test_provider_receives_only_redacted_base_example(tmp_path: Path, monkeypatch: Any) -> None:
     base = tmp_path / "synthetic.docx"
     doc = Document()
@@ -103,7 +182,7 @@ def test_provider_receives_only_redacted_base_example(tmp_path: Path, monkeypatc
     identity.write_text(json.dumps(["Atelier Exemplu"]), encoding="utf-8")
     monkeypatch.setenv("EMA_AUDIT_BASE_DOCUMENT", str(base))
     monkeypatch.setenv("EMA_AUDIT_BASE_IDENTITY", str(identity))
-    provider, _ = _run(tmp_path, [CH2_DRAFT])
+    provider, _, _ = _run(tmp_path, [CH2_DRAFT])
     example = provider.requests[0]["style_example"]
     assert example
     assert "Atelier Exemplu" not in example
@@ -122,7 +201,6 @@ def test_preflight_refuses_before_draft_call(tmp_path: Path, monkeypatch: Any) -
             SECTION,
             provider,
             SupportProvider(),
-            Limits(8),
             model_id=default_model("openai").id,
             synthetic=True,
         )

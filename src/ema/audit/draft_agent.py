@@ -10,7 +10,7 @@ from ema.audit.draft_checks import DraftCheck, DraftReview, check_draft, support
 from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
 from ema.audit.draft_style import configured_style_example
 from ema.core.errors import EmaError
-from ema.core.llm import AgentContext, Limits, ReplayProvider, complete_json
+from ema.core.llm import AgentContext, ReplayProvider, complete_json
 from ema.core.llm.agent import AgentState
 from ema.core.llm.types import Provider
 from ema.core.resources import resource_path
@@ -18,6 +18,9 @@ from ema.core.review.models import Field
 from ema.core.workspace import Workspace
 
 PROMPT_VERSION = "audit-draft-v2"
+FACT_RULE = "Fiecare nume, număr şi dată vine dintr-un fapt, scris {{f:<key>}}."
+REFERENCE_RULE = "Fiecare paragraf, celulă şi legendă enumeră fact_ids folosite."
+WORDING_RULE = "Nu folosi formulări despre AI sau procesul de redactare."
 INSTRUCTIONS = (
     "Redactează numai secţiunea cerută. Fiecare nume, număr şi dată trebuie să provină "
     "dintr-un fapt şi să fie scris ca {{f:<key>}}. Scrie 3–6 propoziţii în registrul "
@@ -40,7 +43,10 @@ def recorded_facts(ws: Workspace, job: str, section: str) -> dict[str, Field]:
 
 def draft_task(section: str) -> str:
     title = next(item.title for item in CATALOGUE if item.id == section)
-    return f"Redactează secţiunea {section} „{title}”. Câmpul section este exact „{section}”."
+    return (
+        f"Redactează secţiunea {section} „{title}”. Câmpul section este exact „{section}”. "
+        f"{FACT_RULE} {REFERENCE_RULE} {WORDING_RULE}"
+    )
 
 
 def draft_content(
@@ -72,7 +78,6 @@ def draft_section_run(  # noqa: PLR0913
     section: str,
     draft_provider: Provider,
     support_provider: Provider,
-    limits: Limits,
     *,
     model_id: str,
     support_model_id: str | None = None,
@@ -81,7 +86,6 @@ def draft_section_run(  # noqa: PLR0913
     client_live: bool = False,
     task: str | None = None,
 ) -> tuple[AgentState, SectionDraft, DraftCheck, tuple[DraftReview, ...]]:
-    del limits
     if section not in SECTION_FACTS:
         raise EmaError("section_missing", "Secţiunea de redactare lipseşte.", section)
     facts = recorded_facts(ws, job, section) if facts is None else facts
@@ -96,26 +100,33 @@ def draft_section_run(  # noqa: PLR0913
         client_live=client_live,
     )
     content = draft_content(ws, section, facts, task)
-    draft = complete_json(context, SectionDraft, INSTRUCTIONS, content)
-    if draft.section != section:
-        raise EmaError("draft_section", "Secţiunea redactată nu corespunde.", section)
+
+    def read_draft(request: str) -> SectionDraft:
+        result = complete_json(context, SectionDraft, INSTRUCTIONS, request, schema_retries=0)
+        if result.section != section:
+            raise EmaError("draft_section", "Secţiunea redactată nu corespunde.", section)
+        return result
+
+    draft = read_draft(content)
     check = check_draft(draft, facts, job)
+    steps = 1
     if check.fatal:
         errors = [
-            {"rule": issue.code, "location": issue.location, "detail": issue.detail}
+            {
+                "rule": issue.code,
+                "rule_text": FACT_RULE,
+                "location": issue.location,
+                "detail": issue.detail,
+            }
             for issue in check.fatal
         ]
-        draft = complete_json(
-            context,
-            SectionDraft,
-            INSTRUCTIONS,
+        draft = read_draft(
             json.dumps(
                 {"request": content, "rejected_draft": draft.model_dump(), "errors": errors},
                 ensure_ascii=False,
             ),
         )
-        if draft.section != section:
-            raise EmaError("draft_section", "Secţiunea redactată nu corespunde.", section)
+        steps = 2
         check = check_draft(draft, facts, job)
         if check.fatal:
             raise EmaError(
@@ -133,10 +144,13 @@ def draft_section_run(  # noqa: PLR0913
         synthetic=synthetic,
         client_live=client_live,
     )
-    flags = support_pass(support_context, draft, facts)
+    try:
+        flags = support_pass(support_context, draft, facts)
+    except EmaError as exc:
+        flags = (DraftReview("support_unavailable", "section", exc.code),)
     state = AgentState(
         messages=[],
-        steps=1,
+        steps=steps,
         status="done",
         model_id=model_id,
         provider_name=draft_provider.name,
@@ -151,7 +165,6 @@ def draft_section_replay(  # noqa: PLR0913
     section: str,
     draft_recording: Path,
     support_recording: Path,
-    limits: Limits,
     *,
     model_id: str | None = None,
     facts: dict[str, Field] | None = None,
@@ -166,7 +179,6 @@ def draft_section_replay(  # noqa: PLR0913
         section,
         draft_provider,
         support_provider,
-        limits,
         model_id=model_id or draft_provider.model_id,
         support_model_id=model_id or support_provider.model_id,
         facts=facts,
