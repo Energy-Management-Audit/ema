@@ -81,6 +81,7 @@ class DraftReview:
     code: str
     location: str
     detail: str
+    sentence: str | None = None
 
 
 @dataclass(frozen=True)
@@ -201,6 +202,10 @@ SUPPORT_PROMPT = (
 )
 
 
+def _support_text(text: str) -> str:
+    return " ".join(text.split()).rstrip(".!?").rstrip()
+
+
 def support_pass(
     context: AgentContext, draft: SectionDraft, facts: dict[str, Field]
 ) -> tuple[DraftReview, ...]:
@@ -223,10 +228,15 @@ def support_pass(
     )
     known = {location: item.text for location, item in items}
     if any(
-        flag.location not in known or flag.sentence not in known[flag.location]
+        flag.location not in known
+        or not _support_text(flag.sentence)
+        or _support_text(flag.sentence) not in _support_text(known[flag.location])
         for flag in result.flags
     ):
         raise EmaError(
             "support_invalid", "Verificarea afirmaţiilor a returnat o poziţie invalidă.", ""
         )
-    return tuple(DraftReview("unsupported", flag.location, flag.reason) for flag in result.flags)
+    return tuple(
+        DraftReview("unsupported", flag.location, flag.reason, flag.sentence)
+        for flag in result.flags
+    )

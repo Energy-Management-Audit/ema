@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from decimal import Decimal
 from pathlib import Path
@@ -17,7 +18,7 @@ from docx.oxml.ns import qn
 from ema.audit.base_anchor import MARKER
 from ema.audit.base_units import heading_spans_document
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.draft_checks import TOKEN, DraftCheck, DraftReview, check_draft
+from ema.audit.draft_checks import TOKEN, DraftCheck, DraftReview, _support_text, check_draft
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.section_body import replace_section_body
 from ema.core.errors import EmaError
@@ -38,19 +39,51 @@ def _value(field: Field) -> str:
 
 
 def _resolved(text: str, facts: dict[str, Field]) -> str:
-    return TOKEN.sub(lambda match: _value(facts[match.group(1)]), text)
+    def replace(match: re.Match[str]) -> str:
+        value = _value(facts[match.group(1)])
+        suffix = match.group(2)
+        return value if suffix and value.endswith((".", "!", "?")) else value + suffix
+
+    return re.sub(TOKEN.pattern + r"(\.?)", replace, text)
 
 
 def _cell(text: DraftText, location: str, blocked: set[str], facts: dict[str, Field]) -> Segment:
     return Num(None, 0) if location in blocked else _resolved(text.text, facts)
 
 
-def draft_blocks(draft: SectionDraft, facts: dict[str, Field], blocked: set[str]) -> list[Block]:
+def _paragraph(
+    item: DraftText, location: str, issues: tuple[DraftReview, ...], facts: dict[str, Field]
+) -> Block:
+    relevant = [issue for issue in issues if issue.location == location]
+    if any(issue.code != "uncited_sentence" and issue.sentence is None for issue in relevant):
+        return Missing(item.kind, MARKER)
+    flagged = [
+        _support_text(issue.sentence if issue.sentence is not None else issue.detail)
+        for issue in relevant
+    ]
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", item.text) if part.strip()]
+    rendered: list[str] = []
+    for sentence in sentences:
+        normalized = _support_text(sentence)
+        value = (
+            MARKER
+            if any(flag and (flag in normalized or normalized in flag) for flag in flagged)
+            else _resolved(sentence, facts)
+        )
+        if value != MARKER or not rendered or rendered[-1] != MARKER:
+            rendered.append(value)
+    if rendered == [MARKER]:
+        return Missing(item.kind, MARKER)
+    return Paragraph(item.kind, [" ".join(rendered)])
+
+
+def draft_blocks(
+    draft: SectionDraft, facts: dict[str, Field], issues: tuple[DraftReview, ...]
+) -> list[Block]:
     """The section as blocks: a flagged text or cell becomes the marker, a figure a marker."""
+    blocked = {issue.location for issue in issues}
     blocks: list[Block] = [
-        Missing(item.kind, MARKER)
-        if f"paragraph:{index}" in blocked
-        else Paragraph(item.kind, [_resolved(item.text, facts)])
+        _paragraph(item, f"paragraph:{index}", issues, facts)
         for index, item in enumerate(draft.paragraphs)
     ]
     for index, table in enumerate(draft.tables):
@@ -151,7 +184,7 @@ def render_section(
     check = check_draft(draft, facts, job)
     if check.fatal:
         raise EmaError("draft_invalid", "Redactarea nu a trecut verificările.", draft.section)
-    blocked = {issue.location for issue in (*check.review, *flags)}
+    issues = (*check.review, *flags)
     output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory() as directory:
         source = base
@@ -160,7 +193,9 @@ def render_section(
         if _insert_absent_section(document, draft.section, spans):
             source = Path(directory) / "with-section.docx"
             document.save(str(source))
-        replace_section_body(source, output, draft.section, draft_blocks(draft, facts, blocked))
+        replace_section_body(
+            source, output, draft.section, draft_blocks(draft, facts, issues), keep_base=True
+        )
     return check
 
 

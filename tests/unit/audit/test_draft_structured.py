@@ -121,6 +121,68 @@ def test_bad_support_keeps_accepted_draft(tmp_path: Path) -> None:
     assert len(provider.requests) == support.calls == 1
 
 
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "{{f:audit.company_name}} are",
+        "Societatea {{f:audit.company_name}} are {{f:audit.employees}} angajați",
+        "Societatea  {{f:audit.company_name}} are {{f:audit.employees}} angajați.",
+    ],
+)
+def test_support_accepts_paragraph_fragments(tmp_path: Path, sentence: str) -> None:
+    ws = Workspace(tmp_path / "ws")
+    job = audit_job_with_facts(ws)
+    support = SupportProvider(
+        json.dumps(
+            {"flags": [{"location": "paragraph:0", "sentence": sentence, "reason": "claim"}]}
+        )
+    )
+    _, _, _, flags = draft_section_run(
+        ws,
+        job,
+        SECTION,
+        DraftProvider([CH2_DRAFT]),
+        support,
+        model_id=default_model("openai").id,
+        synthetic=True,
+    )
+    assert [(flag.code, flag.sentence) for flag in flags] == [("unsupported", sentence)]
+
+
+def test_support_accepts_two_sentences(tmp_path: Path) -> None:
+    ws = Workspace(tmp_path / "ws")
+    job = audit_job_with_facts(ws)
+    draft = SectionDraft(
+        section=SECTION,
+        status="drafted",
+        paragraphs=[
+            DraftText(
+                text=(
+                    "Societatea {{f:audit.company_name}} există. "
+                    "Are {{f:audit.employees}} angajați."
+                ),
+                fact_ids=["audit.company_name", "audit.employees"],
+            )
+        ],
+    )
+    sentence = "Societatea {{f:audit.company_name}} există. Are {{f:audit.employees}} angajați"
+    support = SupportProvider(
+        json.dumps(
+            {"flags": [{"location": "paragraph:0", "sentence": sentence, "reason": "claim"}]}
+        )
+    )
+    _, _, _, flags = draft_section_run(
+        ws,
+        job,
+        SECTION,
+        DraftProvider([draft]),
+        support,
+        model_id=default_model("openai").id,
+        synthetic=True,
+    )
+    assert [(flag.code, flag.sentence) for flag in flags] == [("unsupported", sentence)]
+
+
 def test_invalid_json_has_no_hidden_retry(tmp_path: Path) -> None:
     class InvalidProvider(DraftProvider):
         def respond(self, *args: Any, **kwargs: Any) -> Exchange:

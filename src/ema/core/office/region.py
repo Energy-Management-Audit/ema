@@ -98,13 +98,15 @@ def _remove_old_charts(parts: dict[str, bytes], old: list[etree._Element]) -> No
     _retire_unreferenced(parts, candidates)
 
 
-def replace_region(
+def replace_region(  # noqa: PLR0913
     docx: Path,
     out: Path,
     start: ElementLocator,
     end: ElementLocator,
     blocks: list[Block],
     prototypes: Prototypes,
+    *,
+    keep_old: set[int] | None = None,
 ) -> RenderReport:
     """Replace exclusive body children between two stable, prelocated anchor elements."""
     original = read_parts(docx)
@@ -120,8 +122,9 @@ def replace_region(
     if added < 0:
         raise OfficeError("block_prototype", "Rendering unexpectedly removed body content")
     old = list(replacement_body)[start.body_index + added : end.body_index + added - 1]
-    for node in old:
-        replacement_body.remove(node)
+    for index, node in enumerate(old):
+        if keep_old is None or index not in keep_old:
+            replacement_body.remove(node)
     parts["word/document.xml"] = encoded(root)
     _remove_old_charts(parts, old)
     write_parts(parts, out)

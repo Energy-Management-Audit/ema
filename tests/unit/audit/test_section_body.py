@@ -103,8 +103,9 @@ def test_paragraphs_replace_the_whole_region_whatever_its_length(tmp_path: Path)
     render_section(base, output, _draft(paragraphs=paragraphs), FACTS, (), job="synthetic")
     written = _section(output)
     assert written[:2] == ["Societatea Atelier Exemplu produce.", "punct Atelier Exemplu."]
-    assert len(written) == 8 and "[de completat] în plus" not in written
-    assert not Document(str(output)).tables
+    assert len(written) == 9 and "[de completat] în plus" not in written
+    assert len(Document(str(output)).tables) == 1
+    assert "Tabelul 2. [de completat]" in written
     document = Document(str(output))
     bullet = document.paragraphs[_texts(output).index("punct Atelier Exemplu.")]
     assert bullet._p.find(f".//{qn('w:numPr')}") is not None
@@ -128,7 +129,12 @@ def test_flagged_items_figures_and_missing_status_become_markers(tmp_path: Path)
     flagged = (DraftReview("unsupported", "paragraph:0", "claim"),)
     render_section(base, output, draft, FACTS, flagged, job="synthetic")
     written = _section(output)
-    assert written == ["[de completat]", "legenda Atelier Exemplu", "[de completat]"]
+    assert written == [
+        "[de completat]",
+        "legenda Atelier Exemplu",
+        "[de completat]",
+        "Tabelul 2. [de completat]",
+    ]
     caption = Document(str(output)).paragraphs[_texts(output).index("legenda Atelier Exemplu")]
     assert caption.style.name == "Caption"
     missing = SectionDraft(
@@ -140,7 +146,77 @@ def test_flagged_items_figures_and_missing_status_become_markers(tmp_path: Path)
         missing_fact_ids=["audit.cui"],
     )
     render_section(base, output, missing, FACTS, (), job="synthetic")
-    assert _section(output) == ["Societatea Atelier Exemplu.", "[de completat]"]
+    assert _section(output) == [
+        "Societatea Atelier Exemplu.",
+        "[de completat]",
+        "Tabelul 2. [de completat]",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("flagged", "expected"),
+    [
+        ((1,), "prima Atelier Exemplu. [de completat] ultima Atelier Exemplu."),
+        ((0, 1, 2), "[de completat]"),
+        ((0,), "[de completat] mijloc Atelier Exemplu. ultima Atelier Exemplu."),
+        ((2,), "prima Atelier Exemplu. mijloc Atelier Exemplu. [de completat]"),
+        ((0, 1), "[de completat] ultima Atelier Exemplu."),
+    ],
+)
+def test_only_flagged_sentences_become_markers(
+    tmp_path: Path, flagged: tuple[int, ...], expected: str
+) -> None:
+    sentences = [f"{word} {{{{f:audit.company_name}}}}." for word in ("prima", "mijloc", "ultima")]
+    draft = _draft(
+        paragraphs=[DraftText(text=" ".join(sentences), fact_ids=["audit.company_name"])]
+    )
+    flags = tuple(DraftReview("unsupported", "paragraph:0", "claim", sentences[i]) for i in flagged)
+    output = tmp_path / "out.docx"
+    render_section(_base(tmp_path / "base.docx"), output, draft, FACTS, flags, job="synthetic")
+    assert _section(output)[0] == expected
+
+
+@pytest.mark.parametrize(
+    ("flag", "expected"),
+    [
+        (
+            "mijloc {{f:audit.company_name}}. ultima {{f:audit.company_name}}",
+            "prima Atelier Exemplu. [de completat]",
+        ),
+        (
+            "mijloc {{f:audit.company_name}}",
+            "prima Atelier Exemplu. [de completat] ultima Atelier Exemplu.",
+        ),
+    ],
+)
+def test_fragment_flags_mark_overlapping_sentences(
+    tmp_path: Path, flag: str, expected: str
+) -> None:
+    text = " ".join(
+        f"{word} {{{{f:audit.company_name}}}}." for word in ("prima", "mijloc", "ultima")
+    )
+    draft = _draft(paragraphs=[DraftText(text=text, fact_ids=["audit.company_name"])])
+    output = tmp_path / "out.docx"
+    render_section(
+        _base(tmp_path / "base.docx"),
+        output,
+        draft,
+        FACTS,
+        (DraftReview("unsupported", "paragraph:0", "claim", flag),),
+        job="synthetic",
+    )
+    assert _section(output)[0] == expected
+
+
+@pytest.mark.parametrize("ending", [".", "!", "?"])
+def test_fact_sentence_punctuation_does_not_duplicate_period(tmp_path: Path, ending: str) -> None:
+    facts = {"audit.company_name": _fact("audit.company_name", "solventi" + ending)}
+    draft = _draft(
+        paragraphs=[DraftText(text="{{f:audit.company_name}}.", fact_ids=["audit.company_name"])]
+    )
+    output = tmp_path / "out.docx"
+    render_section(_base(tmp_path / "base.docx"), output, draft, facts, (), job="synthetic")
+    assert _section(output)[0] == "solventi" + ending
 
 
 def test_tables_carry_caption_header_and_flagged_cells(tmp_path: Path) -> None:

@@ -149,8 +149,10 @@ def write_tables(source: Path, target: Path, *, chapter: str, fields: Sequence[F
     for spec, rows in _tables(fields):
         if not spec.section.startswith(chapter):
             continue
-        if (index := _table(body, spans, spec)) is not None:
-            fill_table(body[index], spec, rows)
+        index = _table(body, spans, spec)
+        if index is None:
+            raise EmaError("table_slot", "Locul tabelului lipseşte din bază.", spec.section)
+        fill_table(body[index], spec, rows)
     parts["word/document.xml"] = encoded(root)
     write_parts(parts, target)
 

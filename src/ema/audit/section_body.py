@@ -105,7 +105,7 @@ def _needed(blocks: list[Block]) -> set[str]:
 
 
 def replace_section_body(
-    source: Path, output: Path, section_id: str, blocks: list[Block]
+    source: Path, output: Path, section_id: str, blocks: list[Block], *, keep_base: bool = False
 ) -> RenderReport:
     """Write ``blocks`` over the section's own region, styled after what the region held."""
     document = Document(str(source))
@@ -127,6 +127,26 @@ def replace_section_body(
                     f"{section_id}: {', '.join(missing)}",
                 )
             target = output if occurrence == 0 else Path(directory) / f"{occurrence}.docx"
+            body_element: Any = document.element
+            region: list[etree._Element] = list(body_element.body)[first:end]
+            keep = {
+                index
+                for index, element in enumerate(region)
+                if keep_base
+                and (
+                    element.tag == W + "tbl"
+                    or next(element.iter(W + "drawing"), None) is not None
+                    or (
+                        element.tag == W + "p"
+                        and re.match(r"^\s*(?:Tabel\w*|Fig\w*)\b", _text(element))
+                    )
+                    or (
+                        _text(element).strip() == MARKER
+                        and index + 1 < len(region)
+                        and re.match(r"^\s*Fig\w*\b", _text(region[index + 1]))
+                    )
+                )
+            }
             report = replace_region(
                 current,
                 target,
@@ -134,6 +154,7 @@ def replace_section_body(
                 ElementLocator(end + 1),
                 blocks,
                 Prototypes(elements, _CHAPTERS[section_id], MARKER),
+                keep_old=keep,
             )
             current = target
     assert report is not None
