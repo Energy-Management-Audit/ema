@@ -18,7 +18,7 @@ from docx.oxml.ns import qn
 from ema.audit.base_anchor import MARKER
 from ema.audit.base_units import heading_spans_document
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.draft_checks import TOKEN, DraftCheck, DraftReview, check_draft
+from ema.audit.draft_checks import TOKEN, DraftCheck, DraftReview, _support_text, check_draft
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.section_body import replace_section_body
 from ema.core.errors import EmaError
@@ -39,7 +39,12 @@ def _value(field: Field) -> str:
 
 
 def _resolved(text: str, facts: dict[str, Field]) -> str:
-    return TOKEN.sub(lambda match: _value(facts[match.group(1)]), text)
+    def replace(match: re.Match[str]) -> str:
+        value = _value(facts[match.group(1)])
+        suffix = match.group(2)
+        return value if suffix and value.endswith((".", "!", "?")) else value + suffix
+
+    return re.sub(TOKEN.pattern + r"(\.?)", replace, text)
 
 
 def _cell(text: DraftText, location: str, blocked: set[str], facts: dict[str, Field]) -> Segment:
@@ -52,11 +57,19 @@ def _paragraph(
     relevant = [issue for issue in issues if issue.location == location]
     if any(issue.code != "uncited_sentence" and issue.sentence is None for issue in relevant):
         return Missing(item.kind, MARKER)
-    flagged = {issue.sentence if issue.sentence is not None else issue.detail for issue in relevant}
+    flagged = [
+        _support_text(issue.sentence if issue.sentence is not None else issue.detail)
+        for issue in relevant
+    ]
     sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", item.text) if part.strip()]
     rendered: list[str] = []
     for sentence in sentences:
-        value = MARKER if sentence in flagged else _resolved(sentence, facts)
+        normalized = _support_text(sentence)
+        value = (
+            MARKER
+            if any(flag and (flag in normalized or normalized in flag) for flag in flagged)
+            else _resolved(sentence, facts)
+        )
         if value != MARKER or not rendered or rendered[-1] != MARKER:
             rendered.append(value)
     if rendered == [MARKER]:

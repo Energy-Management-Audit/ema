@@ -176,6 +176,49 @@ def test_only_flagged_sentences_become_markers(
     assert _section(output)[0] == expected
 
 
+@pytest.mark.parametrize(
+    ("flag", "expected"),
+    [
+        (
+            "mijloc {{f:audit.company_name}}. ultima {{f:audit.company_name}}",
+            "prima Atelier Exemplu. [de completat]",
+        ),
+        (
+            "mijloc {{f:audit.company_name}}",
+            "prima Atelier Exemplu. [de completat] ultima Atelier Exemplu.",
+        ),
+    ],
+)
+def test_fragment_flags_mark_overlapping_sentences(
+    tmp_path: Path, flag: str, expected: str
+) -> None:
+    text = " ".join(
+        f"{word} {{{{f:audit.company_name}}}}." for word in ("prima", "mijloc", "ultima")
+    )
+    draft = _draft(paragraphs=[DraftText(text=text, fact_ids=["audit.company_name"])])
+    output = tmp_path / "out.docx"
+    render_section(
+        _base(tmp_path / "base.docx"),
+        output,
+        draft,
+        FACTS,
+        (DraftReview("unsupported", "paragraph:0", "claim", flag),),
+        job="synthetic",
+    )
+    assert _section(output)[0] == expected
+
+
+@pytest.mark.parametrize("ending", [".", "!", "?"])
+def test_fact_sentence_punctuation_does_not_duplicate_period(tmp_path: Path, ending: str) -> None:
+    facts = {"audit.company_name": _fact("audit.company_name", "solventi" + ending)}
+    draft = _draft(
+        paragraphs=[DraftText(text="{{f:audit.company_name}}.", fact_ids=["audit.company_name"])]
+    )
+    output = tmp_path / "out.docx"
+    render_section(_base(tmp_path / "base.docx"), output, draft, facts, (), job="synthetic")
+    assert _section(output)[0] == "solventi" + ending
+
+
 def test_tables_carry_caption_header_and_flagged_cells(tmp_path: Path) -> None:
     base, output = _base(tmp_path / "base.docx"), tmp_path / "out.docx"
     table = DraftTable(
