@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -15,6 +16,7 @@ from ema.audit.chapter_five_render import render_chapter_five
 from ema.audit.chapter_four import render_chapter_four
 from ema.audit.chapter_four_blocks import _written
 from ema.audit.chapter_six import ChapterSixPlan, render_chapter_six
+from ema.audit.chapter_tables import write_charts, write_tables
 from ema.audit.draft_checks import DraftReview
 from ema.audit.draft_render import render_section
 from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
@@ -136,6 +138,15 @@ def write_draft(  # noqa: PLR0913
     draft, flags = _draft(ws, job, section, ctx)
     facts = {key: by_key[key] for key in SECTION_FACTS.get(section, ()) if key in by_key}
     render_section(source, target, draft, facts, flags, job=job)
+
+
+def write_chapter_tables(
+    chain: Chain, chapter_id: str, fields: list[Field], chart_source: Path
+) -> None:
+    """The Necesar-info tables of ch. 2 or ch. 3, then ch. 2's charts: two steps, two failures."""
+    chain.apply(f"{chapter_id}.tables", partial(write_tables, chapter=chapter_id, fields=fields))
+    if chapter_id == "ch2":
+        chain.apply("ch2.charts", partial(write_charts, fields=fields, chart_source=chart_source))
 
 
 def write_intro(source: Path, target: Path, *, section_id: str, text: str | None) -> None:
