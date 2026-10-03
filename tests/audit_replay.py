@@ -11,7 +11,7 @@ from tests.workspace_jobs import create_job
 from ema.audit.draft_agent import (
     INSTRUCTIONS,
     PROMPT_VERSION,
-    DraftTools,
+    draft_content,
     recorded_facts,
 )
 from ema.audit.draft_checks import SUPPORT_PROMPT, DraftCheck, DraftReview, SupportResult
@@ -63,61 +63,19 @@ def write_recording(path: Path, rows: list[dict[str, Any]]) -> Path:
 
 
 def draft_recording(ws: Workspace, job: str, draft: SectionDraft, path: Path) -> Path:
-    tools = DraftTools(ws, job, draft.section)
-    specs = tuple(tool.spec for tool in tools.tools().values())
-    messages: list[dict[str, Any]] = [{"role": "system", "content": INSTRUCTIONS}]
-    rows: list[dict[str, Any]] = []
-    calls = [
-        ("read_facts", {}),
-        ("read_style_guide", {}),
-        ("write_section_draft", draft.model_dump()),
+    facts = recorded_facts(ws, job, draft.section)
+    messages = [
+        {"role": "system", "content": INSTRUCTIONS},
+        {"role": "user", "content": draft_content(ws, draft.section, facts)},
     ]
-    for index, (name, args) in enumerate(calls):
-        rows.append(
-            {
-                "request_hashes": request_hashes(
-                    REPLAY_MODEL, messages, specs, None, 4096, PROMPT_VERSION
-                ),
-                "choices": [
-                    {
-                        "message": {
-                            "tool_calls": [
-                                {
-                                    "id": str(index),
-                                    "type": "function",
-                                    "function": {
-                                        "name": name,
-                                        "arguments": json.dumps(args, ensure_ascii=False),
-                                    },
-                                }
-                            ]
-                        }
-                    }
-                ],
-                "usage": {"prompt_tokens": 1, "completion_tokens": 1},
-            }
-        )
-        result = tools.tools()[name].execute(args)
-        messages.append(
-            {
-                "role": "assistant",
-                "tool_calls": [{"id": str(index), "name": name, "arguments": args}],
-            }
-        )
-        messages.append(
-            {"role": "tool", "name": name, "tool_call_id": str(index), "content": result}
-        )
-    assert tools.draft is not None
-    rows.append(
-        {
-            "request_hashes": request_hashes(
-                REPLAY_MODEL, messages, specs, None, 4096, PROMPT_VERSION
-            ),
-            "choices": [{"message": {"content": "Draft complete"}}],
-            "usage": {"prompt_tokens": 1, "completion_tokens": 1},
-        }
-    )
-    return write_recording(path, rows)
+    row = {
+        "request_hashes": request_hashes(
+            REPLAY_MODEL, messages, (), SectionDraft.model_json_schema(), 4096, PROMPT_VERSION
+        ),
+        "choices": [{"message": {"content": draft.model_dump_json()}}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+    }
+    return write_recording(path, [row])
 
 
 def support_recording(

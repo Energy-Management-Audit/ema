@@ -178,7 +178,11 @@ def support_pass(
             }
         )
     result = complete_json(
-        context, SupportResult, SUPPORT_PROMPT, json.dumps(request, ensure_ascii=False)
+        context,
+        SupportResult,
+        SUPPORT_PROMPT,
+        json.dumps(request, ensure_ascii=False),
+        schema_retries=0,
     )
     known = {location: item.text for location, item in items}
     if any(

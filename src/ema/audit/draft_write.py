@@ -13,10 +13,8 @@ from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
 from ema.audit.publication import queue_sections
 from ema.audit.sections import recompute_ready
 from ema.core.jobs import StageContext
-from ema.core.llm import Limits, RecordingProvider, ReplayProvider
+from ema.core.llm import RecordingProvider, ReplayProvider
 from ema.core.llm.types import Provider
-
-DRAFT_STEPS = 8
 
 
 @dataclass(frozen=True)
@@ -59,7 +57,9 @@ def live_passes(provider: Provider, model_id: str, directory: Path, section: str
     )
 
 
-def write_section(ctx: StageContext, section: str, passes: Passes) -> Drafted:
+def write_section(
+    ctx: StageContext, section: str, passes: Passes, *, ready: bool = False
+) -> Drafted:
     facts = recorded_facts(ctx.ws, ctx.job, section)
     for field in facts.values():
         ctx.record_read("fields", field.id, field.revision)
@@ -69,7 +69,6 @@ def write_section(ctx: StageContext, section: str, passes: Passes) -> Drafted:
         section,
         passes.draft,
         passes.support,
-        Limits(DRAFT_STEPS),
         model_id=passes.model_id,
         support_model_id=passes.support_model_id,
         facts=facts,
@@ -85,7 +84,8 @@ def write_section(ctx: StageContext, section: str, passes: Passes) -> Drafted:
         encoding="utf-8",
     )
     if draft.status == "drafted":
-        recompute_ready(ctx.ws, ctx.job)
+        if not ready:
+            recompute_ready(ctx.ws, ctx.job)
         queue_sections(
             ctx,
             (section,),
