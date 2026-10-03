@@ -53,8 +53,8 @@ def draft_section(
     job: str,
     section: str,
     *,
-    draft_recording: Path | None,
-    support_recording: Path | None,
+    draft_recording: Path | None = None,
+    support_recording: Path | None = None,
 ) -> DraftResult:
     """Draft one chapter 2-3 section: by replay with both recordings, live with neither."""
     record = get_job(ws, job)
