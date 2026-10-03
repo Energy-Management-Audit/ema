@@ -10,6 +10,7 @@ from pydantic import BaseModel, ValidationError
 from ema.core.errors import EmaError
 from ema.core.llm.agent import AgentContext, call_with_budget
 from ema.core.llm.models import selected_model
+from ema.core.llm.replay import ReplayProvider
 from ema.core.llm.types import ImageInput
 
 
@@ -20,11 +21,14 @@ def complete_json[T: BaseModel](
     content: str,
     *,
     images: tuple[ImageInput, ...] = (),
+    max_output_tokens: int = 4096,
 ) -> T:
     if context.provider.name != "replay" and not (context.synthetic or context.client_live):
         raise EmaError("ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", "")
     model = selected_model(
-        context.provider.name if context.provider.name != "replay" else "gemini",
+        context.provider.provider_name
+        if isinstance(context.provider, ReplayProvider)
+        else context.provider.name,
         context.model_id,
     )
     messages: list[dict[str, Any]] = [
@@ -54,6 +58,7 @@ def complete_json[T: BaseModel](
                 messages,
                 (),
                 schema.model_json_schema(),
+                max_output_tokens,
                 synthetic=context.synthetic,
                 prompt_version=context.prompt_version,
                 **kwargs,

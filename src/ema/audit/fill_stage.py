@@ -1,4 +1,4 @@
-"""The Fill stage: one agent run per applicable chapter 2-3 section records its facts."""
+"""The Fill stage: one extraction pass over the dossier for every applicable section."""
 
 from __future__ import annotations
 
@@ -6,35 +6,21 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from ema.audit.catalogue import CATALOGUE, Section
-from ema.audit.catalogue_labels import field_label
 from ema.audit.dossier import dossier_documents
 from ema.audit.draft_schema import SECTION_FACTS
-from ema.audit.fill_files import file_ids
-from ema.audit.fill_tools import FillDocument, FillTools
+from ema.audit.fill_extract import PROMPT_VERSION, ExtractSummary, extract_facts
+from ema.audit.fill_tools import FillDocument
 from ema.audit.sections import record_applicability
 from ema.core.config import Settings, load_settings
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, run_stage, status, subscribe
-from ema.core.llm import (
-    AgentContext,
-    GeminiProvider,
-    Limits,
-    OpenAIProvider,
-    RecordingProvider,
-    ReplayProvider,
-    default_model,
-    run_agent,
-    selected_model,
-)
-from ema.core.llm.agent import AgentState, job_spend
+from ema.core.llm import GeminiProvider, OpenAIProvider, default_model, selected_model
+from ema.core.llm.agent import job_spend
 from ema.core.llm.types import Provider
 from ema.core.logging import write_event
-from ema.core.resources import resource_path
 from ema.core.review.section_transition import Status
 from ema.core.workspace import Workspace
 
-PROMPT_VERSION = "audit-fill-v1"
-FILL_STEPS = 12
 # Codes after which no further section can succeed in this run.
 STOPPING = {
     "ai_quota_day": "Cota zilnică a furnizorului AI s-a epuizat",
@@ -48,19 +34,7 @@ class FillSummary:
     sections: dict[str, str] = field(default_factory=dict[str, str])
     failed: dict[str, str] = field(default_factory=dict[str, str])
     not_applicable: tuple[str, ...] = ()
-    stopped: tuple[str, ...] = ()
-
-
-def instructions() -> str:
-    return resource_path("audit", "prompts", "fill_v1.txt").read_text(encoding="utf-8").strip()
-
-
-def fill_task(section: Section, documents: Sequence[str]) -> str:
-    facts = "\n".join(f"{fact} — {field_label(str(fact))}" for fact in section.facts)
-    return (
-        f"Secţiunea {section.id} „{section.title}”. Fapte de stabilit:\n{facts}\n"
-        "Fişiere:\n" + "\n".join(f"{key}: {name}" for key, name in file_ids(documents).items())
-    )
+    extracted: ExtractSummary | None = None
 
 
 def settings_provider(settings: Settings) -> tuple[Provider, str]:
@@ -76,29 +50,15 @@ def settings_provider(settings: Settings) -> tuple[Provider, str]:
     return provider, model
 
 
-def fill_section(  # noqa: PLR0913
-    ws: Workspace,
-    job: str,
-    section: Section,
-    documents: dict[str, FillDocument],
-    *,
-    provider: Provider,
-    model_id: str,
-    limits: Limits,
-    client_live: bool = False,
-) -> AgentState:
-    tools = FillTools(ws, job, section.id, documents)
-    context = AgentContext(
-        ws, job, section.id, provider, model_id, PROMPT_VERSION, client_live=client_live
-    )
-    task = fill_task(section, list(documents))
-    return run_agent(context, instructions(), tools.tools(), limits, task=task)
-
-
 def _failure_code(exc: EmaError) -> str:
-    # The agent wraps provider refusals as ai_provider; the cause names what happened.
+    # Provider refusals are wrapped as ai_provider; the cause names what happened.
     cause = exc.__cause__
     return cause.code if exc.code == "ai_provider" and isinstance(cause, EmaError) else exc.code
+
+
+def _log_failure(ctx: StageContext, code: str, **where: object) -> None:
+    with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
+        write_event(handle, "fill_failed", run=ctx.run_id, **where, code=code)
 
 
 def _fill(ctx: StageContext, sections: Sequence[str] | None) -> FillSummary:
@@ -114,50 +74,42 @@ def _fill(ctx: StageContext, sections: Sequence[str] | None) -> FillSummary:
         try:
             documents.update(dossier_documents(ctx.ws, ctx.job, {name: slot}))
         except EmaError as exc:
-            code = failed[name] = _failure_code(exc)
-            with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
-                write_event(handle, "fill_failed", run=ctx.run_id, file=name, code=code)
+            failed[name] = _failure_code(exc)
+            _log_failure(ctx, failed[name], file=name)
     wanted = [item for item in CATALOGUE if item.id in SECTION_FACTS]
     if sections is not None:
         wanted = [item for item in wanted if item.id in sections]
-    done: dict[str, str] = {}
+    applicable: list[Section] = []
     not_applicable: list[str] = []
-    for index, section in enumerate(wanted):
+    for section in wanted:
         try:
             state = record_applicability(ctx.ws, ctx.job, section.id)
-            if state.applicability is False or state.status == Status.NA:
-                not_applicable.append(section.id)
-                continue
-            recorded = (
-                provider
-                if isinstance(provider, ReplayProvider)
-                else RecordingProvider(provider, ctx.artifact_dir() / f"{section.id}.json")
-            )
-            agent = fill_section(
-                ctx.ws,
-                ctx.job,
-                section,
-                documents,
-                provider=recorded,
-                model_id=model_id,
-                limits=Limits(FILL_STEPS),
-                client_live=settings.ai_client_live,
-            )
         except EmaError as exc:
-            code = failed[section.id] = _failure_code(exc)
-            with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
-                write_event(handle, "fill_failed", run=ctx.run_id, section=section.id, code=code)
-            if code in STOPPING:
-                return FillSummary(
-                    ctx.run_id,
-                    done,
-                    failed,
-                    tuple(not_applicable),
-                    tuple(item.id for item in wanted[index + 1 :]),
-                )
+            failed[section.id] = _failure_code(exc)
+            _log_failure(ctx, failed[section.id], section=section.id)
             continue
-        done[section.id] = agent.status
-    return FillSummary(ctx.run_id, done, failed, tuple(not_applicable))
+        if state.applicability is False or state.status == Status.NA:
+            not_applicable.append(section.id)
+        else:
+            applicable.append(section)
+    try:
+        extracted = extract_facts(
+            ctx.ws,
+            ctx.job,
+            applicable,
+            documents=documents,
+            provider=provider,
+            model_id=model_id,
+            artifacts=ctx.artifact_dir(),
+            client_live=settings.ai_client_live,
+        )
+    except EmaError as exc:
+        code = _failure_code(exc)
+        failed.update((section.id, code) for section in applicable)
+        _log_failure(ctx, code, sections=[section.id for section in applicable])
+        return FillSummary(ctx.run_id, {}, failed, tuple(not_applicable))
+    done = {section.id: "done" for section in applicable}
+    return FillSummary(ctx.run_id, done, failed, tuple(not_applicable), extracted)
 
 
 def stopped_warning(failed: dict[str, str], stopped: Sequence[str]) -> list[str]:
@@ -184,8 +136,7 @@ def log_spend(ctx: StageContext, stage: str, before: float) -> None:
 
 def _outcome(summary: FillSummary) -> StageOutcome:
     return StageOutcome(
-        item_failures=[f"{section}: {code}" for section, code in summary.failed.items()],
-        warnings=stopped_warning(summary.failed, summary.stopped),
+        item_failures=[f"{section}: {code}" for section, code in summary.failed.items()]
     )
 
 

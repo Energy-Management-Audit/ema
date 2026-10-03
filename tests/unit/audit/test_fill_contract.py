@@ -1,4 +1,4 @@
-"""The Fill tool contract a live model can follow, and the bounds on what a section costs."""
+"""The Fill tool contract that verifies facts, and the job budget shared by AI calls."""
 
 from __future__ import annotations
 
@@ -10,30 +10,19 @@ from threading import Event
 from typing import Any
 
 import pytest
-from tests.unit.audit.test_fill_stage import (
-    FIXTURES,
-    OPENAI_MODEL,
-    SECTION,
-    run_events,
-    synthetic_dossier,
-    use_provider,
-)
+from tests.unit.audit.test_fill_stage import OPENAI_MODEL, SECTION, synthetic_dossier
 from tests.workspace_jobs import create_job
 
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.fill_files import PAGE_CHARS
-from ema.audit.fill_stage import FILL_STEPS, fill_section, fill_sections, stopped_warning
 from ema.audit.fill_tools import FillDocument, FillTools
 from ema.core.errors import EmaError
-from ema.core.llm import AgentContext, Limits, ReplayProvider, agent_state, run_agent
+from ema.core.llm import AgentContext, Limits, run_agent
 from ema.core.llm.agent import Tool, compacted, job_spend
 from ema.core.llm.models import selected_model
 from ema.core.llm.types import Exchange, ToolCall, ToolSpec
 from ema.core.review.fields import fields
 from ema.core.workspace import Workspace
-
-RECORDING = FIXTURES / "llm/fill_contract_synthetic_openai.json"
 
 
 def _tools(tmp_path: Path, documents: dict[str, FillDocument] | None = None) -> FillTools:
@@ -210,37 +199,6 @@ def test_read_dataset_returns_only_the_sections_fields(
     assert tools.read_dataset({"key": outside}) == []
 
 
-def test_replay_of_the_trial_mistakes_gets_reasons_then_records(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ws, job = synthetic_dossier(tmp_path, monkeypatch)
-    replay = ReplayProvider(RECORDING)
-    use_provider(monkeypatch, replay, replay.model_id)
-
-    summary = fill_sections(ws, job, [SECTION])
-
-    assert summary.sections == {SECTION: "done"}
-    assert replay.calls == 3
-    state = agent_state(ws, job, SECTION)
-    assert state is not None
-    assert state.messages[1]["content"].endswith("Fişiere:\nF1: fisa.txt\nF2: permit.pdf")
-    rejected = [
-        message["content"]
-        for message in state.messages
-        if message["role"] == "tool" and "error" in message["content"]
-    ]
-    assert [item["error"] for item in rejected] == ["fact_source", "file_missing"]
-    assert rejected[1]["reason"] == "Fişierul cerut lipseşte: Date generale."
-    for item in rejected:
-        assert item["expected"]["name"] == (
-            "optional: exact dossier file name or its id from the task (e.g. F3)"
-        )
-        assert item["expected"]["key"] == "required: a fact key listed in the task"
-    found = {item.key: item for item in fields(ws, job)}
-    assert found["audit.company_name"].value == "Firma Exemplu SRL"
-    assert found["audit.address"].value == "Alba"
-
-
 def test_history_keeps_the_last_four_tool_results(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "audit", "made-up", 2026)
@@ -256,52 +214,6 @@ def test_history_keeps_the_last_four_tool_results(tmp_path: Path) -> None:
     assert results == ["[rezultat omis: echo, 50 caractere]"] * 2 + ["r" * 50] * 4
     assert [m["content"] for m in state.messages if m["role"] == "tool"] == ["r" * 50] * 6
     assert compacted(state.messages) == last
-
-
-def test_job_budget_stops_the_fill_stage_and_logs_the_spend(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("EMA_AI_CLIENT_LIVE", "1")
-    monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", "0.0001")
-    ws, job = synthetic_dossier(tmp_path, monkeypatch)
-    # One answer over the budget: the next section must not start a call.
-    provider = Scripted([Exchange("Gata.", (), 1_000_000, 10)])
-    use_provider(monkeypatch, provider, OPENAI_MODEL)
-
-    first, second, *rest = [item.id for item in CATALOGUE if item.id in SECTION_FACTS][:4]
-    summary = fill_sections(ws, job, [first, second, *rest])
-
-    spent = job_spend(ws, job)
-    assert spent > 0.0001
-    assert summary.sections == {first: "done"}
-    assert summary.failed == {second: "ai_budget"}
-    assert summary.stopped == tuple(rest)
-    assert len(provider.sent) == 1
-    with pytest.raises(EmaError) as stopped:
-        fill_section(
-            ws,
-            job,
-            next(item for item in CATALOGUE if item.id == rest[0]),
-            {},
-            provider=provider,
-            model_id=OPENAI_MODEL,
-            limits=Limits(FILL_STEPS),
-            client_live=True,
-        )
-    assert (stopped.value.code, stopped.value.user_message_ro, stopped.value.detail) == (
-        "ai_budget",
-        "Bugetul AI al lucrării s-a epuizat.",
-        f"{spent:.2f} USD",
-    )
-    kind, payload = run_events(ws, summary.run)[-1]
-    assert (kind, payload["warnings"]) == ("stage_finished", 1)
-    assert stopped_warning(summary.failed, summary.stopped) == [
-        f"Bugetul AI al lucrării s-a epuizat: {len(rest)} secţiuni rămase."
-    ]
-    with ws.connect() as db:
-        log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
-    spend = [json.loads(line) for line in log.splitlines() if '"ai_spend"' in line]
-    assert [(item["stage"], item["usd"]) for item in spend] == [("fill", round(spent, 6))]
 
 
 def test_concurrent_job_calls_allow_only_one_exchange_at_the_budget(
@@ -342,39 +254,3 @@ def test_concurrent_job_calls_allow_only_one_exchange_at_the_budget(
         assert second_result.result() == "ai_budget"
     assert len(provider.sent) == 1
     assert job_spend(ws, job) == selected_model("openai", OPENAI_MODEL).cost(1_000_000, 0)
-
-
-def test_one_sections_largest_prompt_stays_bounded(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ws, job = synthetic_dossier(tmp_path, monkeypatch)
-    line = "Suprafaţa construită a halei sintetice este de 500 m² conform planului.\n"
-    documents = {
-        "raport.txt": FillDocument("raport.txt", line * 400),
-        "fisa.txt": FillDocument("fisa.txt", "Firma Exemplu SRL are sediul în Alba."),
-    }
-    steps = [
-        _step(0, "read_dataset", {}),
-        *(_step(page, "read_file", {"name": "F1", "page": page}) for page in range(1, 5)),
-        _step(5, "search_files", {"query": "suprafaţa"}),
-        *(_step(page, "read_file", {"name": "raport", "page": page}) for page in range(1, 5)),
-        _step(10, "read_file", {"name": "F2"}),
-    ]
-    provider = Scripted(steps)
-    section = next(item for item in CATALOGUE if item.id == SECTION)
-
-    state = fill_section(
-        ws,
-        job,
-        section,
-        documents,
-        provider=provider,
-        model_id=OPENAI_MODEL,
-        limits=Limits(FILL_STEPS),
-        client_live=True,
-    )
-
-    assert state.steps == FILL_STEPS
-    tools = json.dumps([vars(tool) for tool in provider.tools], ensure_ascii=False)
-    largest = max(len(json.dumps(sent, ensure_ascii=False)) for sent in provider.sent)
-    assert largest + len(tools) < 40_000
