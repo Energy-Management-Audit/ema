@@ -13,6 +13,7 @@ from ema.audit.research_tools import ReplaySearch, ResearchTools
 from ema.audit.research_web import OutboundGuard, Snapshot
 from ema.core.errors import EmaError
 from ema.core.llm import AgentContext, Limits, ReplayProvider, run_agent
+from ema.core.llm.agent import _rejected, compacted
 from ema.core.llm.replay import request_hashes
 from ema.core.review.fields import fields
 from ema.core.workspace import Workspace
@@ -111,19 +112,23 @@ def test_synthetic_research_replay(tmp_path: Path, monkeypatch: Any) -> None:
         )
         tool = tools.tools().get(name)
         if tool is None:
-            result: object = {"error": "unknown_tool"}
+            result: object = {
+                "error": "unknown_tool",
+                "reason": f"Instrumentul {name} nu există.",
+                "expected": sorted(tools.tools()),
+            }
         else:
             try:
                 result = tool.execute(arguments)
             except EmaError as exc:
-                result = {"error": exc.code}
+                result = _rejected(exc, tool.spec)
         messages.append(
             {"role": "tool", "name": name, "tool_call_id": str(index), "content": result}
         )
     rows.append(
         {
             "request_hashes": request_hashes(
-                "gemini-3.6-flash", messages, tool_specs, None, 4096, PROMPT_VERSION
+                "gemini-3.6-flash", compacted(messages), tool_specs, None, 4096, PROMPT_VERSION
             ),
             "choices": [{"message": {"content": "Research complete"}}],
             "usage": {"prompt_tokens": 1, "completion_tokens": 1},
@@ -153,10 +158,8 @@ def test_synthetic_research_replay(tmp_path: Path, monkeypatch: Any) -> None:
         Limits(10),
     )
     assert state.status == "done"
-    assert [m["content"] for m in state.messages if m["role"] == "tool"][2:4] == [
-        {"error": "outbound_refused"},
-        {"error": "unknown_tool"},
-    ]
+    results = [m["content"] for m in state.messages if m["role"] == "tool"]
+    assert [result["error"] for result in results[2:4]] == ["outbound_refused", "unknown_tool"]
     assert next(f.value for f in fields(ws, job) if f.key == "audit.location") == "Exampleville"
     assert not (tmp_path / "stolen").exists()
 

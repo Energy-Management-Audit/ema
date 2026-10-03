@@ -168,7 +168,9 @@ def test_fill_task_names_the_section_its_facts_and_files() -> None:
         "audit.ownership_private — Capital privat (%)\n"
         "audit.employees — Angajaţi\n"
         "audit.tep_class — Pragul 1000 tep\n"
-        "Fişiere: a.txt, b.pdf."
+        "Fişiere:\n"
+        "F1: a.txt\n"
+        "F2: b.pdf"
     )
 
 
@@ -192,7 +194,7 @@ def test_bad_dossier_file_is_recorded_once_and_other_sections_run(
     assert summary.failed == {"permit.pdf": "file_invalid"}
     assert summary.sections == {SECTION: "done", "ch2.localizare": "done"}
     assert len(provider.tasks) == 2
-    assert all("Fişiere: fisa.txt." in task for task in provider.tasks)
+    assert all(task.endswith("Fişiere:\nF1: fisa.txt") for task in provider.tasks)
     with ws.connect() as db:
         log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
     assert log.count('"file": "permit.pdf", "code": "file_invalid"') == 1

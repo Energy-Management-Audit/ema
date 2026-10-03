@@ -10,11 +10,15 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from ema.core.config import load_settings
 from ema.core.errors import EmaError
 from ema.core.llm.models import Model, selected_model
 from ema.core.llm.replay import ReplayProvider
 from ema.core.llm.types import Exchange, Provider, ToolSpec
 from ema.core.workspace import Workspace
+
+# Tool results older than this many steps are summarised: each step resends the history.
+KEPT_STEPS = 4
 
 
 @dataclass(frozen=True)
@@ -108,6 +112,37 @@ def _reserve_cost(
     return (size * input_rate + 4096 * output_rate) / 1_000_000
 
 
+def job_spend(ws: Workspace, job: str) -> float:
+    """What the job's AI calls have cost so far, from every recorded exchange."""
+    with ws.connect() as db:
+        row = db.execute(
+            "SELECT COALESCE(SUM(estimated_cost_usd), 0) FROM llm_calls WHERE job_id=?", (job,)
+        ).fetchone()
+    return float(row[0])
+
+
+def _expected(spec: ToolSpec) -> dict[str, Any]:
+    properties: dict[str, Any] = spec.parameters.get("properties", {})
+    required = set(spec.parameters.get("required", ()))
+    return {
+        name: ("required: " if name in required else "optional: ")
+        + str(schema.get("description") or schema.get("type") or "object")
+        for name, schema in properties.items()
+    }
+
+
+def _rejected(exc: Exception, spec: ToolSpec) -> dict[str, Any]:
+    """A rejection the model can act on: what went wrong and the arguments the tool takes."""
+    if isinstance(exc, EmaError):
+        code = exc.code
+        reason = exc.user_message_ro.rstrip(".") + (f": {exc.detail}." if exc.detail else ".")
+    elif isinstance(exc, KeyError):
+        code, reason = "invalid_arguments", f"Lipseşte argumentul {exc.args[0]}."
+    else:
+        code, reason = "invalid_arguments", "Argumentele nu au forma cerută."
+    return {"error": code, "reason": reason, "expected": _expected(spec)}
+
+
 def _run_tools(state: AgentState, exchange: Exchange, tools: Mapping[str, Tool]) -> None:
     assistant: dict[str, Any] = {
         "role": "assistant",
@@ -122,25 +157,47 @@ def _run_tools(state: AgentState, exchange: Exchange, tools: Mapping[str, Tool])
     for call in exchange.calls:
         tool = tools.get(call.name)
         if tool is None:
-            result: object = {"error": "unknown_tool"}
+            result: object = {
+                "error": "unknown_tool",
+                "reason": f"Instrumentul {call.name} nu există.",
+                "expected": sorted(tools),
+            }
         else:
             try:
                 result = tool.execute(call.arguments)
-            except (EmaError, ValidationError, ValueError, KeyError) as exc:
-                result = {"error": exc.code if isinstance(exc, EmaError) else "invalid_arguments"}
+            except (EmaError, ValidationError, ValueError, KeyError, TypeError) as exc:
+                result = _rejected(exc, tool.spec)
         state.messages.append(
             {"role": "tool", "name": call.name, "tool_call_id": call.id, "content": result}
         )
 
 
+def compacted(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The history to send: tool results of all but the last KEPT_STEPS steps summarised."""
+    steps = [index for index, message in enumerate(messages) if message["role"] == "assistant"]
+    if len(steps) <= KEPT_STEPS:
+        return messages
+    return [
+        _summary(message) if message["role"] == "tool" and index < steps[-KEPT_STEPS] else message
+        for index, message in enumerate(messages)
+    ]
+
+
+def _summary(message: dict[str, Any]) -> dict[str, Any]:
+    content = message["content"]
+    size = len(content if isinstance(content, str) else json.dumps(content, ensure_ascii=False))
+    return {**message, "content": f"[rezultat omis: {message['name']}, {size} caractere]"}
+
+
 def _cap_exceeded(
+    messages: list[dict[str, Any]],
     state: AgentState,
     limits: Limits,
     tools: Mapping[str, Tool],
     model: Model,
 ) -> bool:
     return limits.spend_cap_usd is not None and (
-        state.cost_usd + _reserve_cost(state.messages, tools, model.input_usd, model.output_usd)
+        state.cost_usd + _reserve_cost(messages, tools, model.input_usd, model.output_usd)
         > limits.spend_cap_usd
     )
 
@@ -184,20 +241,27 @@ def run_agent(  # noqa: C901
     state.step_limit, state.spend_cap_usd = limits.steps, limits.spend_cap_usd
     if state.status == "done":
         return state
+    budget = load_settings(context.ws).ai_job_budget_usd
     while True:
         if state.steps >= limits.steps:
             state.status = "step_limit"
             _save(context.ws, context.job, context.section, state)
             return state
-        if _cap_exceeded(state, limits, tools, model):
+        messages = compacted(state.messages)
+        if _cap_exceeded(messages, state, limits, tools, model):
             state.status = "spend_cap"
             _save(context.ws, context.job, context.section, state)
             return state
+        spent = job_spend(context.ws, context.job)
+        if spent > budget:
+            state.status = "ai_budget"
+            _save(context.ws, context.job, context.section, state)
+            raise EmaError("ai_budget", "Bugetul AI al lucrării s-a epuizat.", f"{spent:.2f} USD")
         started = time.monotonic()
         try:
             exchange = context.provider.respond(
                 context.model_id,
-                state.messages,
+                messages,
                 tuple(tool.spec for tool in tools.values()),
                 synthetic=context.synthetic,
                 prompt_version=context.prompt_version,

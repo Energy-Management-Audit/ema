@@ -2,6 +2,7 @@
 
 STATUS: dict[str, int] = {
     "action_invalid": 400,
+    "ai_budget": 429,
     "ai_client_disabled": 403,
     "ai_context_changed": 409,
     "ai_key_missing": 409,
@@ -89,6 +90,8 @@ STATUS: dict[str, int] = {
     "field_unresolved": 409,
     "funding_block_unbounded": 500,
     "file_missing": 404,
+    "page_missing": 404,
+    "query_missing": 400,
     "file_too_large": 413,
     "file_type": 415,
     "fill_failed": 500,

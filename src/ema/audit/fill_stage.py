@@ -9,6 +9,7 @@ from ema.audit.catalogue import CATALOGUE, Section
 from ema.audit.catalogue_labels import field_label
 from ema.audit.dossier import dossier_documents
 from ema.audit.draft_schema import SECTION_FACTS
+from ema.audit.fill_files import file_ids
 from ema.audit.fill_tools import FillDocument, FillTools
 from ema.audit.sections import record_applicability
 from ema.core.config import Settings, load_settings
@@ -25,7 +26,7 @@ from ema.core.llm import (
     run_agent,
     selected_model,
 )
-from ema.core.llm.agent import AgentState
+from ema.core.llm.agent import AgentState, job_spend
 from ema.core.llm.types import Provider
 from ema.core.logging import write_event
 from ema.core.resources import resource_path
@@ -34,6 +35,11 @@ from ema.core.workspace import Workspace
 
 PROMPT_VERSION = "audit-fill-v1"
 FILL_STEPS = 12
+# Codes after which no further section can succeed in this run.
+STOPPING = {
+    "ai_quota_day": "Cota zilnică a furnizorului AI s-a epuizat",
+    "ai_budget": "Bugetul AI al lucrării s-a epuizat",
+}
 
 
 @dataclass(frozen=True)
@@ -53,7 +59,7 @@ def fill_task(section: Section, documents: Sequence[str]) -> str:
     facts = "\n".join(f"{fact} — {field_label(str(fact))}" for fact in section.facts)
     return (
         f"Secţiunea {section.id} „{section.title}”. Fapte de stabilit:\n{facts}\n"
-        f"Fişiere: {', '.join(documents)}."
+        "Fişiere:\n" + "\n".join(f"{key}: {name}" for key, name in file_ids(documents).items())
     )
 
 
@@ -141,7 +147,7 @@ def _fill(ctx: StageContext, sections: Sequence[str] | None) -> FillSummary:
             code = failed[section.id] = _failure_code(exc)
             with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
                 write_event(handle, "fill_failed", run=ctx.run_id, section=section.id, code=code)
-            if code == "ai_quota_day":
+            if code in STOPPING:
                 return FillSummary(
                     ctx.run_id,
                     done,
@@ -154,15 +160,32 @@ def _fill(ctx: StageContext, sections: Sequence[str] | None) -> FillSummary:
     return FillSummary(ctx.run_id, done, failed, tuple(not_applicable))
 
 
+def stopped_warning(failed: dict[str, str], stopped: Sequence[str]) -> list[str]:
+    """The warning for sections a quota or the job budget left undone."""
+    if not stopped:
+        return []
+    cause = next(STOPPING[code] for code in reversed(failed.values()) if code in STOPPING)
+    return [f"{cause}: {len(stopped)} secţiuni rămase."]
+
+
+def log_spend(ctx: StageContext, stage: str, before: float) -> None:
+    """One job log line with what the stage's AI calls cost."""
+    total = job_spend(ctx.ws, ctx.job)
+    with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
+        write_event(
+            handle,
+            "ai_spend",
+            run=ctx.run_id,
+            stage=stage,
+            usd=round(total - before, 6),
+            job_usd=round(total, 6),
+        )
+
+
 def _outcome(summary: FillSummary) -> StageOutcome:
-    warnings = (
-        [f"Cota zilnică a furnizorului AI s-a epuizat: {len(summary.stopped)} secţiuni rămase."]
-        if summary.stopped
-        else []
-    )
     return StageOutcome(
         item_failures=[f"{section}: {code}" for section, code in summary.failed.items()],
-        warnings=warnings,
+        warnings=stopped_warning(summary.failed, summary.stopped),
     )
 
 
@@ -179,7 +202,11 @@ def start_fill(
         raise EmaError("section_missing", "Secţiunea lipseşte.", ", ".join(unknown))
 
     def stage(ctx: StageContext) -> StageOutcome:
-        summary = _fill(ctx, sections)
+        before = job_spend(ctx.ws, ctx.job)
+        try:
+            summary = _fill(ctx, sections)
+        finally:
+            log_spend(ctx, "fill", before)
         if summaries is not None:
             summaries.append(summary)
         return _outcome(summary)
