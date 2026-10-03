@@ -23,6 +23,7 @@ NUMBER = re.compile(r"\d")
 NAME = re.compile(
     r"(?<![.!?]\s)(?<!\w)[A-ZĂÂÎȘȚ][A-Za-zĂÂÎȘȚăâîșț]{1,}(?:\s+[A-ZĂÂÎȘȚ][A-Za-zĂÂÎȘȚăâîșț]{2,})*"
 )
+SENTENCE_WORD = re.compile(r"[A-ZĂÂÎȘȚ][a-zăâîșț]+\b")
 NAME_COMMON = frozenset(
     {
         "Societatea",
@@ -42,6 +43,23 @@ NAME_COMMON = frozenset(
         "Etapa",
     }
 )
+
+
+def _sentence_marked(text: str, facts: dict[str, Field]) -> str:
+    """The text for the name check, without fact references.
+
+    A title-case word that opens the paragraph, or any word after a fact whose value ends a
+    sentence, starts a sentence: a capital there is not taken for a proper name. An acronym that
+    opens the paragraph is still checked.
+    """
+
+    def marker(match: re.Match[str]) -> str:
+        fact = facts.get(match.group(1))
+        ends = fact is not None and str(fact.value).rstrip().endswith((".", "!", "?"))
+        return "." if ends else ""
+
+    marked = TOKEN.sub(marker, text)
+    return ". " + marked if SENTENCE_WORD.match(marked) else marked
 
 
 @dataclass(frozen=True)
@@ -111,7 +129,9 @@ def check_draft(  # noqa: C901, PLR0912
             fatal.append(DraftReview("ai_mention", location, "AI or disclaimer wording"))
         common = {name.casefold() for name in NAME_COMMON}
         candidates = {
-            candidate for candidate in NAME.findall(plain) if candidate.casefold() not in common
+            candidate
+            for candidate in NAME.findall(_sentence_marked(item.text, facts))
+            if candidate.casefold() not in common
         }
         normal_plain = unicodedata.normalize("NFKC", plain).casefold()
         candidates.update(name for name in known_names if name and name in normal_plain)

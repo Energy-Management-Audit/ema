@@ -61,6 +61,27 @@ def test_rejects_literal_number_name_ai_and_unknown_fact() -> None:
         }
 
 
+def test_sentence_start_after_a_sentence_fact_is_not_a_name() -> None:
+    facts = {
+        "audit.company_name": _fact("audit.company_name", "Atelier Exemplu"),
+        "audit.business_activity": _fact("audit.business_activity", "Produce piese turnate."),
+    }
+    names = {
+        issue.detail
+        for issue in check_draft(
+            _draft(
+                "Dotările sunt noi. {{f:audit.business_activity}} Aceste etape sunt continue. "
+                "Societatea {{f:audit.company_name}} Inventata are sediul aici.",
+                ["audit.business_activity", "audit.company_name"],
+            ),
+            facts,
+            "synthetic",
+        ).fatal
+        if issue.code == "literal_name"
+    }
+    assert names == {"Inventata"}
+
+
 def test_uncited_and_nonrenderable_items_are_reviewed() -> None:
     facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
     draft = _draft(
