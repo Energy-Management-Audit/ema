@@ -24,7 +24,7 @@ from ema.core.office.chart_series import Series, read_series
 from ema.core.office.package import C, R, inspect, read_parts, relationships, target_part, xml
 from ema.core.office.workbook import formula_cells
 from ema.energy_data.carriers import Carrier
-from ema.energy_data.factors import FACTORS_2026
+from ema.energy_data.factors import AUDIT_FACTORS_2026
 from ema.energy_data.model import EnergyDataset
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -137,7 +137,7 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
         unit, scale = expected_unit(unit, specific)
         if specific and metrics[0][1].kind == "specific":
             shown = (
-                value(dataset, FACTORS_2026, metric, year, filed=False)[0]
+                value(dataset, AUDIT_FACTORS_2026, metric, year, filed=False)[0]
                 for _, metric in metrics
                 for year in years
             )
@@ -151,7 +151,7 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
                         [
                             value(
                                 dataset,
-                                FACTORS_2026,
+                                AUDIT_FACTORS_2026,
                                 replace(metric, month=month),
                                 year,
                                 filed=False,
@@ -169,7 +169,10 @@ def expected_charts(  # noqa: C901, PLR0912, PLR0915
             Series(
                 name,
                 [str(year) for year in years],
-                [value(dataset, FACTORS_2026, metric, year, filed=False)[0] for year in years],
+                [
+                    value(dataset, AUDIT_FACTORS_2026, metric, year, filed=False)[0]
+                    for year in years
+                ],
             )
             for name, metric in metrics
         ]

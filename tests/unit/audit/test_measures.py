@@ -52,11 +52,11 @@ def test_stage_facts_evidence_narrative_and_rerun(tmp_path: Path) -> None:
         result.payback_missing,
         result.factor_version,
         result.missing_narratives,
-    ) == (2, 1, "2026", 2)
+    ) == (2, 1, "2026-audit", 2)
     assert result.plan_path.name == "ch6.json"
     plan = ChapterSixPlan.model_validate_json(result.plan_path.read_text("utf-8"))
     assert plan.measures[0].saving_tep == 8.6
-    assert plan.measures[0].co2_t == 22.6
+    assert plan.measures[0].co2_t == 17.2
     assert plan.measures[0].payback_years == 4
     by_key = {field.key: field for field in fields(ws, job)}
     assert by_key["audit_measure.count"].value == 2
