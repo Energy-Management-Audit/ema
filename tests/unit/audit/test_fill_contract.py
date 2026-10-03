@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 from typing import Any
 
 import pytest
@@ -26,6 +28,7 @@ from ema.audit.fill_tools import FillDocument, FillTools
 from ema.core.errors import EmaError
 from ema.core.llm import AgentContext, Limits, ReplayProvider, agent_state, run_agent
 from ema.core.llm.agent import Tool, compacted, job_spend
+from ema.core.llm.models import selected_model
 from ema.core.llm.types import Exchange, ToolCall, ToolSpec
 from ema.core.review.fields import fields
 from ema.core.workspace import Workspace
@@ -120,6 +123,34 @@ def test_a_file_is_found_by_id_exact_name_or_name_without_extension(tmp_path: Pa
         {"key": "audit.address", "value": "Alba", "name": "fisa", "quote": "sediul în Alba."}
     )
     assert recorded["key"] == "audit.address"
+
+
+def test_colliding_filename_returns_structured_tool_errors(tmp_path: Path) -> None:
+    tools = _tools(
+        tmp_path,
+        {
+            "first.txt": FillDocument("first.txt", "First synthetic text."),
+            "F1": FillDocument("F1", "Sediu: Alba."),
+        },
+    )
+    provider = Scripted(
+        [
+            _step(1, "read_file", {"name": "F1"}),
+            _step(
+                2,
+                "record_fact",
+                {"key": "audit.address", "value": "Alba", "name": "F1", "quote": "Sediu: Alba."},
+            ),
+        ]
+    )
+    context = AgentContext(
+        tools.ws, tools.job, SECTION, provider, OPENAI_MODEL, "test", synthetic=True
+    )
+    state = run_agent(context, "system", tools.tools(), Limits(3))
+    rejected = [message["content"] for message in state.messages if message["role"] == "tool"]
+    assert [item["error"] for item in rejected] == ["file_ambiguous", "file_ambiguous"]
+    assert all("numele complet" in item["reason"] and item["expected"] for item in rejected)
+    assert tools.read_file({"name": "first.txt"})["name"] == "first.txt"
 
 
 def test_read_file_serves_bounded_pages(tmp_path: Path) -> None:
@@ -271,6 +302,46 @@ def test_job_budget_stops_the_fill_stage_and_logs_the_spend(
         log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
     spend = [json.loads(line) for line in log.splitlines() if '"ai_spend"' in line]
     assert [(item["stage"], item["usd"]) for item in spend] == [("fill", round(spent, 6))]
+
+
+def test_concurrent_job_calls_allow_only_one_exchange_at_the_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = Workspace(tmp_path / "workspace")
+    job = create_job(ws, "audit", "made-up", 2026)
+    exchange = Exchange("Gata.", (), 1_000_000, 0)
+    monkeypatch.setenv(
+        "EMA_AI_JOB_BUDGET_USD", str(selected_model("openai", OPENAI_MODEL).cost(1_000_000, 0))
+    )
+    entered, release, second_started = Event(), Event(), Event()
+
+    class Blocking(Scripted):
+        def respond(self, *args: Any, **kwargs: Any) -> Exchange:
+            entered.set()
+            assert release.wait(5)
+            return super().respond(*args, **kwargs)
+
+    provider = Blocking([exchange])
+    first = AgentContext(ws, job, "first", provider, OPENAI_MODEL, "test", synthetic=True)
+    second = AgentContext(ws, job, "second", provider, OPENAI_MODEL, "test", synthetic=True)
+
+    def later() -> str:
+        second_started.set()
+        try:
+            return run_agent(second, "system", {}, Limits(1)).status
+        except EmaError as exc:
+            return exc.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first_result = pool.submit(run_agent, first, "system", {}, Limits(1))
+        assert entered.wait(5)
+        second_result = pool.submit(later)
+        assert second_started.wait(5)
+        release.set()
+        assert first_result.result().status == "done"
+        assert second_result.result() == "ai_budget"
+    assert len(provider.sent) == 1
+    assert job_spend(ws, job) == selected_model("openai", OPENAI_MODEL).cost(1_000_000, 0)
 
 
 def test_one_sections_largest_prompt_stays_bounded(

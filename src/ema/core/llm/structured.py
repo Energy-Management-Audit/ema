@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-import time
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
 from ema.core.errors import EmaError
-from ema.core.llm.agent import AgentContext, record_call
+from ema.core.llm.agent import AgentContext, call_with_budget
 from ema.core.llm.models import selected_model
 from ema.core.llm.types import ImageInput
 
@@ -46,22 +45,19 @@ def complete_json[T: BaseModel](
     ]
     attachments = {image.sha256: image.data for image in images}
     for attempt in range(2):
-        started = time.monotonic()
         kwargs: dict[str, Any] = {"attachments": attachments} if images else {}
-        response = context.provider.respond(
-            context.model_id,
-            messages,
-            (),
-            schema.model_json_schema(),
-            synthetic=context.synthetic,
-            prompt_version=context.prompt_version,
-            **kwargs,
-        )
-        record_call(
+        response = call_with_budget(
             context,
-            response,
-            model.cost(response.input_tokens, response.output_tokens, response.cached_input_tokens),
-            int((time.monotonic() - started) * 1000),
+            model,
+            lambda kwargs=kwargs: context.provider.respond(
+                context.model_id,
+                messages,
+                (),
+                schema.model_json_schema(),
+                synthetic=context.synthetic,
+                prompt_version=context.prompt_version,
+                **kwargs,
+            ),
         )
         try:
             return schema.model_validate(json.loads(response.text or ""))

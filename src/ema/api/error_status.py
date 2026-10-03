@@ -89,6 +89,7 @@ STATUS: dict[str, int] = {
     "field_missing": 404,
     "field_unresolved": 409,
     "funding_block_unbounded": 500,
+    "file_ambiguous": 400,
     "file_missing": 404,
     "page_missing": 404,
     "query_missing": 400,

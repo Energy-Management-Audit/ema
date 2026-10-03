@@ -16,6 +16,7 @@ from ema.core.llm.models import Model, selected_model
 from ema.core.llm.replay import ReplayProvider
 from ema.core.llm.types import Exchange, Provider, ToolSpec
 from ema.core.workspace import Workspace
+from ema.core.workspace.lock import job_ai_lock
 
 # Tool results older than this many steps are summarised: each step resends the history.
 KEPT_STEPS = 4
@@ -119,6 +120,27 @@ def job_spend(ws: Workspace, job: str) -> float:
             "SELECT COALESCE(SUM(estimated_cost_usd), 0) FROM llm_calls WHERE job_id=?", (job,)
         ).fetchone()
     return float(row[0])
+
+
+def call_with_budget(
+    context: AgentContext, model: Model, respond: Callable[[], Exchange]
+) -> Exchange:
+    """Serialize a job's budget check and recorded provider exchange."""
+    with context.ws.connect() as db:
+        job_root = context.ws.job_path(db, context.job)
+    with job_ai_lock(job_root):
+        spent = job_spend(context.ws, context.job)
+        if spent >= load_settings(context.ws).ai_job_budget_usd:
+            raise EmaError("ai_budget", "Bugetul AI al lucrării s-a epuizat.", f"{spent:.2f} USD")
+        started = time.monotonic()
+        exchange = respond()
+        record_call(
+            context,
+            exchange,
+            model.cost(exchange.input_tokens, exchange.output_tokens, exchange.cached_input_tokens),
+            int((time.monotonic() - started) * 1000),
+        )
+        return exchange
 
 
 def _expected(spec: ToolSpec) -> dict[str, Any]:
@@ -241,7 +263,6 @@ def run_agent(  # noqa: C901
     state.step_limit, state.spend_cap_usd = limits.steps, limits.spend_cap_usd
     if state.status == "done":
         return state
-    budget = load_settings(context.ws).ai_job_budget_usd
     while True:
         if state.steps >= limits.steps:
             state.status = "step_limit"
@@ -252,21 +273,23 @@ def run_agent(  # noqa: C901
             state.status = "spend_cap"
             _save(context.ws, context.job, context.section, state)
             return state
-        spent = job_spend(context.ws, context.job)
-        if spent > budget:
-            state.status = "ai_budget"
-            _save(context.ws, context.job, context.section, state)
-            raise EmaError("ai_budget", "Bugetul AI al lucrării s-a epuizat.", f"{spent:.2f} USD")
-        started = time.monotonic()
         try:
-            exchange = context.provider.respond(
-                context.model_id,
-                messages,
-                tuple(tool.spec for tool in tools.values()),
-                synthetic=context.synthetic,
-                prompt_version=context.prompt_version,
+            exchange = call_with_budget(
+                context,
+                model,
+                lambda messages=messages: context.provider.respond(
+                    context.model_id,
+                    messages,
+                    tuple(tool.spec for tool in tools.values()),
+                    synthetic=context.synthetic,
+                    prompt_version=context.prompt_version,
+                ),
             )
         except EmaError as exc:
+            if exc.code == "ai_budget":
+                state.status = "ai_budget"
+                _save(context.ws, context.job, context.section, state)
+                raise
             if exc.code == "replay_request_mismatch":
                 raise
             state.status = "waiting_for_ai"
@@ -280,11 +303,9 @@ def run_agent(  # noqa: C901
             raise EmaError(
                 "ai_provider", "AI nu este disponibil; reluaţi etapa.", type(exc).__name__
             ) from exc
-        duration_ms = int((time.monotonic() - started) * 1000)
         cost = model.cost(
             exchange.input_tokens, exchange.output_tokens, exchange.cached_input_tokens
         )
-        record_call(context, exchange, cost, duration_ms)
         state.cost_usd += cost
         state.steps += 1
         if limits.spend_cap_usd is not None and state.cost_usd > limits.spend_cap_usd:

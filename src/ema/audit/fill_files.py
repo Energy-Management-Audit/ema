@@ -6,6 +6,8 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import PurePath
 
+from ema.core.errors import EmaError
+
 PAGE_CHARS = 6000
 PASSAGE_CHARS = 300
 SEARCH_LIMIT = 8
@@ -21,6 +23,10 @@ def file_ids(names: Iterable[str]) -> dict[str, str]:
 def resolve_name(wanted: str, names: Sequence[str]) -> str | None:
     """A file named by its id, its exact name, or its name without the extension."""
     ids = file_ids(names)
+    if wanted in ids and wanted in names and ids[wanted] != wanted:
+        raise EmaError(
+            "file_ambiguous", "Numele fişierului este ambiguu; folosiţi numele complet.", wanted
+        )
     if wanted in ids:
         return ids[wanted]
     if wanted in names:
