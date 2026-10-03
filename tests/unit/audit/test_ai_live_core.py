@@ -232,7 +232,11 @@ def test_other_errors_pass_through() -> None:
 
 
 def test_error_codes_have_their_status() -> None:
-    assert (STATUS["ai_quota_day"], STATUS["ai_unavailable"]) == (429, 503)
+    assert (STATUS["ai_quota_day"], STATUS["ai_unavailable"], STATUS["ai_credits"]) == (
+        429,
+        503,
+        402,
+    )
 
 
 def test_new_gemini_model_is_the_standard_default_and_old_one_stays() -> None:

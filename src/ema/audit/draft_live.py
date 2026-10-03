@@ -83,7 +83,19 @@ def _draft_all(
         except EmaError as exc:
             code = failed[section] = failure_code(exc)
             with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
-                write_event(handle, "draft_failed", run=ctx.run_id, section=section, code=code)
+                cause = exc.__cause__
+                provider_error = cause.__cause__ if isinstance(cause, EmaError) else cause
+                fields: dict[str, str | int] = {}
+                if provider_error is not None:
+                    provider_code = getattr(provider_error, "code", None)
+                    provider_status = getattr(provider_error, "status_code", None)
+                    if isinstance(provider_code, str):
+                        fields["provider_code"] = provider_code
+                    if isinstance(provider_status, int):
+                        fields["provider_status"] = provider_status
+                write_event(
+                    handle, "draft_failed", run=ctx.run_id, section=section, code=code, **fields
+                )
             if code in STOPPING:
                 return DraftSummary(
                     ctx.run_id,

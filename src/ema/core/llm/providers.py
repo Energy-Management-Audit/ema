@@ -28,6 +28,19 @@ def _live_key(key: SecretStr | None, llm_live: bool, environment: str) -> str:
     return key.get_secret_value()
 
 
+def _credit_error(exc: Exception, model: str) -> EmaError | None:
+    status = getattr(exc, "status_code", None)
+    code = getattr(exc, "code", None)
+    if status == 402 or code in {
+        "insufficient_quota",
+        "billing_not_active",
+        "credits_exhausted",
+        "payment_required",
+    }:
+        return EmaError("ai_credits", "Creditul furnizorului AI s-a epuizat.", model)
+    return None
+
+
 def _openai_messages(
     messages: list[dict[str, Any]], attachments: Mapping[str, bytes] | None = None
 ) -> list[dict[str, Any]]:
@@ -125,7 +138,12 @@ class OpenAIProvider:
                 "type": "json_schema",
                 "json_schema": {"name": "ema_result", "schema": schema, "strict": True},
             }
-        response = cast(ChatCompletion, self._client.chat.completions.create(**request))
+        try:
+            response = cast(ChatCompletion, self._client.chat.completions.create(**request))
+        except Exception as exc:
+            if credit_error := _credit_error(exc, model):
+                raise credit_error from exc
+            raise
         choice = response.choices[0].message
         calls = tuple(
             ToolCall(call.id, call.function.name, json.loads(call.function.arguments))
@@ -245,11 +263,16 @@ class GeminiProvider:
                 config=types.GenerateContentConfig(**config),
             )
 
-        response = (
-            call_with_retries(generate, model, self._sleep)
-            if getattr(self, "_transport_retries", True)
-            else generate()
-        )
+        try:
+            response = (
+                call_with_retries(generate, model, self._sleep)
+                if getattr(self, "_transport_retries", True)
+                else generate()
+            )
+        except Exception as exc:
+            if credit_error := _credit_error(exc, model):
+                raise credit_error from exc
+            raise
         calls = tuple(
             ToolCall(call.id or str(index), call.name or "", dict(call.args or {}))
             for index, call in enumerate(response.function_calls or [])
