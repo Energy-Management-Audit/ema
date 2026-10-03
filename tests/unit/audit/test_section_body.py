@@ -196,3 +196,59 @@ def test_an_intro_is_her_text_or_one_marker(tmp_path: Path) -> None:
     assert texts[1:4] == ["Primul paragraf.", "Al doilea.", TITLES["ch2.date_generale"]]
     write_intro(base, output, section_id="ch2", text=None)
     assert _texts(output)[1:3] == ["[de completat]", TITLES["ch2.date_generale"]]
+
+
+def test_draft_creates_absent_activity_section(tmp_path: Path) -> None:
+    base, output = _base(tmp_path / "base.docx"), tmp_path / "out.docx"
+    draft = SectionDraft(
+        section="ch2.activitate",
+        status="drafted",
+        paragraphs=[
+            DraftText(
+                text="activitatea {{f:audit.business_activity}}.",
+                fact_ids=["audit.business_activity"],
+            )
+        ],
+    )
+    render_section(
+        base,
+        output,
+        draft,
+        {"audit.business_activity": _fact("audit.business_activity", "industrială")},
+        (),
+        job="synthetic",
+    )
+    texts = _texts(output)
+    assert texts.index(TITLES["ch2.activitate"]) < texts.index(TITLES["ch2.istorie"])
+    assert texts[texts.index(TITLES["ch2.activitate"]) + 1] == "activitatea industrială."
+
+
+def test_process_draft_fills_every_repeated_subsection(tmp_path: Path) -> None:
+    document = Document()
+    document.add_paragraph(TITLES["ch3"], style="Heading 1")
+    document.add_paragraph(TITLES["ch3.flux"], style="Heading 2")
+    document.add_paragraph("[de completat]", style="Body Text")
+    for name in ("Alpha", "Beta"):
+        document.add_paragraph(f"DESCRIEREA SECȚIEI {name}", style="Heading 3")
+        document.add_paragraph("[de completat]", style="Body Text")
+    document.add_paragraph(TITLES["ch4"], style="Heading 1")
+    base, output = tmp_path / "base.docx", tmp_path / "out.docx"
+    document.save(str(base))
+    draft = SectionDraft(
+        section="ch3.process",
+        status="drafted",
+        paragraphs=[
+            DraftText(
+                text="proces {{f:audit.process_sections}}.", fact_ids=["audit.process_sections"]
+            )
+        ],
+    )
+    render_section(
+        base,
+        output,
+        draft,
+        {"audit.process_sections": _fact("audit.process_sections", "test")},
+        (),
+        job="synthetic",
+    )
+    assert _texts(output).count("proces test.") == 2

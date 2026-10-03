@@ -6,8 +6,14 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any, cast
+
+from docx import Document
 
 from ema.audit.base_anchor import MARKER
+from ema.audit.base_units import heading_spans_document
+from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_checks import TOKEN, DraftCheck, DraftReview, check_draft
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.section_body import replace_section_body
@@ -80,7 +86,39 @@ def render_section(
         raise EmaError("draft_invalid", "Redactarea nu a trecut verificările.", draft.section)
     blocked = {issue.location for issue in (*check.review, *flags)}
     output.parent.mkdir(parents=True, exist_ok=True)
-    replace_section_body(base, output, draft.section, draft_blocks(draft, facts, blocked))
+    with TemporaryDirectory() as directory:
+        source = base
+        document = Document(str(base))
+        spans = heading_spans_document(document)
+        if draft.section == "ch2.activitate" and not any(
+            item.section_id == draft.section for item, _, _ in spans
+        ):
+            # This catalogue section is absent from some bases; add its own heading
+            # before the next chapter-two heading so its draft has a real region.
+            order = [section.id for section in CATALOGUE]
+            following = next(
+                (
+                    start
+                    for item, start, _ in spans
+                    if item.section_id.startswith("ch2.")
+                    and order.index(item.section_id) > order.index(draft.section)
+                ),
+                None,
+            )
+            if following is None:
+                raise EmaError("draft_prototype", "Secţiunea lipseşte din bază.", draft.section)
+            body = list(cast(Any, document.element).body)
+            paragraph = next(
+                paragraph for paragraph in document.paragraphs if paragraph._p is body[following]
+            )
+            paragraph.insert_paragraph_before(
+                next(section.title for section in CATALOGUE if section.id == draft.section),
+                style="Heading 2",
+            )
+            paragraph.insert_paragraph_before(MARKER, style="Body Text")
+            source = Path(directory) / "with-section.docx"
+            document.save(str(source))
+        replace_section_body(source, output, draft.section, draft_blocks(draft, facts, blocked))
     return check
 
 

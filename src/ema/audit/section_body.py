@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from docx import Document
@@ -29,15 +30,16 @@ _CHAPTERS = {section.id: section.chapter for section in CATALOGUE}
 _CAPTION = re.compile(r"^\s*Tabel")
 
 
-def own_region(document: Any, section_id: str) -> tuple[int, int]:
+def own_region(document: Any, section_id: str, occurrence: int = 0) -> tuple[int, int]:
     """Body indexes [first, end): after the section's heading, up to the next mapped heading.
 
     A child's heading ends the region, so a parent's own region is its introduction only.
     """
     spans = heading_spans_document(document)
-    start = next((start for item, start, _ in spans if item.section_id == section_id), None)
-    if start is None:
+    starts = [start for item, start, _ in spans if item.section_id == section_id]
+    if occurrence >= len(starts):
         raise EmaError("draft_prototype", "Secţiunea lipseşte din bază.", section_id)
+    start = starts[occurrence]
     body = list(document.element.body)
     following = [begin for _, begin, _ in spans if begin > start]
     return start + 1, min(following, default=len(body) - 1)
@@ -107,19 +109,32 @@ def replace_section_body(
 ) -> RenderReport:
     """Write ``blocks`` over the section's own region, styled after what the region held."""
     document = Document(str(source))
-    first, end = own_region(document, section_id)
-    elements = _prototypes(document, section_id, first, end)
-    if missing := sorted(_needed(blocks) - set(elements)):
-        raise EmaError(
-            "draft_prototype",
-            "Baza nu are un model pentru conţinutul secţiunii.",
-            f"{section_id}: {', '.join(missing)}",
-        )
-    return replace_region(
-        source,
-        output,
-        ElementLocator(first),
-        ElementLocator(end + 1),
-        blocks,
-        Prototypes(elements, _CHAPTERS[section_id], MARKER),
-    )
+    count = sum(item.section_id == section_id for item, _, _ in heading_spans_document(document))
+    if not count:
+        raise EmaError("draft_prototype", "Secţiunea lipseşte din bază.", section_id)
+    # Repeated process headings are separate 3.1.x units, all fed by the accepted draft.
+    with TemporaryDirectory() as directory:
+        current = source
+        report: RenderReport | None = None
+        for occurrence in reversed(range(count if section_id == "ch3.process" else 1)):
+            document = Document(str(current))
+            first, end = own_region(document, section_id, occurrence)
+            elements = _prototypes(document, section_id, first, end)
+            if missing := sorted(_needed(blocks) - set(elements)):
+                raise EmaError(
+                    "draft_prototype",
+                    "Baza nu are un model pentru conţinutul secţiunii.",
+                    f"{section_id}: {', '.join(missing)}",
+                )
+            target = output if occurrence == 0 else Path(directory) / f"{occurrence}.docx"
+            report = replace_region(
+                current,
+                target,
+                ElementLocator(first),
+                ElementLocator(end + 1),
+                blocks,
+                Prototypes(elements, _CHAPTERS[section_id], MARKER),
+            )
+            current = target
+    assert report is not None
+    return report
