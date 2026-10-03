@@ -10,7 +10,7 @@ from ema.audit.draft_agent import PROMPT_VERSION, recorded_facts
 from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.draft_write import live_passes, write_section
 from ema.audit.fill_stage import STOPPING, log_spend, settings_provider, stopped_warning
-from ema.audit.sections import get_status
+from ema.audit.sections import get_status, recompute_ready
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, run_stage
@@ -74,11 +74,12 @@ def _draft_all(
     failed: dict[str, str] = {}
     directory = ctx.artifact_dir() / "draft"
     ctx.record_input(prompt=PROMPT_VERSION, model=model_id)
+    recompute_ready(ctx.ws, ctx.job)
 
     def run_one(section: str) -> tuple[str, str, bool]:
         try:
             result = write_section(
-                ctx, section, live_passes(provider, model_id, directory, section)
+                ctx, section, live_passes(provider, model_id, directory, section), ready=True
             )
             return section, result.draft.status, True
         except EmaError as exc:

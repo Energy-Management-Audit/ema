@@ -57,7 +57,9 @@ def live_passes(provider: Provider, model_id: str, directory: Path, section: str
     )
 
 
-def write_section(ctx: StageContext, section: str, passes: Passes) -> Drafted:
+def write_section(
+    ctx: StageContext, section: str, passes: Passes, *, ready: bool = False
+) -> Drafted:
     facts = recorded_facts(ctx.ws, ctx.job, section)
     for field in facts.values():
         ctx.record_read("fields", field.id, field.revision)
@@ -82,7 +84,8 @@ def write_section(ctx: StageContext, section: str, passes: Passes) -> Drafted:
         encoding="utf-8",
     )
     if draft.status == "drafted":
-        recompute_ready(ctx.ws, ctx.job)
+        if not ready:
+            recompute_ready(ctx.ws, ctx.job)
         queue_sections(
             ctx,
             (section,),
