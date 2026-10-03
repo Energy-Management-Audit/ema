@@ -14,7 +14,7 @@ from ema.core.jobs import StageContext, StageOutcome, run_stage, status, subscri
 from ema.core.jobs.reads import run_current
 from ema.core.office.anchors import leftover_issues
 from ema.core.office.package import check_standalone
-from ema.core.office.word_api import word_automation, word_available
+from ema.core.office.word_api import word_automation, word_available, word_session
 from ema.core.review import base_readiness, fields
 from ema.core.review.models import Field, FieldSpec, Issue, Readiness
 from ema.core.workspace import Workspace
@@ -248,10 +248,11 @@ def start_word_render(ws: Workspace, job: str, *, on_revision: int | None = None
         original = ctx.artifact_dir() / "PIEE-final.docx"
         original.write_bytes(draft_path.read_bytes())
         office = word_automation(settings)
-        office.update_toc_pages(original)
         pdf = ctx.artifact_dir() / "PIEE-final.pdf"
-        office.render_pdf(original, pdf)
-        office.open_check(original)
+        with word_session(office):
+            office.update_toc_pages(original)
+            office.render_pdf(original, pdf)
+            office.open_check(original)
         issues = check_standalone(original)
         denylist = tuple(json.loads((base_dir / "base-identity.json").read_text(encoding="utf-8")))
         leftovers = leftover_issues(original, denylist)

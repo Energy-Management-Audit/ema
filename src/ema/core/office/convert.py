@@ -11,7 +11,7 @@ from ema.core.errors import EmaError
 from ema.core.office.errors import OfficeError
 from ema.core.office.sniff import FileKind, sniff
 from ema.core.office.text_check import TextCheck, check_text
-from ema.core.office.word_api import word_automation, word_available
+from ema.core.office.word_api import word_automation, word_available, word_session
 from ema.core.workspace import SlotVersion, Workspace
 from ema.core.workspace.conversion import publish_conversion
 
@@ -63,8 +63,9 @@ def convert_doc(
     with TemporaryDirectory(dir=ws.root) as temp:
         converted = Path(temp) / "converted.docx"
         try:
-            word.convert_doc(source, converted)
-            original = word.doc_text(source)
+            with word_session(word):
+                word.convert_doc(source, converted)
+                original = word.doc_text(source)
             check = check_text(original, converted)
         except OfficeError as exc:
             code = "convert_timeout" if exc.code == "word_timeout" else "convert_failed"
