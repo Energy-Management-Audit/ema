@@ -100,7 +100,7 @@ def test_cli_and_mcp_use_case(tmp_path: Path, monkeypatch) -> None:  # type: ign
 
     result = with_client(ws, body)
     assert result["measures"] == 1
-    assert result["factor_version"] == "2026"
+    assert result["factor_version"] == "2026-audit"
     assert {field.key: field.value for field in fields(ws, job)}[
         "audit_measure.1.payback_years"
     ] == 4
