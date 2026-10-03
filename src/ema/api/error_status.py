@@ -9,6 +9,7 @@ STATUS: dict[str, int] = {
     "ai_limits": 400,
     "ai_offline": 409,
     "ai_provider": 502,
+    "ai_prompt_size": 413,
     "ai_quota_day": 429,
     "ai_schema": 502,
     "ai_unavailable": 503,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -22,6 +23,7 @@ from ema.core.config import Settings
 from ema.core.errors import EmaError
 from ema.core.jobs import get_job, status, subscribe
 from ema.core.llm import curated_models, default_model
+from ema.core.llm.providers import GeminiProvider
 from ema.core.llm.types import Exchange, Provider, ToolSpec
 from ema.core.workspace import Workspace
 
@@ -141,7 +143,10 @@ def test_bad_dossier_file_is_recorded_once_and_other_sections_run(
     assert "permit" not in provider.tasks[0]
     with ws.connect() as db:
         log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
-    assert log.count('"file": "permit.pdf", "code": "file_invalid"') == 1
+    digest = hashlib.sha256(b"permit.pdf").hexdigest()
+    assert log.count(f'"file_sha": "{digest}", "code": "file_invalid"') == 1
+    assert "permit.pdf" not in log
+    assert "permit.pdf" not in json.dumps(run_events(ws, summary.run))
 
 
 def test_failed_section_setup_is_isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -246,8 +251,12 @@ def test_settings_provider_needs_the_live_switch_and_picks_the_standard_model() 
     )
     assert provider.name == "openai"
     assert model == default_model("openai").id
-    _, gemini = settings_provider(Settings(provider="gemini", gemini_api_key="key", llm_live=True))
+    gemini_provider, gemini = settings_provider(
+        Settings(provider="gemini", gemini_api_key="key", llm_live=True)
+    )
     assert gemini == "gemini-3.8-flash"
+    assert isinstance(gemini_provider, GeminiProvider)
+    assert gemini_provider._transport_retries is False
     _, chosen = settings_provider(
         Settings(provider="openai", model=OPENAI_MODEL, openai_api_key="key", llm_live=True)
     )

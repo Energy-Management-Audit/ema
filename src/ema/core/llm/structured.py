@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -14,7 +15,7 @@ from ema.core.llm.replay import ReplayProvider
 from ema.core.llm.types import ImageInput
 
 
-def complete_json[T: BaseModel](
+def complete_json[T: BaseModel](  # noqa: PLR0913
     context: AgentContext,
     schema: type[T],
     prompt: str,
@@ -22,6 +23,8 @@ def complete_json[T: BaseModel](
     *,
     images: tuple[ImageInput, ...] = (),
     max_output_tokens: int = 4096,
+    estimate_tokens: Callable[[list[dict[str, Any]]], int] | None = None,
+    on_estimate: Callable[[int, float, float], None] | None = None,
 ) -> T:
     if context.provider.name != "replay" and not (context.synthetic or context.client_live):
         raise EmaError("ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", "")
@@ -63,6 +66,17 @@ def complete_json[T: BaseModel](
                 prompt_version=context.prompt_version,
                 **kwargs,
             ),
+            estimate=(
+                (
+                    lambda: (
+                        (tokens := estimate_tokens(messages)),
+                        model.cost(tokens, max_output_tokens),
+                    )
+                )
+                if estimate_tokens is not None
+                else None
+            ),
+            on_estimate=on_estimate,
         )
         try:
             return schema.model_validate(json.loads(response.text or ""))

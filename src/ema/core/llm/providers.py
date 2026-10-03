@@ -156,10 +156,12 @@ class GeminiProvider:
         llm_live: bool,
         client_live: bool = False,
         sleep: Callable[[float], None] = time.sleep,
+        transport_retries: bool = True,
     ) -> None:
         self._client = genai.Client(api_key=_live_key(key, llm_live, "EMA_GEMINI_API_KEY"))
         self._client_live = client_live
         self._sleep = sleep
+        self._transport_retries = transport_retries
 
     def respond(  # noqa: PLR0913, PLR0912, C901
         self,
@@ -235,14 +237,18 @@ class GeminiProvider:
         if schema is not None:
             config["response_mime_type"] = "application/json"
             config["response_json_schema"] = schema
-        response = call_with_retries(
-            lambda: self._client.models.generate_content(
+
+        def generate() -> Any:
+            return self._client.models.generate_content(
                 model=model,
                 contents=cast(Any, contents),
                 config=types.GenerateContentConfig(**config),
-            ),
-            model,
-            self._sleep,
+            )
+
+        response = (
+            call_with_retries(generate, model, self._sleep)
+            if getattr(self, "_transport_retries", True)
+            else generate()
         )
         calls = tuple(
             ToolCall(call.id or str(index), call.name or "", dict(call.args or {}))

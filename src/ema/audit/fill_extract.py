@@ -13,11 +13,8 @@ from ema.audit.catalogue import Section
 from ema.audit.catalogue_labels import field_label
 from ema.audit.fill_files import file_ids, resolve_name
 from ema.audit.fill_tools import FillDocument, FillTools
-from ema.core.config import load_settings
 from ema.core.errors import EmaError
 from ema.core.llm import AgentContext, RecordingProvider, ReplayProvider, complete_json
-from ema.core.llm.agent import job_spend
-from ema.core.llm.models import selected_model
 from ema.core.llm.types import Provider
 from ema.core.logging import write_event
 from ema.core.resources import resource_path
@@ -80,11 +77,22 @@ def file_groups(head: str, files: Sequence[str]) -> list[list[str]]:
     groups: list[list[str]] = [[]]
     size = len(head)
     for text in files:
-        if groups[-1] and size + len(text) + 2 > bound:
-            groups.append([])
-            size = len(head)
-        groups[-1].append(text)
-        size += len(text) + 2
+        if len(head) + len(text) + 2 <= bound:
+            pieces = [text]
+        else:
+            header, *pages = text.split("\n[")
+            pieces = [header + "\n[" + page for page in pages] if pages else [text]
+        for piece in pieces:
+            if len(head) + len(piece) + 2 > bound:
+                raise EmaError("ai_prompt_size", "Pagina depăşeşte limita AI.", str(len(piece)))
+            separator = 2 if groups[-1] else 0
+            if size + len(piece) + separator > bound:
+                groups.append([])
+                size = len(head)
+                separator = 0
+            groups[-1].append(piece)
+            size += len(piece) + separator
+    assert all(len(head + "\n\n".join(group)) <= bound for group in groups)
     return groups
 
 
@@ -101,30 +109,25 @@ class _Caller:
     def __call__(self, content: str) -> Extraction:
         self.calls += 1
         prompt = instructions()
-        provider_name = (
-            self.provider.provider_name
-            if isinstance(self.provider, ReplayProvider)
-            else self.provider.name
-        )
-        tokens = prompt_tokens(prompt + content)
-        estimate = selected_model(provider_name, self.model_id).cost(tokens, OUTPUT_TOKENS)
-        spent = job_spend(self.ws, self.job)
-        with self.ws.connect() as db, self.ws.job_log(db, self.job) as handle:
-            write_event(
-                handle,
-                "ai_estimate",
-                stage="fill",
-                call=self.calls,
-                tokens=tokens,
-                usd=round(estimate, 6),
-                job_usd=round(spent, 6),
-            )
-        if spent + estimate > load_settings(self.ws).ai_job_budget_usd:
-            raise EmaError(
-                "ai_budget",
-                "Bugetul AI al lucrării s-a epuizat.",
-                f"{spent:.2f} + {estimate:.2f} USD",
-            )
+
+        def estimate_tokens(messages: list[dict[str, object]]) -> int:
+            tokens = prompt_tokens("".join(str(message["content"]) for message in messages))
+            if tokens > PROMPT_TOKENS:
+                raise EmaError("ai_prompt_size", "Cererea depăşeşte limita AI.", str(tokens))
+            return tokens
+
+        def log_estimate(tokens: int, estimate: float, spent: float) -> None:
+            with self.ws.connect() as db, self.ws.job_log(db, self.job) as handle:
+                write_event(
+                    handle,
+                    "ai_estimate",
+                    stage="fill",
+                    call=self.calls,
+                    tokens=tokens,
+                    usd=round(estimate, 6),
+                    job_usd=round(spent, 6),
+                )
+
         provider = (
             self.provider
             if isinstance(self.provider, ReplayProvider)
@@ -141,7 +144,13 @@ class _Caller:
         )
         try:
             return complete_json(
-                context, Extraction, prompt, content, max_output_tokens=OUTPUT_TOKENS
+                context,
+                Extraction,
+                prompt,
+                content,
+                max_output_tokens=OUTPUT_TOKENS,
+                estimate_tokens=estimate_tokens,
+                on_estimate=log_estimate,
             )
         except EmaError:
             raise
@@ -159,7 +168,7 @@ def _page_text(documents: Mapping[str, FillDocument], fact: ExtractedFact) -> st
 
 def retry_text(
     facts: Sequence[tuple[str, str]],
-    rejected: Mapping[str, tuple[ExtractedFact, EmaError]],
+    rejected: Sequence[tuple[ExtractedFact, EmaError]],
     documents: Mapping[str, FillDocument],
 ) -> str:
     """Only the rejected items, each with its reason and its cited page; never the dossier."""
@@ -170,9 +179,9 @@ def retry_text(
             + (f" ({error.detail})" if error.detail else ""),
             "page_text": _page_text(documents, fact),
         }
-        for fact, error in rejected.values()
+        for fact, error in rejected
     ]
-    wanted = [(key, section) for key, section in facts if key in rejected]
+    wanted = [(key, section) for key, section in facts if key in {fact.key for fact, _ in rejected}]
     return (
         facts_text(wanted)
         + "\n\nFapte respinse:\n"
@@ -199,7 +208,7 @@ def extract_facts(  # noqa: PLR0913
     tools = {section.id: FillTools(ws, job, section.id, documents) for section in sections}
     call = _Caller(ws, job, provider, model_id, artifacts, client_live)
     verified: set[str] = set()
-    rejected: dict[str, tuple[ExtractedFact, EmaError]] = {}
+    rejected: list[tuple[ExtractedFact, EmaError]] = []
 
     def verify(extraction: Extraction) -> None:
         # The first verified fact per key wins; an unrequested key is ignored.
@@ -208,10 +217,16 @@ def extract_facts(  # noqa: PLR0913
                 continue
             try:
                 tools[owner[fact.key]].record_fact(
-                    {"key": fact.key, "value": fact.value, "name": fact.file, "quote": fact.quote}
+                    {
+                        "key": fact.key,
+                        "value": fact.value,
+                        "name": fact.file,
+                        "page": fact.page,
+                        "quote": fact.quote,
+                    }
                 )
             except EmaError as exc:
-                rejected.setdefault(fact.key, (fact, exc))
+                rejected.append((fact, exc))
                 continue
             verified.add(fact.key)
 
@@ -221,8 +236,8 @@ def extract_facts(  # noqa: PLR0913
     if facts and files:
         for group in file_groups(instructions() + head, files):
             verify(call(head + "\n\n".join(group)))
-    retry = {key: item for key, item in rejected.items() if key not in verified}
-    first_pass = {key: error.code for key, (_, error) in retry.items()}
+    retry = [(fact, error) for fact, error in rejected if fact.key not in verified]
+    first_pass = {fact.key: error.code for fact, error in retry}
     if retry:
         verify(call(retry_text(facts, retry, documents)))
     # A value found earlier, as from the Necesar info, is never overwritten with missing.

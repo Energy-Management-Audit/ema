@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -11,8 +12,10 @@ from tests.workspace_jobs import create_job
 
 from ema.core.errors import EmaError
 from ema.core.llm import AgentContext, ReplayProvider, complete_json
+from ema.core.llm.agent import call_with_budget
 from ema.core.llm.models import selected_model
 from ema.core.llm.replay import request_hashes
+from ema.core.llm.types import Exchange
 from ema.core.workspace import Workspace
 
 
@@ -116,3 +119,33 @@ def test_live_provider_cannot_receive_client_content(tmp_path: Path) -> None:
     with pytest.raises(EmaError) as error:
         complete_json(context, Classification, "Classify", "Confidential text")
     assert error.value.code == "ai_client_disabled"
+
+
+def test_concurrent_estimates_share_the_locked_spend(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = Workspace(tmp_path / "workspace")
+    job = create_job(ws, "audit", "synthetic", 2026)
+    provider = _replay(tmp_path / "responses.json", ['{"item": 1}'])
+    context = AgentContext(ws, job, "classification", provider, "gemini-3.6-flash", "v1")
+    model = selected_model("gemini", "gemini-3.6-flash")
+    cost = model.cost(4_000, 4_000)
+    monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", str(cost * 1.5))
+    calls: list[int] = []
+
+    def one() -> str:
+        try:
+            call_with_budget(
+                context,
+                model,
+                lambda: (calls.append(1), Exchange("ok", (), 4_000, 4_000))[1],
+                estimate=lambda: (4_000, cost),
+            )
+        except EmaError as error:
+            return error.code
+        return "ok"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(lambda _: one(), range(2)))
+    assert sorted(outcomes) == ["ai_budget", "ok"]
+    assert len(calls) == 1

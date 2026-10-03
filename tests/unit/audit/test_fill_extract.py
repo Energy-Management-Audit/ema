@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -221,6 +222,74 @@ def test_a_fact_still_wrong_after_the_retry_is_missing_without_a_third_call(
     assert summary.rejected == {"audit.location": "value_unverified"}
     assert summary.missing == ("audit.location",)
     assert values(ws, job_id)["audit.location"] == ("None", "not_found")
+
+
+def test_wrong_page_file_and_near_match_are_rejected(tmp_path: Path) -> None:
+    for index, (bad, code) in enumerate(
+        (
+            ({**LOCATION, "page": 1}, "evidence_quote"),
+            ({**LOCATION, "file": "F1"}, "page_missing"),
+            ({**LOCATION, "quote": LOCATION["quote"].replace("Vest", "Est")}, "evidence_quote"),
+        )
+    ):
+        ws, job_id = job(tmp_path / str(index))
+        provider = Scripted([{"facts": [bad], "missing": []}, {"facts": [], "missing": []}])
+        summary = extract(ws, job_id, sections("ch2.localizare"), provider)
+        assert summary.rejected == {"audit.location": code}
+        assert summary.missing == ("audit.location",)
+
+
+def test_retry_includes_every_rejected_page_for_one_key(tmp_path: Path) -> None:
+    ws, job_id = job(tmp_path)
+    bad1 = {**LOCATION, "page": 1}
+    bad2 = {**LOCATION, "quote": "Amplasament: zona industrială Est."}
+    provider = Scripted([{"facts": [bad1, bad2], "missing": []}, {"facts": [], "missing": []}])
+    extract(ws, job_id, sections("ch2.localizare"), provider)
+    items = json.loads(provider.sent[1][1]["content"].split("\n\nFapte respinse:\n")[1])
+    assert [(item["page"], item["quote"]) for item in items] == [
+        (1, bad1["quote"]),
+        (2, bad2["quote"]),
+    ]
+
+
+def test_single_oversized_file_splits_on_page_markers(tmp_path: Path) -> None:
+    ws, job_id = job(tmp_path)
+    pages = tuple(f"page-{number} " + "x" * 5900 for number in range(1, 230))
+    documents = {"large.pdf": FillDocument("large.pdf", "", page_texts=pages)}
+    provider = Scripted([{"facts": [], "missing": []}] * 4)
+    summary = extract(ws, job_id, sections("ch2.localizare"), provider, documents)
+    assert summary.calls > 1
+    sent = ["".join(str(message["content"]) for message in call) for call in provider.sent]
+    assert all(len(request) // 4 <= PROMPT_TOKENS for request in sent)
+    markers = [int(page) for request in sent for page in re.findall(r"\[F1 p\.(\d+)\]", request)]
+    assert markers == list(range(1, 230))
+    assert all("F1: large.pdf" in request for request in sent)
+
+
+def test_header_plus_one_page_over_bound_fails_before_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("ema.audit.fill_extract.PROMPT_TOKENS", 20)
+    ws, job_id = job(tmp_path)
+    provider = Scripted([])
+    with pytest.raises(EmaError) as error:
+        extract(ws, job_id, sections("ch2.localizare"), provider)
+    assert error.value.code == "ai_prompt_size"
+    assert provider.sent == []
+
+
+def test_schema_retry_reestimates_its_larger_request(tmp_path: Path) -> None:
+    ws, job_id = job(tmp_path)
+    provider = Scripted([{"facts": "invalid", "missing": []}, {"facts": [], "missing": []}])
+    extract(ws, job_id, sections("ch2.localizare"), provider)
+    estimates = log_events(ws, job_id, "ai_estimate")
+    assert len(estimates) == 2
+    assert estimates[1]["tokens"] > estimates[0]["tokens"]
+    for estimate, messages in zip(estimates, provider.sent, strict=True):
+        assert estimate["tokens"] == sum(len(str(item["content"])) for item in messages) // 4
+        assert estimate["usd"] == round(
+            selected_model("openai", OPENAI_MODEL).cost(estimate["tokens"], OUTPUT_TOKENS), 6
+        )
 
 
 def test_preflight_refuses_over_the_job_budget_before_any_call(

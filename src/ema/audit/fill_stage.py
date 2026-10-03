@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -43,10 +44,17 @@ def settings_provider(settings: Settings) -> tuple[Provider, str]:
         raise EmaError("provider_invalid", "Furnizorul este invalid.", str(name))
     model = settings.model or default_model(name).id
     selected_model(name, model)
-    provider_class = GeminiProvider if name == "gemini" else OpenAIProvider
-    provider = provider_class(
-        settings.provider_key(name), settings.llm_live, client_live=settings.ai_client_live
-    )
+    if name == "gemini":
+        provider = GeminiProvider(
+            settings.provider_key(name),
+            settings.llm_live,
+            client_live=settings.ai_client_live,
+            transport_retries=False,
+        )
+    else:
+        provider = OpenAIProvider(
+            settings.provider_key(name), settings.llm_live, client_live=settings.ai_client_live
+        )
     return provider, model
 
 
@@ -59,6 +67,10 @@ def _failure_code(exc: EmaError) -> str:
 def _log_failure(ctx: StageContext, code: str, **where: object) -> None:
     with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
         write_event(handle, "fill_failed", run=ctx.run_id, **where, code=code)
+
+
+def _file_id(name: str) -> str:
+    return hashlib.sha256(name.encode()).hexdigest()
 
 
 def _fill(ctx: StageContext, sections: Sequence[str] | None) -> FillSummary:
@@ -75,7 +87,7 @@ def _fill(ctx: StageContext, sections: Sequence[str] | None) -> FillSummary:
             documents.update(dossier_documents(ctx.ws, ctx.job, {name: slot}))
         except EmaError as exc:
             failed[name] = _failure_code(exc)
-            _log_failure(ctx, failed[name], file=name)
+            _log_failure(ctx, failed[name], file_sha=_file_id(name))
     wanted = [item for item in CATALOGUE if item.id in SECTION_FACTS]
     if sections is not None:
         wanted = [item for item in wanted if item.id in sections]
@@ -136,7 +148,10 @@ def log_spend(ctx: StageContext, stage: str, before: float) -> None:
 
 def _outcome(summary: FillSummary) -> StageOutcome:
     return StageOutcome(
-        item_failures=[f"{section}: {code}" for section, code in summary.failed.items()]
+        item_failures=[
+            f"{section if section in SECTION_FACTS else _file_id(section)}: {code}"
+            for section, code in summary.failed.items()
+        ]
     )
 
 
