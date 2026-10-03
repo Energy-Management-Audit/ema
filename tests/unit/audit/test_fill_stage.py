@@ -14,7 +14,6 @@ from tests.workspace_jobs import create_job
 from ema.api.job_routes import start_named_stage
 from ema.audit import fill_stage
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.catalogue_labels import field_label
 from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.fill_stage import FillSummary, fill_sections, fill_task, settings_provider
 from ema.audit.fill_tools import FillTools
@@ -142,11 +141,8 @@ def test_fill_stage_replays_the_synthetic_dossier(
     assert state is not None
     assert state.prompt_version == "audit-fill-v1"
     assert state.messages[0]["content"] == fill_stage.instructions()
-    assert str(state.messages[1]["content"]).startswith(
-        "Secţiunea ch2.date_generale „Date generale”. Fapte de stabilit: "
-        "audit.company_name — Denumirea societăţii\n"
-    )
-    assert str(state.messages[1]["content"]).endswith(". Fişiere: fisa.txt, permit.pdf.")
+    section = next(item for item in CATALOGUE if item.id == SECTION)
+    assert state.messages[1]["content"] == fill_task(section, ["fisa.txt", "permit.pdf"])
     errors = [
         message["content"]["error"]
         for message in state.messages
@@ -159,12 +155,68 @@ def test_fill_stage_replays_the_synthetic_dossier(
 
 def test_fill_task_names_the_section_its_facts_and_files() -> None:
     section = next(item for item in CATALOGUE if item.id == SECTION)
-    facts = "\n".join(f"{fact} — {field_label(str(fact))}" for fact in section.facts)
-
     assert fill_task(section, ["a.txt", "b.pdf"]) == (
-        f"Secţiunea ch2.date_generale „Date generale”. Fapte de stabilit: {facts}. "
+        "Secţiunea ch2.date_generale „Date generale”. Fapte de stabilit:\n"
+        "audit.company_name — Denumirea societăţii\n"
+        "audit.cui — CUI\n"
+        "audit.registrul_comertului — Registrul Comerţului\n"
+        "audit.address — Adresa\n"
+        "audit.phone — Telefon\n"
+        "audit.website — Website\n"
+        "audit.caen_code — Cod CAEN\n"
+        "audit.caen_description — Sector de activitate\n"
+        "audit.ownership_state — Capital de stat (%)\n"
+        "audit.ownership_private — Capital privat (%)\n"
+        "audit.employees — Angajaţi\n"
+        "audit.tep_class — Pragul 1000 tep\n"
         "Fişiere: a.txt, b.pdf."
     )
+
+
+def test_bad_dossier_file_is_recorded_once_and_other_sections_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EMA_AI_CLIENT_LIVE", "1")
+    ws, job = synthetic_dossier(tmp_path, monkeypatch)
+    provider = LiveProvider({})
+    use_provider(monkeypatch, provider, OPENAI_MODEL)
+    original = fill_stage.dossier_documents
+
+    def bad_file(ws: Workspace, job: str, slots: dict[str, str]) -> dict[str, Any]:
+        if "permit.pdf" in slots:
+            raise EmaError("file_invalid", "Fişier invalid.", "permit.pdf")
+        return original(ws, job, slots)
+
+    monkeypatch.setattr(fill_stage, "dossier_documents", bad_file)
+    summary = fill_sections(ws, job, [SECTION, "ch2.localizare"])
+
+    assert summary.failed == {"permit.pdf": "file_invalid"}
+    assert summary.sections == {SECTION: "done", "ch2.localizare": "done"}
+    assert len(provider.tasks) == 2
+    assert all("Fişiere: fisa.txt." in task for task in provider.tasks)
+    with ws.connect() as db:
+        log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
+    assert log.count('"file": "permit.pdf", "code": "file_invalid"') == 1
+
+
+def test_failed_section_setup_is_isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("EMA_AI_CLIENT_LIVE", "1")
+    ws, job = synthetic_dossier(tmp_path, monkeypatch)
+    provider = LiveProvider({})
+    use_provider(monkeypatch, provider, OPENAI_MODEL)
+    original = fill_stage.record_applicability
+
+    def bad_setup(ws: Workspace, job: str, section: str) -> Any:
+        if section == SECTION:
+            raise EmaError("applicability_invalid", "Aplicabilitate invalidă.", section)
+        return original(ws, job, section)
+
+    monkeypatch.setattr(fill_stage, "record_applicability", bad_setup)
+    summary = fill_sections(ws, job, [SECTION, "ch2.localizare"])
+
+    assert summary.failed == {SECTION: "applicability_invalid"}
+    assert summary.sections == {"ch2.localizare": "done"}
+    assert len(provider.tasks) == 1
 
 
 def test_fill_instructions_are_the_s12_text_verbatim() -> None:

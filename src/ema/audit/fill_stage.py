@@ -52,7 +52,7 @@ def instructions() -> str:
 def fill_task(section: Section, documents: Sequence[str]) -> str:
     facts = "\n".join(f"{fact} — {field_label(str(fact))}" for fact in section.facts)
     return (
-        f"Secţiunea {section.id} „{section.title}”. Fapte de stabilit: {facts}. "
+        f"Secţiunea {section.id} „{section.title}”. Fapte de stabilit:\n{facts}\n"
         f"Fişiere: {', '.join(documents)}."
     )
 
@@ -102,24 +102,31 @@ def _fill(ctx: StageContext, sections: Sequence[str] | None) -> FillSummary:
     slots = {
         version.slot.removeprefix("dossier/"): version.slot for version in ctx.read_slots("dossier")
     }
-    documents = dossier_documents(ctx.ws, ctx.job, slots)
+    documents: dict[str, FillDocument] = {}
+    failed: dict[str, str] = {}
+    for name, slot in slots.items():
+        try:
+            documents.update(dossier_documents(ctx.ws, ctx.job, {name: slot}))
+        except EmaError as exc:
+            code = failed[name] = _failure_code(exc)
+            with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
+                write_event(handle, "fill_failed", run=ctx.run_id, file=name, code=code)
     wanted = [item for item in CATALOGUE if item.id in SECTION_FACTS]
     if sections is not None:
         wanted = [item for item in wanted if item.id in sections]
     done: dict[str, str] = {}
-    failed: dict[str, str] = {}
     not_applicable: list[str] = []
     for index, section in enumerate(wanted):
-        state = record_applicability(ctx.ws, ctx.job, section.id)
-        if state.applicability is False or state.status == Status.NA:
-            not_applicable.append(section.id)
-            continue
-        recorded = (
-            provider
-            if isinstance(provider, ReplayProvider)
-            else RecordingProvider(provider, ctx.artifact_dir() / f"{section.id}.json")
-        )
         try:
+            state = record_applicability(ctx.ws, ctx.job, section.id)
+            if state.applicability is False or state.status == Status.NA:
+                not_applicable.append(section.id)
+                continue
+            recorded = (
+                provider
+                if isinstance(provider, ReplayProvider)
+                else RecordingProvider(provider, ctx.artifact_dir() / f"{section.id}.json")
+            )
             agent = fill_section(
                 ctx.ws,
                 ctx.job,
