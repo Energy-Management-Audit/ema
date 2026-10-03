@@ -123,15 +123,26 @@ def job_spend(ws: Workspace, job: str) -> float:
 
 
 def call_with_budget(
-    context: AgentContext, model: Model, respond: Callable[[], Exchange]
+    context: AgentContext,
+    model: Model,
+    respond: Callable[[], Exchange],
+    *,
+    estimate: Callable[[], tuple[int, float]] | None = None,
+    on_estimate: Callable[[int, float, float], None] | None = None,
 ) -> Exchange:
     """Serialize a job's budget check and recorded provider exchange."""
     with context.ws.connect() as db:
         job_root = context.ws.job_path(db, context.job)
     with job_ai_lock(job_root):
         spent = job_spend(context.ws, context.job)
-        if spent >= load_settings(context.ws).ai_job_budget_usd:
-            raise EmaError("ai_budget", "Bugetul AI al lucrării s-a epuizat.", f"{spent:.2f} USD")
+        tokens, projected = estimate() if estimate is not None else (0, 0.0)
+        if on_estimate is not None:
+            on_estimate(tokens, projected, spent)
+        if spent + projected > load_settings(context.ws).ai_job_budget_usd or (
+            estimate is None and spent >= load_settings(context.ws).ai_job_budget_usd
+        ):
+            detail = f"{spent:.2f} + {projected:.2f} USD" if estimate else f"{spent:.2f} USD"
+            raise EmaError("ai_budget", "Bugetul AI al lucrării s-a epuizat.", detail)
         started = time.monotonic()
         exchange = respond()
         record_call(

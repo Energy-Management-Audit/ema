@@ -1,4 +1,4 @@
-"""Auditable tools exposed to the per-section audit Fill agent."""
+"""Validate extracted Fill facts against dossier and dataset evidence."""
 
 from __future__ import annotations
 
@@ -211,22 +211,33 @@ class FillTools:
         if not any(isinstance(ref, AuditFact) and ref.value == key for ref in section.facts):
             raise EmaError("fact_section", "Faptul nu aparţine secţiunii active.", key)
 
-    def _document_evidence(self, name: str, quote: str, value: object) -> Evidence:
+    def _document_evidence(
+        self, name: str, quote: str, value: object, page: int | None = None
+    ) -> Evidence:
         _, document = self._document(name)
-        if not quote or not any(
-            quote in text for text in (document.text, document.ocr_text, *document.page_texts)
-        ):
+        pages = document.pages
+        if page is not None and not 1 <= page <= len(pages):
+            raise EmaError("page_missing", "Pagina cerută lipseşte.", str(page))
+        quoted = (
+            quote in pages[page - 1] if page is not None else any(quote in text for text in pages)
+        )
+        if not quote or not quoted:
             raise EmaError("evidence_quote", "Fragmentul citat nu apare în fişier.", name)
         if isinstance(value, int | float) and not _number_in_quote(value, quote):
             raise EmaError("value_unverified", "Numărul nu apare în fragment.", name)
         if isinstance(value, str) and value not in quote:
             raise EmaError("value_unverified", "Textul nu apare în fragment.", name)
-        page = next(
-            (number for number, text in enumerate(document.page_texts, 1) if quote in text),
-            None,
+        located = page or next(
+            (number for number, text in enumerate(document.page_texts, 1) if quote in text), None
         )
-        locator = PdfText(page=page, span=quote) if page is not None else TextLoc(span=quote)
-        evidence_id = hashlib.sha256(f"{self.job}:{document.sha}:{quote}".encode()).hexdigest()
+        locator = (
+            PdfText(page=located, span=quote)
+            if document.page_texts and located
+            else TextLoc(span=quote)
+        )
+        evidence_id = hashlib.sha256(
+            f"{self.job}:{document.sha}:{located}:{quote}".encode()
+        ).hexdigest()
         with self.ws.connect() as db:
             previous = db.execute(
                 "SELECT data FROM evidence WHERE id=? AND job_id=?", (evidence_id, self.job)
@@ -261,7 +272,8 @@ class FillTools:
             evidence = self._dataset_evidence(source_key, value)
         else:
             name, quote = str(args["name"]), str(args["quote"])
-            evidence = [self._document_evidence(name, quote, value)]
+            page = int(args["page"]) if "page" in args else None
+            evidence = [self._document_evidence(name, quote, value, page)]
         spec = fact_spec(
             key,
             "number" if isinstance(value, int | float) else "text",

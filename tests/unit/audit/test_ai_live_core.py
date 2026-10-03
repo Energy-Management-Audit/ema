@@ -215,6 +215,15 @@ def test_5xx_recovers() -> None:
     assert sleeps == [10.0]
 
 
+def test_fill_adapter_disables_transport_retries() -> None:
+    provider, sleeps, calls = _gemini([_api_error(503), OK])
+    provider._transport_retries = False
+    with pytest.raises(errors.APIError):
+        provider.respond("gemini-3.8-flash", MESSAGES, ())
+    assert calls == [None]
+    assert sleeps == []
+
+
 def test_other_errors_pass_through() -> None:
     provider, sleeps, _ = _gemini([_api_error(400)])
     with pytest.raises(errors.APIError):
