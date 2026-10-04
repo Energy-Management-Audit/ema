@@ -161,6 +161,37 @@ def test_live_single_section_takes_the_chapter_path_and_records_one_file(
     assert recorded["source"] == "recorded" and len(recorded["responses"]) == 2
 
 
+def test_a_recorded_chapter_replays_offline(
+    tmp_path: Path, live: FakeLive, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    live.modes[SECTION] = "retry"
+    ws = Workspace(tmp_path / "ws")
+    job = _two_chapters(ws)
+    recorded = draft_section(ws, job, SECTION)
+    recording = recorded.draft_path.parent.parent / f"chapter-{SECTION}.json"
+    assert live.logical() == ["draft", "retry", "support"]
+
+    monkeypatch.setenv("EMA_AI_CLIENT_LIVE", "0")
+    replayed = draft_section(ws, job, SECTION, recording=recording)
+
+    assert live.logical() == ["draft", "retry", "support"]
+    assert replayed.run != recorded.run
+    assert replayed.draft_path.read_text(encoding="utf-8") == recorded.draft_path.read_text(
+        encoding="utf-8"
+    )
+    assert (replayed.draft_status, replayed.review) == (recorded.draft_status, recorded.review)
+    with pytest.raises(EmaError) as both:
+        draft_section(
+            ws,
+            job,
+            SECTION,
+            draft_recording=recording,
+            support_recording=recording,
+            recording=recording,
+        )
+    assert both.value.code == "replay_invalid"
+
+
 def test_support_error_keeps_written_and_queued_draft(tmp_path: Path, live: FakeLive) -> None:
     live.support_response = "not json"
     ws = Workspace(tmp_path / "ws")

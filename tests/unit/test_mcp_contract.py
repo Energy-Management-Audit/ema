@@ -62,7 +62,7 @@ TOOLS: dict[str, tuple[str, dict[str, Any], list[str], list[str]]] = {
         "Draft one audit section of chapter 2 or 3 from recorded facts, using recorded AI "
         "responses, or the live model when none are given and the live-AI switch is on.",
         WRITE,
-        ["job", "section", "draft_recording", "support_recording"],
+        ["job", "section", "draft_recording", "support_recording", "recording"],
         ["job", "section"],
     ),
     "audit_visit": ("Register grouped meter and thermal visit photos.", WRITE, ["job"], ["job"]),

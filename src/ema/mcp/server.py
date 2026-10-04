@@ -201,6 +201,7 @@ def build_server(ws: Workspace, import_roots: tuple[Path, ...]) -> FastMCP:  # n
         section: str,
         draft_recording: str | None = None,
         support_recording: str | None = None,
+        recording: str | None = None,
     ) -> AuditDraft:
         result = await call(
             ws,
@@ -211,6 +212,7 @@ def build_server(ws: Workspace, import_roots: tuple[Path, ...]) -> FastMCP:  # n
                 section,
                 draft_recording=optional_file(import_roots, draft_recording),
                 support_recording=optional_file(import_roots, support_recording),
+                recording=optional_file(import_roots, recording),
             ),
         )
         return AuditDraft.model_validate(

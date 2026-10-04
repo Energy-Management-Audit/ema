@@ -26,6 +26,12 @@ def replay_passes(draft: Path, support: Path) -> Passes:
     )
 
 
+def chapter_replay(recording: Path) -> Passes:
+    """A chapter-<group> recording replayed: both passes, in the order they were recorded."""
+    replay = ReplayProvider(recording)
+    return Passes(replay, replay, replay.model_id, synthetic=True)
+
+
 def live_passes(provider: Provider, model_id: str, directory: Path, group: str) -> Passes:
     """Both passes of a chapter group recorded, in call order, in draft/<run>/chapter-<group>."""
     recording = RecordingProvider(provider, directory / f"chapter-{group}.json")

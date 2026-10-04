@@ -12,7 +12,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from ema.audit.catalogue_types import PASSAGE_FACTS, AuditFact, fact_key
-from ema.audit.draft_checks import ANY_TOKEN, TOKEN, DraftCheck, DraftReview, check_draft
+from ema.audit.draft_checks import ANY_TOKEN, DraftCheck, DraftReview, check_draft
 from ema.audit.draft_plan import Group, SectionPlan
 from ema.audit.draft_prompt import (
     PROMPT_VERSION,
@@ -79,11 +79,12 @@ def unit_issues(
     return issues
 
 
-def rendered_passages(draft: SectionDraft) -> set[str]:
+def cited_passages(draft: SectionDraft) -> set[str]:
+    """The passages a draft quotes or paraphrases: either way, no other section uses them."""
     return {
         key
         for item in draft.paragraphs
-        for key in TOKEN.findall(item.text)
+        for key in ANY_TOKEN.findall(item.text)
         if fact_key(key) in PASSAGE_FACTS
     }
 
@@ -128,7 +129,7 @@ def _sorted(
             continue
         plan = plans[section]
         check = check_draft(draft, plan.facts, job)
-        passages = rendered_passages(draft)
+        passages = cited_passages(draft)
         issues = [
             *check.fatal,
             *unit_issues(draft, plan, units),

@@ -68,6 +68,7 @@ def _run(
 
 
 QUOTED = _draft(FLUX, "{{f:audit.equipment}}", "audit.equipment")
+FLOW = _draft(FLUX, "{{f:audit.process_sections}}", "audit.process_sections")
 PARAPHRASED = _draft(
     CONSUMERS,
     "Consumatorii principali sunt utilajele liniei {{c:audit.equipment}}.",
@@ -76,19 +77,17 @@ PARAPHRASED = _draft(
 
 
 def test_one_call_drafts_two_sections(tmp_path: Path) -> None:
-    provider, support, used, result, _, _ = _run(
-        tmp_path, [FLUX, CONSUMERS], [[QUOTED, PARAPHRASED]]
-    )
+    provider, support, used, result, _, _ = _run(tmp_path, [FLUX, CONSUMERS], [[FLOW, PARAPHRASED]])
     assert [item["section"] for item in provider.requests[0]["sections"]] == [FLUX, CONSUMERS]
     assert set(result.drafted) == {FLUX, CONSUMERS}  # type: ignore[attr-defined]
     assert (len(provider.requests), support.calls) == (1, 1)
-    assert used.passages == {"audit.equipment"}
+    # A paraphrased passage is used as much as a quoted one.
+    assert used.passages == {"audit.process_sections", "audit.equipment"}
 
 
 def test_a_passage_used_by_an_earlier_section_goes_back_with_what_is_used(tmp_path: Path) -> None:
-    reused = _draft(CONSUMERS, "{{f:audit.equipment}}", "audit.equipment")
     provider, _, _, result, _, _ = _run(
-        tmp_path, [FLUX, CONSUMERS], [[QUOTED, reused], PARAPHRASED]
+        tmp_path, [FLUX, CONSUMERS], [[QUOTED, PARAPHRASED], PARAPHRASED]
     )
     retry = provider.requests[1]
     assert [item["section"] for item in retry["request"]["sections"]] == [CONSUMERS]
@@ -97,7 +96,19 @@ def test_a_passage_used_by_an_earlier_section_goes_back_with_what_is_used(tmp_pa
     ]
     assert retry["request"]["used_passages"] == ["audit.equipment"]
     assert retry["request"]["opening_sentences"] == {FLUX: "{{f:audit.equipment}}"}
-    assert result.drafted[CONSUMERS].draft == PARAPHRASED  # type: ignore[attr-defined]
+    assert result.failed[CONSUMERS].code == "draft_incomplete"  # type: ignore[attr-defined]
+
+
+def test_two_sections_may_not_paraphrase_one_passage(tmp_path: Path) -> None:
+    described = _draft(FLUX, "Linia are utilaje {{c:audit.equipment}}.", "audit.equipment")
+    provider, _, used, result, _, _ = _run(
+        tmp_path, [FLUX, CONSUMERS], [[described, PARAPHRASED], PARAPHRASED]
+    )
+    assert [(error["section"], error["rule"]) for error in provider.requests[1]["errors"]] == [
+        (CONSUMERS, "passage_reused")
+    ]
+    assert set(result.drafted) == {FLUX}  # type: ignore[attr-defined]
+    assert used.passages == {"audit.equipment"}
 
 
 def test_unknown_and_duplicate_sections_are_dropped_and_logged(tmp_path: Path) -> None:
@@ -106,7 +117,7 @@ def test_unknown_and_duplicate_sections_are_dropped_and_logged(tmp_path: Path) -
     answer = json.dumps(
         {
             "sections": [
-                QUOTED.model_dump(),
+                FLOW.model_dump(),
                 second.model_dump(),
                 unknown.model_dump(),
                 {"section": CONSUMERS, "status": "drafted"},
@@ -114,7 +125,7 @@ def test_unknown_and_duplicate_sections_are_dropped_and_logged(tmp_path: Path) -
         }
     )
     provider, _, _, result, ws, job = _run(tmp_path, [FLUX, CONSUMERS], [answer, PARAPHRASED])
-    assert result.drafted[FLUX].draft == QUOTED  # type: ignore[attr-defined]
+    assert result.drafted[FLUX].draft == FLOW  # type: ignore[attr-defined]
     assert result.drafted[CONSUMERS].draft == PARAPHRASED  # type: ignore[attr-defined]
     assert [error["rule"] for error in provider.requests[1]["errors"]] == ["omitted"]
     with ws.connect() as db:
@@ -221,15 +232,29 @@ def test_the_allowance_and_the_split_follow_the_targets() -> None:
     ]
 
 
+def test_her_longest_chapter_plans_as_one_group() -> None:
+    # Her longest chapter holds about 10,800 words of targets. One group per chapter keeps a
+    # two-chapter job at six logical calls at most: a draft, a retry and a support pass each.
+    plans = [SectionPlan(f"ch3.{index}", {}, 1350, "") for index in range(8)]
+    assert sum(plan.target or 0 for plan in plans) == 10_800
+    (group,) = split(3, plans)
+    assert len(group.sections) == 8
+    assert group.allowance < MAX_OUTPUT_TOKENS
+
+
 def test_later_groups_receive_the_passages_earlier_groups_used(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "ws")
     job = _job(ws, {"audit.equipment": EQUIPMENT})
     groups, units = chapter_groups(ws, job, [FLUX, CONSUMERS])
     first, second = (Group(f"3-{n}", 3, (plan,)) for n, plan in enumerate(groups[0].sections, 1))
     used = Used()
-    for group, answer in ((first, QUOTED), (second, PARAPHRASED)):
-        provider = DraftProvider([answer])
+    described = _draft(FLUX, "Linia are utilaje {{c:audit.equipment}}.", "audit.equipment")
+    for group, answer in ((first, described), (second, PARAPHRASED)):
+        provider = DraftProvider([answer, answer])
         passes = Passes(provider, SupportProvider(), default_model("openai").id, synthetic=True)
         run_group(ws, job, group, passes, used, units)
+    # The earlier group only paraphrased the passage; the later one still receives its key.
     assert provider.requests[0]["used_passages"] == ["audit.equipment"]
-    assert provider.requests[0]["opening_sentences"] == {FLUX: "{{f:audit.equipment}}"}
+    assert provider.requests[0]["opening_sentences"] == {
+        FLUX: "Linia are utilaje {{c:audit.equipment}}."
+    }

@@ -192,6 +192,27 @@ def test_unavailable_support_marks_only_sentences_that_cite(tmp_path: Path) -> N
     ]
 
 
+def test_two_verdicts_for_one_sentence_fail_the_pass_closed(tmp_path: Path) -> None:
+    location = f"{SECTION}:paragraph:0"
+    verdicts = [
+        {"location": location, "sentence_index": 0, "supported": supported, "reason": ""}
+        for supported in (True, True)
+    ]
+    cited = "Societatea are personal propriu {{c:audit.employees}}."
+    draft = SectionDraft(
+        section=SECTION,
+        status="drafted",
+        paragraphs=[DraftText(text=cited, fact_ids=["audit.employees"])],
+    )
+    support = SupportProvider(json.dumps({"verdicts": verdicts}))
+    _, _, accepted, flags = _run(tmp_path, [draft], support)
+    assert accepted == draft
+    assert [(flag.code, flag.location, flag.detail) for flag in flags] == [
+        ("unsupported", "paragraph:0", "support_unavailable"),
+        ("support_unavailable", "section", "ai_schema"),
+    ]
+
+
 def test_support_output_is_bounded_per_sentence(tmp_path: Path) -> None:
     _, support, _, _ = _run(tmp_path, [CH2_DRAFT])
     assert support.limits == [16_000 + 40]

@@ -22,7 +22,7 @@ Trasabilitate (obligatoriu):
 
 Pasaje (fapte cu cheie numerotată, de exemplu audit.history, audit.history.2):
 8. Un pasaj se redă întreg, ca {{f:<cheie>}}, câte un pasaj pe paragraf, în ordinea numerelor; sau se descrie cu cuvintele tale și se citează cu {{c:<cheie>}}, când textul lui are nevoie de diacritice sau de o listă.
-9. Un pasaj redat cu {{f:}} într-o secțiune nu se mai redă în altă secțiune a capitolului.
+9. Un pasaj redat cu {{f:}} sau descris cu {{c:}} într-o secțiune nu se mai folosește în altă secțiune a capitolului.
 
 Conținut:
 10. Lungimea: te apropii de ținta de cuvinte a secțiunii, socotind textul redat cu valorile faptelor. Când faptele nu ajung, scrii mai scurt; nu umpli.

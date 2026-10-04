@@ -1,7 +1,8 @@
 """The support pass: one verdict per drafted sentence, fail-closed (D1).
 
-A sentence without a verdict is unsupported. When the pass cannot run, every sentence that
-carries a citation is unsupported; one whose facts are all rendered keeps its text.
+A sentence without a verdict is unsupported. When the pass cannot run, or answers a sentence
+twice, every sentence that carries a citation is unsupported; one whose facts are all rendered
+keeps its text.
 """
 
 from __future__ import annotations
@@ -99,6 +100,17 @@ def support_pass(
             max_output_tokens=support_allowance(len(sentences)),
             schema_retries=0,
         )
+        verdicts: dict[tuple[str, int], Verdict] = {}
+        for verdict in result.verdicts:
+            key = (verdict.location, verdict.sentence_index)
+            if key in verdicts:
+                # Two verdicts leave the sentence undecided: the whole answer is off the schema.
+                raise EmaError(
+                    "ai_schema",
+                    "Răspunsul AI nu respectă formatul cerut.",
+                    f"duplicate verdict {verdict.location}#{verdict.sentence_index}",
+                )
+            verdicts[key] = verdict
     except EmaError as exc:
         for section, location, _, sentence in sentences:
             if CITE.search(sentence):
@@ -108,13 +120,9 @@ def support_pass(
         for items in flags.values():
             items.append(DraftReview("support_unavailable", "section", exc.code))
         return {section: tuple(items) for section, items in flags.items()}
-    verdicts: dict[tuple[str, int], list[Verdict]] = {}
-    for verdict in result.verdicts:
-        verdicts.setdefault((verdict.location, verdict.sentence_index), []).append(verdict)
     for section, location, index, sentence in sentences:
-        given = verdicts.get((f"{section}:{location}", index), [])
-        refused = next((verdict for verdict in given if not verdict.supported), None)
-        if not given or refused is not None:
-            reason = refused.reason if refused is not None else "no verdict"
+        given = verdicts.get((f"{section}:{location}", index))
+        if given is None or not given.supported:
+            reason = given.reason if given is not None else "no verdict"
             flags[section].append(DraftReview("unsupported", location, reason, sentence))
     return {section: tuple(items) for section, items in flags.items()}

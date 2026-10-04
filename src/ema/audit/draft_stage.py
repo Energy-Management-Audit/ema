@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from ema.audit.draft_agent import draft_one
-from ema.audit.draft_chapter import Drafted
+from ema.audit.draft_chapter import Drafted, Passes
 from ema.audit.draft_checks import DraftReview
 from ema.audit.draft_live import live_provider
 from ema.audit.draft_prompt import PROMPT_VERSION
 from ema.audit.draft_schema import SECTION_FACTS
-from ema.audit.draft_write import live_passes, replay_passes, write_section
+from ema.audit.draft_write import chapter_replay, live_passes, replay_passes, write_section
 from ema.audit.sections import get_status
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, get_job, run_stage, status, subscribe
@@ -45,6 +46,30 @@ def _replayable(recording: Path) -> None:
         ) from exc
 
 
+def _passes(
+    ws: Workspace,
+    section: str,
+    draft_recording: Path | None,
+    support_recording: Path | None,
+    recording: Path | None,
+) -> Callable[[Path], Passes]:
+    """The stage's passes from its artifact folder: checked recordings, or the live provider,
+    refused before any run when the live switch is off."""
+    if (draft_recording is None) != (support_recording is None):
+        raise EmaError("replay_invalid", "Înregistrările AI sunt incomplete.", section)
+    if recording is not None and draft_recording is not None:
+        raise EmaError("replay_invalid", "Înregistrările AI sunt în conflict.", section)
+    if recording is not None:
+        _replayable(recording)
+        return lambda _: chapter_replay(recording)
+    if draft_recording is not None and support_recording is not None:
+        _replayable(draft_recording)
+        _replayable(support_recording)
+        return lambda _: replay_passes(draft_recording, support_recording)
+    provider, model_id = live_provider(ws)
+    return lambda directory: live_passes(provider, model_id, directory, section)
+
+
 def draft_section(
     ws: Workspace,
     job: str,
@@ -52,9 +77,10 @@ def draft_section(
     *,
     draft_recording: Path | None = None,
     support_recording: Path | None = None,
+    recording: Path | None = None,
 ) -> DraftResult:
-    """Draft one chapter 2-3 section through the chapter path: by replay with both recordings,
-    live with neither."""
+    """Draft one chapter 2-3 section through the chapter path: by replay with both recordings
+    or with the chapter-<section> recording a live run wrote, live with none."""
     record = get_job(ws, job)
     if record["type"] != "audit":
         raise EmaError("wrong_job_type", "Lucrarea nu este un audit.", job)
@@ -62,20 +88,11 @@ def draft_section(
         raise EmaError("job_running", "Lucrarea rulează deja.", job)
     if section not in SECTION_FACTS:
         raise EmaError("section_missing", "Secţiunea de redactare lipseşte.", section)
-    if (draft_recording is None) != (support_recording is None):
-        raise EmaError("replay_invalid", "Înregistrările AI sunt incomplete.", section)
-    if draft_recording is not None and support_recording is not None:
-        _replayable(draft_recording)
-        _replayable(support_recording)
+    source = _passes(ws, section, draft_recording, support_recording, recording)
     drafted: list[tuple[Drafted, Path]] = []
-    live = live_provider(ws) if draft_recording is None or support_recording is None else None
 
     def stage(ctx: StageContext) -> StageOutcome:
-        if live is None:
-            assert draft_recording is not None and support_recording is not None
-            passes = replay_passes(draft_recording, support_recording)
-        else:
-            passes = live_passes(live[0], live[1], ctx.artifact_dir(), section)
+        passes = source(ctx.artifact_dir())
         ctx.record_input(prompt=PROMPT_VERSION, model=passes.model_id)
         done = draft_one(ctx.ws, ctx.job, section, passes)
         drafted.append((done, write_section(ctx, done)))
