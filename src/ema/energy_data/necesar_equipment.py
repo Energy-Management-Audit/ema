@@ -16,6 +16,7 @@ Row = dict[str, Located]
 
 @dataclass
 class NecesarEquipment:
+    rows: list[Row] = field(default_factory=list[Row])
     boilers: list[Row] = field(default_factory=list[Row])
     forklifts: list[Row] = field(default_factory=list[Row])
     vehicles: list[Row] = field(default_factory=list[Row])
@@ -78,6 +79,7 @@ def _boilers(table: GenericTable) -> list[Row]:
         "year": "an pif",
         "load": "grad mediu",
         "power": "putere instalata",
+        "resource": "combustibil",
     }
     rows: list[Row] = []
     for row in table.rows:
@@ -88,6 +90,36 @@ def _boilers(table: GenericTable) -> list[Row]:
             cells["power"] = replace(cells["power"], unit="kW") if kilowatts else cells["power"]
             if not kilowatts:
                 del cells["power"]
+        rows.append(cells)
+    return rows
+
+
+def _equipment_rows(table: GenericTable) -> list[Row]:
+    rows: list[Row] = []
+    for row in table.rows:
+        if not _numbered(row, "nr"):
+            continue
+        cells = _cells(
+            row,
+            {
+                "name": "denumire",
+                "process": "proces",
+                "count": "nr buc",
+                "power": "putere instalata",
+                "resource": "resursa consumata",
+            },
+        )
+        if "resource" not in cells:
+            resource = next(
+                (
+                    cell
+                    for label in ("combustibil", "comb", "tip combustibil")
+                    if (cell := _column(row, label)) is not None
+                ),
+                None,
+            )
+            if resource is not None:
+                cells["resource"] = _typed("resource", resource)
         rows.append(cells)
     return rows
 
@@ -146,6 +178,8 @@ def _transformers(table: GenericTable) -> list[dict[str, Located]]:
 def read_equipment(info: NecesarInfo) -> NecesarEquipment:
     result = NecesarEquipment()
     for table in info.tables.values():
+        if normal(table.sheet).startswith("echipamente "):
+            result.rows.extend(_equipment_rows(table))
         if _has(table, "denumire autovehicul"):
             result.vehicles = _vehicles(table)
         elif _has(table, "proces de fabricatie", "putere instalata", "nr buc"):
