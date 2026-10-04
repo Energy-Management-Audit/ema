@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -56,6 +57,29 @@ def normal(value: str) -> str:
     return " ".join(
         re.findall(r"[a-z0-9]+", "".join(c for c in plain if not unicodedata.combining(c)))
     )
+
+
+def is_placeholder(text: str) -> bool:
+    return re.fullmatch(r"x+", normal(text).replace(" ", "")) is not None
+
+
+def empty_measure_value(value: object) -> bool:
+    return (
+        value is None
+        or (isinstance(value, str) and (not value.strip() or value.startswith("#")))
+        or (isinstance(value, int | float) and value == 0)
+    )
+
+
+def skip_placeholder(
+    description: Located, cells: Iterable[CellValue], issues: list[ReaderIssue]
+) -> bool:
+    if not isinstance(description.value, str) or not is_placeholder(description.value):
+        return False
+    if all(empty_measure_value(cell.value) for cell in cells):
+        return True
+    issues.append(ReaderIssue("measure_placeholder", description.value, description.ref))
+    return False
 
 
 def filled(cell: CellValue) -> Located | None:

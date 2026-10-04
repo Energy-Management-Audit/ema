@@ -24,6 +24,7 @@ from ema.energy_data.source import (
     normal,
     number,
     row_with,
+    skip_placeholder,
 )
 
 
@@ -263,7 +264,7 @@ def _measure_columns(sheet: Sheet, header: int, result: AnexaData) -> dict[str, 
     return columns
 
 
-def _measures(sheet: Sheet, kind: str, result: AnexaData) -> list[Measure]:
+def _measures(sheet: Sheet, kind: str, result: AnexaData) -> list[Measure]:  # noqa: C901
     items: list[Measure] = []
     location = _measure_header(sheet, kind, result)
     if location is None:
@@ -280,7 +281,12 @@ def _measures(sheet: Sheet, kind: str, result: AnexaData) -> list[Measure]:
             ("descrierea", "masuri pe termen", "total", "data trimiterii")
         ):
             continue
-        year_cell = cell_at(sheet, row, year_col, result.issues)
+        row_issues: list[ReaderIssue] = []
+        year_cell = cell_at(sheet, row, year_col, row_issues)
+        raw_values = {key: cell_at(sheet, row, col, row_issues) for key, col in columns.items()}
+        if skip_placeholder(description, (year_cell, *raw_values.values()), result.issues):
+            continue
+        result.issues.extend(row_issues)
         year = _measure_year(year_cell)
         if year is None:
             result.issues.append(
@@ -297,7 +303,7 @@ def _measures(sheet: Sheet, kind: str, result: AnexaData) -> list[Measure]:
             col = columns.get(key)
             if col is None:
                 continue
-            value = number(cell_at(sheet, row, col, result.issues), result.issues, unit=unit)
+            value = number(raw_values[key], result.issues, unit=unit)
             if value is not None:
                 values[key] = value
         if not values:
