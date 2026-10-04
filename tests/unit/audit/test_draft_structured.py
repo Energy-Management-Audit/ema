@@ -1,4 +1,5 @@
-"""Synthetic Draft v2 request, checker retry, and runtime style redaction."""
+"""Synthetic Draft v4 single-section path: the chapter request, checker retry, fail-closed
+support and runtime style redaction."""
 
 import json
 import re
@@ -9,7 +10,8 @@ import pytest
 from docx import Document
 from tests.audit_replay import CH2_DRAFT, audit_job_with_facts
 
-from ema.audit.draft_agent import FACT_RULE, SENTENCE_RULE, draft_section_run
+from ema.audit.draft_agent import draft_section_run
+from ema.audit.draft_prompt import rule_text
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.draft_style import style_example
 from ema.core.errors import EmaError
@@ -18,41 +20,71 @@ from ema.core.llm.types import Exchange
 from ema.core.workspace import Workspace
 
 SECTION = "ch2.date_generale"
+Answer = SectionDraft | list[SectionDraft] | str
 
 
 class DraftProvider:
+    """Answers each chapter call in turn: a draft, the drafts of a call, or a raw text."""
+
     name = "openai"
 
-    def __init__(self, drafts: list[SectionDraft]) -> None:
+    def __init__(self, drafts: list[Answer]) -> None:
         self.drafts = drafts
         self.requests: list[dict[str, Any]] = []
+        self.limits: list[int] = []
 
     def respond(self, *args: Any, **kwargs: Any) -> Exchange:
-        messages = args[1]
-        self.requests.append(json.loads(messages[1]["content"]))
-        return Exchange(self.drafts.pop(0).model_dump_json(), (), 1, 1)
+        self.requests.append(json.loads(args[1][1]["content"]))
+        self.limits.append(args[4])
+        answer = self.drafts.pop(0)
+        if isinstance(answer, str):
+            return Exchange(answer, (), 1, 1)
+        drafts = answer if isinstance(answer, list) else [answer]
+        return Exchange(json.dumps({"sections": [item.model_dump() for item in drafts]}), (), 1, 1)
 
 
 class SupportProvider:
+    """Supports every sentence it is asked about, except the refused (location, index) pairs;
+    or answers a fixed text."""
+
     name = "openai"
 
-    def __init__(self, response: str = '{"flags": []}') -> None:
+    def __init__(
+        self, response: str | None = None, refused: frozenset[tuple[str, int]] = frozenset()
+    ) -> None:
         self.response = response
+        self.refused = refused
         self.calls = 0
+        self.requests: list[list[dict[str, Any]]] = []
+        self.limits: list[int] = []
 
     def respond(self, *args: Any, **kwargs: Any) -> Exchange:
         self.calls += 1
-        return Exchange(self.response, (), 1, 1)
+        request = json.loads(args[1][1]["content"])
+        self.requests.append(request)
+        self.limits.append(args[4])
+        if self.response is not None:
+            return Exchange(self.response, (), 1, 1)
+        verdicts = [
+            {
+                "location": item["location"],
+                "sentence_index": item["sentence_index"],
+                "supported": (item["location"], item["sentence_index"]) not in self.refused,
+                "reason": "claim",
+            }
+            for item in request
+        ]
+        return Exchange(json.dumps({"verdicts": verdicts}), (), 1, 1)
 
 
 def _run(
-    tmp_path: Path, drafts: list[SectionDraft]
-) -> tuple[DraftProvider, SupportProvider, SectionDraft]:
+    tmp_path: Path, drafts: list[Answer], support: SupportProvider | None = None
+) -> tuple[DraftProvider, SupportProvider, SectionDraft, tuple[Any, ...]]:
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
     provider = DraftProvider(drafts)
-    support = SupportProvider()
-    _, accepted, _, _ = draft_section_run(
+    support = support or SupportProvider()
+    _, accepted, _, flags = draft_section_run(
         ws,
         job,
         SECTION,
@@ -61,16 +93,14 @@ def _run(
         model_id=default_model("openai").id,
         synthetic=True,
     )
-    return provider, support, accepted
+    return provider, support, accepted, flags
 
 
 def test_accepted_draft_uses_one_structured_call(tmp_path: Path) -> None:
-    provider, support, accepted = _run(tmp_path, [CH2_DRAFT])
-    assert accepted == CH2_DRAFT
-    assert len(provider.requests) == 1
-    assert support.calls == 1
-    assert FACT_RULE in provider.requests[0]["task"]
-    assert provider.requests[0]["task"].startswith(f"Redactează secţiunea {SECTION}")
+    provider, support, accepted, flags = _run(tmp_path, [CH2_DRAFT])
+    assert accepted == CH2_DRAFT and flags == ()
+    assert len(provider.requests) == support.calls == 1
+    assert [item["section"] for item in provider.requests[0]["sections"]] == [SECTION]
 
 
 def test_literal_name_retry_carries_rule(tmp_path: Path) -> None:
@@ -79,13 +109,17 @@ def test_literal_name_retry_carries_rule(tmp_path: Path) -> None:
         status="drafted",
         paragraphs=[DraftText(text="Atelier Exemplu are activitate.")],
     )
-    provider, support, accepted = _run(tmp_path, [invalid, CH2_DRAFT])
+    provider, support, accepted, _ = _run(tmp_path, [invalid, CH2_DRAFT])
     assert accepted == CH2_DRAFT
     assert len(provider.requests) == 2
     assert support.calls == 1
     rules = {(error["rule"], error["rule_text"]) for error in provider.requests[1]["errors"]}
-    assert rules == {("literal_name", FACT_RULE), ("uncited_sentence", SENTENCE_RULE)}
-    assert FACT_RULE in json.loads(provider.requests[1]["request"])["task"]
+    assert rules == {
+        ("literal_name", rule_text("literal_name")),
+        ("uncited_sentence", rule_text("uncited_sentence")),
+    }
+    assert rule_text("literal_name").startswith("Orice nume, număr")
+    assert [item["section"] for item in provider.requests[1]["request"]["sections"]] == [SECTION]
 
 
 def test_second_fatal_draft_stops_after_two_calls(tmp_path: Path) -> None:
@@ -104,54 +138,16 @@ def test_second_fatal_draft_stops_after_two_calls(tmp_path: Path) -> None:
     assert support.calls == 0
 
 
-def test_bad_support_keeps_accepted_draft(tmp_path: Path) -> None:
-    ws = Workspace(tmp_path / "ws")
-    job = audit_job_with_facts(ws)
-    provider = DraftProvider([CH2_DRAFT])
-    support = SupportProvider(
-        '{"flags": [{"location": "elsewhere", "sentence": "x", "reason": "x"}]}'
-    )
-    _, accepted, _, flags = draft_section_run(
-        ws, job, SECTION, provider, support, model_id=default_model("openai").id, synthetic=True
-    )
+def test_a_sentence_without_a_verdict_is_unsupported(tmp_path: Path) -> None:
+    sentence = "Societatea {{f:audit.company_name}} are {{f:audit.employees}} angajați."
+    _, _, accepted, flags = _run(tmp_path, [CH2_DRAFT], SupportProvider('{"verdicts": []}'))
     assert accepted == CH2_DRAFT
-    assert [(flag.code, flag.location, flag.detail) for flag in flags] == [
-        ("support_unavailable", "section", "support_invalid")
+    assert [(flag.code, flag.location, flag.detail, flag.sentence) for flag in flags] == [
+        ("unsupported", "paragraph:0", "no verdict", sentence)
     ]
-    assert len(provider.requests) == support.calls == 1
 
 
-@pytest.mark.parametrize(
-    "sentence",
-    [
-        "{{f:audit.company_name}} are",
-        "Societatea {{f:audit.company_name}} are {{f:audit.employees}} angajați",
-        "Societatea  {{f:audit.company_name}} are {{f:audit.employees}} angajați.",
-    ],
-)
-def test_support_accepts_paragraph_fragments(tmp_path: Path, sentence: str) -> None:
-    ws = Workspace(tmp_path / "ws")
-    job = audit_job_with_facts(ws)
-    support = SupportProvider(
-        json.dumps(
-            {"flags": [{"location": "paragraph:0", "sentence": sentence, "reason": "claim"}]}
-        )
-    )
-    _, _, _, flags = draft_section_run(
-        ws,
-        job,
-        SECTION,
-        DraftProvider([CH2_DRAFT]),
-        support,
-        model_id=default_model("openai").id,
-        synthetic=True,
-    )
-    assert [(flag.code, flag.sentence) for flag in flags] == [("unsupported", sentence)]
-
-
-def test_support_accepts_two_sentences(tmp_path: Path) -> None:
-    ws = Workspace(tmp_path / "ws")
-    job = audit_job_with_facts(ws)
+def test_a_refused_sentence_is_flagged_alone(tmp_path: Path) -> None:
     draft = SectionDraft(
         section=SECTION,
         status="drafted",
@@ -165,40 +161,77 @@ def test_support_accepts_two_sentences(tmp_path: Path) -> None:
             )
         ],
     )
-    sentence = "Societatea {{f:audit.company_name}} există. Are {{f:audit.employees}} angajați"
-    support = SupportProvider(
-        json.dumps(
-            {"flags": [{"location": "paragraph:0", "sentence": sentence, "reason": "claim"}]}
-        )
+    support = SupportProvider(refused=frozenset({(f"{SECTION}:paragraph:0", 1)}))
+    _, _, _, flags = _run(tmp_path, [draft], support)
+    assert [(flag.code, flag.sentence) for flag in flags] == [
+        ("unsupported", "Are {{f:audit.employees}} angajați.")
+    ]
+    assert [item["sentence_index"] for item in support.requests[0]] == [0, 1]
+    assert support.requests[0][1]["facts"] == {"audit.employees": "85"}
+
+
+def test_unavailable_support_marks_only_sentences_that_cite(tmp_path: Path) -> None:
+    cited = "Societatea are personal propriu {{c:audit.employees}}."
+    mixed = "Firma {{f:audit.company_name}} are personal calificat {{c:audit.employees}}."
+    valued = "Societatea {{f:audit.company_name}} are {{f:audit.employees}} angajați."
+    draft = SectionDraft(
+        section=SECTION,
+        status="drafted",
+        paragraphs=[
+            DraftText(text=cited, fact_ids=["audit.employees"]),
+            DraftText(text=mixed, fact_ids=["audit.company_name", "audit.employees"]),
+            DraftText(text=valued, fact_ids=["audit.company_name", "audit.employees"]),
+        ],
     )
-    _, _, _, flags = draft_section_run(
-        ws,
-        job,
-        SECTION,
-        DraftProvider([draft]),
-        support,
-        model_id=default_model("openai").id,
-        synthetic=True,
+    _, _, accepted, flags = _run(tmp_path, [draft], SupportProvider("not json"))
+    assert accepted == draft
+    assert [(flag.code, flag.location, flag.detail) for flag in flags] == [
+        ("unsupported", "paragraph:0", "support_unavailable"),
+        ("unsupported", "paragraph:1", "support_unavailable"),
+        ("support_unavailable", "section", "ai_schema"),
+    ]
+
+
+def test_two_verdicts_for_one_sentence_fail_the_pass_closed(tmp_path: Path) -> None:
+    location = f"{SECTION}:paragraph:0"
+    verdicts = [
+        {"location": location, "sentence_index": 0, "supported": supported, "reason": ""}
+        for supported in (True, True)
+    ]
+    cited = "Societatea are personal propriu {{c:audit.employees}}."
+    draft = SectionDraft(
+        section=SECTION,
+        status="drafted",
+        paragraphs=[DraftText(text=cited, fact_ids=["audit.employees"])],
     )
-    assert [(flag.code, flag.sentence) for flag in flags] == [("unsupported", sentence)]
+    support = SupportProvider(json.dumps({"verdicts": verdicts}))
+    _, _, accepted, flags = _run(tmp_path, [draft], support)
+    assert accepted == draft
+    assert [(flag.code, flag.location, flag.detail) for flag in flags] == [
+        ("unsupported", "paragraph:0", "support_unavailable"),
+        ("support_unavailable", "section", "ai_schema"),
+    ]
 
 
-def test_invalid_json_has_no_hidden_retry(tmp_path: Path) -> None:
-    class InvalidProvider(DraftProvider):
-        def respond(self, *args: Any, **kwargs: Any) -> Exchange:
-            self.requests.append({})
-            return Exchange("not json", (), 1, 1)
+def test_support_output_is_bounded_per_sentence(tmp_path: Path) -> None:
+    _, support, _, _ = _run(tmp_path, [CH2_DRAFT])
+    assert support.limits == [16_000 + 40]
 
-    ws = Workspace(tmp_path / "ws")
+
+def test_an_answer_off_the_schema_takes_the_one_retry(tmp_path: Path) -> None:
+    provider, support, accepted, _ = _run(tmp_path, ['{"sections": [', CH2_DRAFT])
+    assert accepted == CH2_DRAFT
+    assert [error["rule"] for error in provider.requests[1]["errors"]] == ["omitted"]
+    assert (len(provider.requests), support.calls) == (2, 1)
+    ws = Workspace(tmp_path / "again")
     job = audit_job_with_facts(ws)
-    provider, support = InvalidProvider([]), SupportProvider()
+    provider, support = DraftProvider(["not json", "not json"]), SupportProvider()
     with pytest.raises(EmaError) as error:
         draft_section_run(
             ws, job, SECTION, provider, support, model_id=default_model("openai").id, synthetic=True
         )
     assert error.value.code == "ai_schema"
-    assert len(provider.requests) == 1
-    assert support.calls == 0
+    assert (len(provider.requests), support.calls) == (2, 0)
 
 
 def test_style_example_masks_identity_and_every_number(tmp_path: Path) -> None:
@@ -244,8 +277,8 @@ def test_provider_receives_only_redacted_base_example(tmp_path: Path, monkeypatc
     identity.write_text(json.dumps(["Atelier Exemplu"]), encoding="utf-8")
     monkeypatch.setenv("EMA_AUDIT_BASE_DOCUMENT", str(base))
     monkeypatch.setenv("EMA_AUDIT_BASE_IDENTITY", str(identity))
-    provider, _, _ = _run(tmp_path, [CH2_DRAFT])
-    example = provider.requests[0]["style_example"]
+    provider, _, _, _ = _run(tmp_path, [CH2_DRAFT])
+    example = provider.requests[0]["sections"][0]["style_example"]
     assert example
     assert "Atelier Exemplu" not in example
     assert not re.search(r"\d", example)

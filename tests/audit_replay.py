@@ -8,21 +8,24 @@ from typing import Any
 from tests.replay_models import REPLAY_MODEL
 from tests.workspace_jobs import create_job
 
-from ema.audit.draft_agent import (
-    INSTRUCTIONS,
+from ema.audit.draft_agent import chapter_groups
+from ema.audit.draft_checks import DraftCheck, DraftReview
+from ema.audit.draft_plan import Group
+from ema.audit.draft_prompt import (
     PROMPT_VERSION,
-    draft_content,
-    recorded_facts,
-)
-from ema.audit.draft_checks import (
-    SUPPORT_PROMPT,
-    DraftCheck,
-    DraftReview,
-    SupportResult,
-    token_only,
+    SUPPORT_VERSION,
+    Used,
+    chapter_request,
+    instructions,
 )
 from ema.audit.draft_render import render_section, review_payload
-from ema.audit.draft_schema import DraftText, SectionDraft
+from ema.audit.draft_schema import ChapterDraft, DraftText, SectionDraft
+from ema.audit.draft_support import (
+    SUPPORT_PROMPT,
+    SupportVerdicts,
+    support_allowance,
+    support_request,
+)
 from ema.audit.sections import mark_drafted, recompute_ready
 from ema.core.llm.replay import request_hashes
 from ema.core.review.fields import propose
@@ -68,17 +71,31 @@ def write_recording(path: Path, rows: list[dict[str, Any]]) -> Path:
     return path
 
 
+def section_group(ws: Workspace, job: str, section: str) -> Group:
+    """The one-section group the single-section path drafts, as `draft_one` builds it."""
+    (group,), _ = chapter_groups(ws, job, (section,))
+    return Group(section, group.chapter, group.sections)
+
+
 def draft_recording(ws: Workspace, job: str, draft: SectionDraft, path: Path) -> Path:
-    facts = recorded_facts(ws, job, draft.section)
+    group = section_group(ws, job, draft.section)
     messages = [
-        {"role": "system", "content": INSTRUCTIONS},
-        {"role": "user", "content": draft_content(ws, draft.section, facts)},
+        {"role": "system", "content": instructions()},
+        {
+            "role": "user",
+            "content": json.dumps(chapter_request(group, Used()), ensure_ascii=False),
+        },
     ]
     row = {
         "request_hashes": request_hashes(
-            REPLAY_MODEL, messages, (), SectionDraft.model_json_schema(), 4096, PROMPT_VERSION
+            REPLAY_MODEL,
+            messages,
+            (),
+            ChapterDraft.model_json_schema(),
+            group.allowance,
+            PROMPT_VERSION,
         ),
-        "choices": [{"message": {"content": draft.model_dump_json()}}],
+        "choices": [{"message": {"content": json.dumps({"sections": [draft.model_dump()]})}}],
         "usage": {"prompt_tokens": 1, "completion_tokens": 1},
     }
     return write_recording(path, [row])
@@ -87,42 +104,32 @@ def draft_recording(ws: Workspace, job: str, draft: SectionDraft, path: Path) ->
 def support_recording(
     ws: Workspace, job: str, draft: SectionDraft, path: Path, flagged: int | None
 ) -> Path:
-    facts = recorded_facts(ws, job, draft.section)
-    request = [
-        {
-            "location": f"paragraph:{index}",
-            "text": paragraph.text,
-            "facts": {key: str(facts[key].value) for key in paragraph.fact_ids},
-        }
-        for index, paragraph in enumerate(draft.paragraphs)
-        if not token_only(paragraph.text)
-    ]
-    content = json.dumps(request, ensure_ascii=False)
+    """Every sentence supported, except those of paragraph `flagged`."""
+    facts = section_group(ws, job, draft.section).sections[0].facts
+    request = support_request([draft], facts)
     messages = [
         {"role": "system", "content": SUPPORT_PROMPT},
-        {"role": "user", "content": content},
+        {"role": "user", "content": json.dumps(request, ensure_ascii=False)},
     ]
-    flags = (
-        []
-        if flagged is None
-        else [
-            {
-                "location": f"paragraph:{flagged}",
-                "sentence": draft.paragraphs[flagged].text,
-                "reason": "The cited fact does not support a claim about efficiency.",
-            }
-        ]
-    )
+    verdicts = [
+        {
+            "location": item["location"],
+            "sentence_index": item["sentence_index"],
+            "supported": item["location"] != f"{draft.section}:paragraph:{flagged}",
+            "reason": "The cited fact does not support a claim about efficiency.",
+        }
+        for item in request
+    ]
     row = {
         "request_hashes": request_hashes(
             REPLAY_MODEL,
             messages,
             (),
-            SupportResult.model_json_schema(),
-            4096,
-            PROMPT_VERSION + "-support",
+            SupportVerdicts.model_json_schema(),
+            support_allowance(len(request)),
+            SUPPORT_VERSION,
         ),
-        "choices": [{"message": {"content": json.dumps({"flags": flags})}}],
+        "choices": [{"message": {"content": json.dumps({"verdicts": verdicts})}}],
         "usage": {"prompt_tokens": 1, "completion_tokens": 1},
     }
     return write_recording(path, [row])
@@ -133,7 +140,6 @@ def mark_section_drafted(ws: Workspace, job: str, draft: SectionDraft) -> None:
     if draft.status == "drafted":
         recompute_ready(ws, job)
         keys = {key for paragraph in draft.paragraphs for key in paragraph.fact_ids}
-        keys.update(figure.fact_id for figure in draft.figures)
         mark_drafted(ws, job, draft.section, "agent", tuple(f"fact:{key}" for key in sorted(keys)))
 
 

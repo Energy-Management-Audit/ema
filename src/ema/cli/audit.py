@@ -54,12 +54,19 @@ def draft(
     section: str,
     draft_recording: Path | None = typer.Option(None, "--draft-recording"),  # noqa: B008
     support_recording: Path | None = typer.Option(None, "--support-recording"),  # noqa: B008
+    recording: Path | None = typer.Option(None, "--recording"),  # noqa: B008
 ) -> None:
-    """Draft one chapter 2-3 section: by replay with both recordings, live with neither."""
+    """Draft one chapter 2-3 section: by replay with both recordings or with a chapter
+    recording, live with none."""
     ws = Workspace(workspace_path())
     recover(ws)
     result = draft_section(
-        ws, job, section, draft_recording=draft_recording, support_recording=support_recording
+        ws,
+        job,
+        section,
+        draft_recording=draft_recording,
+        support_recording=support_recording,
+        recording=recording,
     )
     typer.echo(json.dumps(asdict(result), ensure_ascii=False, default=str))
 

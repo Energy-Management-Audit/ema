@@ -15,7 +15,7 @@ from ema.audit.base_cleanup import clean_base
 from ema.audit.catalogue import CATALOGUE, FACT_LABELS, AuditFact, fact_spec, field_label
 from ema.audit.chapter_five import PlannedReading
 from ema.audit.chapter_five_render import _bullet
-from ema.audit.draft_render import _value
+from ema.audit.draft_render import rendered_value as _value
 from ema.audit.fill_tools import FillDocument, FillTools
 from ema.audit.measures import run_measures
 from ema.audit.read import _record, read_dossier

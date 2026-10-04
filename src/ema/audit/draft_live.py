@@ -1,13 +1,15 @@
-"""The Draft stage over a live model: every chapter 2-3 section that has recorded facts."""
+"""The Draft stage over a live model: chapters 2 and 3, one call per chapter group (D2)."""
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.draft_agent import PROMPT_VERSION, recorded_facts
-from ema.audit.draft_schema import SECTION_FACTS
+from ema.audit.draft_agent import chapter_groups, job_facts
+from ema.audit.draft_chapter import run_group
+from ema.audit.draft_plan import usable
+from ema.audit.draft_prompt import PROMPT_VERSION, Used
+from ema.audit.draft_schema import SECTION_FACTS, citable
 from ema.audit.draft_write import live_passes, write_section
 from ema.audit.fill_stage import (
     STOPPING,
@@ -55,13 +57,14 @@ def draftable(ws: Workspace, job: str) -> tuple[list[str], list[str], list[str]]
     ready: list[str] = []
     empty: list[str] = []
     absent: list[str] = []
+    facts = job_facts(ws, job)
     for section in CATALOGUE:
         if section.id not in SECTION_FACTS:
             continue
         state = get_status(ws, job, section.id)
         if state.applicability is False or state.status == Status.NA:
             absent.append(section.id)
-        elif any(f.presence == "found" for f in recorded_facts(ws, job, section.id).values()):
+        elif any(usable(value) for key, value in facts.items() if citable(section.id, key)):
             ready.append(section.id)
         else:
             empty.append(section.id)
@@ -76,38 +79,36 @@ def _draft_all(
     skipped: list[str],
     absent: list[str],
 ) -> DraftSummary:
+    """One call per chapter group, in catalogue order; a quota or the budget stops the rest."""
     drafted: dict[str, str] = {}
     failed: dict[str, str] = {}
-    directory = ctx.artifact_dir() / "draft"
     ctx.record_input(prompt=PROMPT_VERSION, model=model_id)
     recompute_ready(ctx.ws, ctx.job)
-
-    def run_one(section: str) -> tuple[str, str, dict[str, str | int] | None]:
-        try:
-            result = write_section(
-                ctx, section, live_passes(provider, model_id, directory, section), ready=True
-            )
-            return section, result.draft.status, None
-        except EmaError as exc:
-            return section, failure_code(exc), provider_failure(exc)
-
+    groups, units = chapter_groups(ctx.ws, ctx.job, sections)
+    used = {2: Used(), 3: Used()}
     stopped: tuple[str, ...] = ()
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        for offset in range(0, len(sections), 4):
-            batch = sections[offset : offset + 4]
-            results = list(pool.map(run_one, batch))
-            for section, value, cause in results:
-                if cause is None:
-                    drafted[section] = value
-                    continue
-                failed[section] = value
-                with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
-                    write_event(
-                        handle, "draft_failed", run=ctx.run_id, section=section, code=value, **cause
-                    )
-            if any(value in STOPPING for _, value, cause in results if cause is not None):
-                stopped = tuple(sections[offset + len(batch) :])
-                break
+    for index, group in enumerate(groups):
+        passes = live_passes(provider, model_id, ctx.artifact_dir(), group.id)
+        result = run_group(ctx.ws, ctx.job, group, passes, used[group.chapter], units)
+        for section, done in result.drafted.items():
+            write_section(ctx, done, ready=True)
+            drafted[section] = done.draft.status
+        for section, exc in result.failed.items():
+            failed[section] = failure_code(exc)
+            with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
+                write_event(
+                    handle,
+                    "draft_failed",
+                    run=ctx.run_id,
+                    section=section,
+                    code=failed[section],
+                    **provider_failure(exc),
+                )
+        if any(failed[section] in STOPPING for section in result.failed):
+            stopped = tuple(
+                plan.section for later in groups[index + 1 :] for plan in later.sections
+            )
+            break
     return DraftSummary(ctx.run_id, drafted, failed, tuple(skipped), tuple(absent), stopped)
 
 

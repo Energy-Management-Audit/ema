@@ -149,3 +149,26 @@ def test_concurrent_estimates_share_the_locked_spend(
         outcomes = list(pool.map(lambda _: one(), range(2)))
     assert sorted(outcomes) == ["ai_budget", "ok"]
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize(("asked", "sent"), [(None, 8000), (40_000, 40_000)])
+def test_a_draft_call_takes_its_callers_output_limit(
+    tmp_path: Path, asked: int | None, sent: int
+) -> None:
+    class Live:
+        name = "gemini"
+
+        def __init__(self) -> None:
+            self.limits: list[int] = []
+
+        def respond(self, *args: object, **_kwargs: object) -> Exchange:
+            self.limits.append(int(args[4]))  # type: ignore[call-overload]
+            return Exchange('{"item": 1}', (), 1, 1)
+
+    ws = Workspace(tmp_path / "workspace")
+    job = create_job(ws, "audit", "synthetic", 2026)
+    provider = Live()
+    context = AgentContext(ws, job, "draft:2-1", provider, "gemini-3.6-flash", "v1", synthetic=True)
+    complete_json(context, Classification, "Classify", "text", max_output_tokens=asked)
+    # D2: 8,000 is a draft call's default only; a chapter call is sized by its allowance.
+    assert provider.limits == [sent]

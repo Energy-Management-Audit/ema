@@ -2,22 +2,10 @@
 
 import pytest
 
+from ema.audit.chapter_tables_data import FAMILIES
 from ema.audit.draft_checks import check_draft
-from ema.audit.draft_schema import DraftFigure, DraftTable, DraftText, SectionDraft
+from ema.audit.draft_schema import DraftText, SectionDraft, citable
 from ema.core.review.models import Field
-
-
-def unrendered_items(draft: SectionDraft) -> tuple[str, ...]:
-    return tuple(
-        [
-            f"table:{index}: not rendered yet; S8 table slots required"
-            for index in range(len(draft.tables))
-        ]
-        + [
-            f"figure:{index}: not rendered yet; S8 figure slots required"
-            for index in range(len(draft.figures))
-        ]
-    )
 
 
 def _fact(key: str, value: str | int, kind: str = "text") -> Field:
@@ -142,15 +130,17 @@ def test_an_abbreviation_does_not_end_a_sentence(text: str) -> None:
     assert (checked.cited_sentences, checked.total_sentences, checked.fatal) == (1, 1, ())
 
 
-def test_an_uncited_cell_is_reviewed_not_fatal() -> None:
+def test_an_uncited_bullet_is_reviewed_not_fatal() -> None:
     facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
-    cited = DraftText(text="{{f:audit.company_name}}", fact_ids=["audit.company_name"])
-    table = DraftTable(caption=cited, rows=[[DraftText(text="Denumire"), cited]])
-    draft = SectionDraft(section="ch2.date_generale", status="drafted", tables=[table])
+    draft = SectionDraft(
+        section="ch2.date_generale",
+        status="drafted",
+        paragraphs=[DraftText(text="ambalare şi depozitare", kind="bullet")],
+    )
     checked = check_draft(draft, facts, "synthetic")
     assert checked.fatal == ()
     assert [(issue.code, issue.location) for issue in checked.review] == [
-        ("uncited_sentence", "table:0:0:0")
+        ("uncited_sentence", "paragraph:0")
     ]
 
 
@@ -175,30 +165,94 @@ def test_a_numbered_passage_is_a_fact_of_its_section() -> None:
     ]
 
 
-def test_nonrenderable_items_are_reviewed() -> None:
-    facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
-    rich = SectionDraft(
-        section="ch2.date_generale",
-        status="drafted",
-        tables=[
-            DraftTable(
-                caption=DraftText(
-                    text="Date despre {{f:audit.company_name}}.", fact_ids=["audit.company_name"]
-                ),
-                rows=[
-                    [DraftText(text="{{f:audit.company_name}}", fact_ids=["audit.company_name"])]
-                ],
-            )
-        ],
-        figures=[
-            DraftFigure(
-                fact_id="audit.company_name",
-                caption=DraftText(text="{{f:audit.company_name}}", fact_ids=["audit.company_name"]),
-            )
-        ],
+FACTS = {
+    "audit.company_name": _fact("audit.company_name", "Atelier Exemplu"),
+    "audit.employees": _fact("audit.employees", 85, "number"),
+}
+
+
+def _codes(text: str, ids: list[str], facts: dict[str, Field] = FACTS) -> set[str]:
+    return {issue.code for issue in check_draft(_draft(text, ids), facts, "synthetic").fatal}
+
+
+def test_a_paraphrase_with_a_citation_passes() -> None:
+    text = "Societatea are personal propriu de producţie {{c:audit.employees}}."
+    checked = check_draft(_draft(text, ["audit.employees"]), FACTS, "synthetic")
+    assert (checked.fatal, checked.cited_sentences, checked.total_sentences) == ((), 1, 1)
+
+
+def test_a_number_outside_a_value_token_fails_even_when_a_cited_fact_holds_it() -> None:
+    assert "literal_number" in _codes(
+        "Firma are 500 angajaţi {{c:audit.employees}}.", ["audit.employees"]
     )
-    assert not check_draft(rich, facts, "synthetic").fatal
-    assert {item.code for item in check_draft(rich, facts, "synthetic").review} == {
-        "unrendered_figure",
-    }
-    assert len(unrendered_items(rich)) == 2
+    # D1: the cited fact holds 85, still only a value token may print it.
+    assert "literal_number" in _codes(
+        "Firma are 85 angajaţi {{c:audit.employees}}.", ["audit.employees"]
+    )
+
+
+def test_a_name_prints_only_from_a_value_token() -> None:
+    assert (
+        _codes("Societatea {{f:audit.company_name}} produce ambalaje.", ["audit.company_name"])
+        == set()
+    )
+    # D1: a name the cited fact holds is still a literal name outside its value token.
+    assert "literal_name" in _codes(
+        "Firma Atelier Exemplu produce ambalaje {{c:audit.company_name}}.", ["audit.company_name"]
+    )
+
+
+@pytest.mark.parametrize(
+    "word",
+    ["două", "doua", "şase", "șase", "Trei", "zece", "sute", "mii", "douăzeci", "unsprezece"],
+)
+def test_a_romanian_number_word_is_a_literal_number(word: str) -> None:
+    text = f"Linia are {word} posturi de lucru {{{{c:audit.employees}}}}."
+    assert "literal_number" in _codes(text, ["audit.employees"])
+
+
+@pytest.mark.parametrize("word", ["optim", "unitatea", "trecut", "operare", "cincinal", "noul"])
+def test_a_word_that_holds_a_number_word_is_not_one(word: str) -> None:
+    text = f"Societatea are un regim {word} de lucru {{{{c:audit.employees}}}}."
+    assert "literal_number" not in _codes(text, ["audit.employees"])
+
+
+@pytest.mark.parametrize(
+    "change", [{"review": "rejected"}, {"presence": "missing"}, {"evidence": []}]
+)
+def test_a_rejected_or_unfound_fact_is_citable_by_neither_token(change: dict[str, object]) -> None:
+    facts = {"audit.employees": FACTS["audit.employees"].model_copy(update=change)}
+    for token in ("c", "f"):
+        text = f"Societatea are personal {{{{{token}:audit.employees}}}}."
+        assert "fact_missing" in _codes(text, ["audit.employees"], facts)
+
+
+def test_listed_ids_include_citations() -> None:
+    text = "Societatea are personal {{c:audit.employees}}."
+    assert "fact_refs" in _codes(text, [])
+
+
+@pytest.mark.parametrize(
+    ("section", "key", "allowed"),
+    [
+        ("ch3.electricitate", "audit.transformer.1.putere_nominala", True),
+        ("ch3.apa", "audit.transformer.1.putere_nominala", False),
+        ("ch3.equipment", "audit.equipment_row.2.name", True),
+        ("ch3.equipment", "audit.equipment_row.2.process", True),
+        ("ch3.gaz", "audit.equipment_row.2.name", True),
+        ("ch3.gaz", "audit.equipment_row.2.resource", True),
+        ("ch3.apa", "audit.equipment_row.2.name", False),
+        # The equipment table prints these; the prose refers to it (D4).
+        ("ch3.equipment", "audit.equipment_row.2.count", False),
+        ("ch3.gaz", "audit.equipment_row.2.power", False),
+        ("ch3.gaz", "audit.heating.2", True),
+    ],
+)
+def test_necesar_rows_are_described_in_their_ch3_section(
+    section: str, key: str, allowed: bool
+) -> None:
+    assert citable(section, key) is allowed
+
+
+def test_the_render_reads_the_transformer_rows_a_draft_cites() -> None:
+    assert "audit.transformer." in FAMILIES

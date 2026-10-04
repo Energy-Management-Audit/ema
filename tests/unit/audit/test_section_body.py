@@ -13,7 +13,7 @@ from tests.unit.audit.test_draft_checks import _fact
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_checks import DraftReview
 from ema.audit.draft_render import render_section
-from ema.audit.draft_schema import DraftFigure, DraftTable, DraftText, SectionDraft
+from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.render_writers import write_intro
 from ema.audit.section_body import own_region
 from ema.core.errors import EmaError
@@ -113,30 +113,18 @@ def test_paragraphs_replace_the_whole_region_whatever_its_length(tmp_path: Path)
     assert _texts(output)[1] == "Introducerea capitolului"
 
 
-def test_flagged_items_figures_and_missing_status_become_markers(tmp_path: Path) -> None:
+def test_flagged_items_and_missing_status_become_markers(tmp_path: Path) -> None:
     base, output = _base(tmp_path / "base.docx"), tmp_path / "out.docx"
     draft = _draft(
         paragraphs=[
             DraftText(text="Societatea {{f:audit.company_name}}.", fact_ids=["audit.company_name"]),
-            DraftText(
-                text="legenda {{f:audit.company_name}}",
-                fact_ids=["audit.company_name"],
-                kind="caption",
-            ),
+            DraftText(text="Firma {{f:audit.company_name}}.", fact_ids=["audit.company_name"]),
         ],
-        figures=[DraftFigure(fact_id="audit.company_name", caption=NAME)],
     )
     flagged = (DraftReview("unsupported", "paragraph:0", "claim"),)
     render_section(base, output, draft, FACTS, flagged, job="synthetic")
     written = _section(output)
-    assert written == [
-        "[de completat]",
-        "legenda Atelier Exemplu",
-        "[de completat]",
-        "Tabelul 2. [de completat]",
-    ]
-    caption = Document(str(output)).paragraphs[_texts(output).index("legenda Atelier Exemplu")]
-    assert caption.style.name == "Caption"
+    assert written == ["[de completat]", "Firma Atelier Exemplu.", "Tabelul 2. [de completat]"]
     missing = SectionDraft(
         section="ch2.date_generale",
         status="missing",
@@ -219,50 +207,23 @@ def test_fact_sentence_punctuation_does_not_duplicate_period(tmp_path: Path, end
     assert _section(output)[0] == "solventi" + ending
 
 
-def test_tables_carry_caption_header_and_flagged_cells(tmp_path: Path) -> None:
+def test_a_citation_renders_nothing(tmp_path: Path) -> None:
     base, output = _base(tmp_path / "base.docx"), tmp_path / "out.docx"
-    table = DraftTable(
-        caption=DraftText(text="Date {{f:audit.company_name}}", fact_ids=["audit.company_name"]),
-        rows=[
-            [NAME, NAME],
-            [NAME, NAME],
-            [NAME, NAME],
-        ],
-    )
-    # A text that cites no fact is flagged `uncited_sentence` and prints the marker.
-    uncited = DraftTable(caption=NAME, rows=[[DraftText(text="denumire"), NAME], [NAME, NAME]])
-    render_section(base, output, _draft(tables=[uncited]), FACTS, (), job="synthetic")
-    assert Document(str(output)).tables[0].rows[0].cells[0].text == "[de completat]"
-    render_section(base, output, _draft(tables=[table, table]), FACTS, (), job="synthetic")
-    written = _section(output)
-    assert written[0] == "Tabelul 2.1 Date Atelier Exemplu"
-    assert "Tabelul 2.2 Date Atelier Exemplu" in written
-    grid = Document(str(output)).tables[0]
-    assert [[cell.text for cell in row.cells] for row in grid.rows] == [
-        ["Atelier Exemplu", "Atelier Exemplu"],
-        ["Atelier Exemplu", "Atelier Exemplu"],
-        ["Atelier Exemplu", "Atelier Exemplu"],
-    ]
-    flags = (
-        DraftReview("unsupported", "table:0:caption", "claim"),
-        DraftReview("unsupported", "table:0:1:1", "claim"),
-    )
-    render_section(base, output, _draft(tables=[table]), FACTS, flags, job="synthetic")
-    assert _section(output)[0] == "Tabelul 2.1 [de completat]"
-    grid = Document(str(output)).tables[0]
-    assert grid.rows[1].cells[1].text == "[de completat]"
-    assert grid.rows[2].cells[1].text == "Atelier Exemplu"
+    text = "Societatea produce ambalaje {{c:audit.company_name}}. Firma {{f:audit.company_name}}."
+    draft = _draft(paragraphs=[DraftText(text=text, fact_ids=["audit.company_name"])])
+    render_section(base, output, draft, FACTS, (), job="synthetic")
+    assert _section(output)[0] == "Societatea produce ambalaje. Firma Atelier Exemplu."
 
 
-def test_a_missing_prototype_is_an_item_failure(tmp_path: Path) -> None:
-    base, output = _base(tmp_path / "base.docx", table=False), tmp_path / "out.docx"
-    table = DraftTable(caption=NAME, rows=[[NAME], [NAME]])
-    with pytest.raises(EmaError) as failed:
-        render_section(base, output, _draft(tables=[table]), FACTS, (), job="synthetic")
-    assert (failed.value.code, failed.value.detail) == (
-        "draft_prototype",
-        "ch2.date_generale: table",
-    )
+def test_a_stored_draft_with_tables_is_redone_but_empty_lists_load() -> None:
+    stored = {
+        "section": "ch2.date_generale",
+        "status": "drafted",
+        "paragraphs": [NAME.model_dump()],
+    }
+    assert SectionDraft.model_validate({**stored, "tables": [], "figures": []}).paragraphs
+    with pytest.raises(ValueError, match="tables"):
+        SectionDraft.model_validate({**stored, "tables": [{"caption": NAME.model_dump()}]})
 
 
 def test_an_intro_is_her_text_or_one_marker(tmp_path: Path) -> None:
@@ -397,3 +358,34 @@ def test_process_draft_fills_the_first_unit_and_marks_the_others(tmp_path: Path)
         job="synthetic",
     )
     assert _texts(output).count("proces test.") == 1
+
+
+def test_each_process_unit_renders_only_its_own_paragraphs(tmp_path: Path) -> None:
+    document = Document()
+    document.add_paragraph(TITLES["ch3"], style="Heading 1")
+    document.add_paragraph(TITLES["ch3.flux"], style="Heading 2")
+    document.add_paragraph("[de completat]", style="Body Text")
+    for name in ("Alpha", "Beta", "Gamma"):
+        document.add_paragraph(f"DESCRIEREA SECȚIEI {name}", style="Heading 3")
+        document.add_paragraph("[de completat]", style="Body Text")
+    document.add_paragraph(TITLES["ch4"], style="Heading 1")
+    base, output = tmp_path / "base.docx", tmp_path / "out.docx"
+    document.save(str(base))
+    keys = ("audit.process_sections", "audit.process_sections.2")
+    draft = SectionDraft(
+        section="ch3.process",
+        status="drafted",
+        paragraphs=[
+            DraftText(text=f"prima {{{{f:{keys[0]}}}}}.", fact_ids=[keys[0]], unit=1),
+            DraftText(text=f"urmează {{{{f:{keys[1]}}}}}.", fact_ids=[keys[1]], unit=2),
+        ],
+    )
+    facts = {key: _fact(key, f"etapa {index}") for index, key in enumerate(keys, 1)}
+    render_section(base, output, draft, facts, (), job="synthetic")
+    texts = _texts(output)
+    units = [texts.index(f"DESCRIEREA SECȚIEI {name}") for name in ("Alpha", "Beta", "Gamma")]
+    assert [texts[index + 1] for index in units] == [
+        "prima etapa 1.",
+        "urmează etapa 2.",
+        "[de completat]",
+    ]

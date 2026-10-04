@@ -153,9 +153,9 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
     assert texts[general + 1] == "[de completat]"  # unsupported prose withheld
     assert "asamblare" in texts[texts.index(TITLES["ch3.flux"]) + 1]
     assert coverage == [1.0, 1.0]
+    # A ch. 2-3 draft holds no tables: the deterministic tables are the only ones (D6).
     synthetic_structure = {
-        draft.section: {"paragraphs": len(draft.paragraphs), "tables": len(draft.tables)}
-        for draft in drafts
+        draft.section: {"paragraphs": len(draft.paragraphs), "tables": 0} for draft in drafts
     }
     propose(
         ws,

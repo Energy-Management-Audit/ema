@@ -7,14 +7,15 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ema.audit.read_equipment import EQUIPMENT_ROW, FORKLIFT, VEHICLE
+from ema.audit.read_equipment import EQUIPMENT_ROW, FORKLIFT, TRANSFORMER, VEHICLE
 from ema.core.office.numbers_ro import format_number
 from ema.core.review.models import Field
 
 EMPLOYEES = "audit.employees."
 TURNOVER = "turnover."
-# What the render reads (the stage binds each family, so a new row makes the render stale).
-FAMILIES = (EMPLOYEES, TURNOVER, EQUIPMENT_ROW, FORKLIFT, VEHICLE)
+# What the render reads (the stage binds each family, so a new row makes the render stale); the
+# transformers have no table, the ch. 3 draft cites them.
+FAMILIES = (EMPLOYEES, TURNOVER, EQUIPMENT_ROW, FORKLIFT, VEHICLE, TRANSFORMER)
 
 # None is a value the sources do not hold: the table shows a red n.d.
 type Cell = str | None

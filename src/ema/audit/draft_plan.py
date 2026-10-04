@@ -1,0 +1,135 @@
+"""What one chapter call drafts: each section's facts, length target and style example (D2, D8).
+
+A chapter whose targets exceed one call's output allowance splits, in catalogue order, into
+consecutive groups under it. The process passages split by unit (D3): ch3.process gets those of
+the 3.1.x units, ch3.flux the overview.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+
+from ema.audit.catalogue import CATALOGUE
+from ema.audit.catalogue_types import AuditFact, fact_key
+from ema.audit.draft_style import Example
+from ema.core.review.models import Field
+
+THINKING_TOKENS = 16_000
+MAX_OUTPUT_TOKENS = 65_536
+TOKENS_PER_WORD = 1.3
+OUTPUT_FACTOR = 2.5
+# A section the base gives no own text to measure counts as a short one in the allowance.
+UNMEASURED_WORDS = 150
+_SECTIONS = {section.id: section for section in CATALOGUE}
+
+
+@dataclass(frozen=True)
+class SectionPlan:
+    section: str
+    facts: dict[str, Field]
+    target: int | None
+    example: str
+    # ch3.process only: every 3.1.x unit, from 1, with the passage keys that are its own.
+    units: tuple[tuple[int, tuple[str, ...]], ...] = ()
+
+
+@dataclass(frozen=True)
+class Group:
+    id: str
+    chapter: int
+    sections: tuple[SectionPlan, ...]
+
+    @property
+    def allowance(self) -> int:
+        return allowance(plan.target for plan in self.sections)
+
+
+def allowance(targets: Iterable[int | None]) -> int:
+    """A chapter call's output tokens: thinking, then the drafts at about 2.5 tokens per token
+    of prose, which carries fact tokens and the JSON around it."""
+    words = sum(UNMEASURED_WORDS if target is None else target for target in targets)
+    return min(MAX_OUTPUT_TOKENS, THINKING_TOKENS + int(OUTPUT_FACTOR * words * TOKENS_PER_WORD))
+
+
+def usable(field: Field) -> bool:
+    return field.presence == "found" and field.review != "rejected" and bool(field.evidence)
+
+
+def _process_passage(key: str) -> bool:
+    return fact_key(key) == AuditFact.PROCESS_SECTIONS
+
+
+def offered(
+    section: str, facts: Mapping[str, Field], units: Mapping[str, int | None]
+) -> dict[str, Field]:
+    """The section's facts, with each process passage given to its unit or to the overview."""
+    if section not in {"ch3.flux", "ch3.process"}:
+        return dict(facts)
+    overview = section == "ch3.flux"
+    return {
+        key: field
+        for key, field in facts.items()
+        if not _process_passage(key) or (units.get(key) is None) == overview
+    }
+
+
+def _share(section: str, facts: Mapping[str, Field]) -> float:
+    """The share of the section's own catalogue facts the dossier holds."""
+    own = [str(ref) for ref in _SECTIONS[section].facts if isinstance(ref, AuditFact)]
+    if not own:
+        return 0.0
+    found = {fact_key(key) for key, field in facts.items() if usable(field)}
+    return sum(ref in found for ref in own) / len(own)
+
+
+def plan_section(
+    section: str,
+    facts: Mapping[str, Field],
+    example: Example | None,
+    units: Mapping[str, int | None],
+    unit_count: int = 1,
+) -> SectionPlan:
+    """The section's facts and target: its base own words scaled by the facts found (D8).
+
+    A 3.1.x unit is a copy of the base's unit text, so ch3.process aims at that length for each
+    unit that has passages.
+    """
+    own = offered(section, facts, units)
+    grouped: tuple[tuple[int, tuple[str, ...]], ...] = ()
+    if section == "ch3.process":
+        grouped = tuple(
+            (
+                number,
+                tuple(
+                    sorted(
+                        key
+                        for key, field in own.items()
+                        if _process_passage(key) and units.get(key) == number and usable(field)
+                    )
+                ),
+            )
+            for number in range(1, unit_count + 1)
+        )
+    if example is None or not example.words:
+        target = None
+    elif section == "ch3.process":
+        target = example.words * sum(bool(keys) for _, keys in grouped) or None
+    else:
+        target = round(example.words * _share(section, own)) or None
+    return SectionPlan(section, own, target, example.text if example else "", grouped)
+
+
+def split(chapter: int, plans: Iterable[SectionPlan]) -> list[Group]:
+    """Consecutive groups in catalogue order, each under the output bound; a section that
+    exceeds it alone is a group of its own, at the bound."""
+    batches: list[list[SectionPlan]] = []
+    for plan in plans:
+        current = batches[-1] if batches else None
+        if current and allowance(item.target for item in (*current, plan)) < MAX_OUTPUT_TOKENS:
+            current.append(plan)
+        else:
+            batches.append([plan])
+    return [
+        Group(f"{chapter}-{index}", chapter, tuple(batch)) for index, batch in enumerate(batches, 1)
+    ]

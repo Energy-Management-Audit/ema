@@ -1,95 +1,77 @@
-"""Structured audit Draft call and the separate support check."""
+"""The chapter groups of a Draft run, and one section drafted by the same chapter path."""
 
 from __future__ import annotations
 
-import json
+from collections.abc import Sequence
 from pathlib import Path
 
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.catalogue_types import fact_key
-from ema.audit.draft_checks import DraftCheck, DraftReview, check_draft, support_pass
-from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
-from ema.audit.draft_style import configured_style_example
+from ema.audit.draft_chapter import Drafted, Passes, run_group
+from ema.audit.draft_checks import DraftCheck, DraftReview
+from ema.audit.draft_plan import Group, plan_section, split
+from ema.audit.draft_prompt import PROMPT_VERSION, Used
+from ema.audit.draft_schema import SECTION_FACTS, SectionDraft, citable
+from ema.audit.draft_style import configured_examples
+from ema.audit.process_units import ProcessUnits, job_process_units, passage_units
 from ema.core.errors import EmaError
-from ema.core.llm import AgentContext, ReplayProvider, complete_json
+from ema.core.llm import ReplayProvider
 from ema.core.llm.agent import AgentState
 from ema.core.llm.types import Provider
-from ema.core.resources import resource_path
+from ema.core.logging import write_event
 from ema.core.review.models import Field
 from ema.core.workspace import Workspace
 
-PROMPT_VERSION = "audit-draft-v3"
-FACT_RULE = "Fiecare nume, număr şi dată vine dintr-un fapt, scris {{f:<key>}}."
-REFERENCE_RULE = "Fiecare paragraf, celulă şi legendă enumeră fact_ids folosite."
-WORDING_RULE = "Nu folosi formulări despre AI sau procesul de redactare."
-SENTENCE_RULE = (
-    "Fiecare propoziţie conţine cel puţin un {{f:<key>}}; nu scrie propoziţii fără fapt "
-    "(introduceri, generalităţi, concluzii)."
-)
-LENGTH_RULE = (
-    "Lungimea urmează faptele: un paragraf pentru fiecare subiect, iar un fapt care este "
-    "un pasaj din sursă se scrie întreg, ca {{f:<key>}}, în paragraful lui."
-)
-PASSAGE_RULE = (
-    "Un pasaj ({{f:<key>}}, {{f:<key>.2}} …) stă în paragraful lui, câte un pasaj în fiecare "
-    "paragraf, în ordinea numerelor."
-)
-RULE_TEXT = {
-    "uncited_sentence": SENTENCE_RULE,
-    "passage_paragraph": PASSAGE_RULE,
-    "passage_order": PASSAGE_RULE,
-}
-INSTRUCTIONS = (
-    "Redactează numai secţiunea cerută, în registrul auditorului. Fiecare nume, număr şi "
-    "dată trebuie să provină dintr-un fapt şi să fie scris ca {{f:<key>}}. "
-    f"{SENTENCE_RULE} {LENGTH_RULE} {PASSAGE_RULE} "
-    "Nu folosi formulări despre AI sau procesul de redactare. "
-    "Fiecare paragraf, celulă şi legendă enumeră fact_ids folosite. "
-    "Dacă lipseşte un fapt necesar, foloseşte status missing."
-)
+_CHAPTERS = {section.id: section.chapter for section in CATALOGUE}
+
+
+def job_facts(ws: Workspace, job: str) -> dict[str, Field]:
+    with ws.connect() as db:
+        rows = db.execute("SELECT key,data FROM fields WHERE job_id=?", (job,))
+        return {str(row["key"]): Field.model_validate_json(row["data"]) for row in rows}
 
 
 def recorded_facts(ws: Workspace, job: str, section: str) -> dict[str, Field]:
-    allowed = SECTION_FACTS[section]
-    with ws.connect() as db:
-        rows = db.execute("SELECT key,data FROM fields WHERE job_id=?", (job,))
-        return {
-            str(row["key"]): Field.model_validate_json(row["data"])
-            for row in rows
-            if fact_key(str(row["key"])) in allowed
-        }
+    return {key: value for key, value in job_facts(ws, job).items() if citable(section, key)}
 
 
-def draft_task(section: str) -> str:
-    title = next(item.title for item in CATALOGUE if item.id == section)
-    return (
-        f"Redactează secţiunea {section} „{title}”. Câmpul section este exact „{section}”. "
-        f"{FACT_RULE} {SENTENCE_RULE} {LENGTH_RULE} {PASSAGE_RULE} {REFERENCE_RULE} "
-        f"{WORDING_RULE}"
-    )
+def _units(ws: Workspace, job: str) -> tuple[dict[str, int | None], int]:
+    """Each process passage's 3.1.x unit and the unit count; an unreadable dossier gives one
+    unit and leaves every passage to the overview."""
+    try:
+        units = job_process_units(ws, job)
+        return passage_units(ws, job, units), units.count
+    except Exception as exc:  # The Fişa is a client file: one that will not open is logged.
+        with ws.connect() as db, ws.job_log(db, job) as handle:
+            write_event(handle, "draft_units_failed", error=type(exc).__name__)
+        return {}, ProcessUnits().count
 
 
-def draft_content(
-    ws: Workspace, section: str, facts: dict[str, Field], task: str | None = None
-) -> str:
-    guide = resource_path("audit", "prompts", "style_guide_v1.json").read_text(encoding="utf-8")
-    return json.dumps(
-        {
-            "task": task or draft_task(section),
-            "facts": [
-                {
-                    "key": key,
-                    "value": str(field.value) if field.presence == "found" else None,
-                    "presence": field.presence,
-                    "unit": field.unit,
-                }
-                for key, field in sorted(facts.items())
-            ],
-            "style_guide": json.loads(guide),
-            "style_example": configured_style_example(ws, section),
-        },
-        ensure_ascii=False,
-    )
+def chapter_groups(
+    ws: Workspace,
+    job: str,
+    sections: Sequence[str],
+    facts: dict[str, Field] | None = None,
+) -> tuple[list[Group], dict[str, int | None]]:
+    """The sections' chapter groups in catalogue order, with each process passage's unit."""
+    facts = job_facts(ws, job) if facts is None else facts
+    examples = configured_examples(ws, sections)
+    units, count = _units(ws, job) if {"ch3.flux", "ch3.process"} & set(sections) else ({}, 1)
+    groups: list[Group] = []
+    for chapter in (2, 3):
+        plans = [
+            plan_section(
+                section,
+                {key: value for key, value in facts.items() if citable(section, key)},
+                examples.get(section),
+                units,
+                count,
+            )
+            for section in sections
+            if _CHAPTERS[section] == chapter
+        ]
+        if plans:
+            groups.extend(split(chapter, plans))
+    return groups, units
 
 
 def draft_section_run(  # noqa: PLR0913
@@ -104,79 +86,39 @@ def draft_section_run(  # noqa: PLR0913
     facts: dict[str, Field] | None = None,
     synthetic: bool = False,
     client_live: bool = False,
-    task: str | None = None,
 ) -> tuple[AgentState, SectionDraft, DraftCheck, tuple[DraftReview, ...]]:
+    """One section through the chapter path, restricted to it: one group of one section."""
     if section not in SECTION_FACTS:
         raise EmaError("section_missing", "Secţiunea de redactare lipseşte.", section)
-    facts = recorded_facts(ws, job, section) if facts is None else facts
-    context = AgentContext(
-        ws,
-        job,
-        f"draft:{section}",
+    passes = Passes(
         draft_provider,
-        model_id,
-        PROMPT_VERSION,
-        synthetic=synthetic,
-        client_live=client_live,
-    )
-    content = draft_content(ws, section, facts, task)
-
-    def read_draft(request: str) -> SectionDraft:
-        result = complete_json(context, SectionDraft, INSTRUCTIONS, request, schema_retries=0)
-        if result.section != section:
-            raise EmaError("draft_section", "Secţiunea redactată nu corespunde.", section)
-        return result
-
-    draft = read_draft(content)
-    check = check_draft(draft, facts, job)
-    steps = 1
-    if check.fatal:
-        errors = [
-            {
-                "rule": issue.code,
-                "rule_text": RULE_TEXT.get(issue.code, FACT_RULE),
-                "location": issue.location,
-                "detail": issue.detail,
-            }
-            for issue in check.fatal
-        ]
-        draft = read_draft(
-            json.dumps(
-                {"request": content, "rejected_draft": draft.model_dump(), "errors": errors},
-                ensure_ascii=False,
-            ),
-        )
-        steps = 2
-        check = check_draft(draft, facts, job)
-        if check.fatal:
-            raise EmaError(
-                "draft_incomplete",
-                "Redactarea nu respectă regulile.",
-                ", ".join(issue.code for issue in check.fatal),
-            )
-    support_context = AgentContext(
-        ws,
-        job,
-        f"support:{section}",
         support_provider,
-        support_model_id or model_id,
-        PROMPT_VERSION + "-support",
+        model_id,
+        support_model_id,
         synthetic=synthetic,
         client_live=client_live,
     )
-    try:
-        flags = support_pass(support_context, draft, facts)
-    except EmaError as exc:
-        flags = (DraftReview("support_unavailable", "section", exc.code),)
+    done = draft_one(ws, job, section, passes, facts)
     state = AgentState(
         messages=[],
-        steps=steps,
+        steps=1,
         status="done",
         model_id=model_id,
-        provider_name=draft_provider.name,
+        provider_name=passes.draft.name,
         prompt_version=PROMPT_VERSION,
     )
-    return state, draft, check, flags
+    return state, done.draft, done.check, done.flags
+
+
+def draft_one(
+    ws: Workspace, job: str, section: str, passes: Passes, facts: dict[str, Field] | None = None
+) -> Drafted:
+    (group,), units = chapter_groups(ws, job, (section,), facts)
+    group = Group(section, group.chapter, group.sections)
+    result = run_group(ws, job, group, passes, Used(), units)
+    if section in result.failed:
+        raise result.failed[section]
+    return result.drafted[section]
 
 
 def draft_section_replay(  # noqa: PLR0913

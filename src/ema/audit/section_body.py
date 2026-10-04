@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -182,15 +183,24 @@ def _removable(region: list[etree._Element], section_id: str, blocks: list[Block
 
 
 def replace_section_body(
-    source: Path, output: Path, section_id: str, blocks: list[Block], *, keep_base: bool = False
+    source: Path,
+    output: Path,
+    section_id: str,
+    blocks: list[Block],
+    *,
+    keep_base: bool = False,
+    unit_blocks: Callable[[int], list[Block]] | None = None,
 ) -> RenderReport:
-    """Write ``blocks`` over the section's own region, styled after what the region held."""
+    """Write ``blocks`` over the section's own region, styled after what the region held.
+
+    Repeated process headings are separate 3.1.x units: with ``unit_blocks``, unit i (from 1)
+    gets only its own blocks (D3); without, the first unit gets ``blocks`` and the others keep
+    the marker rather than repeat it.
+    """
     document = Document(str(source))
     count = sum(item.section_id == section_id for item, _, _ in heading_spans_document(document))
     if not count:
         raise EmaError("draft_prototype", "Secţiunea lipseşte din bază.", section_id)
-    # Repeated process headings are separate 3.1.x units. Until the draft maps its passages to
-    # stages, it fills the first unit and the others keep the marker rather than repeat it.
     with TemporaryDirectory() as directory:
         current = source
         report: RenderReport | None = None
@@ -198,7 +208,11 @@ def replace_section_body(
             document = Document(str(current))
             first, end = own_region(document, section_id, occurrence)
             elements = _prototypes(document, section_id, first, end)
-            unit: list[Block] = blocks if occurrence == 0 else [Missing("body", MARKER)]
+            unit: list[Block]
+            if unit_blocks is not None:
+                unit = unit_blocks(occurrence + 1)
+            else:
+                unit = blocks if occurrence == 0 else [Missing("body", MARKER)]
             if missing := sorted(_needed(unit) - set(elements)):
                 raise EmaError(
                     "draft_prototype",
