@@ -1534,18 +1534,20 @@ code/ (repository root)
 | Architecture | `import-linter` contracts (§5.1) |
 | File size | a CI check: modules > ~400 lines fail |
 | Tests | `pytest` unit (CI) + golden (local) |
-| One gate | `scripts/check`, non-mutating: format check, lint, file size on tracked files, pyright, import contracts, non-golden unit tests, and the frontend checks once `frontend/` exists. CI runs exactly it; the pre-push hook runs it; commit hooks may auto-fix. (Today's `.pre-commit-config.yaml` has no tests and fixes instead of checking, so "pre-commit = CI" is not yet true: S1 aligns it and `AGENTS.md`.) |
+| Check tiers | `scripts/check --static` runs private-term, format, lint, file-size, type and import checks for Python and frontend at pre-push; `scripts/check` adds non-golden Python and frontend unit tests without coverage on dev; `scripts/check --full` adds coverage, the frontend build and e2e on prod. Commit hooks may auto-fix. |
 | Design traceability | frontend commits and component names carry the design id (`feat(ui/3c): …`, `FieldReviewRow` "3c") (§5.18) |
 
 **Where each gate runs:**
 
 | Gate | Runs on | When |
 |---|---|---|
-| `scripts/check` | Linux CI + every dev machine | every push and PR |
+| `scripts/check --static` | every dev machine | pre-push |
+| `scripts/check` | Linux CI | PRs and pushes to `dev` |
+| `scripts/check --full` | Linux CI | PRs and pushes to `prod` |
 | Windows unit job | Windows CI runner | release tags; manual dispatch when `unit_tests` is enabled |
 | Golden | a machine with `$EMA_REFERENCE` (Vlad's Mac) | before feature and release PRs |
 | Word check: the output opens in Word with no repair prompt, charts open with Edit Data, the TOC numbers are right | Word for Mac now; Vlad's Windows PC from the port | every slice that produces a document; every release |
-| Windows build smoke: the frozen one-folder build loads its resources, starts the server, runs one headless job | Windows CI runner | from the port (S18): every push to `dev`, every tag |
+| Windows build smoke: the frozen one-folder build loads its resources, starts the server, runs one headless job | Windows CI runner | PRs to `prod` that touch packaging paths, `v*` tags, and manual `workflow_dispatch` |
 | Windows Office checks: Word COM conversion, PDF render, TOC page numbers; the window on WebView2 | Vlad's Windows PC | from the port: every slice that adds Office automation, an external binary or a bundled resource; every release |
 
 **Principles (the one page in `AGENTS.md`):**
@@ -1626,9 +1628,11 @@ code/ (repository root)
 - **Completion signal:** the PR head and its CI, waited on with one blocking REST call
   (`gh run watch <run-id> --interval 90 --exit-status`; `gh pr checks --watch` polls GraphQL, and
   many parallel watchers exhaust the shared limit), then one DONE or QUESTION message to the
-  coordinator's handle. The required check is `checks`; the Windows build and smoke run on PRs to
-  `dev` that touch packaging paths, and the Windows unit job runs on release tags and manual
-  dispatch.
+  coordinator's handle. The required check is `checks`: pre-push runs `scripts/check --static`,
+  PRs and pushes to `dev` run `scripts/check`, and PRs and pushes to `prod` run
+  `scripts/check --full`. The Windows build and smoke run on PRs to `prod` that touch packaging
+  paths, `v*` tags, and manual `workflow_dispatch`; the Windows unit job runs on release tags
+  and manual dispatch when enabled.
 - **Word for Mac is exclusive:** one golden run that drives Word at a time, scheduled by the
   coordinator; reviewers never run goldens or Word. The coordinator runs the full golden suite once
   per merge batch.

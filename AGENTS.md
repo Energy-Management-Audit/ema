@@ -29,7 +29,7 @@ interfaces (api, cli, mcp) -> workflows (invoices, piee, audit, reporting)
 `scripts/check --static` runs private-term, Python and frontend static checks at pre-push;
 `scripts/check` adds non-golden unit tests in CI on PRs to dev; `scripts/check --full` adds
 coverage, the frontend build and e2e in CI to prod and for releases. The Windows build runs on
-prod PRs and tags.
+prod PRs that touch packaging paths, and on tags.
 Client, person and place names never appear in code, commits, branch names, PR text or issues; use
 case codes only.
 Commit hooks may fix formatting. Install both with

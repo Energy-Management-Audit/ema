@@ -42,7 +42,7 @@ else
   npm --prefix frontend run --silent format:check
   npm --prefix frontend run --silent lint
   npm --prefix frontend run --silent typecheck
-  if [[ "$mode" == light ]]; then
+  if [[ "$mode" != --static ]]; then
     npm --prefix frontend run test
   fi
 fi
