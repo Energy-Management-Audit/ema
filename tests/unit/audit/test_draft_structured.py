@@ -9,7 +9,7 @@ import pytest
 from docx import Document
 from tests.audit_replay import CH2_DRAFT, audit_job_with_facts
 
-from ema.audit.draft_agent import FACT_RULE, draft_section_run
+from ema.audit.draft_agent import FACT_RULE, SENTENCE_RULE, draft_section_run
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.draft_style import style_example
 from ema.core.errors import EmaError
@@ -83,8 +83,8 @@ def test_literal_name_retry_carries_rule(tmp_path: Path) -> None:
     assert accepted == CH2_DRAFT
     assert len(provider.requests) == 2
     assert support.calls == 1
-    assert any(error["rule"] == "literal_name" for error in provider.requests[1]["errors"])
-    assert all(error["rule_text"] == FACT_RULE for error in provider.requests[1]["errors"])
+    rules = {(error["rule"], error["rule_text"]) for error in provider.requests[1]["errors"]}
+    assert rules == {("literal_name", FACT_RULE), ("uncited_sentence", SENTENCE_RULE)}
     assert FACT_RULE in json.loads(provider.requests[1]["request"])["task"]
 
 

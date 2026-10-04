@@ -14,8 +14,10 @@ from tests.workspace_jobs import create_job
 
 from ema.audit.catalogue import CATALOGUE, Section
 from ema.audit.catalogue_labels import field_label
+from ema.audit.catalogue_types import MAX_PASSAGES
 from ema.audit.fill_extract import (
     OUTPUT_TOKENS,
+    PASSAGE_TOKENS,
     PROMPT_TOKENS,
     PROMPT_VERSION,
     Extraction,
@@ -139,7 +141,7 @@ def test_the_output_schema_and_the_instructions_are_the_plan_contract() -> None:
     assert fact["required"] == ["key", "value", "file", "page", "quote"]
     assert ("audit", "prompts", "extract_v1.txt") in RESOURCE_FILES
     assert instructions().startswith("Establish the listed facts from the dossier files.")
-    assert (PROMPT_TOKENS, OUTPUT_TOKENS, PROMPT_VERSION) == (300_000, 8_000, "audit-extract-v1")
+    assert (PROMPT_TOKENS, OUTPUT_TOKENS, PROMPT_VERSION) == (300_000, 8_000, "audit-extract-v2")
 
 
 def test_one_call_fills_several_sections(tmp_path: Path) -> None:
@@ -155,7 +157,8 @@ def test_one_call_fills_several_sections(tmp_path: Path) -> None:
     assert summary.rejected == {}
     found = values(ws, job_id)
     assert found["audit.company_name"] == ("Firma Exemplu SRL", "found")
-    assert found["audit.business_activity"] == ("vopsire industrială", "found")
+    # A narrative fact is its passage: the quote, whatever value the model gave.
+    assert found["audit.business_activity"] == ("Activitate: vopsire industrială.", "found")
     assert found["audit.location"] == ("zona industrială Vest", "found")
     assert "audit.cui" in summary.missing and found["audit.cui"][1] == "not_found"
     system, user = provider.sent[0]
@@ -170,7 +173,7 @@ def test_one_call_fills_several_sections(tmp_path: Path) -> None:
         "Activitate: vopsire industrială.\n\nF2: permit.pdf\n[F2 p.1]\n"
         "Prima pagină a autorizaţiei.\n[F2 p.2]\nAmplasament: zona industrială Vest, lot 4."
     )
-    assert provider.max_output_tokens == [OUTPUT_TOKENS]
+    assert provider.max_output_tokens == [OUTPUT_TOKENS + MAX_PASSAGES * PASSAGE_TOKENS]
     recording = json.loads((ws.root / "artifacts/extract-1.json").read_text("utf-8"))
     assert (recording["source"], len(recording["responses"])) == ("recorded", 1)
     (estimate,) = log_events(ws, job_id, "ai_estimate")

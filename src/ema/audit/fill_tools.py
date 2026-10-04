@@ -12,6 +12,7 @@ from typing import Any
 
 from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import CATALOGUE, AuditFact, fact_spec
+from ema.audit.catalogue_types import fact_key
 from ema.audit.fill_files import file_ids, resolve_name, search, windows
 from ema.audit.sections import recompute_ready, set_status
 from ema.core.errors import EmaError
@@ -259,9 +260,9 @@ class FillTools:
 
     def record_fact(self, args: dict[str, Any]) -> object:
         key = str(args["key"])
-        if key not in _FACTS:
+        if fact_key(key) not in _FACTS:
             raise EmaError("fact_unknown", "Faptul nu există în catalog.", key)
-        self._validate_section_fact(key)
+        self._validate_section_fact(fact_key(key))
         value = args["value"]
         if isinstance(value, bool) or not isinstance(value, str | int | float):
             raise EmaError("fact_type", "Tipul faptului nu este valid.", key)
@@ -284,11 +285,22 @@ class FillTools:
         recompute_ready(self.ws, self.job)
         return {"key": field.key, "evidence": field.evidence}
 
+    def passage_position(self, args: dict[str, Any]) -> tuple[int, int, int]:
+        """Verify a passage quote without recording it; return its file, page and offset."""
+        key = str(args["key"])
+        if fact_key(key) not in _FACTS:
+            raise EmaError("fact_unknown", "Faptul nu există în catalog.", key)
+        self._validate_section_fact(fact_key(key))
+        name, quote, page = str(args["name"]), str(args["quote"]), int(args["page"])
+        self._document_evidence(name, quote, quote, page)
+        file_id, document = self._document(name)
+        return int(file_id.removeprefix("F")), page, document.pages[page - 1].index(quote)
+
     def mark_missing(self, args: dict[str, Any]) -> object:
         key = str(args["key"])
-        if key not in _FACTS:
+        if fact_key(key) not in _FACTS:
             raise EmaError("fact_unknown", "Faptul nu există în catalog.", key)
-        self._validate_section_fact(key)
+        self._validate_section_fact(fact_key(key))
         field = mark_absent(
             self.ws, self.job, fact_spec(key, "text", chapter=self.section), "not_found"
         )

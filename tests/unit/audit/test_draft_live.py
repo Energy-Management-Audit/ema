@@ -14,7 +14,15 @@ import pytest
 from tests.audit_replay import audit_job_with_facts
 
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.draft_agent import FACT_RULE, REFERENCE_RULE, WORDING_RULE, draft_task
+from ema.audit.draft_agent import (
+    FACT_RULE,
+    LENGTH_RULE,
+    PASSAGE_RULE,
+    REFERENCE_RULE,
+    SENTENCE_RULE,
+    WORDING_RULE,
+    draft_task,
+)
 from ema.audit.draft_live import DraftSummary, start_draft
 from ema.audit.draft_schema import SECTION_FACTS, DraftText, SectionDraft
 from ema.audit.draft_stage import draft_section
@@ -33,7 +41,7 @@ SECTION = "ch2.date_generale"
 TASK = (
     "Redactează secţiunea ch2.date_generale „Date generale”. "
     "Câmpul section este exact „ch2.date_generale”. "
-    f"{FACT_RULE} {REFERENCE_RULE} {WORDING_RULE}"
+    f"{FACT_RULE} {SENTENCE_RULE} {LENGTH_RULE} {PASSAGE_RULE} {REFERENCE_RULE} {WORDING_RULE}"
 )
 TITLES = {section.id: section.title for section in CATALOGUE}
 

@@ -1,6 +1,6 @@
 """Review labels and presentation for the section catalogue's fact vocabulary."""
 
-from ema.audit.catalogue_types import AuditFact
+from ema.audit.catalogue_types import AuditFact, fact_key
 from ema.audit.reading_labels import READING_LABELS
 from ema.core.review.models import FieldSpec, ValueType
 
@@ -99,6 +99,8 @@ def field_label(  # noqa: C901, PLR0911
 ) -> str:
     if key in FACT_LABELS:
         return FACT_LABELS[key]
+    if fact_key(key) != key:
+        return f"{FACT_LABELS[fact_key(key)]} ({key.rpartition('.')[2]})"
     parts = key.split(".")
     if key.startswith("audit.economics."):
         return f"{ECONOMIC_LABELS[parts[2]]} {parts[3]}"

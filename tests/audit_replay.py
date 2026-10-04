@@ -14,7 +14,13 @@ from ema.audit.draft_agent import (
     draft_content,
     recorded_facts,
 )
-from ema.audit.draft_checks import SUPPORT_PROMPT, DraftCheck, DraftReview, SupportResult
+from ema.audit.draft_checks import (
+    SUPPORT_PROMPT,
+    DraftCheck,
+    DraftReview,
+    SupportResult,
+    token_only,
+)
 from ema.audit.draft_render import render_section, review_payload
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.sections import mark_drafted, recompute_ready
@@ -89,6 +95,7 @@ def support_recording(
             "facts": {key: str(facts[key].value) for key in paragraph.fact_ids},
         }
         for index, paragraph in enumerate(draft.paragraphs)
+        if not token_only(paragraph.text)
     ]
     content = json.dumps(request, ensure_ascii=False)
     messages = [

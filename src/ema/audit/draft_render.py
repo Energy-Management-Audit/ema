@@ -18,7 +18,15 @@ from docx.oxml.ns import qn
 from ema.audit.base_anchor import MARKER
 from ema.audit.base_units import heading_spans_document
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.draft_checks import TOKEN, DraftCheck, DraftReview, _support_text, check_draft
+from ema.audit.draft_checks import (
+    TOKEN,
+    DraftCheck,
+    DraftReview,
+    _support_text,
+    check_draft,
+    sentence_parts,
+    token_only,
+)
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.section_body import replace_section_body
 from ema.core.errors import EmaError
@@ -61,13 +69,14 @@ def _paragraph(
         _support_text(issue.sentence if issue.sentence is not None else issue.detail)
         for issue in relevant
     ]
-    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", item.text) if part.strip()]
     rendered: list[str] = []
-    for sentence in sentences:
+    for sentence in sentence_parts(item.text, facts):
         normalized = _support_text(sentence)
+        # A verified passage standing alone is the source's own text; a flag never erases it.
         value = (
             MARKER
-            if any(flag and (flag in normalized or normalized in flag) for flag in flagged)
+            if not token_only(sentence)
+            and any(flag and (flag in normalized or normalized in flag) for flag in flagged)
             else _resolved(sentence, facts)
         )
         if value != MARKER or not rendered or rendered[-1] != MARKER:
