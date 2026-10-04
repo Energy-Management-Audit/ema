@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from ema.audit.research_quote import in_quote
 from ema.audit.research_web import OutboundGuard, Snapshot, fetch, load_snapshot, store_snapshot
 from ema.core.errors import EmaError
 from ema.core.review.fields import propose
@@ -39,33 +39,6 @@ def _cache_path(ws: Workspace, job: str, model: str) -> tuple[str, Path]:
     if row is None:
         raise EmaError("job_missing", "Lucrarea nu există.", job)
     return slug, ws.path(f"clients/{row['client_slug']}/research/equipment-{slug}.json")
-
-
-_SPACE, _THOUSANDS = "[ \u00a0\u202f]", r"\d{3}(?!\d)"  # 1 234,5 groups its thousands
-
-
-def _extends(before: str, value: str, after: str) -> bool:
-    """Whether the text around the value makes it part of a longer word or number: 115 kW
-    holds "15 kW", 15 kWh holds "15 kW", 1.234,5 and 1 234,5 hold "234,5"."""
-    first, last = value[0], value[-1]
-    return bool(
-        (first.isalnum() and before[-1:].isalnum())
-        or (last.isalnum() and after[:1].isalnum())
-        or (first.isdigit() and re.search(r"\d[.,]$", before))
-        or (first.isdigit() and re.search(rf"\d{_SPACE}$", before) and re.match(_THOUSANDS, value))
-        or (last.isdigit() and re.match(r"[.,]\d", after))
-        or (last.isdigit() and re.match(_SPACE + _THOUSANDS, after))
-    )
-
-
-def in_quote(value: str, quote: str) -> bool:
-    """Whether the value appears in the quote as whole words and numbers, never inside one."""
-    start = quote.find(value) if value else -1
-    while start >= 0:
-        if not _extends(quote[:start], value, quote[start + len(value) :]):
-            return True
-        start = quote.find(value, start + 1)
-    return False
 
 
 def _propose_entry(ws: Workspace, job: str, slug: str, entry: EquipmentEntry) -> None:

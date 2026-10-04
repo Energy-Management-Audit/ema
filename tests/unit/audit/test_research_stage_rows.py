@@ -19,7 +19,7 @@ from tests.unit.audit.test_research_stage import (
 )
 
 from ema.audit import research_stage
-from ema.audit.research_equipment import in_quote
+from ema.audit.research_quote import in_quote
 from ema.audit.research_stage import research_equipment
 from ema.core.errors import EmaError
 from ema.core.review.fields import fields

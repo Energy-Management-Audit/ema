@@ -13,6 +13,7 @@ from ema.audit.catalogue import CATALOGUE, AuditFact
 from ema.audit.catalogue_labels import field_label
 from ema.audit.research_equipment import cached_equipment, record_equipment
 from ema.audit.research_map import locality_map
+from ema.audit.research_quote import in_quote
 from ema.audit.research_web import OutboundGuard, Snapshot, fetch, load_snapshot
 from ema.audit.sections import recompute_ready
 from ema.core.errors import EmaError
@@ -252,7 +253,7 @@ class ResearchTools:
         snapshot = self._snapshot(sha)
         if not quote or quote not in snapshot.text:
             raise EmaError("evidence_quote", "Fragmentul citat nu apare în sursă.", key)
-        if value not in quote:
+        if not in_quote(value, quote):
             raise EmaError("value_unverified", "Valoarea nu apare în fragment.", key)
         evidence = Evidence(
             id=hashlib.sha256(f"{self.job}:{sha}:{quote}".encode()).hexdigest(),
