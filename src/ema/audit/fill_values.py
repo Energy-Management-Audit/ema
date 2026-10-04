@@ -54,7 +54,8 @@ def in_unit(
     """The value in its fact's unit, read from the unit the quote writes right after the number.
 
     The fact's own unit is kept as is; a convertible one is converted with its derivation; any
-    other unit, or none, is rejected: "1 MWp" is never recorded as 1 kWp.
+    other unit, or none, is rejected: "1 MWp" is never recorded as 1 kWp. A value the quote
+    writes with two different units is ambiguous and rejected too.
     """
     unit = FACT_TYPES[key][1]
     written = {
@@ -62,7 +63,11 @@ def in_unit(
         for match in NUMBER.finditer(quote)
         if number(match.group()) == value and (found := _UNIT.match(quote, match.end()))
     }
-    if unit is None or unit in written:
+    if unit is None:
+        return value, None
+    if len(written) > 1:
+        raise EmaError("value_unverified", "Numărul apare cu unităţi diferite în fragment.", key)
+    if unit in written:
         return value, None
     for (source, target), factor in CONVERSIONS.items():
         if target == unit and source in written:

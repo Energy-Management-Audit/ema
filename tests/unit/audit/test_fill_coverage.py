@@ -148,6 +148,7 @@ PV_LINES = (
     "Centrala fotovoltaică are o putere instalată de 1 MWp.",
     "Centrala fotovoltaică are o putere instalată de 800 kW.",
     "Puterea instalată a centralei fotovoltaice: 950.",
+    "Centrala fotovoltaică are 1 MWp; fiecare panou are 1 kWp.",
 )
 PV = {"pv.txt": FillDocument("pv.txt", "\n".join(PV_LINES))}
 
@@ -161,7 +162,8 @@ def test_a_power_in_mwp_is_converted_and_any_other_unit_is_rejected(tmp_path: Pa
     tools = FillTools(ws, job_id, "ch3.electricitate", PV)
 
     # "1 MWp" is never recorded as 1 kWp; a unit other than kWp or MWp, or none, is rejected.
-    for args in (pv_power("800", 2), pv_power("950", 3)):
+    # A value written with two units is ambiguous: neither 1 kWp nor 1 MWp is recorded.
+    for args in (pv_power("800", 2), pv_power("950", 3), pv_power("1", 4)):
         with pytest.raises(EmaError) as error:
             tools.record_fact(args)
         assert error.value.code == "value_unverified"

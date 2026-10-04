@@ -249,6 +249,10 @@ def test_a_fisa_unit_name_is_quoted_from_its_own_flux_block_and_page(tmp_path: P
     rejected({**record, "key": process_unit_name(1), "page": 1}, "fact_unit")
     rejected({**record, "page": 1}, "fact_section", section="ch3.flux")
     rejected({**record, "quote": "Piesele sunt uscate în cuptor.", "page": 1}, "value_unverified")
+    # A name is a non-empty text: an empty or numeric value is rejected, never raised unchecked.
+    for value in ("", " ", 1):
+        rejected({**record, "value": value, "page": 1}, "fact_type")
+    assert process_unit_name(2) not in values(ws, job_id)
 
     tools.record_fact({**record, "page": 1})
 

@@ -272,6 +272,8 @@ class FillTools:
         value = args["value"]
         if isinstance(value, bool) or not isinstance(value, str | int | float):
             raise EmaError("fact_type", "Tipul faptului nu este valid.", key)
+        if process_unit_number(key) is not None and not (isinstance(value, str) and value.strip()):
+            raise EmaError("fact_type", "Tipul faptului nu este valid.", key)
         stored_value = typed(key, value)
         derivation = None
         source_key = str(args.get("source_key", ""))
