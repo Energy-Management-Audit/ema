@@ -20,6 +20,7 @@ from ema.audit.fill_extract import (
     PASSAGE_TOKENS,
     PROMPT_TOKENS,
     PROMPT_VERSION,
+    THINKING_TOKENS,
     Extraction,
     ExtractSummary,
     extract_facts,
@@ -63,6 +64,8 @@ LOCATION = {
     "page": 2,
     "quote": "Amplasament: zona industrială Vest, lot 4.",
 }
+
+ALLOWANCE = OUTPUT_TOKENS + THINKING_TOKENS
 
 
 class Scripted:
@@ -173,7 +176,7 @@ def test_one_call_fills_several_sections(tmp_path: Path) -> None:
         "Activitate: vopsire industrială.\n\nF2: permit.pdf\n[F2 p.1]\n"
         "Prima pagină a autorizaţiei.\n[F2 p.2]\nAmplasament: zona industrială Vest, lot 4."
     )
-    assert provider.max_output_tokens == [OUTPUT_TOKENS + MAX_PASSAGES * PASSAGE_TOKENS]
+    assert provider.max_output_tokens == [ALLOWANCE + MAX_PASSAGES * PASSAGE_TOKENS]
     recording = json.loads((ws.root / "artifacts/extract-1.json").read_text("utf-8"))
     assert (recording["source"], len(recording["responses"])) == ("recorded", 1)
     (estimate,) = log_events(ws, job_id, "ai_estimate")
@@ -291,7 +294,7 @@ def test_schema_retry_reestimates_its_larger_request(tmp_path: Path) -> None:
     for estimate, messages in zip(estimates, provider.sent, strict=True):
         assert estimate["tokens"] == sum(len(str(item["content"])) for item in messages) // 4
         assert estimate["usd"] == round(
-            selected_model("openai", OPENAI_MODEL).cost(estimate["tokens"], OUTPUT_TOKENS), 6
+            selected_model("openai", OPENAI_MODEL).cost(estimate["tokens"], ALLOWANCE), 6
         )
 
 
@@ -310,7 +313,7 @@ def test_preflight_refuses_over_the_job_budget_before_any_call(
     assert provider.sent == []
     (estimate,) = log_events(ws, job_id, "ai_estimate")
     model = selected_model("openai", OPENAI_MODEL)
-    assert estimate["usd"] == round(model.cost(estimate["tokens"], OUTPUT_TOKENS), 6)
+    assert estimate["usd"] == round(model.cost(estimate["tokens"], ALLOWANCE), 6)
     assert estimate["usd"] > 0.001 and estimate["job_usd"] == 0
     assert refused.value.detail == f"0.00 + {estimate['usd']:.2f} USD"
 
