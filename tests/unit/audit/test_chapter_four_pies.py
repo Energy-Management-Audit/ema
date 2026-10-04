@@ -280,6 +280,24 @@ def test_pv_pies_cover_only_pv_years_and_mark_a_missing_grid_annual() -> None:
     ]
 
 
+def test_pv_pie_with_grid_and_pv_in_different_units_is_missing() -> None:
+    dataset = EnergyDataset(
+        (2024, 2025),
+        {
+            Carrier.electricity_grid: _annual({2024: 100, 2025: 100}, "MWh"),
+            Carrier.electricity_pv: {
+                2024: CarrierSeries(annual=Reading(50, "MWh")),
+                2025: CarrierSeries(annual=Reading(50, "kWh")),
+            },
+        },
+    )
+    skipped: list[str] = []
+    blocks = pv_pies(dataset, FACTORS_2026, CLIENT, 3, skipped)
+    assert blocks[-1] == Missing("body", f"Fig. nr. 4.3 b) {PV}2025: date indisponibile")
+    assert len(_pies(blocks)) == 1
+    assert skipped == ["ch4.electricitate_pv:pie:2025:unit_mismatch"]
+
+
 def test_a_dataset_without_pv_has_no_pv_pies_or_notes() -> None:
     carriers = dict(_dataset().carriers)
     del carriers[Carrier.electricity_pv]

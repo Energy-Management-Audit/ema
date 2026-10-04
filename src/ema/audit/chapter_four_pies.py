@@ -11,7 +11,7 @@ from ema.core.office.pie_xml import COLOURS, PieKind
 from ema.energy_data.calc import annual, tep
 from ema.energy_data.carriers import CARRIER_NAMES_RO, Carrier, counts_in_total
 from ema.energy_data.factors import FactorTable
-from ema.energy_data.model import EnergyDataset
+from ema.energy_data.model import Derived, EnergyDataset
 
 MIX_GROUPS: tuple[tuple[str, frozenset[Carrier]], ...] = (
     ("Energie electrică din SEN", frozenset({Carrier.electricity_grid})),
@@ -120,6 +120,16 @@ def mix_pies(
     return _figures("mix", k, MIX_LEAD, years)
 
 
+def _pv_gap(totals: list[Derived], values: list[float]) -> str | None:
+    if len(values) < 2:
+        return "no_data"
+    if totals[0].unit != totals[1].unit:
+        return "unit_mismatch"
+    if sum(values) == 0:
+        return "no_data"
+    return None
+
+
 def pv_pies(
     dataset: EnergyDataset, factors: FactorTable, client: str, k: int, skipped: list[str]
 ) -> list[Block]:
@@ -131,15 +141,14 @@ def pv_pies(
             "Ponderea energiei electrice consumată din parcul fotovoltaic propriu din total "
             f"energie electrică la nivelul anului {year}"
         )
-        values: list[float] = []
-        for carrier in (Carrier.electricity_grid, Carrier.electricity_pv):
-            series = dataset.carriers.get(carrier, {}).get(year)
-            amount = annual(series, "carrier", carrier.value, year).value if series else None
-            if amount is not None:
-                values.append(amount)
-        if len(values) < 2 or sum(values) == 0:
-            skipped.append(f"ch4.electricitate_pv:pie:{year}:no_data")
-            years.append((subject, None))
-        else:
-            years.append((subject, (PV_LABELS, tuple(values))))
+        totals = [
+            annual(series, "carrier", carrier.value, year)
+            for carrier in (Carrier.electricity_grid, Carrier.electricity_pv)
+            if (series := dataset.carriers.get(carrier, {}).get(year)) is not None
+        ]
+        values = [total.value for total in totals if total.value is not None]
+        reason = _pv_gap(totals, values)
+        if reason is not None:
+            skipped.append(f"ch4.electricitate_pv:pie:{year}:{reason}")
+        years.append((subject, None if reason else (PV_LABELS, tuple(values))))
     return _figures("pv", k, PV_LEAD, years)

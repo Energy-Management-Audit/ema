@@ -73,9 +73,14 @@ def test_pie_block_renders_one_embedded_related_pie(tmp_path: Path) -> None:
     [
         [Series("Pondere", ["A", "B"], [0.5, None])],
         [Series("Pondere", ["A", "B"], [0.5, 0.5]), Series("Alt", ["A", "B"], [0.5, 0.5])],
+        [Series("Share", ["A", "B"], [0.5, 0.5])],
+        [Series("Pondere", ["A", "B"], [0.75, 0.75])],
+        [Series("Pondere", ["A", "B"], [1.5, -0.5])],
     ],
 )
-def test_pie_block_needs_one_series_without_gaps(tmp_path: Path, series: list[Series]) -> None:
+def test_pie_block_needs_one_pondere_series_of_fractions(
+    tmp_path: Path, series: list[Series]
+) -> None:
     source, prototypes = _source(tmp_path)
     with pytest.raises(ValueError):
         render(

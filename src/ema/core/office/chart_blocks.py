@@ -260,9 +260,15 @@ def build_chart_detached(  # noqa: PLR0913
 ) -> tuple[str, etree._Element]:
     """Build the chart a native chart block describes: a pie, a column chart or a clone."""
     if pie is not None:
-        if len(series) != 1 or any(value is None for value in series[0].values):
-            raise ValueError("a pie chart needs exactly one series without gaps")
-        values = tuple(value for value in series[0].values if value is not None)
+        values = tuple(value for value in series[0].values if value is not None) if series else ()
+        if (
+            len(series) != 1
+            or series[0].name != "Pondere"
+            or len(values) != len(series[0].values)
+            or any(value < 0 for value in values)
+            or abs(sum(values) - 1) > 1e-9
+        ):
+            raise ValueError("a pie chart needs one 'Pondere' series of fractions summing to 1")
         labels = tuple(series[0].categories)
         return build_pie_chart_detached(docx, part, pie, labels, values, out, prototype_paragraph)
     if column_axis_title is not None:
