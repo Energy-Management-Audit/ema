@@ -10,7 +10,8 @@ from docx import Document
 from openpyxl import Workbook
 from tests.workspace_jobs import create_job
 
-from ema.audit.render_plan import JobUnitPlan, process_count, unit_plan
+from ema.audit.process_units import ProcessUnits, process_units
+from ema.audit.render_plan import JobUnitPlan, unit_plan
 from ema.core.errors import EmaError
 from ema.core.review import decide, mark_absent, propose
 from ema.core.review.models import FieldSpec
@@ -46,14 +47,18 @@ def _add(ws: Workspace, job: str, slot: str, source: Path) -> None:
     ws.set_slot(job, slot, ws.add_file("synthetic", source))
 
 
-def test_process_count_prefers_schemes_then_fisa_then_one(tmp_path: Path) -> None:
-    schemes = ["dossier/5.1. Flux A.pdf", "dossier/5.1. Flux A v2.pdf", "dossier/5.3. Flux C.pdf"]
-    assert process_count(schemes, None) == (2, "schemes")
-    fisa = _fisa(tmp_path / "Fisa.docx", 2)
-    assert process_count(["dossier/0. Necesar.xlsx"], fisa) == (2, "fisa")
-    assert process_count(schemes, fisa) == (2, "schemes")
-    assert process_count([], _fisa(tmp_path / "None.docx", 0)) == (1, "default")
-    assert process_count([], None) == (1, "default")
+def test_process_count_prefers_schemes_then_fisa_then_one() -> None:
+    schemes = [("5.1. Flux A.pdf", "a"), ("5.1. Flux A v2.pdf", "b"), ("5.3. Flux C.pdf", "c")]
+    fisa = ("f", ["Fişa de date", "  Flux 1: prelucrare", "  Flux 2: prelucrare", "Descriere"])
+
+    def count(units: ProcessUnits) -> tuple[int, str]:
+        return units.count, units.source
+
+    assert count(process_units(schemes)) == (2, "schemes")
+    assert count(process_units([("0. Necesar.xlsx", "n")], fisa)) == (2, "fisa")
+    assert count(process_units(schemes, fisa)) == (2, "schemes")
+    assert count(process_units([], ("f", ["Fişa de date"]))) == (1, "default")
+    assert count(process_units([])) == (1, "default")
 
 
 def test_unit_plan_counts_every_unit_from_the_job(tmp_path: Path) -> None:

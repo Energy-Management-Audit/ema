@@ -10,7 +10,9 @@ from ema.audit.catalogue import CATALOGUE, Section
 from ema.audit.dossier import dossier_documents
 from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.fill_extract import PROMPT_VERSION, ExtractSummary, extract_facts
-from ema.audit.fill_tools import FillDocument
+from ema.audit.fill_tools import FillDocument, FillTools
+from ema.audit.fill_units import record_unit_names
+from ema.audit.process_units import job_process_units
 from ema.audit.sections import record_applicability
 from ema.core.config import Settings, load_settings
 from ema.core.errors import EmaError
@@ -101,6 +103,15 @@ def _file_id(name: str) -> str:
     return hashlib.sha256(name.encode()).hexdigest()
 
 
+def _unit_names(ctx: StageContext, documents: dict[str, FillDocument]) -> None:
+    try:
+        units = job_process_units(ctx.ws, ctx.job)
+    except Exception as exc:  # An unreadable Fişa leaves the unit headings as markers.
+        _log_failure(ctx, "process_units", section="ch3.process", error=type(exc).__name__)
+        return
+    record_unit_names(FillTools(ctx.ws, ctx.job, "ch3.process", documents), units, documents)
+
+
 def _fill(ctx: StageContext, sections: Sequence[str] | None) -> FillSummary:
     settings = load_settings(ctx.ws)
     provider, model_id = settings_provider(settings)
@@ -148,6 +159,8 @@ def _fill(ctx: StageContext, sections: Sequence[str] | None) -> FillSummary:
         failed.update((section.id, code) for section in applicable)
         _log_failure(ctx, code, exc, sections=[section.id for section in applicable])
         return FillSummary(ctx.run_id, {}, failed, tuple(not_applicable))
+    if any(section.id == "ch3.process" for section in applicable):
+        _unit_names(ctx, documents)
     done = {section.id: "done" for section in applicable}
     return FillSummary(ctx.run_id, done, failed, tuple(not_applicable), extracted)
 
