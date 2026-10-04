@@ -28,8 +28,8 @@ from ema.audit.fill_extract import (
     THINKING_TOKENS,
     instructions,
     output_tokens,
-    split_passage,
 )
+from ema.audit.fill_passages import split_passage
 from ema.audit.fill_tools import FillDocument
 from ema.core.llm import ReplayProvider
 from ema.core.llm.models import selected_model
