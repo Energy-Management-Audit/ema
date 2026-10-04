@@ -12,6 +12,7 @@ from docx import Document
 from docx.oxml.ns import qn
 from openpyxl import load_workbook
 from tests.golden.cases import case_path
+from tests.golden.piee_case_c_measures import compare_measure_tables
 
 from ema.consumption_analysis.analysis import Metric, value
 from ema.core.office.chart_series import read_series
@@ -319,7 +320,7 @@ def _display(value: float, decimals: int) -> Decimal:
 def _compare_numbered_tables(actual: Path, final: Path, data: PieeData) -> None:
     produced, authored = Document(actual).tables, Document(final).tables
     assert len(produced) == 18 and len(authored) == 15
-    # T8, T9 and T11 are outside the sourced comparison pending #48.
+    compare_measure_tables(produced, authored, data)
     for half in range(2):
         for row in range(1, 4):
             for column in range(7):

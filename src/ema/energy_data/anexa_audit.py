@@ -12,6 +12,7 @@ from ema.energy_data.source import (
     normal,
     number,
     right_of_label,
+    skip_placeholder,
 )
 
 
@@ -74,9 +75,16 @@ def _measures(sheet: Sheet, result: AnexaData) -> None:
         label = normal(description.value)
         if not label or label.startswith(("masura", "total")):
             continue
+        row_issues: list[ReaderIssue] = []
+        raw_values = {
+            key: cell_at(sheet, data_row, col, row_issues) for key, col in columns.items()
+        }
+        if skip_placeholder(description, raw_values.values(), result.issues):
+            continue
+        result.issues.extend(row_issues)
         values: dict[str, Located] = {}
-        for key, col in columns.items():
-            found = number(cell_at(sheet, data_row, col, result.issues), result.issues)
+        for key in columns:
+            found = number(raw_values[key], result.issues)
             if found is not None:
                 values[key] = found
         result.audit_measures.append(Measure("audit", description, None, values))
