@@ -43,6 +43,41 @@ def test_private_query_refused_and_logged(tmp_path: Path) -> None:
     assert encoded.value.code == "outbound_refused"
 
 
+@pytest.mark.parametrize(
+    ("value", "quote", "accepted"),
+    [
+        ("15", "115 kW", False),
+        ("1.234,5", "Putere 1.234,5 kW", True),
+        ("1 234,5", "Putere 1 234,5 kW", True),
+    ],
+)
+def test_record_fact_matches_whole_numbers(
+    tmp_path: Path, value: str, quote: str, accepted: bool
+) -> None:
+    tools, _, _ = setup(tmp_path)
+    tools.snapshots["sha"] = Snapshot(
+        "https://example.org/company",
+        "sha",
+        datetime.now(UTC),
+        "text/plain",
+        quote.encode(),
+    )
+
+    args = {
+        "key": "audit.address",
+        "value": value,
+        "snapshot_sha": "sha",
+        "quote": quote,
+        "trust_reason": "Official register",
+    }
+    if accepted:
+        tools.record_fact(args)
+    else:
+        with pytest.raises(EmaError) as error:
+            tools.record_fact(args)
+        assert error.value.code == "value_unverified"
+
+
 def test_dataset_decimal_is_private(tmp_path: Path) -> None:
     _, ws, job = setup(tmp_path)
     propose(
