@@ -30,33 +30,33 @@ from ema.core.office.region import replace_region
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _CHAPTERS = {section.id: section.chapter for section in CATALOGUE}
 _CAPTION = re.compile(r"^\s*Tabel")
-# The base's equipment, transformer, gas, heating and fleet photos have no dossier images.
+# The base's own site photos in ch. 3 have no dossier images.
 # Each number is the figure caption anchor stamped by base_anchor, scoped to its section.
 REMOVABLE_PHOTOS = {
     "ch3.equipment": frozenset(
         {
-            4,  # First crane photo.
-            5,  # Portal crane photo.
-            6,  # Port crane photo.
-            7,  # Modernized crane photo.
-            8,  # Dosing hopper photo.
+            4,  # Equipment photo.
+            5,  # Equipment photo.
+            6,  # Equipment photo.
+            7,  # Equipment photo.
+            8,  # Equipment photo.
         }
     ),
-    "ch3.electricitate": frozenset({9}),  # Transformer station photo.
+    "ch3.electricitate": frozenset({9}),  # Electrical station photo.
     "ch3.gaz": frozenset(
         {
-            10,  # Gas regulating station photo.
-            11,  # Boiler photo.
-            12,  # Heating circuit diagram.
-            13,  # Radiator photo.
+            10,  # Gas station photo.
+            11,  # Heating equipment photo.
+            12,  # Heating diagram.
+            13,  # Heating equipment photo.
         }
     ),
     "ch3.carburant": frozenset(
         {
-            14,  # First forklift photo.
-            15,  # Second forklift photo.
-            16,  # Third forklift photo.
-            17,  # Fuel tank photo.
+            14,  # Vehicle photo.
+            15,  # Vehicle photo.
+            16,  # Vehicle photo.
+            17,  # Fuel storage photo.
         }
     ),
 }
