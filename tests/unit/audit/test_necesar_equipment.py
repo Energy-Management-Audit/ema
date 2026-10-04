@@ -8,6 +8,7 @@ from pathlib import Path
 from openpyxl import Workbook, load_workbook
 from tests.workspace_jobs import create_job
 
+from ema.audit.chapter_tables_data import boiler_rows
 from ema.audit.read import read_dossier
 from ema.core.review import fields
 from ema.core.review.models import Cell, Evidence, Field
@@ -28,16 +29,23 @@ def _necesar(path: Path) -> Path:
     ):
         sheet.cell(7, column, label)
     sheet.cell(7, 8, "Putere instalată")
+    sheet.cell(7, 9, "Combustibil utilizat")
     sheet.cell(8, 3, "Tip echipament")
     sheet.cell(8, 8, "(kW)")
-    for row, (name, process, count, year, power) in enumerate(
-        (("Centrala A", "Incalzire hala", 1, 2007, 500), ("Centrala B", "Apa calda", 2, 1997, 55)),
+    for row, (name, process, count, year, power, fuel) in enumerate(
+        (
+            ("Centrala A", "Incalzire hala", 1, 2007, 500, "gaz natural"),
+            ("Centrala B", "Apa calda", 2, 1997, 55, None),
+            ("Compresor", "Aer comprimat", 1, 2010, 25, "energie electrică"),
+        ),
         9,
     ):
         for column, value in zip(
-            (2, 3, 4, 5, 6, 8), (row - 8, name, process, count, year, power), strict=True
+            (2, 3, 4, 5, 6, 8, 9), (row - 8, name, process, count, year, power, fuel), strict=True
         ):
             sheet.cell(row, column, value)
+    sheet.cell(12, 3, "Total")
+    sheet.cell(12, 5, 4)
     forklifts = book.create_sheet("Echipamente 1")
     for column, label in enumerate(
         ("Nr.", "Denumire", "Comb.", "Greutate/inaltime", "An fabricaţie", "Ore de funcţionare"), 2
@@ -70,8 +78,18 @@ def _necesar(path: Path) -> Path:
 
 def test_rows_are_found_by_label_and_kept_apart(tmp_path: Path) -> None:
     equipment = read_equipment(parse_necesar_info(_necesar(tmp_path / "necesar.xlsx")))
-    assert [row["name"].value for row in equipment.boilers] == ["Centrala A", "Centrala B"]
-    assert [row["count"].value for row in equipment.boilers] == [1, 2]
+    assert [row["name"].value for row in equipment.boilers] == [
+        "Centrala A",
+        "Centrala B",
+        "Compresor",
+    ]
+    assert [row["count"].value for row in equipment.boilers] == [1, 2, 1]
+    assert equipment.boilers[0]["resource"].value == "gaz natural"
+    assert [row["name"].value for row in equipment.rows] == [
+        "Centrala A",
+        "Centrala B",
+        "Compresor",
+    ]
     assert equipment.boilers[0]["power"].unit == "kW"
     assert [row["name"].value for row in equipment.forklifts] == [
         "MARCA : Marca X",
@@ -89,8 +107,25 @@ def test_power_not_in_kilowatts_is_not_read(tmp_path: Path) -> None:
     book = load_workbook(path)
     book["Echipamente 2"].cell(8, 8, "(CP)")
     book.save(path)
-    boilers = read_equipment(parse_necesar_info(path)).boilers
-    assert boilers and all("power" not in row for row in boilers)
+    equipment = read_equipment(parse_necesar_info(path))
+    assert equipment.boilers and all("power" not in row for row in equipment.boilers)
+    assert equipment.rows and all("power" not in row for row in equipment.rows)
+
+
+def test_shifted_headers_fill_the_general_table_in_sheet_order(tmp_path: Path) -> None:
+    path = _necesar(tmp_path / "necesar.xlsx")
+    book = load_workbook(path)
+    book["Echipamente 2"].insert_rows(7)
+    book["Echipamente 1"].insert_rows(5)
+    book.save(path)
+    workspace = Workspace(tmp_path / "workspace")
+    job = create_job(workspace, "audit", "synthetic", 2025)
+    read_dossier(workspace, job, path)
+    assert boiler_rows(fields(workspace, job)) == [
+        ["Centrala A", "Incalzire hala", "1", "500", "gaz natural"],
+        ["Centrala B", "Apa calda", "2", "55", None],
+        ["Compresor", "Aer comprimat", "1", "25", "energie electrică"],
+    ]
 
 
 def test_read_records_each_row_with_its_cell(tmp_path: Path) -> None:
@@ -98,10 +133,13 @@ def test_read_records_each_row_with_its_cell(tmp_path: Path) -> None:
     job = create_job(workspace, "audit", "synthetic", 2025)
     read_dossier(workspace, job, _necesar(tmp_path / "necesar.xlsx"))
     saved: dict[str, Field] = {field.key: field for field in fields(workspace, job)}
-    assert saved["audit.boiler.2.name"].value == "Centrala B"
-    assert saved["audit.boiler.2.count"].value == 2
-    assert saved["audit.boiler.1.power"].value == 500
-    assert saved["audit.boiler.1.power"].unit == "kW"
+    assert saved["audit.equipment_row.2.name"].value == "Centrala B"
+    assert saved["audit.equipment_row.2.count"].value == 2
+    assert saved["audit.equipment_row.1.power"].value == 500
+    assert saved["audit.equipment_row.1.power"].unit == "kW"
+    assert not any(key.startswith("audit.boiler.") for key in saved)
+    assert saved["audit.equipment_row.1.resource"].value == "gaz natural"
+    assert saved["audit.equipment_row.3.name"].value == "Compresor"
     assert saved["audit.forklift.2.fuel"].value == "propan"
     assert saved["audit.vehicle.1.type"].value == "308"
     assert saved["audit.vehicle.1.year"].value == "2015-2016"
@@ -109,8 +147,17 @@ def test_read_records_each_row_with_its_cell(tmp_path: Path) -> None:
     assert saved["audit.transformer.1.putere_aparenta_nominala_kva"].value == Decimal("1000")
     with workspace.connect() as db:
         row = db.execute(
-            "SELECT data FROM evidence WHERE id=?", (saved["audit.boiler.2.name"].evidence[0],)
+            "SELECT data FROM evidence WHERE id=?",
+            (saved["audit.equipment_row.2.name"].evidence[0],),
         ).fetchone()
     locator = Evidence.model_validate_json(row["data"]).locator
     assert isinstance(locator, Cell)
     assert (locator.sheet, locator.ref) == ("Echipamente 2", "C10")
+    with workspace.connect() as db:
+        resource = db.execute(
+            "SELECT data FROM evidence WHERE id=?",
+            (saved["audit.equipment_row.1.resource"].evidence[0],),
+        ).fetchone()
+    fuel_locator = Evidence.model_validate_json(resource["data"]).locator
+    assert isinstance(fuel_locator, Cell)
+    assert (fuel_locator.sheet, fuel_locator.ref) == ("Echipamente 2", "I9")

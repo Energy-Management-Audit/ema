@@ -101,6 +101,70 @@ def _text(value: Any) -> str:
     return " ".join(str(value).split())
 
 
+def _equipment_value(grid: list[list[Any]], head: int, row: int, *labels: str) -> str:
+    for label in labels:
+        try:
+            found = _cell(grid, head, row, label)
+        except StopIteration:
+            continue
+        if found is not None:
+            return _text(found)
+    return "n.d."
+
+
+def _equipment_expected(book: Book) -> list[list[str]]:
+    equipment_rows: list[list[str]] = []
+    for name in book.sheet_names:
+        if not normal(name).startswith("echipamente ") or normal(name) == "echipamente 1":
+            continue
+        equipment = _grid(book.sheet(name))
+        try:
+            head = _row_with(equipment, "nr crt")
+            number = _column(equipment, head, "nr crt")
+        except StopIteration:
+            continue
+        unit = (
+            next(
+                (
+                    row[_column(equipment, head, "putere instalata")]
+                    for row in equipment[head + 1 :]
+                    if row[number] is None and row[_column(equipment, head, "putere instalata")]
+                ),
+                None,
+            )
+            if any(
+                isinstance(cell, str) and normal(cell).startswith("putere instalata")
+                for cell in equipment[head]
+            )
+            else None
+        )
+
+        for i in range(head + 1, len(equipment)):
+            if not isinstance(equipment[i][number], int | float):
+                continue
+            equipment_rows.append(
+                [
+                    _equipment_value(equipment, head, i, "denumire"),
+                    _equipment_value(equipment, head, i, "proces"),
+                    _equipment_value(equipment, head, i, "nr buc"),
+                    _equipment_value(equipment, head, i, "putere instalata")
+                    if normal(str(unit)) == "kw"
+                    else "n.d.",
+                    _equipment_value(
+                        equipment,
+                        head,
+                        i,
+                        "resursa consumata",
+                        "combustibil",
+                        "comb",
+                        "tip combustibil",
+                    ),
+                ]
+            )
+
+    return equipment_rows
+
+
 def _expected(book: Book) -> dict[str, list[list[str]]]:
     employees = _sheet_with(book, "numar de salariati")
     row = _row_with(employees, "numar de salariati")
@@ -110,21 +174,6 @@ def _expected(book: Book) -> dict[str, list[list[str]]]:
     row = _row_with(economics, "cifra de afaceri")
     year_row = _row_with(economics, "anul")
     money = {year: economics[row][col] for col, year in _years(economics, year_row).items()}
-
-    boilers = _sheet_with(book, "proces de fabricatie")
-    head = _row_with(boilers, "proces de fabricatie")
-    number = _column(boilers, head, "nr crt")
-    boiler_rows = [
-        [
-            _text(_cell(boilers, head, i, "denumire")),
-            _text(_cell(boilers, head, i, "proces de fabricatie")),
-            _text(_cell(boilers, head, i, "nr buc")),
-            _text(_cell(boilers, head, i, "putere instalata")),
-            "n.d.",
-        ]
-        for i in range(head + 1, len(boilers))
-        if isinstance(boilers[i][number], int | float)
-    ]
 
     fleet = _sheet_with(book, "denumire autovehicul")
     head = _row_with(fleet, "denumire autovehicul")
@@ -160,7 +209,7 @@ def _expected(book: Book) -> dict[str, list[list[str]]]:
     return {
         "employees": [[str(y), _thousands(_num(v), 0)] for y, v in sorted(people.items())],
         "turnover": [[str(y), _thousands(_num(v), 2)] for y, v in sorted(money.items())],
-        "boilers": boiler_rows,
+        "equipment": _equipment_expected(book),
         "vehicles": [[v[0], v[1], v[2]] for v in vehicles],
         "forklifts": [[f"Autostivuitor {name} ({fuel})", "1", "n.d."] for name, fuel in forklifts],
     }
@@ -193,7 +242,9 @@ def test_ch2_and_ch3_tables_follow_the_necesar_sheets(
     finally:
         book.close()
     # the sources hold rows, so the count the data gives is not the base's own
-    assert len(expected["boilers"]) and len(expected["vehicles"]) + len(expected["forklifts"]) > 18
+    assert (
+        len(expected["equipment"]) and len(expected["vehicles"]) + len(expected["forklifts"]) > 18
+    )
 
     ws = Workspace(tmp_path / "workspace")
     job = create_job(ws, "audit", "audit-case-a", 2026)
@@ -225,10 +276,10 @@ def test_ch2_and_ch3_tables_follow_the_necesar_sheets(
     assert employees[1:] == expected["employees"]
     assert turnover[1:] == expected["turnover"]
 
-    boilers = next(t for h, t in by_header.items() if h[1] == "Denumire + tip echipament")
-    # header, the base's blank spacer row, then one row per boiler; its first column is numbered
-    assert [row[1:] for row in boilers[2:]] == expected["boilers"]
-    assert boilers[0][5] == "Resursa consumată"
+    equipment = next(t for h, t in by_header.items() if h[1] == "Denumire + tip echipament")
+    # header, the base's blank spacer row, then one row per equipment item
+    assert [row[1:] for row in equipment[2:]] == expected["equipment"]
+    assert equipment[0][5] == "Resursa consumată"
 
     fleet = next(t for h, t in by_header.items() if h[1] == "Tip autovehicul")
     assert [row[1:] for row in fleet[1:]] == expected["vehicles"] + expected["forklifts"]
