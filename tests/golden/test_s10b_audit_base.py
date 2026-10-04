@@ -99,6 +99,13 @@ def _style_signature(style: object) -> bytes:
     return etree.tostring(clone, method="c14n")
 
 
+def _renumbered_chapter_reference(source: str, target: str, number: str) -> bool:
+    references = list(re.finditer(r"Capitolului (\d+)\b", source))
+    return len(references) == 1 and target == (
+        source[: references[0].start(1)] + number + source[references[0].end(1) :]
+    )
+
+
 def _prototype_format(base: Path, prototype: Path, output: Path) -> None:
     source = Document(base)
     reference = Document(prototype)
@@ -130,6 +137,11 @@ def _prototype_format(base: Path, prototype: Path, output: Path) -> None:
 
 
 def _fixed_chapters(base: Path, output: Path, identity: tuple[str, ...]) -> None:
+    document = Document(output)
+    heading = next(
+        item.heading for item in map_headings(output, "audit-01").mapped if item.section_id == "ch7"
+    )
+    chapter_number = printed_numbers(document)[document.paragraphs[heading.index]._p].rstrip(".")
     for section in ("ch1", "ch7"):
         original = _section_paragraphs(base, section)
         built = _section_paragraphs(output, section)
@@ -142,6 +154,12 @@ def _fixed_chapters(base: Path, output: Path, identity: tuple[str, ...]) -> None
             if section == "ch7" and index == 0:
                 assert source.style.style_id == target.style.style_id  # type: ignore[attr-defined]
                 continue  # its printed chapter number changes when ch5 is inserted
+            if section == "ch7" and _renumbered_chapter_reference(
+                source_text,
+                target.text,
+                chapter_number,  # type: ignore[attr-defined]
+            ):
+                continue
             xml_text = _paragraph_text(source._p)  # type: ignore[attr-defined]
             if has_number(xml_text) and not approved_fixed_text(xml_text):
                 assert MARKER in target.text  # type: ignore[attr-defined]

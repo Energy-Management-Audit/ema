@@ -79,6 +79,27 @@ CHARTS = (
 )
 
 
+@dataclass(frozen=True)
+class Caption:
+    key: str
+    title: str
+    unit: str | None = None
+
+
+CAPTIONS = {
+    EMPLOYEES_TABLE: (
+        Caption("employees.table", "Numărul mediu de angajați"),
+        Caption("employees.chart", "Evoluția numărului mediu de angajați"),
+    ),
+    TURNOVER_TABLE: (
+        Caption("turnover.table", "Cifra de afaceri", "lei"),
+        Caption("turnover.chart", "Evoluția cifrei de afaceri", "lei"),
+    ),
+    BOILERS_TABLE: (Caption("boilers.table", "Centrale termice"),),
+    VEHICLES_TABLE: (Caption("vehicles.table", "Parcul auto"),),
+}
+
+
 def _text(element: etree._Element) -> str:
     return "".join(node.text or "" for node in element.iter(W + "t"))
 
@@ -138,7 +159,60 @@ def _tables(fields: Sequence[Field]) -> list[tuple[TableSpec, list[list[Cell]]]]
     return [(spec, rows) for spec, rows in tables if rows]
 
 
-def write_tables(source: Path, target: Path, *, chapter: str, fields: Sequence[Field]) -> None:
+def _title_captions(
+    body: Sequence[etree._Element],
+    spans: dict[str, tuple[int, int]],
+    spec: TableSpec,
+    table: int,
+) -> None:
+    start, end = spans[spec.section]
+    captions = CAPTIONS[spec]
+    before = next(
+        (
+            body[i]
+            for i in range(table - 1, start - 1, -1)
+            if body[i].tag == W + "p" and re.match(r"^\s*Tabel", _text(body[i]))
+        ),
+        None,
+    )
+    if before is None:
+        raise EmaError("table_slot", "Legenda tabelului lipseşte din bază.", spec.section)
+    caption = captions[0]
+    if MARKER in _text(before):
+        set_text(
+            before,
+            _text(before).replace(MARKER, _caption_title(caption)),
+        )
+    if len(captions) == 2:
+        after = next(
+            (
+                body[i]
+                for i in range(table + 1, end)
+                if body[i].tag == W + "p" and re.match(r"^\s*Fig", _text(body[i]))
+            ),
+            None,
+        )
+        if after is None:
+            raise EmaError("chart_slot", "Legenda graficului lipseşte din bază.", spec.section)
+        caption = captions[1]
+        if MARKER in _text(after):
+            set_text(
+                after,
+                _text(after).replace(MARKER, _caption_title(caption)),
+            )
+
+
+def _caption_title(caption: Caption) -> str:
+    return f"{caption.title} ({caption.unit})" if caption.unit else caption.title
+
+
+def write_tables(
+    source: Path,
+    target: Path,
+    *,
+    chapter: str,
+    fields: Sequence[Field],
+) -> None:
     """The tables of one chapter, filled; a table without data keeps its markers."""
     parts = read_parts(source)
     root = xml(parts, "word/document.xml")
@@ -153,6 +227,7 @@ def write_tables(source: Path, target: Path, *, chapter: str, fields: Sequence[F
         if index is None:
             raise EmaError("table_slot", "Locul tabelului lipseşte din bază.", spec.section)
         fill_table(body[index], spec, rows)
+        _title_captions(body, spans, spec, index)
     parts["word/document.xml"] = encoded(root)
     write_parts(parts, target)
 
