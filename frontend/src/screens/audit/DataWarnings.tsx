@@ -4,9 +4,12 @@ import type { Field, Issue } from '../../api/types.ts'
 import { sourceLabel } from '../../audit/sources.ts'
 import { dataWarnings, sourceField } from '../../audit/warnings.ts'
 import { useJob } from '../../state/job.tsx'
-import { useResource } from '../../state/resource.ts'
+import { invalidate, useResource } from '../../state/resource.ts'
+import { Button } from '../../ui/Button.tsx'
+import { FailureNotice } from '../../ui/Feedback.tsx'
 import { DataWarningRow, SourceButton } from '../../ui/Review.tsx'
 import { SectionKey } from '../../ui/Surface.tsx'
+import { problemTitle } from '../States.tsx'
 import { EvidencePanel } from './EvidencePanel.tsx'
 
 function WarningSource({ id, open, onOpen }: { id: string; open: boolean; onOpen: () => void }) {
@@ -36,6 +39,27 @@ function WarningSnippet({
 }) {
   const evidence = useResource(`evidence/${id}`, () => api.evidence(id))
   if (!field) return <span>Câmpul acestei surse nu mai există.</span>
+  if (evidence.error && !evidence.data) {
+    return (
+      <FailureNotice
+        title="Nu am putut încărca sursa"
+        actions={
+          <Button
+            variant="secondary"
+            height={30}
+            disabled={evidence.loading}
+            onClick={() => {
+              invalidate(`evidence/${id}`)
+            }}
+          >
+            Încearcă din nou
+          </Button>
+        }
+      >
+        {problemTitle(evidence.error)}
+      </FailureNotice>
+    )
+  }
   if (!evidence.data) return <span>Se încarcă…</span>
   return <EvidencePanel field={field} evidence={evidence.data} close={close} marked={marked} />
 }
@@ -74,6 +98,7 @@ export function DataWarnings() {
         snippet={
           openId ? (
             <WarningSnippet
+              key={openId}
               id={openId}
               field={sourceField(fields, openId)}
               marked={warning.message}

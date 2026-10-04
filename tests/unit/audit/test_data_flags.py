@@ -1,5 +1,6 @@
 """Data suspicions stay in the review queue with evidence from both sources."""
 
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -143,3 +144,75 @@ def test_unit_mismatch_is_refused_with_warning() -> None:
     ]
     assert len(found) == 1
     assert "unități diferite" in found[0].message
+
+
+def _diesel(values: dict[int, int]) -> dict[str, Field]:
+    return {
+        f"carrier.diesel.2025.{month:02d}": _field(
+            f"carrier.diesel.2025.{month:02d}", value, f"month-{month}"
+        )
+        for month, value in values.items()
+    }
+
+
+def test_messages_name_the_carrier_and_month_in_romanian() -> None:
+    repeat = flags(_diesel({1: 10, 2: 10, 3: 12}))
+    quarter = flags(_diesel({1: 100, 2: 0, 3: 0, 4: 12, 5: 10, 6: 11}))
+    refused = flags(
+        {
+            "carrier.diesel.2024": _field("carrier.diesel.2024", 0, "old"),
+            "carrier.diesel.2025": _field("carrier.diesel.2025", 10, "new"),
+        }
+    )
+    message = {issue.code: issue.message for issue in [*repeat, *quarter, *refused]}
+    assert (
+        message["data_month_repeat"]
+        == "Luni consecutive egale: motorină 2025, ianuarie şi februarie."
+    )
+    assert (
+        message["data_quarter_in_month"]
+        == "Consum concentrat într-o lună: motorină 2025, luna ianuarie."
+    )
+    assert message["data_change_refused"] == "Schimbare omisă: motorină, 2024–2025: bază zero."
+
+
+def test_no_internal_key_reaches_a_message() -> None:
+    fields = {
+        **_diesel({1: 100, 2: 100, 3: 0, 4: 12, 5: 10, 6: 11}),
+        "carrier.diesel.2024": _field("carrier.diesel.2024", 0, "old"),
+        "carrier.diesel.2025": _field("carrier.diesel.2025", 10, "new"),
+        "carrier.lpg.2025": _field("carrier.lpg.2025", 0, "quantity"),
+        "audit.economics.lpg_costs_lei.2025": _field(
+            "audit.economics.lpg_costs_lei.2025", 100, "cost"
+        ),
+        "audit.vehicle.1.count": _field(
+            "audit.vehicle.1.count",
+            2,
+            "document-a",
+            candidates=[
+                Candidate(id="a", value=2, evidence=["document-a"]),
+                Candidate(id="b", value=3, evidence=["document-b"]),
+            ],
+        ).model_copy(update={"label": "Număr autovehicule"}),
+    }
+    found = flags(fields)
+    assert {issue.code for issue in found} >= {
+        "data_gpl_cost_no_quantity",
+        "data_count_conflict",
+        "data_month_repeat",
+        "data_quarter_in_month",
+        "data_change_refused",
+    }
+    assert not [issue.message for issue in found if re.search(r"\w\.\w", issue.message)]
+
+
+def test_unknown_carrier_is_not_flagged() -> None:
+    fields = {
+        f"carrier.steam.2025.{month:02d}": _field(
+            f"carrier.steam.2025.{month:02d}", value, f"steam-{month}"
+        )
+        for month, value in {1: 10, 2: 10, 3: 0, 4: 2}.items()
+    }
+    fields["carrier.steam.2024"] = _field("carrier.steam.2024", 0, "old")
+    fields["carrier.steam.2026"] = _field("carrier.steam.2026", 10, "new")
+    assert flags(fields) == []
