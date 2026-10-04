@@ -9,6 +9,7 @@ from ema.audit.applicability import applies, fact_fields
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.catalogue_labels import CEDILLA
 from ema.audit.chapter_readiness import empty_chapters
+from ema.audit.data_flags import flags
 from ema.audit.totals_review import totals_issues
 from ema.core.review.models import Issue, Readiness
 from ema.core.review.section_transition import Status
@@ -73,9 +74,11 @@ def audit_readiness(ws: Workspace, job: str, db: sqlite3.Connection | None = Non
                     )
     issues.extend(totals_issues(facts))
     issues.extend(empty_chapters(states))
+    warnings = flags(facts)
     return Readiness(
         draft_ok=True,
         final_ok=not issues,
         blocking=issues,
+        warnings=warnings,
         next=[issue.message for issue in issues],
     )

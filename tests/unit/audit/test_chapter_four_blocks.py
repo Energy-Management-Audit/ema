@@ -11,6 +11,23 @@ from ema.energy_data.factors import FACTORS_2026
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
 
 
+def _section(blocks: list[object], section: str) -> list[object]:
+    start = next(
+        index
+        for index, block in enumerate(blocks)
+        if isinstance(block, Paragraph) and block.proto == f"heading:{section}"
+    )
+    end = next(
+        (
+            index
+            for index in range(start + 1, len(blocks))
+            if isinstance(blocks[index], Paragraph) and blocks[index].proto.startswith("heading:")
+        ),
+        len(blocks),
+    )
+    return blocks[start:end]
+
+
 def test_chapter_four_has_source_backed_tables_and_missing_sections() -> None:
     dataset = EnergyDataset(
         (2025,),
@@ -73,7 +90,7 @@ def test_grouped_tables_source_labels_and_scaled_value_lines() -> None:
     number = tables[0].rows[0][1][0]
     assert isinstance(number, Num) and number.grouping and number.value == 1234.5
     title = next(block for block in blocks if isinstance(block, Caption))
-    assert "".join(segment for segment in title.segments[3:] if isinstance(segment, str)) == (
+    assert "".join(segment for segment in title.segments[3:-1] if isinstance(segment, str)) == (
         "Centralizator al producției lunare înregistrate de către Atelier Exemplu SRL "
         "– Lacuri și vopsele/lună"
     )
@@ -161,7 +178,7 @@ def test_lei_title_and_unavailable_metadata_use_typed_missing_segments():
     )
     blocks = chapter_four_blocks(dataset, FACTORS_2026, client="Atelier Exemplu SRL")
     caption = next(block for block in blocks if isinstance(block, Caption))
-    assert "".join(segment for segment in caption.segments[3:] if isinstance(segment, str)) == (
+    assert "".join(segment for segment in caption.segments[3:-1] if isinstance(segment, str)) == (
         "Centralizator al cifrei lunare de afaceri înregistrate de către Atelier Exemplu SRL "
         "– lei/lună"
     )
@@ -223,7 +240,7 @@ def test_production_titles_classify_lei_as_a_word_and_keep_source_unit(
     )
     title = "".join(segment for segment in table.segments if isinstance(segment, str))
     assert f"Centralizator al {table_subject} înregistrate de către Client" in title
-    assert title.endswith(suffix)
+    assert f"{suffix} – 2025 ({unit})" in title
     charts, _ = chart_blocks("ch4.productie", dataset, FACTORS_2026, "Client")
     caption = next(block for block in charts if isinstance(block, Paragraph))
     assert f"Evoluția lunară a {figure_subject}" in caption.segments[0]
@@ -288,3 +305,31 @@ def test_specific_product_name_is_present_only_for_multiple_active_products():
     assert all(
         line.segments[0] == "pentru anul 2025 s-a înregistrat o valoare de " for line in lines
     )
+
+
+def test_year_blocks_have_two_six_month_tables_with_unit_captions() -> None:
+    dataset = EnergyDataset(
+        (2024, 2025),
+        {
+            Carrier.electricity_grid: {
+                year: CarrierSeries(annual=Reading(10, "MWh")) for year in (2024, 2025)
+            }
+        },
+        turnover_lei={year: Reading(1_000_000, "lei") for year in (2024, 2025)},
+    )
+    blocks = chapter_four_blocks(dataset, FACTORS_2026)
+    electric = _section(blocks, "ch4.electricitate")
+    tables = [block for block in electric if isinstance(block, Table)]
+    captions = [block for block in electric if isinstance(block, Caption)]
+    assert len(tables) == len(captions) == 4
+    assert [table.rows[0][0] for table in tables] == [["2024"], ["2024"], ["2025"], ["2025"]]
+    assert [caption.segments[-1] for caption in captions] == [
+        " – 2024 (MWh)",
+        " – 2024 (MWh)",
+        " – 2025 (MWh)",
+        " – 2025 (MWh)",
+    ]
+    intensity = _section(blocks, "ch4.intensitate")
+    table = next(block for block in intensity if isinstance(block, Table))
+    assert table.header == [["Indicator", "2024", "2025"]]
+    assert isinstance(table.rows[0][1][0], Num)

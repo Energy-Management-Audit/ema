@@ -123,6 +123,7 @@ export type Issue = {
   code: string
   field_id?: string | null
   message: string
+  evidence_ids?: string[]
 }
 
 export type Readiness = {

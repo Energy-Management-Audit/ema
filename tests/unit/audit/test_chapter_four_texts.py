@@ -51,7 +51,17 @@ def test_written_text_replaces_the_marker() -> None:
         dataset, FACTORS_2026, texts={"ch4.concluzii": "Primul paragraf.\n\n  Al doilea.  "}
     )
     heading = blocks.index(Paragraph("heading:ch4.concluzii", [TITLES["ch4.concluzii"]]))
-    assert blocks[heading + 1 : heading + 3] == [
+    next_heading = next(
+        index
+        for index in range(heading + 1, len(blocks))
+        if isinstance(blocks[index], Paragraph) and blocks[index].proto.startswith("heading:")
+    )
+    conclusions = blocks[heading + 1 : next_heading]
+    assert any(
+        isinstance(block, Paragraph) and "ponderea cea mai mare" in str(block.segments)
+        for block in conclusions
+    )
+    assert conclusions[-2:] == [
         Paragraph("body", ["Primul paragraf."]),
         Paragraph("body", ["Al doilea."]),
     ]
@@ -71,7 +81,6 @@ def test_na_section_text_never_blocks_the_final(tmp_path: Path) -> None:
         blocking = {issue.message for issue in content_issues(db, job)}
     labels = {message.removeprefix("Textul lipseşte: ") for message in blocking}
     assert labels == {
-        "Concluziile privind analiza consumului echivalent de energie",
         "Analiza eficienţei utilizării energiei",
         "Introducerea capitolului 3",
         "Introducerea capitolului 6",
