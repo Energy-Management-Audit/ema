@@ -6,6 +6,7 @@ import sqlite3
 
 from ema.audit.ai_wording import ai_wording
 from ema.audit.chapter_four_sentences import sentence_plan
+from ema.audit.render_dataset import reviewed_dataset
 from ema.audit.visit import slug
 from ema.core.review.models import Field, Issue
 from ema.core.review.section_transition import SectionState, Status
@@ -38,7 +39,7 @@ def _has_arithmetic_conclusion(fields: dict[str, Field]) -> bool:
     if not readings:
         return False
     years = tuple(sorted({year for series in readings.values() for year in series}))
-    dataset = EnergyDataset(years, readings)
+    dataset = reviewed_dataset(EnergyDataset(years, readings), fields.values())
     try:
         return bool(sentence_plan(dataset, AUDIT_FACTORS_2026).sections.get("ch4.concluzii"))
     except ValueError:

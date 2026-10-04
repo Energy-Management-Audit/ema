@@ -58,7 +58,7 @@ def test_written_text_replaces_the_marker() -> None:
     )
     conclusions = blocks[heading + 1 : next_heading]
     assert any(
-        isinstance(block, Paragraph) and "ponderea cea mai mare" in str(block.segments)
+        isinstance(block, Paragraph) and "Cea mai mare pondere" in str(block.segments)
         for block in conclusions
     )
     assert conclusions[-2:] == [

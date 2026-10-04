@@ -84,9 +84,9 @@ def _monthly_flags(name: str, months: dict[int, Field]) -> list[Issue]:
     result: list[Issue] = []
     for month in range(1, 12):
         first, second = months.get(month), months.get(month + 1)
-        if first is None or second is None or _number(first) is None:
+        if first is None or second is None or _number(first) in (None, 0):
             continue
-        if _number(first) == _number(second):
+        if _number(second) not in (None, 0) and _number(first) == _number(second):
             issue = _issue(
                 "data_month_repeat",
                 f"Luni consecutive egale: {name}, {month} şi {month + 1}.",
@@ -114,7 +114,14 @@ def _monthly_flags(name: str, months: dict[int, Field]) -> list[Issue]:
             "data_quarter_in_month",
             f"Consum concentrat într-o lună: {name}, luna {month}.",
             field,
-            peers[0],
+            next(
+                (
+                    months[index]
+                    for index in quarter
+                    if index != month and index in months and _number(months[index]) in (None, 0)
+                ),
+                peers[0],
+            ),
         )
         if issue:
             result.append(issue)
@@ -134,14 +141,12 @@ def flags(fields: Mapping[str, Field]) -> list[Issue]:
     for carrier, values in annual.items():
         ordered = sorted(values)
         for (earlier, before), (later, after) in pairwise(ordered):
-            if before.unit != after.unit:
-                continue
             previous = Derived(
                 _number(before), before.unit or "", "reading", (before.key,), year=earlier
             )
             current = Derived(_number(after), after.unit or "", "reading", (after.key,), year=later)
             reason = change_refusal(previous, current)
-            if reason in {"bază zero", "ani neconsecutivi"}:
+            if reason in {"bază zero", "ani neconsecutivi", "unități diferite"}:
                 issue = _issue(
                     "data_change_refused",
                     f"Schimbare omisă: {carrier}, {earlier}–{later}: {reason}.",

@@ -109,3 +109,37 @@ def test_flags_reach_audit_readiness_without_blocking(tmp_path) -> None:
     readiness = audit_readiness(ws, job)
     assert any(issue.code == "data_gpl_cost_no_quantity" for issue in readiness.warnings)
     assert not any(issue.code == "data_gpl_cost_no_quantity" for issue in readiness.blocking)
+
+
+def test_zero_summer_months_are_not_repeats() -> None:
+    fields = {
+        f"carrier.diesel.2025.{month:02d}": _field(
+            f"carrier.diesel.2025.{month:02d}", 0, f"summer-{month}"
+        )
+        for month in (6, 7, 8)
+    }
+    assert not any(issue.code == "data_month_repeat" for issue in flags(fields))
+
+
+def test_quarter_flag_cites_empty_month_of_same_quarter() -> None:
+    values = {1: 100, 2: 0, 3: 0, 4: 12, 5: 10, 6: 11}
+    fields = {
+        f"carrier.diesel.2025.{month:02d}": _field(
+            f"carrier.diesel.2025.{month:02d}", value, f"month-{month}"
+        )
+        for month, value in values.items()
+    }
+    found = next(issue for issue in flags(fields) if issue.code == "data_quarter_in_month")
+    assert found.evidence_ids == ("month-1", "month-2")
+
+
+def test_unit_mismatch_is_refused_with_warning() -> None:
+    before = _field("carrier.diesel.2024", 10, "old")
+    after = _field("carrier.diesel.2025", 15, "new").model_copy(update={"unit": "kg"})
+    found = [
+        issue
+        for issue in flags({before.key: before, after.key: after})
+        if issue.code == "data_change_refused"
+    ]
+    assert len(found) == 1
+    assert "unități diferite" in found[0].message

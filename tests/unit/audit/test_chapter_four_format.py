@@ -37,7 +37,7 @@ def test_keeps_chapter_chart_groups_and_centres_missing_cells_at_text_width():
     for paragraph in (chapter, heading, label, drawing):
         assert paragraph._p.find(W + "pPr/" + W + "keepNext").get(W + "val") == "1"
     assert caption._p.find(W + "pPr/" + W + "keepLines").get(W + "val") == "1"
-    assert caption._p.find(W + "pPr/" + W + "keepNext") is None
+    assert caption._p.find(W + "pPr/" + W + "keepNext").get(W + "val") == "1"
     section = document.sections[0]
     width = (section.page_width - section.left_margin - section.right_margin) // 635
     assert table._tbl.find(W + "tblPr/" + W + "tblW").get(W + "w") == str(width)
@@ -171,3 +171,22 @@ def test_six_long_production_values_fit_without_changing_font_or_text():
             assert cell.width // 635 - padding >= 1260  # 63 pt of text at her 12 pt font
             assert cell.text == "1.234.567,89"
             assert cell.paragraphs[0].runs[0].font.size == Pt(12)
+
+
+def test_first_half_table_rows_link_to_second_half_caption() -> None:
+    document = Document()
+    document.add_heading(TITLES["ch4"], 1)
+    first_caption = document.add_paragraph("Tabelul 4.1 – 2025")
+    first = document.add_table(rows=2, cols=7)
+    first.cell(0, 1).text = "Ianuarie"
+    second_caption = document.add_paragraph("Tabelul 4.2 – 2025")
+    second = document.add_table(rows=2, cols=7)
+    second.cell(0, 1).text = "Iulie"
+    document.add_heading(TITLES["ch5"], 1)
+    format_chapter_four(document)
+    for caption in (first_caption, second_caption):
+        assert caption._p.find(W + "pPr/" + W + "keepNext").get(W + "val") == "1"
+    for row in first.rows:
+        for cell in row.cells:
+            assert cell.paragraphs[0]._p.find(W + "pPr/" + W + "keepNext") is not None
+    assert second.cell(1, 1).paragraphs[0]._p.find(W + "pPr/" + W + "keepNext") is None
