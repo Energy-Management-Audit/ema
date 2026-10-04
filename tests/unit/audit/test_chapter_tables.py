@@ -303,6 +303,18 @@ def test_each_table_spec_selects_its_header_instead_of_the_first_table(spec: Tab
     assert find_table(body, {spec.section: (0, len(body))}, spec) == 1
 
 
+@pytest.mark.parametrize("spec", (EMPLOYEES_TABLE, BOILERS_TABLE))
+def test_a_base_table_whose_header_is_only_markers_is_the_slot(spec: TableSpec) -> None:
+    document = Document()
+    other = document.add_table(rows=2, cols=len(spec.header) + 1)
+    other.rows[0].cells[0].text = "alt antet"
+    target = document.add_table(rows=2, cols=len(spec.header))
+    for cell in target.rows[0].cells:
+        cell.text = "[de completat]"
+    body = list(document.element.body)
+    assert find_table(body, {spec.section: (0, len(body))}, spec) == 1
+
+
 @pytest.mark.parametrize(
     ("section", "anchor", "header"),
     (
