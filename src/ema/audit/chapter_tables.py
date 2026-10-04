@@ -83,20 +83,20 @@ CHARTS = (
 class Caption:
     key: str
     title: str
-    unit: str
+    unit: str | None = None
 
 
 CAPTIONS = {
     EMPLOYEES_TABLE: (
-        Caption("employees.table", "Numărul mediu de angajați", "angajați"),
-        Caption("employees.chart", "Evoluția numărului mediu de angajați", "angajați"),
+        Caption("employees.table", "Numărul mediu de angajați"),
+        Caption("employees.chart", "Evoluția numărului mediu de angajați"),
     ),
     TURNOVER_TABLE: (
         Caption("turnover.table", "Cifra de afaceri", "lei"),
         Caption("turnover.chart", "Evoluția cifrei de afaceri", "lei"),
     ),
-    BOILERS_TABLE: (Caption("boilers.table", "Cazanele termice", "buc."),),
-    VEHICLES_TABLE: (Caption("vehicles.table", "Autovehiculele", "buc."),),
+    BOILERS_TABLE: (Caption("boilers.table", "Centrale termice"),),
+    VEHICLES_TABLE: (Caption("vehicles.table", "Parcul auto"),),
 }
 
 
@@ -164,7 +164,6 @@ def _title_captions(
     spans: dict[str, tuple[int, int]],
     spec: TableSpec,
     table: int,
-    base_titles: tuple[str | None, ...],
 ) -> None:
     start, end = spans[spec.section]
     captions = CAPTIONS[spec]
@@ -182,7 +181,7 @@ def _title_captions(
     if MARKER in _text(before):
         set_text(
             before,
-            _text(before).replace(MARKER, f"{base_titles[0] or caption.title} ({caption.unit})"),
+            _text(before).replace(MARKER, _caption_title(caption)),
         )
     if len(captions) == 2:
         after = next(
@@ -199,44 +198,12 @@ def _title_captions(
         if MARKER in _text(after):
             set_text(
                 after,
-                _text(after).replace(MARKER, f"{base_titles[1] or caption.title} ({caption.unit})"),
+                _text(after).replace(MARKER, _caption_title(caption)),
             )
 
 
-def _base_titles(path: Path | None, spec: TableSpec) -> tuple[str | None, ...]:
-    if path is None:
-        return (None,) * len(CAPTIONS[spec])
-    parts = read_parts(path)
-    body = list(xml(parts, "word/document.xml").find(W + "body"))  # type: ignore[arg-type]
-    spans = _spans(path)
-    table = _table(body, spans, spec)
-    if table is None:
-        return (None,) * len(CAPTIONS[spec])
-    start, end = spans[spec.section]
-    candidates = [
-        next(
-            (
-                body[i]
-                for i in indexes
-                if body[i].tag == W + "p" and re.match(pattern, _text(body[i]))
-            ),
-            None,
-        )
-        for indexes, pattern in (
-            (range(table - 1, start - 1, -1), r"^\s*Tabel"),
-            (range(table + 1, end), r"^\s*Fig"),
-        )
-    ]
-    titles: list[str | None] = []
-    for node in candidates[: len(CAPTIONS[spec])]:
-        value = _text(node) if node is not None else ""
-        title = re.sub(r"^\s*(?:Tabel\w*|Fig\.?)\s*(?:nr\.?\s*)?\d*(?:\.\d+)*\.?\s*", "", value)
-        titles.append(
-            title
-            if title and MARKER not in title and not re.search(r"\b20\d{2}\b", title)
-            else None
-        )
-    return tuple(titles)
+def _caption_title(caption: Caption) -> str:
+    return f"{caption.title} ({caption.unit})" if caption.unit else caption.title
 
 
 def write_tables(
@@ -245,7 +212,6 @@ def write_tables(
     *,
     chapter: str,
     fields: Sequence[Field],
-    caption_source: Path | None = None,
 ) -> None:
     """The tables of one chapter, filled; a table without data keeps its markers."""
     parts = read_parts(source)
@@ -261,7 +227,7 @@ def write_tables(
         if index is None:
             raise EmaError("table_slot", "Locul tabelului lipseşte din bază.", spec.section)
         fill_table(body[index], spec, rows)
-        _title_captions(body, spans, spec, index, _base_titles(caption_source, spec))
+        _title_captions(body, spans, spec, index)
     parts["word/document.xml"] = encoded(root)
     write_parts(parts, target)
 

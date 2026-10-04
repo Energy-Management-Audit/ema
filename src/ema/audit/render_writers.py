@@ -160,7 +160,7 @@ def write_chapter_tables(
     """The Necesar-info tables of ch. 2 or ch. 3, then ch. 2's charts: two steps, two failures."""
     chain.apply(
         f"{chapter_id}.tables",
-        partial(write_tables, chapter=chapter_id, fields=fields, caption_source=chart_source),
+        partial(write_tables, chapter=chapter_id, fields=fields),
     )
     if chapter_id == "ch2":
         chain.apply("ch2.charts", partial(write_charts, fields=fields, chart_source=chart_source))
