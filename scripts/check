@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+if (( $# > 1 )) || { (( $# == 1 )) && [[ "$1" != --static && "$1" != --full ]]; }; then
+  printf '%s\n' 'usage: scripts/check [--static|--full]' >&2
+  exit 2
+fi
+mode="${1:-light}"
 if [[ -x .venv/Scripts/python.exe ]]; then
   python=.venv/Scripts/python.exe
   lint=.venv/Scripts/lint-imports.exe
@@ -18,14 +23,26 @@ fi
 "$python" scripts/check_file_size.py
 "$pyright" --pythonpath "$python"
 "$lint"
-coverage_file="$(mktemp "${TMPDIR:-/tmp}/ema-coverage.XXXXXX")"
-trap 'rm -f "$coverage_file"' EXIT
-COVERAGE_FILE="$coverage_file" "$python" -m pytest -m 'not golden and not network' \
-  --cov --cov-config=pyproject.toml --cov-fail-under=80 --cov-report=term
+if [[ "$mode" == --full ]]; then
+  coverage_file="$(mktemp "${TMPDIR:-/tmp}/ema-coverage.XXXXXX")"
+  trap 'rm -f "$coverage_file"' EXIT
+  COVERAGE_FILE="$coverage_file" "$python" -m pytest -m 'not golden and not network' \
+    --cov --cov-config=pyproject.toml --cov-fail-under=80 --cov-report=term
+elif [[ "$mode" == light ]]; then
+  "$python" -m pytest -m 'not golden and not network' -q
+fi
 
-# Frontend gates (docs/PLAN.md §5.18): format, lint, strict types, token tests, build.
 if [[ ! -f frontend/node_modules/.package-lock.json || frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]]; then
   printf '%s\n' 'frontend dependencies missing or stale: run npm ci --prefix frontend' >&2
   exit 1
 fi
-npm --prefix frontend run --silent check
+if [[ "$mode" == --full ]]; then
+  npm --prefix frontend run --silent check
+else
+  npm --prefix frontend run --silent format:check
+  npm --prefix frontend run --silent lint
+  npm --prefix frontend run --silent typecheck
+  if [[ "$mode" != --static ]]; then
+    npm --prefix frontend run test
+  fi
+fi

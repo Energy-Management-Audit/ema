@@ -40,7 +40,13 @@ jobs:
         run: npm ci --prefix frontend
 
       - name: Install the e2e browser
+        if: github.base_ref == 'prod' || github.ref == 'refs/heads/prod'
         run: npx --prefix frontend playwright install --with-deps chromium
 
-      - name: Complete check
+      - name: Light check
+        if: github.base_ref == 'dev' || github.ref == 'refs/heads/dev'
         run: scripts/check
+
+      - name: Full check
+        if: github.base_ref == 'prod' || github.ref == 'refs/heads/prod'
+        run: scripts/check --full

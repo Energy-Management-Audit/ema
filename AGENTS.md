@@ -26,8 +26,10 @@ interfaces (api, cli, mcp) -> workflows (invoices, piee, audit, reporting)
 
 ## Gates
 
-`scripts/check` is the non-mutating gate run by CI and the pre-push hook: ruff format and check,
-the 400-line file limit, pyright strict on `src/`, import contracts, and non-golden unit tests.
+`scripts/check --static` runs private-term, Python and frontend static checks at pre-push;
+`scripts/check` adds non-golden unit tests in CI on PRs to dev; `scripts/check --full` adds
+coverage, the frontend build and e2e in CI to prod and for releases. The Windows build runs on
+prod PRs that touch packaging paths, and on tags.
 Client, person and place names never appear in code, commits, branch names, PR text or issues; use
 case codes only.
 Commit hooks may fix formatting. Install both with
@@ -37,7 +39,7 @@ Golden tests are the real acceptance: they run against the reference library (`E
 compare against documents the auditor actually delivered. They stay local — client material never
 enters git, CI or a bug report.
 They are slow and heavy (OCR, Word), so they are not run per edit, per branch or per PR. Work and
-review rely on the unit tests, `scripts/check` and CI. Agents and the coordinator never run them:
+review rely on the light and static checks and CI. Agents and the coordinator never run goldens:
 Vlad runs the golden suite at the gates he sets, and each failure becomes an issue.
 
 ## How work is sliced

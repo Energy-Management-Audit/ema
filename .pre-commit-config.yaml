@@ -1,4 +1,4 @@
-# Commit hooks may fix; pre-push checks outgoing commits and runs the non-mutating CI gate.
+# Commit hooks may fix; pre-push checks outgoing commits and runs static checks.
 # Install once with: uv run pre-commit install --install-hooks -t pre-commit -t pre-push
 default_stages: [pre-commit]
 
@@ -39,8 +39,8 @@ repos:
         pass_filenames: false
         always_run: true
       - id: check-pre-push
-        name: complete check
-        entry: bash scripts/check
+        name: static check
+        entry: bash scripts/check --static
         language: system
         stages: [pre-push]
         pass_filenames: false
