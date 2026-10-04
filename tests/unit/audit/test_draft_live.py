@@ -1,9 +1,8 @@
-"""Live Draft over a fake provider: the task turn, recordings, and the stage's section choice."""
+"""Live Draft over a fake provider: a call per chapter group, recordings and the stage's stops."""
 
 from __future__ import annotations
 
 import json
-import re
 import sys
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -13,17 +12,8 @@ from typing import Any
 import pytest
 from tests.audit_replay import audit_job_with_facts
 
-from ema.audit.catalogue import CATALOGUE
-from ema.audit.draft_agent import (
-    FACT_RULE,
-    LENGTH_RULE,
-    PASSAGE_RULE,
-    REFERENCE_RULE,
-    SENTENCE_RULE,
-    WORDING_RULE,
-    draft_task,
-)
 from ema.audit.draft_live import DraftSummary, start_draft
+from ema.audit.draft_plan import allowance
 from ema.audit.draft_schema import SECTION_FACTS, DraftText, SectionDraft
 from ema.audit.draft_stage import draft_section
 from ema.audit.stages import start_audit_stage
@@ -38,25 +28,22 @@ from ema.core.review.models import Evidence, Manual
 from ema.core.workspace import Workspace
 
 SECTION = "ch2.date_generale"
-TASK = (
-    "Redactează secţiunea ch2.date_generale „Date generale”. "
-    "Câmpul section este exact „ch2.date_generale”. "
-    f"{FACT_RULE} {SENTENCE_RULE} {LENGTH_RULE} {PASSAGE_RULE} {REFERENCE_RULE} {WORDING_RULE}"
-)
-TITLES = {section.id: section.title for section in CATALOGUE}
+# A second section in each chapter, each from a fact that is not a passage.
+CH2_OTHER, CH3 = "ch2.manager", ("ch3.parc_auto", "ch3.automatizare")
 
 
 class FakeLive:
-    """Stands in for the OpenAI adapter; per-section modes: ok, empty (no draft), quota."""
+    """Stands in for the OpenAI adapter. Per-section modes: ok, omit (left out of every
+    answer), quota (the call fails), retry (invalid in the first answer)."""
 
     name = "openai"
 
     def __init__(self, modes: dict[str, str] | None = None) -> None:
         self.modes = modes or {}
-        self.tasks: list[str] = []
+        self.calls: list[tuple[str, tuple[str, ...], int]] = []
         self.models: list[str] = []
         self.synthetic: list[bool] = []
-        self.support_response = '{"flags": []}'
+        self.support_response: str | None = None
 
     def respond(
         self,
@@ -72,31 +59,39 @@ class FakeLive:
     ) -> Exchange:
         self.models.append(model)
         self.synthetic.append(synthetic)
-        if prompt_version.endswith("-support"):
-            return Exchange(self.support_response, (), 1, 1)
         request = json.loads(str(messages[1]["content"]))
-        if "request" in request:
-            request = json.loads(request["request"])
-        task = request["task"]
-        self.tasks.append(task)
-        section = re.findall("„([^”]+)”", task)[-1]
-        mode = self.modes.get(section, "ok")
-        if mode == "quota":
+        if prompt_version.endswith("-support"):
+            self.calls.append(("support", (), max_output_tokens))
+            verdicts = [
+                {"location": item["location"], "sentence_index": item["sentence_index"]}
+                | {"supported": True, "reason": ""}
+                for item in request
+            ]
+            return Exchange(self.support_response or json.dumps({"verdicts": verdicts}), (), 1, 1)
+        retry = "request" in request
+        asked = (request["request"] if retry else request)["sections"]
+        names = tuple(item["section"] for item in asked)
+        self.calls.append(("retry" if retry else "draft", names, max_output_tokens))
+        if any(self.modes.get(name) == "quota" for name in names):
             raise EmaError("ai_quota_day", "Cota zilnică.", model)
-        if mode == "empty":
-            return Exchange(json.dumps({"flags": []}), (), 1, 1)
-        if mode == "retry" and self.tasks.count(task) == 1:
-            invalid = SectionDraft(
-                section=section, status="drafted", paragraphs=[DraftText(text="Atelier Exemplu.")]
-            )
-            return Exchange(invalid.model_dump_json(), (), 1, 1)
-        key = next(item["key"] for item in request["facts"] if item["presence"] == "found")
-        draft = SectionDraft(
-            section=section,
-            status="drafted",
-            paragraphs=[DraftText(text=f"valoarea este {{{{f:{key}}}}}.", fact_ids=[key])],
-        )
-        return Exchange(draft.model_dump_json(), (), 1, 1)
+        drafts = [
+            self._draft(item, invalid=self.modes.get(item["section"]) == "retry" and not retry)
+            for item in asked
+            if self.modes.get(item["section"]) != "omit"
+        ]
+        return Exchange(json.dumps({"sections": drafts}), (), 1, 1)
+
+    @staticmethod
+    def _draft(item: dict[str, Any], *, invalid: bool) -> dict[str, Any]:
+        key = item["facts"][0]["key"]
+        text = "Atelier Exemplu." if invalid else f"valoarea este {{{{f:{key}}}}}."
+        paragraph = DraftText(text=text, fact_ids=[] if invalid else [key])
+        return SectionDraft(
+            section=item["section"], status="drafted", paragraphs=[paragraph]
+        ).model_dump()
+
+    def logical(self) -> list[str]:
+        return [kind for kind, _, _ in self.calls]
 
 
 @pytest.fixture
@@ -123,34 +118,51 @@ def _found(ws: Workspace, job: str, section: str) -> None:
     propose(ws, job, key, "Exemplu", [evidence], state="supplied")
 
 
-def test_task_sentence_names_the_section_id_and_title_exactly() -> None:
-    assert TITLES[SECTION] == "Date generale"
-    assert draft_task(SECTION) == TASK
+def _two_chapters(ws: Workspace) -> str:
+    job = audit_job_with_facts(ws)
+    for section in (CH2_OTHER, *CH3):
+        _found(ws, job, section)
+    return job
 
 
-def test_live_draft_section_runs_on_settings_and_records_both_passes(
+def _run(ws: Workspace, job: str) -> tuple[DraftSummary, str]:
+    summaries: list[DraftSummary] = []
+    run = start_draft(ws, job, summaries=summaries)
+    for _ in subscribe(ws, job):
+        pass
+    state = next(item for item in status(ws, job).runs if item["id"] == run)
+    return summaries[0], str(state["state"])
+
+
+def _logical_calls(ws: Workspace, job: str) -> int:
+    with ws.connect() as db:
+        return int(
+            db.execute("SELECT COUNT(*) FROM llm_calls WHERE job_id=?", (job,)).fetchone()[0]
+        )
+
+
+def test_live_single_section_takes_the_chapter_path_and_records_one_file(
     tmp_path: Path, live: FakeLive
 ) -> None:
     ws = Workspace(tmp_path / "ws")
-    job = audit_job_with_facts(ws)
+    job = _two_chapters(ws)
 
     result = draft_section(ws, job, SECTION)
 
     assert (result.draft_status, result.section_status) == ("drafted", "drafted")
-    assert live.tasks and set(live.tasks) == {TASK}
+    assert [(kind, names) for kind, names, _ in live.calls] == [
+        ("draft", (SECTION,)),
+        ("support", ()),
+    ]
     assert set(live.models) == {default_model("openai").id}
     assert live.synthetic == [False] * len(live.synthetic)
-    folder = result.draft_path.parent.parent / "draft"
-    for name in (f"{SECTION}.draft.json", f"{SECTION}.support.json"):
-        recorded = json.loads((folder / name).read_text(encoding="utf-8"))
-        assert recorded["source"] == "recorded" and recorded["responses"]
-    assert json.loads((folder / f"{SECTION}.draft.json").read_text("utf-8"))["responses"][0][
-        "choices"
-    ][0]["message"]["content"]
+    recording = result.draft_path.parent.parent / f"chapter-{SECTION}.json"
+    recorded = json.loads(recording.read_text(encoding="utf-8"))
+    assert recorded["source"] == "recorded" and len(recorded["responses"]) == 2
 
 
 def test_support_error_keeps_written_and_queued_draft(tmp_path: Path, live: FakeLive) -> None:
-    live.support_response = '{"flags": [{"location": "bad", "sentence": "x", "reason": "x"}]}'
+    live.support_response = "not json"
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
     result = draft_section(ws, job, SECTION)
@@ -172,80 +184,84 @@ def test_live_switch_off_sends_nothing(
     with pytest.raises(EmaError) as stage:
         start_audit_stage(ws, job, "draft", int(str(get_job(ws, job)["revision"])))
     assert stage.value.code == "ai_client_disabled"
-    assert live.tasks == []
+    assert live.calls == []
 
 
-def _run(ws: Workspace, job: str) -> tuple[DraftSummary, str]:
-    summaries: list[DraftSummary] = []
-    run = start_draft(ws, job, summaries=summaries)
-    for _ in subscribe(ws, job):
-        pass
-    state = next(item for item in status(ws, job).runs if item["id"] == run)
-    return summaries[0], str(state["state"])
-
-
-def test_stage_drafts_only_sections_with_a_found_fact(tmp_path: Path, live: FakeLive) -> None:
+def test_one_call_per_chapter_drafts_its_sections_and_records_each_group(
+    tmp_path: Path, live: FakeLive
+) -> None:
     ws = Workspace(tmp_path / "ws")
-    job = audit_job_with_facts(ws)
-
-    started = start_audit_stage(ws, job, "draft", int(str(get_job(ws, job)["revision"])))
-    for _ in subscribe(ws, job):
-        pass
-
-    assert next(item for item in status(ws, job).runs if item["id"] == started)["state"] == "ready"
-    assert {re.findall("„([^”]+)”", task)[-1] for task in live.tasks} == {SECTION}
-    summary, _ = _run(ws, job)
-    assert summary.drafted == {SECTION: "drafted"}
-    assert SECTION not in summary.skipped
-    assert set(summary.skipped) | {SECTION} | set(summary.not_applicable) == set(SECTION_FACTS)
-
-
-def test_one_failed_section_does_not_fail_the_others(tmp_path: Path, live: FakeLive) -> None:
-    ws = Workspace(tmp_path / "ws")
-    job = audit_job_with_facts(ws)
-    other = next(item for item in SECTION_FACTS if item != SECTION)
-    _found(ws, job, other)
-    live.modes[other] = "empty"
+    job = _two_chapters(ws)
 
     summary, state = _run(ws, job)
 
-    assert summary.drafted == {SECTION: "drafted"}
-    assert summary.failed == {other: "ai_schema"}
     assert state == "ready"
+    assert summary.drafted == dict.fromkeys((SECTION, CH2_OTHER, *CH3), "drafted")
+    assert [(kind, names) for kind, names, _ in live.calls] == [
+        ("draft", (SECTION, CH2_OTHER)),
+        ("support", ()),
+        ("draft", CH3),
+        ("support", ()),
+    ]
+    # No audit base is configured, so each section counts as an unmeasured one.
+    assert live.calls[0][2] == allowance([None, None])
+    assert set(summary.skipped) | set(summary.drafted) | set(summary.not_applicable) == set(
+        SECTION_FACTS
+    )
+    with ws.connect() as db:
+        run = str(db.execute("SELECT id FROM runs WHERE stage='draft'").fetchone()["id"])
+        folder = ws.artifact_dir(db, job, "draft", run)
+    for group in ("2-1", "3-1"):
+        recorded = json.loads((folder / f"chapter-{group}.json").read_text(encoding="utf-8"))
+        assert len(recorded["responses"]) == 2
+    assert {path.name for path in (folder / "sections").glob("*.json")} == {
+        name
+        for section in summary.drafted
+        for name in (f"{section}.json", f"{section}.draft-review.json")
+    }
 
 
-def test_day_quota_stops_the_remaining_sections(tmp_path: Path, live: FakeLive) -> None:
+def test_a_two_chapter_job_takes_at_most_six_logical_calls(tmp_path: Path, live: FakeLive) -> None:
+    live.modes.update({SECTION: "retry", CH3[0]: "retry"})
     ws = Workspace(tmp_path / "ws")
-    job = audit_job_with_facts(ws)
-    order = [item for item in SECTION_FACTS if item != SECTION][:2]
-    for section in order:
-        _found(ws, job, section)
-    first, second = sorted([SECTION, *order], key=list(SECTION_FACTS).index)[:2]
-    live.modes[first] = "quota"
+    job = _two_chapters(ws)
 
     summary, _ = _run(ws, job)
 
-    assert summary.failed == {first: "ai_quota_day"}
-    assert second in summary.drafted
-    assert len(live.tasks) == 3
+    assert summary.failed == {}
+    assert live.logical() == ["draft", "retry", "support"] * 2
+    assert _logical_calls(ws, job) == 6
+    # The retry carries only the failing section.
+    assert [names for kind, names, _ in live.calls if kind == "retry"] == [(SECTION,), (CH3[0],)]
 
 
-def test_quota_stops_sections_after_first_batch(tmp_path: Path, live: FakeLive) -> None:
+def test_an_omitted_section_is_retried_then_fails_alone(tmp_path: Path, live: FakeLive) -> None:
+    live.modes[CH2_OTHER] = "omit"
     ws = Workspace(tmp_path / "ws")
-    job = audit_job_with_facts(ws)
-    order = list(SECTION_FACTS)[:5]
-    for section in order:
-        if section != SECTION:
-            _found(ws, job, section)
-    live.modes[order[0]] = "quota"
+    job = _two_chapters(ws)
+
+    summary, state = _run(ws, job)
+
+    assert state == "ready"
+    assert summary.failed == {CH2_OTHER: "draft_incomplete"}
+    assert set(summary.drafted) == {SECTION, *CH3}
+    assert ("retry", (CH2_OTHER,)) in [(kind, names) for kind, names, _ in live.calls]
+
+
+def test_day_quota_stops_the_remaining_groups(tmp_path: Path, live: FakeLive) -> None:
+    live.modes[SECTION] = "quota"
+    ws = Workspace(tmp_path / "ws")
+    job = _two_chapters(ws)
+
     summary, _ = _run(ws, job)
-    assert summary.failed[order[0]] == "ai_quota_day"
-    assert summary.stopped == (order[4],)
-    assert order[4] not in summary.drafted
-    assert len(live.tasks) == 4
+
+    assert summary.failed == {SECTION: "ai_quota_day", CH2_OTHER: "ai_quota_day"}
+    assert summary.stopped == CH3
+    assert summary.drafted == {}
+    assert live.logical() == ["draft"]
 
 
-def test_parallel_budget_keeps_order_and_caps_calls(
+def test_the_budget_stops_the_next_group_before_its_call(
     tmp_path: Path, live: FakeLive, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     class FixedCost:
@@ -254,20 +270,15 @@ def test_parallel_budget_keeps_order_and_caps_calls(
 
     monkeypatch.setattr("ema.core.llm.structured.selected_model", lambda *_a: FixedCost())
     monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", "0.5")
-    order = list(SECTION_FACTS)[:4]
-    for index in range(3):
-        ws = Workspace(tmp_path / f"ws-{index}")
-        job = audit_job_with_facts(ws)
-        for section in order:
-            if section != SECTION:
-                _found(ws, job, section)
-        summary, _ = _run(ws, job)
-        assert len(summary.drafted) == 1
-        assert list(summary.drafted) == [section for section in order if section in summary.drafted]
-        assert list(summary.failed) == [section for section in order if section in summary.failed]
-        assert set(summary.failed.values()) == {"ai_budget"}
-        assert job_spend(ws, job) == pytest.approx(0.4)
-        assert len(live.tasks) == index + 1
+    ws = Workspace(tmp_path / "ws")
+    job = _two_chapters(ws)
+
+    summary, _ = _run(ws, job)
+
+    assert set(summary.drafted) == {SECTION, CH2_OTHER}
+    assert summary.failed == dict.fromkeys(CH3, "ai_budget")
+    assert live.logical() == ["draft", "support"]
+    assert job_spend(ws, job) == pytest.approx(0.4)
 
 
 def test_checker_retry_is_budgeted(
@@ -278,15 +289,14 @@ def test_checker_retry_is_budgeted(
             return 0.2
 
     monkeypatch.setattr("ema.core.llm.structured.selected_model", lambda *_a: FixedCost())
-    monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", "0.5")
+    monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", "0.7")
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
     live.modes[SECTION] = "retry"
     summary, _ = _run(ws, job)
     assert summary.drafted == {SECTION: "drafted"}
-    assert summary.failed == {}
-    assert len(live.tasks) == 2
-    assert job_spend(ws, job) == pytest.approx(0.4)
+    assert live.logical() == ["draft", "retry", "support"]
+    assert job_spend(ws, job) == pytest.approx(0.6)
 
 
 def test_job_budget_spent_earlier_stops_the_stage_before_any_call(
@@ -294,9 +304,7 @@ def test_job_budget_spent_earlier_stops_the_stage_before_any_call(
 ) -> None:
     monkeypatch.setenv("EMA_AI_JOB_BUDGET_USD", "0.5")
     ws = Workspace(tmp_path / "ws")
-    job = audit_job_with_facts(ws)
-    for section in [item for item in SECTION_FACTS if item != SECTION][:2]:
-        _found(ws, job, section)
+    job = _two_chapters(ws)
     with ws.connect() as db:
         db.execute(
             "INSERT INTO llm_calls(job_id,section,provider,model,prompt_version,input_tokens,"
@@ -307,7 +315,8 @@ def test_job_budget_spent_earlier_stops_the_stage_before_any_call(
     summary, _ = _run(ws, job)
 
     assert set(summary.failed.values()) == {"ai_budget"}
-    assert live.tasks == []
+    assert summary.stopped == CH3
+    assert live.calls == []
     with ws.connect() as db:
         log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
     spend = [json.loads(line) for line in log.splitlines() if '"ai_spend"' in line]
@@ -333,4 +342,4 @@ def test_cli_run_draft_takes_the_stage_path(
     run = json.loads(capsys.readouterr().out)["run_id"]
     assert exited.value.code == 0
     assert next(item for item in status(ws, job).runs if item["id"] == run)["state"] == "ready"
-    assert {re.findall("„([^”]+)”", task)[-1] for task in live.tasks} == {SECTION}
+    assert live.calls[0][:2] == ("draft", (SECTION,))

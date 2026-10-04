@@ -10,8 +10,9 @@ from tests.unit.audit.test_draft_passages import PASSAGES, passage_job
 from tests.unit.audit.test_draft_structured import DraftProvider
 
 from ema.audit.base_anchor import MARKER
-from ema.audit.draft_agent import PASSAGE_RULE, draft_section_run
+from ema.audit.draft_agent import draft_section_run
 from ema.audit.draft_checks import DraftReview, check_draft
+from ema.audit.draft_prompt import rule_text
 from ema.audit.draft_render import draft_blocks
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.core.llm.models import default_model
@@ -19,13 +20,14 @@ from ema.core.llm.types import Exchange
 from ema.core.office.blocks import Paragraph
 from ema.core.workspace import Workspace
 
-SECTION = "ch3.process"
+# Passages from no flow scheme or Fişa block are the overview, which ch3.flux describes (D3).
+SECTION = "ch3.flux"
 FACTS = {key: _fact(key, value) for key, value in PASSAGES.items()} | {
     "audit.equipment": _fact("audit.equipment", "cuptor de polimerizare")
 }
 
 
-Kind = Literal["body", "bullet", "caption"]
+Kind = Literal["body", "bullet"]
 
 
 def text(value: str, *keys: str, kind: Kind = "body") -> DraftText:
@@ -53,7 +55,7 @@ def test_a_value_ending_a_sentence_still_ends_one() -> None:
     ]
 
 
-@pytest.mark.parametrize(("kind", "fatal"), [("body", True), ("bullet", False), ("caption", False)])
+@pytest.mark.parametrize(("kind", "fatal"), [("body", True), ("bullet", False)])
 def test_only_an_uncited_body_paragraph_is_fatal(kind: Kind, fatal: bool) -> None:
     draft = section(
         text("{{f:audit.process_sections}}", "audit.process_sections"),
@@ -112,10 +114,10 @@ def test_a_misplaced_passage_goes_back_with_the_passage_rule(tmp_path: Path) -> 
         synthetic=True,
     )
     assert accepted == ordered
-    assert PASSAGE_RULE in provider.requests[0]["task"]
     assert [(error["rule"], error["rule_text"]) for error in provider.requests[1]["errors"]] == [
-        ("passage_order", PASSAGE_RULE)
+        ("passage_order", rule_text("passage_order"))
     ]
+    assert "în ordinea numerelor" in rule_text("passage_order")
 
 
 @pytest.mark.parametrize(
@@ -146,11 +148,12 @@ def test_a_passage_only_paragraph_is_not_checked_or_flagged(tmp_path: Path) -> N
         text("{{f:audit.process_sections}}", "audit.process_sections"),
         text("Etapa următoare: {{f:audit.process_sections.2}}", "audit.process_sections.2"),
     )
-    flagged = [
-        {"location": "paragraph:0", "sentence": "{{f:audit.process_sections}}", "reason": "x"},
-        {"location": "paragraph:1", "sentence": "Etapa următoare", "reason": "lead-in"},
+    lead_in = "Etapa următoare: {{f:audit.process_sections.2}}"
+    verdicts = [
+        {"location": f"{SECTION}:paragraph:0", "sentence_index": 0, "supported": False},
+        {"location": f"{SECTION}:paragraph:1", "sentence_index": 0, "supported": False},
     ]
-    support = Support(json.dumps({"flags": flagged}))
+    support = Support(json.dumps({"verdicts": verdicts}))
     _, _, _, flags = draft_section_run(
         ws,
         job,
@@ -160,17 +163,15 @@ def test_a_passage_only_paragraph_is_not_checked_or_flagged(tmp_path: Path) -> N
         model_id=default_model("openai").id,
         synthetic=True,
     )
-    assert [item["location"] for item in support.requests[0]] == ["paragraph:1"]
-    assert [(flag.location, flag.sentence) for flag in flags] == [
-        ("paragraph:1", "Etapa următoare")
-    ]
+    assert [item["location"] for item in support.requests[0]] == [f"{SECTION}:paragraph:1"]
+    assert [(flag.location, flag.sentence) for flag in flags] == [("paragraph:1", lead_in)]
 
 
 def test_a_section_of_passages_only_needs_no_support_call(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "ws")
     job = passage_job(ws)
     draft = section(text("{{f:audit.process_sections}}", "audit.process_sections"))
-    support = Support('{"flags": []}')
+    support = Support('{"verdicts": []}')
     _, _, _, flags = draft_section_run(
         ws,
         job,

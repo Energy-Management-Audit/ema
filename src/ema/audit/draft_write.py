@@ -1,39 +1,18 @@
-"""One section drafted inside a running Draft stage: both passes, artifacts, and the queue."""
+"""A drafted section inside a running Draft stage: its artifacts, reads and review queue entry."""
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
 
-from ema.audit.draft_agent import draft_section_run, draft_task, recorded_facts
-from ema.audit.draft_checks import DraftCheck, DraftReview
+from ema.audit.draft_chapter import Drafted, Passes
 from ema.audit.draft_render import review_payload
-from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
+from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.publication import queue_sections
 from ema.audit.sections import recompute_ready
 from ema.core.jobs import StageContext
 from ema.core.llm import RecordingProvider, ReplayProvider
 from ema.core.llm.types import Provider
-
-
-@dataclass(frozen=True)
-class Passes:
-    draft: Provider
-    support: Provider
-    model_id: str
-    support_model_id: str | None = None
-    synthetic: bool = False
-    client_live: bool = False
-    task: str | None = None
-
-
-@dataclass(frozen=True)
-class Drafted:
-    draft: SectionDraft
-    check: DraftCheck
-    review: tuple[DraftReview, ...]
-    directory: Path
 
 
 def replay_passes(draft: Path, support: Path) -> Passes:
@@ -47,50 +26,35 @@ def replay_passes(draft: Path, support: Path) -> Passes:
     )
 
 
-def live_passes(provider: Provider, model_id: str, directory: Path, section: str) -> Passes:
-    return Passes(
-        RecordingProvider(provider, directory / f"{section}.draft.json"),
-        RecordingProvider(provider, directory / f"{section}.support.json"),
-        model_id,
-        client_live=True,
-        task=draft_task(section),
-    )
+def live_passes(provider: Provider, model_id: str, directory: Path, group: str) -> Passes:
+    """Both passes of a chapter group recorded, in call order, in draft/<run>/chapter-<group>."""
+    recording = RecordingProvider(provider, directory / f"chapter-{group}.json")
+    return Passes(recording, recording, model_id, client_live=True)
 
 
-def write_section(
-    ctx: StageContext, section: str, passes: Passes, *, ready: bool = False
-) -> Drafted:
-    facts = recorded_facts(ctx.ws, ctx.job, section)
-    for field in facts.values():
+def write_section(ctx: StageContext, done: Drafted, *, ready: bool = False) -> Path:
+    """Write sections/<section>.json and its review beside it; queue a drafted section."""
+    section = done.draft.section
+    for field in done.facts.values():
         ctx.record_read("fields", field.id, field.revision)
-    _, draft, check, flags = draft_section_run(
-        ctx.ws,
-        ctx.job,
-        section,
-        passes.draft,
-        passes.support,
-        model_id=passes.model_id,
-        support_model_id=passes.support_model_id,
-        facts=facts,
-        synthetic=passes.synthetic,
-        client_live=passes.client_live,
-        task=passes.task,
-    )
     directory = ctx.artifact_dir() / "sections"
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / f"{section}.json").write_text(draft.model_dump_json(indent=2), "utf-8")
+    (directory / f"{section}.json").write_text(done.draft.model_dump_json(indent=2), "utf-8")
     (directory / f"{section}.draft-review.json").write_text(
-        json.dumps(review_payload(draft, check, flags), ensure_ascii=False, indent=2),
+        json.dumps(
+            review_payload(done.draft, done.check, done.flags), ensure_ascii=False, indent=2
+        ),
         encoding="utf-8",
     )
-    if draft.status == "drafted":
+    if done.draft.status == "drafted":
         if not ready:
             recompute_ready(ctx.ws, ctx.job)
+        keys = {*SECTION_FACTS[section], *done.facts}
         queue_sections(
             ctx,
             (section,),
             "agent",
-            tuple(f"fact:{key}" for key in SECTION_FACTS[section]),
-            facts=facts,
+            tuple(f"fact:{key}" for key in sorted(keys)),
+            facts=done.facts,
         )
-    return Drafted(draft, check, flags, directory)
+    return directory

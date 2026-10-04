@@ -6,16 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from ema.audit.draft_agent import PROMPT_VERSION
+from ema.audit.draft_agent import draft_one
+from ema.audit.draft_chapter import Drafted
 from ema.audit.draft_checks import DraftReview
 from ema.audit.draft_live import live_provider
+from ema.audit.draft_prompt import PROMPT_VERSION
 from ema.audit.draft_schema import SECTION_FACTS
-from ema.audit.draft_write import (
-    Drafted,
-    live_passes,
-    replay_passes,
-    write_section,
-)
+from ema.audit.draft_write import live_passes, replay_passes, write_section
 from ema.audit.sections import get_status
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext, StageOutcome, get_job, run_stage, status, subscribe
@@ -56,7 +53,8 @@ def draft_section(
     draft_recording: Path | None = None,
     support_recording: Path | None = None,
 ) -> DraftResult:
-    """Draft one chapter 2-3 section: by replay with both recordings, live with neither."""
+    """Draft one chapter 2-3 section through the chapter path: by replay with both recordings,
+    live with neither."""
     record = get_job(ws, job)
     if record["type"] != "audit":
         raise EmaError("wrong_job_type", "Lucrarea nu este un audit.", job)
@@ -69,7 +67,7 @@ def draft_section(
     if draft_recording is not None and support_recording is not None:
         _replayable(draft_recording)
         _replayable(support_recording)
-    drafted: list[Drafted] = []
+    drafted: list[tuple[Drafted, Path]] = []
     live = live_provider(ws) if draft_recording is None or support_recording is None else None
 
     def stage(ctx: StageContext) -> StageOutcome:
@@ -77,9 +75,10 @@ def draft_section(
             assert draft_recording is not None and support_recording is not None
             passes = replay_passes(draft_recording, support_recording)
         else:
-            passes = live_passes(live[0], live[1], ctx.artifact_dir() / "draft", section)
+            passes = live_passes(live[0], live[1], ctx.artifact_dir(), section)
         ctx.record_input(prompt=PROMPT_VERSION, model=passes.model_id)
-        drafted.append(write_section(ctx, section, passes))
+        done = draft_one(ctx.ws, ctx.job, section, passes)
+        drafted.append((done, write_section(ctx, done)))
         return StageOutcome()
 
     run = run_stage(ws, job, "draft", stage)
@@ -88,8 +87,8 @@ def draft_section(
     recorded = next(item for item in status(ws, job).runs if item["id"] == run)
     if recorded["state"] != "ready" or not drafted:
         raise EmaError("draft_failed", "Redactarea secţiunii a eşuat.", str(recorded["error"]))
-    done = drafted[0]
-    draft, check, directory = done.draft, done.check, done.directory
+    done, directory = drafted[0]
+    draft, check = done.draft, done.check
     return DraftResult(
         job=job,
         run=run,
@@ -99,7 +98,7 @@ def draft_section(
         coverage=check.coverage,
         cited_sentences=check.cited_sentences,
         total_sentences=check.total_sentences,
-        review=(*check.review, *done.review),
+        review=(*check.review, *done.flags),
         draft_path=directory / f"{section}.json",
         review_path=directory / f"{section}.draft-review.json",
     )

@@ -1,4 +1,8 @@
-"""A redacted, runtime-only section example from the configured audit base."""
+"""A redacted, runtime-only section example from the configured audit base, and its length.
+
+A section's example is its own text, without its subsections' (D8): the chapter call sees every
+subsection's own example beside it.
+"""
 
 from __future__ import annotations
 
@@ -6,18 +10,27 @@ import json
 import logging
 import re
 import unicodedata
+from collections.abc import Collection
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
 from docx import Document
 
-from ema.audit.headings import map_headings
+from ema.audit.headings import headings, map_headings
 from ema.core.config import load_settings
 from ema.core.errors import EmaError
 from ema.core.workspace import Workspace
 
 _NUMBER = re.compile(r"\d+(?:[.,/–-]\d+)*\s*%?")
 _WORD = re.compile(r"\b[A-ZĂÂÎȘȚŞŢ][A-Za-z0-9ĂÂÎȘȚăâîșțŞŢşţ]*\b")
+_CAPTION = re.compile(r"^\s*(?:Tabel|Fig)")
+
+
+@dataclass(frozen=True)
+class Example:
+    text: str
+    words: int
 
 
 def _fold(value: str) -> str:
@@ -58,33 +71,51 @@ def _mask_names(value: str) -> str:
     return _WORD.sub("{{…}}", value)
 
 
-def style_example(base: Path, identity: tuple[str, ...], section: str) -> str:
+def _own_texts(base: Path, sections: Collection[str]) -> dict[str, list[str]]:
+    """Each section's own paragraphs in the base, from its first heading to the next heading."""
     paragraphs = Document(str(base)).paragraphs
-    mapped = map_headings(base, "audit-01").mapped
-    heading = next((item.heading for item in mapped if item.section_id == section), None)
-    if heading is None:
-        return ""
-    end = min(
-        (
-            item.heading.index
-            for item in mapped
-            if item.heading.index > heading.index and item.heading.level <= heading.level
-        ),
-        default=len(paragraphs),
-    )
-    example = "\n".join(p.text for p in paragraphs[heading.index + 1 : end] if p.text.strip())
-    example = _mask_identity(example, tuple(sorted(identity, key=len, reverse=True)))
-    return _mask_names(_NUMBER.sub("{{…}}", example))
+    starts = sorted(item.index for item in headings(base))
+    found: dict[str, list[str]] = {}
+    for item in map_headings(base, "audit-01").mapped:
+        if item.section_id not in sections or item.section_id in found:
+            continue
+        begin = item.heading.index
+        end = next((index for index in starts if index > begin), len(paragraphs))
+        found[item.section_id] = [
+            paragraph.text
+            for paragraph in paragraphs[begin + 1 : end]
+            if paragraph.text.strip() and not _CAPTION.match(paragraph.text)
+        ]
+    return found
 
 
-def configured_style_example(ws: Workspace, section: str) -> str:
+def style_examples(
+    base: Path, identity: tuple[str, ...], sections: Collection[str]
+) -> dict[str, Example]:
+    """Per section, its redacted own text and that text's word count before redaction."""
+    terms = tuple(sorted(identity, key=len, reverse=True))
+    return {
+        section: Example(
+            _mask_names(_NUMBER.sub("{{…}}", _mask_identity("\n".join(own), terms))),
+            sum(len(text.split()) for text in own),
+        )
+        for section, own in _own_texts(base, sections).items()
+    }
+
+
+def style_example(base: Path, identity: tuple[str, ...], section: str) -> str:
+    example = style_examples(base, identity, (section,)).get(section)
+    return example.text if example is not None else ""
+
+
+def configured_examples(ws: Workspace, sections: Collection[str]) -> dict[str, Example]:
     settings = load_settings(ws)
     base, identity_file = settings.audit_base_document, settings.audit_base_identity
     if base is None or identity_file is None or not base.is_file() or not identity_file.is_file():
         logging.getLogger(__name__).warning(
             "Audit style example unavailable: audit_base_document or audit_base_identity"
         )
-        return ""
+        return {}
     try:
         identity = cast(object, json.loads(identity_file.read_text(encoding="utf-8")))
     except (OSError, ValueError) as exc:
@@ -97,4 +128,4 @@ def configured_style_example(ws: Workspace, section: str) -> str:
         raise EmaError(
             "audit_base_missing", "Baza auditului nu este configurată.", "audit_base_identity"
         )
-    return style_example(base, tuple(cast(list[str], identity)), section)
+    return style_examples(base, tuple(cast(list[str], identity)), sections)

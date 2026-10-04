@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from copy import deepcopy
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -19,10 +20,10 @@ from ema.audit.base_anchor import MARKER
 from ema.audit.base_units import heading_spans_document
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_checks import (
+    CITE_GAP,
     TOKEN,
     DraftCheck,
     DraftReview,
-    _support_text,
     check_draft,
     sentence_parts,
     token_only,
@@ -30,7 +31,7 @@ from ema.audit.draft_checks import (
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.section_body import replace_section_body
 from ema.core.errors import EmaError
-from ema.core.office.blocks import Block, Caption, Missing, Num, Paragraph, Ref, Segment, Table
+from ema.core.office.blocks import Block, Missing, Paragraph
 from ema.core.office.numbers_ro import format_number
 from ema.core.review.models import Field
 
@@ -39,7 +40,8 @@ ENUM_TEXT = {"below_1000_tep": "sub 1.000 tep", "at_least_1000_tep": "de cel puÅ
 UNSPOKEN_UNITS = frozenset({"persons"})
 
 
-def _value(field: Field) -> str:
+def rendered_value(field: Field) -> str:
+    """A fact as the deliverable prints it: Romanian number format, with its unit."""
     if field.value_type in {"number", "year"}:
         return format_number(
             Decimal(str(field.value)),
@@ -50,17 +52,19 @@ def _value(field: Field) -> str:
     return ENUM_TEXT.get(str(field.value), str(field.value))
 
 
+def support_text(text: str) -> str:
+    return " ".join(text.split()).rstrip(".!?").rstrip()
+
+
 def _resolved(text: str, facts: dict[str, Field]) -> str:
+    """The text as printed: a value for each fact token, nothing for a citation."""
+
     def replace(match: re.Match[str]) -> str:
-        value = _value(facts[match.group(1)])
+        value = rendered_value(facts[match.group(1)])
         suffix = match.group(2)
         return value if suffix and value.endswith((".", "!", "?")) else value + suffix
 
-    return re.sub(TOKEN.pattern + r"(\.?)", replace, text)
-
-
-def _cell(text: DraftText, location: str, blocked: set[str], facts: dict[str, Field]) -> Segment:
-    return Num(None, 0) if location in blocked else _resolved(text.text, facts)
+    return re.sub(TOKEN.pattern + r"(\.?)", replace, CITE_GAP.sub("", text))
 
 
 def _paragraph(
@@ -70,12 +74,12 @@ def _paragraph(
     if any(issue.code != "uncited_sentence" and issue.sentence is None for issue in relevant):
         return Missing(item.kind, MARKER)
     flagged = [
-        _support_text(issue.sentence if issue.sentence is not None else issue.detail)
+        support_text(issue.sentence if issue.sentence is not None else issue.detail)
         for issue in relevant
     ]
     rendered: list[str] = []
     for sentence in sentence_parts(item.text, facts):
-        normalized = _support_text(sentence)
+        normalized = support_text(sentence)
         # A verified passage standing alone is the source's own text; a flag never erases it.
         value = (
             MARKER
@@ -91,29 +95,18 @@ def _paragraph(
 
 
 def draft_blocks(
-    draft: SectionDraft, facts: dict[str, Field], issues: tuple[DraftReview, ...]
+    draft: SectionDraft,
+    facts: dict[str, Field],
+    issues: tuple[DraftReview, ...],
+    unit: int | None = None,
 ) -> list[Block]:
-    """The section as blocks: a flagged text or cell becomes the marker, a figure a marker."""
-    blocked = {issue.location for issue in issues}
+    """The section as blocks, a flagged text as the marker; with a unit, only that unit's text."""
     blocks: list[Block] = [
         _paragraph(item, f"paragraph:{index}", issues, facts)
         for index, item in enumerate(draft.paragraphs)
+        if unit is None or item.unit == unit
     ]
-    for index, table in enumerate(draft.tables):
-        ref = f"{draft.section}.{index}"
-        caption = _cell(table.caption, f"table:{index}:caption", blocked, facts)
-        blocks.append(Caption("caption", "tab", ref, ["Tabelul ", Ref("tab", ref), " ", caption]))
-        rows = [
-            [
-                [_cell(cell, f"table:{index}:{row}:{column}", blocked, facts)]
-                for column, cell in enumerate(cells)
-            ]
-            for row, cells in enumerate(table.rows)
-        ]
-        header = [MARKER if isinstance(cell[0], Num) else str(cell[0]) for cell in rows[0]]
-        blocks.append(Table("table", rows[1:], header_rows=1, header=[header]))
-    blocks.extend(Missing("body", MARKER) for _ in draft.figures)
-    if draft.status == "missing":
+    if draft.status == "missing" or not blocks:
         blocks.append(Missing("body", MARKER))
     return blocks
 
@@ -206,8 +199,16 @@ def render_section(
         if _insert_absent_section(document, draft.section, spans):
             source = Path(directory) / "with-section.docx"
             document.save(str(source))
+        by_unit = draft.section == "ch3.process" and any(
+            item.unit is not None for item in draft.paragraphs
+        )
         replace_section_body(
-            source, output, draft.section, draft_blocks(draft, facts, issues), keep_base=True
+            source,
+            output,
+            draft.section,
+            draft_blocks(draft, facts, issues),
+            keep_base=True,
+            unit_blocks=partial(draft_blocks, draft, facts, issues) if by_unit else None,
         )
     return check
 

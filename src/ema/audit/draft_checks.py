@@ -1,26 +1,28 @@
-"""Mechanical traceability checks and the separate qualitative support pass."""
+"""Mechanical traceability checks of a section draft: every name and number from a token."""
 
 from __future__ import annotations
 
-import json
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Any
-
-from pydantic import BaseModel
-from pydantic import Field as ModelField
 
 from ema.audit.ai_wording import ai_wording
 from ema.audit.catalogue_types import PASSAGE_FACTS, fact_key
-from ema.audit.draft_schema import SECTION_FACTS, DraftText, SectionDraft
-from ema.core.errors import EmaError
-from ema.core.llm.agent import AgentContext
-from ema.core.llm.structured import complete_json
+from ema.audit.draft_schema import DraftText, SectionDraft, citable
 from ema.core.review.models import Field
 
 TOKEN = re.compile(r"\{\{f:([a-z][a-z0-9_.:-]*)\}\}")
+# A citation names the fact a paraphrase rests on and renders nothing (D1).
+CITE = re.compile(r"\{\{c:([a-z][a-z0-9_.:-]*)\}\}")
+ANY_TOKEN = re.compile(r"\{\{[fc]:([a-z][a-z0-9_.:-]*)\}\}")
+CITE_GAP = re.compile(r"\s*" + CITE.pattern)
 NUMBER = re.compile(r"\d")
+# Romanian number words, matched on text folded to plain letters so that "două", "doua", "şase"
+# and "șase" are one word: a quantity spelled out is a number outside a fact token (D1).
+NUMBER_WORD = re.compile(
+    r"\b(?:unu|una|doi|doua|trei|patru|cinci|sase|sapte|opt|noua|zece|suta|sute|mie|mii"
+    r"|milion|milioane|(?:un|doi|doua|trei|pai|patru|cinci|sai|sapte|opt|noua)(?:sprezece|zeci))\b"
+)
 UPPER = "A-ZĂÂÎȘȚŞŢ"
 LOWER = "a-zăâîșțşţ"
 NAME = re.compile(
@@ -106,7 +108,30 @@ def sentence_parts(text: str, facts: dict[str, Field]) -> list[str]:
 
 def token_only(text: str) -> bool:
     """Text that is nothing but fact references, as a passage paragraph: the source speaks."""
-    return bool(TOKEN.search(text)) and not re.sub(r"[\s.,;:!?]", "", TOKEN.sub("", text))
+    return bool(TOKEN.search(text)) and not re.sub(r"[\s.,;:!?]", "", ANY_TOKEN.sub("", text))
+
+
+def folded(text: str) -> str:
+    return "".join(
+        char for char in unicodedata.normalize("NFKD", text) if not unicodedata.combining(char)
+    ).casefold()
+
+
+def literal_number(plain: str) -> bool:
+    """Text outside fact tokens that states a quantity: a digit or a Romanian number word."""
+    return bool(NUMBER.search(plain) or NUMBER_WORD.search(folded(plain)))
+
+
+def citable_fact(section: str, key: str, fact: Field | None, job: str) -> bool:
+    """A fact either token may name: the section's own, found, not rejected, with evidence."""
+    return (
+        citable(section, key)
+        and fact is not None
+        and fact.job_id == job
+        and fact.presence == "found"
+        and fact.review != "rejected"
+        and bool(fact.evidence)
+    )
 
 
 def _sentence_marked(text: str, facts: dict[str, Field]) -> str:
@@ -141,17 +166,8 @@ class DraftCheck:
     review: tuple[DraftReview, ...]
 
 
-def _texts(draft: SectionDraft) -> list[tuple[str, DraftText]]:
-    result = [(f"paragraph:{i}", paragraph) for i, paragraph in enumerate(draft.paragraphs)]
-    for table_index, table in enumerate(draft.tables):
-        result.append((f"table:{table_index}:caption", table.caption))
-        result.extend(
-            (f"table:{table_index}:{row_index}:{cell_index}", cell)
-            for row_index, row in enumerate(table.rows)
-            for cell_index, cell in enumerate(row)
-        )
-    result.extend((f"figure:{i}:caption", figure.caption) for i, figure in enumerate(draft.figures))
-    return result
+def texts(draft: SectionDraft) -> list[tuple[str, DraftText]]:
+    return [(f"paragraph:{i}", paragraph) for i, paragraph in enumerate(draft.paragraphs)]
 
 
 def _passage_number(key: str) -> int:
@@ -179,145 +195,58 @@ def _passage_layout(draft: SectionDraft) -> list[DraftReview]:
     return issues
 
 
-def check_draft(  # noqa: C901, PLR0912
-    draft: SectionDraft, facts: dict[str, Field], job: str
-) -> DraftCheck:
+def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> DraftCheck:
     fatal: list[DraftReview] = []
     review: list[DraftReview] = []
-    allowed = SECTION_FACTS[draft.section]
     known_names = {
         unicodedata.normalize("NFKC", str(field.value)).casefold()
         for field in facts.values()
         if field.key.endswith(("company_name", "client_name")) and field.job_id == job
     }
+    common = {name.casefold() for name in NAME_COMMON}
     cited = total = 0
-    for location, item in _texts(draft):
-        tokens = set(TOKEN.findall(item.text))
-        plain = TOKEN.sub("", item.text)
-        declared = set(item.fact_ids)
-        if tokens != declared:
+    for location, item in texts(draft):
+        tokens = set(ANY_TOKEN.findall(item.text))
+        plain = ANY_TOKEN.sub("", item.text)
+        if tokens != set(item.fact_ids):
             fatal.append(DraftReview("fact_refs", location, "tokens and listed fact ids differ"))
-        for key in tokens | declared:
-            fact = facts.get(key)
-            if (
-                fact_key(key) not in allowed
-                or fact is None
-                or fact.job_id != job
-                or fact.presence != "found"
-                or not fact.evidence
-            ):
-                fatal.append(DraftReview("fact_missing", location, key))
-        if NUMBER.search(plain):
+        fatal.extend(
+            DraftReview("fact_missing", location, key)
+            for key in sorted(tokens | set(item.fact_ids))
+            if not citable_fact(draft.section, key, facts.get(key), job)
+        )
+        if literal_number(plain):
             fatal.append(DraftReview("literal_number", location, "number outside fact reference"))
         resolved = TOKEN.sub(
             lambda match: str(facts[match.group(1)].value) if match.group(1) in facts else "",
-            item.text,
+            CITE_GAP.sub("", item.text),
         )
         if ai_wording(resolved):
             fatal.append(DraftReview("ai_mention", location, "AI or disclaimer wording"))
-        common = {name.casefold() for name in NAME_COMMON}
         candidates = {
             candidate
             for candidate in (
-                *NAME.findall(_sentence_marked(item.text, facts)),
+                *NAME.findall(_sentence_marked(CITE_GAP.sub("", item.text), facts)),
                 *ACRONYM.findall(plain),
             )
             if candidate.casefold() not in common
         }
         normal_plain = unicodedata.normalize("NFKC", plain).casefold()
         candidates.update(name for name in known_names if name and name in normal_plain)
-        for candidate in sorted(candidates):
-            fatal.append(DraftReview("literal_name", location, candidate))
-        body = location.startswith("paragraph:") and item.kind == "body"
+        fatal.extend(DraftReview("literal_name", location, name) for name in sorted(candidates))
         for sentence in sentence_parts(item.text, facts):
             total += 1
-            if TOKEN.search(sentence):
+            if ANY_TOKEN.search(sentence):
                 cited += 1
             else:
-                # Body text without a fact is filler and goes back to the drafter; a bullet,
-                # caption or table cell is a label, which the auditor reviews.
-                issues = fatal if body else review
+                # Body text without a fact is filler and goes back to the drafter; a bullet is a
+                # label, which the auditor reviews.
+                issues = fatal if item.kind == "body" else review
                 issues.append(DraftReview("uncited_sentence", location, sentence))
     fatal.extend(_passage_layout(draft))
-    for figure_index, figure in enumerate(draft.figures):
-        fact = facts.get(figure.fact_id)
-        if (
-            figure.fact_id not in allowed
-            or fact is None
-            or fact.job_id != job
-            or fact.presence != "found"
-            or not fact.evidence
-        ):
-            fatal.append(
-                DraftReview("figure_fact_missing", f"figure:{figure_index}", figure.fact_id)
-            )
-    review.extend(
-        DraftReview("unrendered_figure", f"figure:{index}", "S8 figure slots required")
-        for index in range(len(draft.figures))
-    )
     for key in draft.missing_fact_ids:
-        if fact_key(key) not in allowed or (
+        if not citable(draft.section, key) or (
             key in facts and (facts[key].job_id != job or facts[key].presence == "found")
         ):
             fatal.append(DraftReview("missing_status_invalid", "section", key))
     return DraftCheck(cited / total if total else 0.0, cited, total, tuple(fatal), tuple(review))
-
-
-class SupportFlag(BaseModel):
-    location: str
-    sentence: str
-    reason: str
-
-
-class SupportResult(BaseModel):
-    flags: list[SupportFlag] = ModelField(default_factory=list[SupportFlag])
-
-
-SUPPORT_PROMPT = (
-    "Flag every sentence whose cited facts do not support its claim, including qualitative "
-    "overstatement. Return locations, exact sentences and reasons. Do not infer missing facts."
-)
-
-
-def _support_text(text: str) -> str:
-    return " ".join(text.split()).rstrip(".!?").rstrip()
-
-
-def support_pass(
-    context: AgentContext, draft: SectionDraft, facts: dict[str, Field]
-) -> tuple[DraftReview, ...]:
-    items = _texts(draft)
-    # A text that is only fact references, as a passage paragraph, claims nothing of its own.
-    request: list[dict[str, Any]] = [
-        {
-            "location": location,
-            "text": item.text,
-            "facts": {key: str(facts[key].value) for key in item.fact_ids if key in facts},
-        }
-        for location, item in items
-        if not token_only(item.text)
-    ]
-    if not request:
-        return ()
-    result = complete_json(
-        context,
-        SupportResult,
-        SUPPORT_PROMPT,
-        json.dumps(request, ensure_ascii=False),
-        schema_retries=0,
-    )
-    known = {location: item.text for location, item in items}
-    if any(
-        flag.location not in known
-        or not _support_text(flag.sentence)
-        or _support_text(flag.sentence) not in _support_text(known[flag.location])
-        for flag in result.flags
-    ):
-        raise EmaError(
-            "support_invalid", "Verificarea afirmaţiilor a returnat o poziţie invalidă.", ""
-        )
-    return tuple(
-        DraftReview("unsupported", flag.location, flag.reason, flag.sentence)
-        for flag in result.flags
-        if not token_only(flag.sentence)
-    )

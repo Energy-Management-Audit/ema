@@ -11,7 +11,6 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from ema.audit.catalogue_types import fact_key
 from ema.audit.chapter_five import ChapterFivePlan
 from ema.audit.chapter_five_render import render_chapter_five
 from ema.audit.chapter_four import render_chapter_four
@@ -20,7 +19,7 @@ from ema.audit.chapter_six import ChapterSixPlan, render_chapter_six
 from ema.audit.chapter_tables import write_charts, write_tables
 from ema.audit.draft_checks import DraftReview
 from ema.audit.draft_render import render_section
-from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
+from ema.audit.draft_schema import SectionDraft, citable
 from ema.audit.intake import select_checklist
 from ema.audit.read import NARRATIVE_SECTIONS
 from ema.audit.render_dataset import reviewed_dataset
@@ -127,8 +126,7 @@ def review_flags(items: list[dict[str, str | None]]) -> tuple[DraftReview, ...]:
 
 def section_facts(section: str, by_key: dict[str, Field]) -> dict[str, Field]:
     """The facts a section's draft may cite, numbered passages of its narrative facts included."""
-    allowed = SECTION_FACTS.get(section, ())
-    return {key: field for key, field in by_key.items() if fact_key(key) in allowed}
+    return {key: field for key, field in by_key.items() if citable(section, key)}
 
 
 def drafted_sections(ws: Workspace, job: str, *, ctx: StageContext | None = None) -> set[str]:

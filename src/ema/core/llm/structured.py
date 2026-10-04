@@ -23,7 +23,7 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
     content: str,
     *,
     images: tuple[ImageInput, ...] = (),
-    max_output_tokens: int = 4096,
+    max_output_tokens: int | None = None,
     estimate_tokens: Callable[[list[dict[str, Any]]], int] | None = None,
     on_estimate: Callable[[int, float, float], None] | None = None,
     schema_retries: int = 1,
@@ -54,7 +54,9 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
     ]
     attachments = {image.sha256: image.data for image in images}
     draft_call = context.section.startswith(("draft:", "support:"))
-    output_limit = 8000 if draft_call and context.provider.name != "replay" else max_output_tokens
+    # A draft or support call is sized by its caller (D2); 8,000 is only its default.
+    default_limit = 8000 if draft_call and context.provider.name != "replay" else 4096
+    output_limit = default_limit if max_output_tokens is None else max_output_tokens
     budget_estimate_tokens = estimate_tokens
     if draft_call and estimate_tokens is None:
         schema_size = len(json.dumps(schema.model_json_schema()).encode("utf-8"))

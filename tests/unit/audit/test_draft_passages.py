@@ -1,4 +1,4 @@
-"""Draft v2 over passage facts: one paragraph per passage, every sentence cites, no filler."""
+"""Draft over passage facts: one paragraph per passage, every sentence cites, no filler."""
 
 from datetime import UTC, datetime
 from pathlib import Path
@@ -7,16 +7,8 @@ from tests.audit_replay import draft_recording, support_recording
 from tests.unit.audit.test_draft_structured import DraftProvider, SupportProvider
 from tests.workspace_jobs import create_job
 
-from ema.audit.draft_agent import (
-    INSTRUCTIONS,
-    LENGTH_RULE,
-    PASSAGE_RULE,
-    PROMPT_VERSION,
-    SENTENCE_RULE,
-    draft_section_replay,
-    draft_section_run,
-    recorded_facts,
-)
+from ema.audit.draft_agent import draft_section_replay, draft_section_run, recorded_facts
+from ema.audit.draft_prompt import PROMPT_VERSION, instructions, rule_text
 from ema.audit.draft_render import draft_blocks
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.core.llm.models import default_model
@@ -25,7 +17,8 @@ from ema.core.review.fields import propose
 from ema.core.review.models import Evidence, Manual
 from ema.core.workspace import Workspace
 
-SECTION = "ch3.process"
+# Passages from no flow scheme or Fişa block are the overview, which ch3.flux describes (D3).
+SECTION = "ch3.flux"
 PASSAGES = {
     "audit.process_sections": "Piesele sunt degresate într-o baie alcalină şi clătite.",
     "audit.process_sections.2": "Piesele uscate trec în cabina de vopsire electrostatică.",
@@ -78,18 +71,23 @@ def run(ws: Workspace, job: str, drafts: list[SectionDraft]) -> tuple[DraftProvi
     return provider, accepted
 
 
-def test_the_task_asks_for_cited_sentences_and_length_by_facts() -> None:
-    assert SENTENCE_RULE in INSTRUCTIONS and LENGTH_RULE in INSTRUCTIONS
-    assert "3–6" not in INSTRUCTIONS
-    assert "nu scrie propoziţii fără fapt" in SENTENCE_RULE
-    assert "un paragraf pentru fiecare subiect" in LENGTH_RULE
-    assert PASSAGE_RULE in INSTRUCTIONS
-    assert "câte un pasaj în fiecare paragraf, în ordinea numerelor" in PASSAGE_RULE
+def test_the_prompt_asks_for_cited_sentences_her_register_and_length_by_target() -> None:
+    prompt = instructions()
+    assert "Nu scrie introduceri, generalități sau concluzii fără fapt" in rule_text(
+        "uncited_sentence"
+    )
+    assert "câte un pasaj pe paragraf, în ordinea numerelor" in rule_text("passage_order")
+    assert "diacritice corecte (ă, â, î, ș, ț)" in prompt
+    assert 'kind "bullet"' in prompt and "niciun tabel" in prompt
+    assert "ținta de cuvinte a secțiunii" in prompt
+    assert "Transformatoarele (audit.transformer.*)" in prompt
+    assert "nu alegi și nu împaci valorile" in prompt
+    assert "Nu repeți o cantitate pe care o arată un tabel al capitolului" in prompt
 
 
 def test_the_prompt_version_keys_recordings_of_this_task() -> None:
     # Recordings are keyed by version: one made for an earlier prompt is never replayed.
-    assert PROMPT_VERSION == "audit-draft-v3"
+    assert PROMPT_VERSION == "audit-draft-v4"
 
 
 def test_a_multi_paragraph_draft_over_numbered_passages_is_accepted(tmp_path: Path) -> None:
@@ -99,8 +97,8 @@ def test_a_multi_paragraph_draft_over_numbered_passages_is_accepted(tmp_path: Pa
 
     assert accepted == DRAFT
     (request,) = provider.requests
-    assert SENTENCE_RULE in request["task"] and LENGTH_RULE in request["task"]
-    assert {item["key"]: item["value"] for item in request["facts"]} == PASSAGES
+    (asked,) = request["sections"]
+    assert {item["key"]: item["text"] for item in asked["facts"]} == PASSAGES
     blocks = draft_blocks(accepted, recorded_facts(ws, job, SECTION), ())
     assert [block.segments for block in blocks if isinstance(block, Paragraph)] == [
         [PASSAGES["audit.process_sections"]],
@@ -129,7 +127,14 @@ def test_filler_goes_back_once_with_the_sentence_rule(tmp_path: Path) -> None:
     assert [
         (error["rule"], error["rule_text"], error["location"], error["detail"])
         for error in provider.requests[1]["errors"]
-    ] == [("uncited_sentence", SENTENCE_RULE, "paragraph:0", "Procesul este modern şi eficient.")]
+    ] == [
+        (
+            "uncited_sentence",
+            rule_text("uncited_sentence"),
+            "paragraph:0",
+            "Procesul este modern şi eficient.",
+        )
+    ]
 
 
 def test_replay_reproduces_the_passage_draft_offline(tmp_path: Path) -> None:
