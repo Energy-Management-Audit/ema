@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import re
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
-
-from docx import Document
 
 from ema.audit.base_units import UnitPlan
+from ema.audit.process_units import ProcessesSource, dossier_units
 from ema.audit.visit import visit_view_from_slots
 from ema.core.errors import EmaError
 from ema.core.jobs import StageContext
@@ -20,11 +17,7 @@ from ema.core.review.models import Field
 from ema.core.workspace import SlotVersion, Workspace
 from ema.energy_data.carriers import WATER_CARRIERS, Carrier
 from ema.energy_data.necesar import parse_necesar_info
-from ema.energy_data.source import normal
 
-ProcessesSource = Literal["schemes", "fisa", "default"]
-
-_SCHEME = re.compile(r"^5\.(\d+)\.")
 _FAMILIES: dict[Carrier, str] = {
     Carrier.electricity_grid: "electricity",
     Carrier.electricity_pv: "electricity",
@@ -42,21 +35,6 @@ _FAMILIES: dict[Carrier, str] = {
 class JobUnitPlan(UnitPlan):
     processes_source: ProcessesSource = "default"
     client_revision: tuple[str, int] | None = None
-
-
-def process_count(slot_names: Iterable[str], fisa: Path | None) -> tuple[int, ProcessesSource]:
-    """Flow schemes (checklist item 5) first, then the Fişa's `Flux` paragraphs, else one."""
-    schemes = {match.group(1) for name in slot_names if (match := _SCHEME.match(Path(name).name))}
-    if schemes:
-        return len(schemes), "schemes"
-    if fisa is not None:
-        flows = sum(
-            paragraph.text.strip().casefold().startswith("flux")
-            for paragraph in Document(str(fisa)).paragraphs
-        )
-        if flows:
-            return flows, "fisa"
-    return 1, "default"
 
 
 def carrier_families(job_fields: Iterable[Field]) -> frozenset[str]:
@@ -143,18 +121,7 @@ def unit_plan(
                 "slots", f"{job}:{row['slot']}", revision(db, "slots", f"{job}:{row['slot']}") or 0
             )
     dossier = [row for row in rows if str(row["slot"]).startswith("dossier/")]
-    fisas = sorted(
-        (
-            row
-            for row in dossier
-            if Path(str(row["slot"])).suffix.lower() == ".docx"
-            and normal(Path(str(row["slot"])).name).startswith("fisa")
-            and row["relative_path"] is not None
-        ),
-        key=lambda row: float(row["added_at"]),
-    )
-    fisa = ws.path(str(fisas[-1]["relative_path"])) if fisas else None
-    processes, source = process_count((str(row["slot"]) for row in dossier), fisa)
+    processes = dossier_units(ws, [dict(row) for row in dossier])
     view = visit_view_from_slots([_slot(dict(row)) for row in rows])
     checklist = [row for row in dossier if Path(str(row["slot"])).name.startswith("0.")]
     tables = 0
@@ -165,12 +132,12 @@ def unit_plan(
     measures = int(count.value) if count is not None and count.value is not None else 0
     return JobUnitPlan(
         client_name=client_name,
-        processes=processes,
+        processes=processes.count,
         carriers=carrier_families(job_fields),
         measured_panels=len(view.panels),
         thermal_measurements=any(str(row["slot"]).startswith("visit/thermal/") for row in rows),
         equipment_tables=tables,
         measures=measures,
-        processes_source=source,
+        processes_source=processes.source,
         client_revision=client_revision,
     )

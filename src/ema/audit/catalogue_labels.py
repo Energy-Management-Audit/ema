@@ -1,6 +1,6 @@
 """Review labels and presentation for the section catalogue's fact vocabulary."""
 
-from ema.audit.catalogue_types import AuditFact, fact_key
+from ema.audit.catalogue_types import PROCESS_UNIT, AuditFact, fact_key
 from ema.audit.reading_labels import READING_LABELS
 from ema.core.review.models import FieldSpec, ValueType
 
@@ -35,6 +35,17 @@ FACT_LABELS: dict[str, str] = {
     AuditFact.METERING: "Contorizare",
     AuditFact.AUTOMATION: "Automatizare",
     AuditFact.PRODUCTION: "Producţie",
+    # Her audits print these under "Date privind regimul de lucru", the gas and thermal energy
+    # section's boiler rooms and the "parcul propriu fotovoltaic" analysis.
+    AuditFact.WORK_REGIME: "Regimul de lucru",
+    AuditFact.HEATING: "Centrale termice",
+    AuditFact.PV_POWER: "Parcul propriu fotovoltaic – putere instalată",
+    AuditFact.PV_YEAR: "Parcul propriu fotovoltaic – anul punerii în funcţiune",
+}
+# The facts that are not free text: their value type and unit.
+FACT_TYPES: dict[str, tuple[ValueType, str | None]] = {
+    AuditFact.PV_POWER: ("number", "kWp"),
+    AuditFact.PV_YEAR: ("year", None),
 }
 IDENTIFIERS = frozenset(
     {"audit.cui", "audit.caen_code", "audit.registrul_comertului", "audit.phone"}
@@ -106,6 +117,8 @@ def field_label(  # noqa: C901, PLR0911
         return f"{ECONOMIC_LABELS[parts[2]]} {parts[3]}"
     if key.startswith("audit.employees."):
         return f"Angajaţi {parts[-1]}"
+    if key.startswith(PROCESS_UNIT):
+        return f"Fluxul tehnologic {parts[2]} – denumire"
     if key == "audit_measure.count":
         return "Numărul măsurilor"
     if key.startswith("audit_measure.") and len(parts) == 3:

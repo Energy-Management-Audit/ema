@@ -26,7 +26,7 @@ from ema.audit.base_units import UnitPlan, select_units
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.headings import map_headings
 from ema.audit.inventory import inventory
-from ema.audit.render_plan import process_count
+from ema.audit.process_units import process_units
 from ema.core.config import Settings
 from ema.core.office.anchors import find
 from ema.core.office.word_api import word_automation, word_available
@@ -42,7 +42,8 @@ def _references(root: Path) -> tuple[Path, Path]:
 def _audit_case_a_plan(root: Path) -> UnitPlan:
     received = root / case_path("audit-case-a", "received")
     # Six distinct 5.x Flux schemes; the second 5.1 file is a revision.
-    assert process_count([path.name for path in received.iterdir()], None) == (6, "schemes")
+    units = process_units((path.name, path.name) for path in received.iterdir())
+    assert (units.count, units.source) == (6, "schemes")
     panels = list(received.glob("13.[56].Armonici*.pdf"))
     assert len(panels) == 2
     info = parse_necesar_info(next(received.glob("*Necesar info*.xls")))
@@ -59,7 +60,9 @@ def _audit_case_b_plan(root: Path) -> UnitPlan:
     received = case / "received"
     # No 5.x schemes; the received Fisa has two body paragraphs beginning "Flux".
     fisa = next(received.glob("Fisa*.docx"))
-    assert process_count([path.name for path in received.iterdir()], fisa) == (2, "fisa")
+    paragraphs = [paragraph.text for paragraph in Document(str(fisa)).paragraphs]
+    units = process_units(((path.name, path.name) for path in received.iterdir()), ("", paragraphs))
+    assert (units.count, units.source) == (2, "fisa")
     assert list(received.glob("*ATR*.pdf"))  # electricity
     assert list(received.glob("*Gaze*.zip"))  # gas
     panels = list((case / "visit/electrical").glob("tablou-electric-*"))

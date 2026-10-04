@@ -142,9 +142,9 @@ def test_the_output_schema_and_the_instructions_are_the_plan_contract() -> None:
     fact = schema["$defs"]["ExtractedFact"]
     assert list(fact["properties"]) == ["key", "value", "file", "page", "quote"]
     assert fact["required"] == ["key", "value", "file", "page", "quote"]
-    assert ("audit", "prompts", "extract_v1.txt") in RESOURCE_FILES
+    assert ("audit", "prompts", "extract_v2.txt") in RESOURCE_FILES
     assert instructions().startswith("Establish the listed facts from the dossier files.")
-    assert (PROMPT_TOKENS, OUTPUT_TOKENS, PROMPT_VERSION) == (300_000, 8_000, "audit-extract-v2")
+    assert (PROMPT_TOKENS, OUTPUT_TOKENS, PROMPT_VERSION) == (300_000, 8_000, "audit-extract-v3")
 
 
 def test_one_call_fills_several_sections(tmp_path: Path) -> None:

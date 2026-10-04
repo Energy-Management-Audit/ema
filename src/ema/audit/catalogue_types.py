@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
@@ -47,6 +48,10 @@ class AuditFact(StrEnum):
     METERING = "audit.metering"
     AUTOMATION = "audit.automation"
     PRODUCTION = "audit.production"
+    WORK_REGIME = "audit.work_regime"
+    HEATING = "audit.heating"
+    PV_POWER = "audit.pv.power"
+    PV_YEAR = "audit.pv.year"
 
 
 # Narrative facts are whole verbatim source passages. A description in several places, as the
@@ -63,19 +68,41 @@ PASSAGE_FACTS = frozenset(
         AuditFact.COMPRESSED_AIR,
         AuditFact.HVAC,
         AuditFact.LIGHTING,
+        AuditFact.HEATING,
+        AuditFact.EQUIPMENT,
+        AuditFact.METERING,
     }
 )
 MAX_PASSAGES = 6
+# The process flow keeps a passage per stage of every process unit (D3).
+MAX_PROCESS_PASSAGES = 12
+# A 3.1.x unit's heading, numbered from 1 in unit order: audit.process_unit.<i>.name.
+PROCESS_UNIT = "audit.process_unit."
+_UNIT_NAME = re.compile(rf"^{re.escape(PROCESS_UNIT)}([1-9]\d*)\.name$")
+
+
+def max_passages(key: str) -> int:
+    return MAX_PROCESS_PASSAGES if key == AuditFact.PROCESS_SECTIONS else MAX_PASSAGES
 
 
 def passage_key(key: str, number: int) -> str:
     return key if number == 1 else f"{key}.{number}"
 
 
+def process_unit_name(number: int) -> str:
+    return f"{PROCESS_UNIT}{number}.name"
+
+
+def process_unit_number(key: str) -> int | None:
+    """The unit a name key belongs to: `audit.process_unit.2.name` is unit 2."""
+    match = _UNIT_NAME.match(key)
+    return int(match.group(1)) if match else None
+
+
 def fact_key(key: str) -> str:
     """The catalogue fact a stored key belongs to: `audit.history.2` is `audit.history`."""
     base, _, number = key.rpartition(".")
-    numbered = base in PASSAGE_FACTS and number.isdigit() and 2 <= int(number) <= MAX_PASSAGES
+    numbered = base in PASSAGE_FACTS and number.isdigit() and 2 <= int(number) <= max_passages(base)
     return base if numbered else key
 
 

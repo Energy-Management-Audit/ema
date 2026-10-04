@@ -18,7 +18,7 @@ from tests.unit.audit.test_fill_extract import (
 
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.catalogue_labels import field_label
-from ema.audit.catalogue_types import MAX_PASSAGES, PASSAGE_FACTS
+from ema.audit.catalogue_types import MAX_PASSAGES, MAX_PROCESS_PASSAGES, PASSAGE_FACTS
 from ema.audit.fill_extract import (
     MAX_OUTPUT_TOKENS,
     OUTPUT_TOKENS,
@@ -28,8 +28,8 @@ from ema.audit.fill_extract import (
     THINKING_TOKENS,
     instructions,
     output_tokens,
-    split_passage,
 )
+from ema.audit.fill_passages import split_passage
 from ema.audit.fill_tools import FillDocument
 from ema.core.llm import ReplayProvider
 from ema.core.llm.models import selected_model
@@ -61,6 +61,7 @@ def test_the_prompt_states_the_passage_rule_with_the_code_limits() -> None:
     assert 'A fact whose line ends with "— pasaj" is a description' in text
     assert f"up to {PASSAGE_CHARS} characters" in text
     assert f"up to {MAX_PASSAGES} for one key" in text
+    assert f"up to {MAX_PROCESS_PASSAGES} for audit.process_sections" in text
     assert {str(key) for key in PASSAGE_FACTS} == {
         "audit.history",
         "audit.business_activity",
@@ -71,11 +72,14 @@ def test_the_prompt_states_the_passage_rule_with_the_code_limits() -> None:
         "audit.compressed_air",
         "audit.hvac",
         "audit.lighting",
+        "audit.heating",
+        "audit.equipment",
+        "audit.metering",
     }
 
 
 def test_the_prompt_version_keys_recordings_of_the_passage_prompt() -> None:
-    assert PROMPT_VERSION == "audit-extract-v2"
+    assert PROMPT_VERSION == "audit-extract-v3"
     assert f"up to {PASSAGE_CHARS} characters" in instructions() and PASSAGE_CHARS == 1_500
 
 
@@ -91,7 +95,7 @@ def test_a_long_passage_verifies_whole_and_page_exact(tmp_path: Path) -> None:
     line = f"audit.process_sections — {field_label('audit.process_sections')} — ch3.process"
     assert f"{line} — pasaj\n" in content
     (equipment,) = [item for item in content.splitlines() if item.startswith("audit.equipment")]
-    assert equipment == f"audit.equipment — {field_label('audit.equipment')} — ch3.process"
+    assert equipment == f"audit.equipment — {field_label('audit.equipment')} — ch3.process — pasaj"
     (stored,) = [item for item in fields(ws, job_id) if item.key == "audit.process_sections"]
     assert stored.value == STAGES[0].strip()
     with ws.connect() as db:
@@ -103,18 +107,18 @@ def test_a_long_passage_verifies_whole_and_page_exact(tmp_path: Path) -> None:
 
 def test_each_distinct_passage_is_its_own_numbered_fact(tmp_path: Path) -> None:
     ws, job_id = job(tmp_path)
-    returned = [passage(page) for page in (1, 2, 1, 3, 4, 5, 6, 7, 8)]
+    returned = [passage(page, key="audit.history") for page in (1, 2, 1, 3, 4, 5, 6, 7, 8)]
     provider = Scripted([{"facts": returned, "missing": []}])
 
-    extract(ws, job_id, sections("ch3.process"), provider, FLOW)
+    extract(ws, job_id, sections("ch2.istorie"), provider, FLOW)
 
     found = values(ws, job_id)
-    numbered = ["audit.process_sections"] + [
-        f"audit.process_sections.{number}" for number in range(2, MAX_PASSAGES + 1)
+    numbered = ["audit.history"] + [
+        f"audit.history.{number}" for number in range(2, MAX_PASSAGES + 1)
     ]
     # The repeated page 1 is skipped; pages past MAX_PASSAGES are not kept.
     assert [found[key][0] for key in numbered] == [STAGES[page - 1].strip() for page in range(1, 7)]
-    assert "audit.process_sections.7" not in found
+    assert "audit.history.7" not in found
     assert field_label("audit.process_sections.3") == f"{field_label('audit.process_sections')} (3)"
 
 
@@ -133,9 +137,10 @@ def test_a_rejected_passage_is_retried_when_another_one_verified(tmp_path: Path)
     assert found["audit.process_sections.2"] == (STAGES[1].strip(), "found")
     retry = provider.sent[1][1]["content"]
     assert retry.startswith("Fapte de stabilit:\naudit.process_sections — ")
+    # ch3.process asks for the process flow's passages and the equipment's.
     assert provider.max_output_tokens == [
-        OUTPUT_TOKENS + THINKING_TOKENS + MAX_PASSAGES * PASSAGE_TOKENS,
-        OUTPUT_TOKENS + THINKING_TOKENS + MAX_PASSAGES * PASSAGE_TOKENS,
+        OUTPUT_TOKENS + THINKING_TOKENS + (MAX_PROCESS_PASSAGES + MAX_PASSAGES) * PASSAGE_TOKENS,
+        OUTPUT_TOKENS + THINKING_TOKENS + MAX_PROCESS_PASSAGES * PASSAGE_TOKENS,
     ]
 
 
@@ -228,18 +233,19 @@ def test_what_does_not_fit_is_dropped_whole_and_logged() -> None:
 
 def test_pieces_past_the_passage_count_are_logged(tmp_path: Path) -> None:
     ws, job_id = job(tmp_path)
-    returned = [passage(1, quote=LONG, file="F2")] + [passage(page) for page in range(1, 6)]
+    returned = [passage(1, quote=LONG, file="F2", key="audit.history")]
+    returned += [passage(page, key="audit.history") for page in range(1, 6)]
     flows = {**FLOW, **LONG_FLOW}
     provider = Scripted([{"facts": returned, "missing": []}])
 
-    extract(ws, job_id, sections("ch3.process"), provider, flows)
+    extract(ws, job_id, sections("ch2.istorie"), provider, flows)
 
     found = values(ws, job_id)
-    assert found[f"audit.process_sections.{MAX_PASSAGES}"][0].startswith("Fraza 1:")
+    assert found[f"audit.history.{MAX_PASSAGES}"][0].startswith("Fraza 1:")
     dropped = log_events(ws, job_id, "passage_dropped")
     # Five stage passages, then four pieces of the long one: the last three do not fit.
     assert [(item["key"], item["reason"]) for item in dropped] == [
-        ("audit.process_sections", "passage_count")
+        ("audit.history", "passage_count")
     ] * 3
 
 
