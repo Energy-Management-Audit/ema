@@ -15,7 +15,7 @@ from typing import Literal
 from lxml import etree
 
 from ema.core.office.block_text import set_text
-from ema.core.office.chart_blocks import build_column_chart_detached, clone_chart_detached
+from ema.core.office.chart_blocks import build_chart_detached
 from ema.core.office.chart_ids import refresh_unique_ids
 from ema.core.office.chart_series import Series
 from ema.core.office.errors import OfficeError
@@ -23,6 +23,7 @@ from ema.core.office.missing_text import MISSING_TEXT
 from ema.core.office.numbers_ro import format_number
 from ema.core.office.package import encoded, read_parts, write_parts
 from ema.core.office.pictures import replace_picture
+from ema.core.office.pie_xml import PieKind
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
@@ -84,6 +85,7 @@ class NativeChart:
     series: list[Series]
     title: str | None = None
     column_axis_title: str | None = None
+    pie: PieKind | None = None
 
 
 @dataclass(frozen=True)
@@ -329,15 +331,16 @@ def render(  # noqa: C901, PLR0912, PLR0915
         for index, block in enumerate(blocks):
             if not isinstance(block, NativeChart):
                 continue
-            proto = _prototype(prototypes, block.proto, "p")
-            if block.column_axis_title is None:
-                part, paragraph = clone_chart_detached(
-                    current, block.part, block.series, block.title, next_path, proto
-                )
-            else:
-                part, paragraph = build_column_chart_detached(
-                    current, block.part, block.series, block.column_axis_title, next_path, proto
-                )
+            part, paragraph = build_chart_detached(
+                current,
+                block.part,
+                block.series,
+                next_path,
+                _prototype(prototypes, block.proto, "p"),
+                title=block.title,
+                column_axis_title=block.column_axis_title,
+                pie=block.pie,
+            )
             chart_parts.append(part)
             detached[index] = paragraph
             current, next_path = next_path, current

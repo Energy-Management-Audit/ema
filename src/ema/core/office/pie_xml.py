@@ -12,7 +12,7 @@ from ema.core.office.package import C, R
 
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 PieKind = Literal["pv", "mix"]
-COLOURS = ("4F81BD", "C0504D", "9BBB59", "8064A2", "4BACC6")
+COLOURS = ("4F81BD", "C0504D", "9BBB59", "8064A2", "4BACC6", "F79646", "2C4D75", "772C2A")
 
 
 def _add(parent: etree._Element, space: str, name: str, **attrs: str) -> etree._Element:
@@ -149,8 +149,12 @@ def pie_root(
     """Build a native, editable chart from sourced positive carrier values."""
     if representation not in {"normalized", "raw"}:
         raise ValueError("unknown pie value representation")
-    if len(labels) != len(values) or not 2 <= len(values) <= 5 or any(v < 0 for v in values):
-        raise ValueError("pie requires two to five nonnegative labelled values")
+    if (
+        len(labels) != len(values)
+        or not 2 <= len(values) <= len(COLOURS)
+        or any(v < 0 for v in values)
+    ):
+        raise ValueError("pie requires two to eight nonnegative labelled values")
     root = etree.Element(f"{{{C}}}chartSpace", nsmap={"c": C, "a": A, "r": R})
     _flag(root, "date1904", "0")
     _add(root, C, "lang", val="ro-RO")
