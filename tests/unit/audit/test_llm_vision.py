@@ -38,6 +38,7 @@ class FakeProvider:
         *,
         prompt_version: str = "",
         attachments: dict[str, bytes] | None = None,
+        thinking_tokens: int | None = None,
     ) -> Exchange:
         assert attachments == {"a" * 64: b"image bytes"}
         return Exchange('{"value":"read"}', (), 10, 2)
@@ -88,6 +89,34 @@ def test_hash_uses_image_sha_not_bytes_and_recording_replays(tmp_path: Path) -> 
         ).text
         == '{"value":"read"}'
     )
+
+
+def test_thinking_budget_does_not_change_recording_hash(tmp_path: Path) -> None:
+    class DraftProvider:
+        name = "gemini"
+
+        def __init__(self) -> None:
+            self.thinking: list[int | None] = []
+
+        def respond(self, *args: Any, **kwargs: Any) -> Exchange:
+            self.thinking.append(kwargs.get("thinking_tokens"))
+            return Exchange('{"value":"read"}', (), 1, 1, finish_reason="MAX_TOKENS")
+
+    inner = DraftProvider()
+    recording = tmp_path / "recording.json"
+    provider = RecordingProvider(inner, recording)
+    messages = [{"role": "user", "content": "synthetic draft"}]
+    for thinking in (None, 16_000):
+        provider.respond("gemini-3.6-flash", messages, (), synthetic=True, thinking_tokens=thinking)
+    rows = json.loads(recording.read_text(encoding="utf-8"))["responses"]
+    assert rows[0]["request_hashes"] == rows[1]["request_hashes"]
+    assert rows[0]["candidates"][0]["finishReason"] == "MAX_TOKENS"
+    replay = ReplayProvider(recording)
+    assert (
+        replay.respond("gemini-3.6-flash", messages, (), thinking_tokens=16_000).finish_reason
+        == "MAX_TOKENS"
+    )
+    assert inner.thinking == [None, 16_000]
 
 
 def test_openai_and_gemini_convert_images_without_forwarding_hash_key() -> None:

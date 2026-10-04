@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 from google.genai import types
 
+from ema.audit.draft_plan import THINKING_TOKENS
 from ema.core.errors import EmaError
 from ema.core.llm.models import curated_models
 from ema.core.llm.providers import GeminiProvider, OpenAIProvider
@@ -53,6 +54,36 @@ def test_gemini_keeps_signed_function_history_and_call_id() -> None:
     assert contents[0].parts[0].thought_signature == b"signature"
     assert contents[1].parts[0].function_response.id == "f1"
     assert result.text == "done"
+
+
+def test_gemini_draft_thinking_config_and_finish_reason() -> None:
+    configs: list[types.GenerateContentConfig] = []
+
+    class Models:
+        def generate_content(self, **kwargs: object) -> object:
+            configs.append(kwargs["config"])  # type: ignore[arg-type]
+            return SimpleNamespace(
+                function_calls=[],
+                text='{"item": 1}',
+                usage_metadata=None,
+                candidates=[
+                    SimpleNamespace(content=None, finish_reason=types.FinishReason.MAX_TOKENS)
+                ],
+            )
+
+    provider = GeminiProvider.__new__(GeminiProvider)
+    provider._client = SimpleNamespace(models=Models())
+    for thinking in (THINKING_TOKENS, None):
+        result = provider.respond(
+            "gemini-3.6-flash",
+            [{"role": "user", "content": "synthetic draft"}],
+            (),
+            synthetic=True,
+            thinking_tokens=thinking,
+        )
+        assert result.finish_reason == "MAX_TOKENS"
+    assert configs[0].thinking_config.thinking_budget == THINKING_TOKENS
+    assert configs[1].thinking_config is None
 
 
 def test_openai_rebuilds_function_messages_for_sdk() -> None:

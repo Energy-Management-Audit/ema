@@ -15,6 +15,7 @@ from ema.audit.draft_agent import chapter_groups
 from ema.audit.draft_chapter import Passes, run_group, unit_issues
 from ema.audit.draft_plan import (
     MAX_OUTPUT_TOKENS,
+    THINKING_TOKENS,
     Group,
     SectionPlan,
     allowance,
@@ -26,6 +27,7 @@ from ema.audit.draft_prompt import Used
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.audit.draft_style import Example
 from ema.core.llm.models import default_model
+from ema.core.llm.types import Exchange
 from ema.core.review.fields import propose
 from ema.core.review.models import Evidence, Manual
 from ema.core.workspace import Workspace
@@ -56,12 +58,15 @@ def _draft(section: str, text: str, *keys: str) -> SectionDraft:
 
 
 def _run(
-    tmp_path: Path, sections: list[str], answers: list[object]
+    tmp_path: Path,
+    sections: list[str],
+    answers: list[object],
+    provider: DraftProvider | None = None,
 ) -> tuple[DraftProvider, SupportProvider, Used, object, Workspace, str]:
     ws = Workspace(tmp_path / "ws")
     job = _job(ws, {"audit.equipment": EQUIPMENT, "audit.process_sections": "Piesele se spală."})
     (group,), units = chapter_groups(ws, job, sections)
-    provider, support, used = DraftProvider(answers), SupportProvider(), Used()  # type: ignore[arg-type]
+    provider, support, used = provider or DraftProvider(answers), SupportProvider(), Used()  # type: ignore[arg-type]
     passes = Passes(provider, support, default_model("openai").id, synthetic=True)
     result = run_group(ws, job, group, passes, used, units)
     return provider, support, used, result, ws, job
@@ -83,6 +88,29 @@ def test_one_call_drafts_two_sections(tmp_path: Path) -> None:
     assert (len(provider.requests), support.calls) == (1, 1)
     # A paraphrased passage is used as much as a quoted one.
     assert used.passages == {"audit.process_sections", "audit.equipment"}
+
+
+def test_truncated_chapter_retries_once_with_full_output_room(tmp_path: Path) -> None:
+    class TruncatedDraft(DraftProvider):
+        def __init__(self) -> None:
+            super().__init__([[FLOW, PARAPHRASED]])
+            self.thinking: list[int | None] = []
+
+        def respond(self, *args: object, **kwargs: object) -> Exchange:
+            self.thinking.append(kwargs.get("thinking_tokens"))  # type: ignore[arg-type]
+            if not self.requests:
+                self.requests.append(json.loads(args[1][1]["content"]))  # type: ignore[index]
+                self.limits.append(args[4])  # type: ignore[arg-type]
+                return Exchange('{"sections": [', (), 1, 1, finish_reason="MAX_TOKENS")
+            return super().respond(*args, **kwargs)
+
+    provider = TruncatedDraft()
+    _, _, _, result, _, _ = _run(tmp_path, [FLUX, CONSUMERS], [], provider)
+    assert set(result.drafted) == {FLUX, CONSUMERS}  # type: ignore[attr-defined]
+    assert provider.limits[0] < MAX_OUTPUT_TOKENS
+    assert provider.limits[1] == MAX_OUTPUT_TOKENS == 65_536
+    assert provider.thinking == [THINKING_TOKENS, THINKING_TOKENS]
+    assert len(provider.requests) == 2
 
 
 def test_a_passage_used_by_an_earlier_section_goes_back_with_what_is_used(tmp_path: Path) -> None:

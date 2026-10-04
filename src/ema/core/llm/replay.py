@@ -90,8 +90,9 @@ class ReplayProvider:
         *,
         prompt_version: str = "",
         attachments: Mapping[str, bytes] | None = None,
+        thinking_tokens: int | None = None,
     ) -> Exchange:
-        del synthetic, attachments
+        del synthetic, attachments, thinking_tokens
         if self.calls >= len(self._responses):
             raise EmaError("replay_exhausted", "Răspunsurile AI înregistrate s-au terminat.", "")
         row = self._responses[self.calls]
@@ -124,6 +125,7 @@ class ReplayProvider:
                 int(usage.get("candidatesTokenCount", 0)) + int(usage.get("thoughtsTokenCount", 0)),
                 content,
                 int(usage.get("cachedContentTokenCount", 0)),
+                row["candidates"][0].get("finishReason"),
             )
         message = row["choices"][0]["message"]
         usage = row["usage"]
@@ -138,4 +140,5 @@ class ReplayProvider:
             int(usage["prompt_tokens"]),
             int(usage["completion_tokens"]),
             cached_input_tokens=int(usage.get("prompt_tokens_details", {}).get("cached_tokens", 0)),
+            finish_reason=row["choices"][0].get("finish_reason"),
         )

@@ -32,6 +32,7 @@ class RecordingProvider:
         *,
         prompt_version: str = "",
         attachments: Mapping[str, bytes] | None = None,
+        thinking_tokens: int | None = None,
     ) -> Exchange:
         response = self.inner.respond(
             model,
@@ -42,6 +43,7 @@ class RecordingProvider:
             synthetic,
             prompt_version=prompt_version,
             attachments=attachments,
+            **({"thinking_tokens": thinking_tokens} if thinking_tokens is not None else {}),
         )
         row = self._row(response)
         row["model"] = model
@@ -69,7 +71,16 @@ class RecordingProvider:
                 else [{"text": response.text or ""}]
             )
             return {
-                "candidates": [{"content": {"role": "model", "parts": parts}}],
+                "candidates": [
+                    {
+                        "content": {"role": "model", "parts": parts},
+                        **(
+                            {"finishReason": response.finish_reason}
+                            if response.finish_reason
+                            else {}
+                        ),
+                    }
+                ],
                 "usageMetadata": {
                     "promptTokenCount": response.input_tokens,
                     "candidatesTokenCount": response.output_tokens,
@@ -79,6 +90,7 @@ class RecordingProvider:
         return {
             "choices": [
                 {
+                    "finish_reason": response.finish_reason,
                     "message": {
                         "content": response.text,
                         "tool_calls": [
@@ -92,7 +104,7 @@ class RecordingProvider:
                             }
                             for call in response.calls
                         ],
-                    }
+                    },
                 }
             ],
             "usage": {

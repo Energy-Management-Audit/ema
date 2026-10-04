@@ -10,6 +10,7 @@ import pytest
 from pydantic import BaseModel
 from tests.workspace_jobs import create_job
 
+from ema.api.error_status import STATUS
 from ema.core.errors import EmaError
 from ema.core.llm import AgentContext, ReplayProvider, complete_json
 from ema.core.llm.agent import call_with_budget
@@ -80,6 +81,33 @@ def test_complete_json_surfaces_second_schema_error(tmp_path: Path) -> None:
     with pytest.raises(EmaError) as error:
         complete_json(context, Classification, "Classify", "Synthetic permit")
     assert error.value.code == "ai_schema"
+
+
+def test_complete_json_reports_truncation_without_schema_retry(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    class CutProvider:
+        name = "gemini"
+        calls = 0
+
+        def respond(self, *args: object, **kwargs: object) -> Exchange:
+            self.calls += 1
+            return Exchange('{"item":', (), 1, 1, finish_reason="MAX_TOKENS")
+
+    ws = Workspace(tmp_path / "workspace")
+    job = create_job(ws, "audit", "synthetic", 2026)
+    provider = CutProvider()
+    context = AgentContext(ws, job, "draft:3-1", provider, "gemini-3.6-flash", "v1", synthetic=True)
+    with pytest.raises(EmaError) as error:
+        complete_json(context, Classification, "Classify", "synthetic", schema_retries=1)
+    assert (error.value.code, error.value.user_message_ro, error.value.detail) == (
+        "ai_truncated",
+        "Răspunsul AI a fost întrerupt.",
+        "draft:3-1",
+    )
+    assert STATUS["ai_truncated"] == 502
+    assert provider.calls == 1
+    assert "ai_truncated section=draft:3-1" in caplog.text
 
 
 def test_complete_json_checks_budget_before_initial_call_and_schema_retry(
