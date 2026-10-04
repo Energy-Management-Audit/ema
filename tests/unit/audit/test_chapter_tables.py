@@ -14,17 +14,24 @@ from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_tables import (
     BOILERS_TABLE,
     CAPTIONS,
+    EMPLOYEES_TABLE,
     MISSING,
+    TURNOVER_TABLE,
     VEHICLES_TABLE,
     TableSpec,
     fill_table,
     write_tables,
 )
+from ema.audit.chapter_tables import (
+    _table as find_table,
+)
 from ema.audit.chapter_tables_data import FAMILIES, boiler_rows, vehicle_rows, yearly
 from ema.audit.draft_render import render_section
 from ema.audit.draft_schema import SECTION_FACTS, DraftText, SectionDraft
 from ema.audit.render import ITERATED
+from ema.audit.section_body import REMOVABLE_PHOTOS, _removable
 from ema.core.errors import EmaError
+from ema.core.office.blocks import Table
 from ema.core.review.models import Field
 
 TITLES = {section.id: section.title for section in CATALOGUE}
@@ -158,14 +165,16 @@ def test_table_with_rows_and_no_place_is_a_render_failure(tmp_path: Path) -> Non
 def test_drafted_sections_keep_base_tables_captions_and_chart_slots(tmp_path: Path) -> None:
     document = Document()
     document.add_paragraph(TITLES["ch2"], style="Heading 1")
-    for section, width in (("ch2.date_generale", 2), ("ch2.istorie", 2)):
+    for section, spec in (("ch2.date_generale", EMPLOYEES_TABLE), ("ch2.istorie", TURNOVER_TABLE)):
         document.add_paragraph(TITLES[section], style="Heading 2")
         document.add_paragraph("proza veche")
         document.add_paragraph("Tabelul [de completat]", style="Caption")
-        table = document.add_table(rows=2, cols=width)
+        table = document.add_table(rows=2, cols=len(spec.header))
         for row in table.rows:
             for cell in row.cells:
                 cell.text = "antet"
+        for cell, label in zip(table.rows[0].cells, spec.header, strict=True):
+            cell.text = label
         document.add_paragraph("[de completat]")
         document.add_paragraph("Fig. [de completat]", style="Caption")
     document.add_paragraph(TITLES["ch3"], style="Heading 1")
@@ -177,6 +186,8 @@ def test_drafted_sections_keep_base_tables_captions_and_chart_slots(tmp_path: Pa
     for row in table.rows:
         for cell in row.cells:
             cell.text = "antet"
+    for cell, label in zip(table.rows[0].cells, BOILERS_TABLE.header, strict=True):
+        cell.text = label
     document.add_paragraph(TITLES["ch4"], style="Heading 1")
     current = tmp_path / "base.docx"
     document.save(current)
@@ -229,6 +240,8 @@ def test_unfilled_table_keeps_its_caption_marker(tmp_path: Path) -> None:
     for row in table.rows:
         for cell in row.cells:
             cell.text = "antet"
+    for cell, label in zip(table.rows[0].cells, EMPLOYEES_TABLE.header, strict=True):
+        cell.text = label
     document.add_paragraph("[de completat]")
     document.add_paragraph("Fig. [de completat]", style="Caption")
     document.add_paragraph(TITLES["ch3"], style="Heading 1")
@@ -249,6 +262,8 @@ def test_filled_caption_uses_catalogue_title(tmp_path: Path) -> None:
     for row in table.rows:
         for cell in row.cells:
             cell.text = "antet"
+    for cell, label in zip(table.rows[0].cells, EMPLOYEES_TABLE.header, strict=True):
+        cell.text = label
     document.add_paragraph("[de completat]")
     chart_caption = document.add_paragraph("Fig. nr. 2.1 Evoluția personalului", style="Caption")
     document.add_paragraph(TITLES["ch3"], style="Heading 1")
@@ -265,3 +280,64 @@ def test_filled_caption_uses_catalogue_title(tmp_path: Path) -> None:
     texts = [paragraph.text for paragraph in Document(target).paragraphs]
     assert "Tabelul 2.1 Numărul mediu de angajați" in texts
     assert "Fig. nr. 2.1 Evoluția numărului mediu de angajați" in texts
+
+
+@pytest.mark.parametrize("spec", (EMPLOYEES_TABLE, TURNOVER_TABLE, BOILERS_TABLE, VEHICLES_TABLE))
+def test_each_table_spec_selects_its_header_instead_of_the_first_table(spec: TableSpec) -> None:
+    document = Document()
+    decoy = document.add_table(rows=2, cols=len(spec.header))
+    for cell in decoy.rows[0].cells:
+        cell.text = "alt antet"
+    target = document.add_table(rows=2, cols=len(spec.header))
+    for cell, label in zip(target.rows[0].cells, spec.header, strict=True):
+        cell.text = label
+    body = list(document.element.body)
+    assert find_table(body, {spec.section: (0, len(body))}, spec) == 1
+
+
+@pytest.mark.parametrize(
+    ("section", "anchor", "header"),
+    (
+        ("ch3.electricitate", "Tabel 4. [de completat]", "Tipul lămpii"),
+        ("ch3.gaz", "Tabel 5. [de completat]", "Parametrii"),
+    ),
+)
+def test_unfilled_base_table_is_removed_by_its_caption_anchor(
+    section: str, anchor: str, header: str
+) -> None:
+    document = Document()
+    document.add_paragraph(anchor)
+    table = document.add_table(rows=2, cols=2)
+    table.rows[0].cells[0].text = header
+    region = list(document.element.body)[:2]
+    assert _removable(region, section, []) == {0, 1}
+    assert _removable(region, section, [Table("table", [])]) == set()
+
+
+@pytest.mark.parametrize(
+    ("section", "number"),
+    [(section, number) for section, numbers in REMOVABLE_PHOTOS.items() for number in numbers],
+)
+def test_each_unfilled_base_photo_caption_is_removed(section: str, number: int) -> None:
+    document = Document()
+    document.add_paragraph("[de completat]")
+    document.add_paragraph(f"Fig. {number}. [de completat]")
+    assert _removable(list(document.element.body)[:2], section, []) == {0, 1}
+
+
+def test_caption_catalogue_has_verbatim_titles_and_units() -> None:
+    assert {
+        spec: [(caption.key, caption.title, caption.unit) for caption in captions]
+        for spec, captions in CAPTIONS.items()
+    } == {
+        EMPLOYEES_TABLE: [
+            ("employees.table", "Numărul mediu de angajați", None),
+            ("employees.chart", "Evoluția numărului mediu de angajați", None),
+        ],
+        TURNOVER_TABLE: [
+            ("turnover.table", "Cifra de afaceri", "lei"),
+            ("turnover.chart", "Evoluția cifrei de afaceri", "lei"),
+        ],
+        BOILERS_TABLE: [("boilers.table", "Centrale termice", None)],
+        VEHICLES_TABLE: [("vehicles.table", "Parcul auto", None)],
+    }

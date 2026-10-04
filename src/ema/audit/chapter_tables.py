@@ -112,15 +112,30 @@ def _spans(source: Path) -> dict[str, tuple[int, int]]:
 def _table(
     body: Sequence[etree._Element], spans: dict[str, tuple[int, int]], spec: TableSpec
 ) -> int | None:
-    """The first table under the section, None when the base has none there."""
+    """Find the table whose header identifies this spec, even among other tables."""
     start, end = spans.get(spec.section, (0, 0))
-    index = next((i for i in range(start, end) if body[i].tag == W + "tbl"), None)
-    if index is None:
-        return None
-    width = len(body[index].find(W + "tr").findall(W + "tc"))  # type: ignore[union-attr]
-    if width != len(spec.header):
-        raise EmaError("table_shape", "Tabelul bazei nu are coloanele aşteptate.", spec.section)
-    return index
+
+    def normalized(value: str) -> str:
+        return re.sub(r"[^\w]+", "", value.casefold())
+
+    for index in range(start, end):
+        table = body[index]
+        if table.tag != W + "tbl":
+            continue
+        header = table.find(W + "tr")
+        if header is None:
+            continue
+        cells = header.findall(W + "tc")
+        if len(cells) != len(spec.header):
+            continue
+        actual = [normalized(_text(cell)) for cell in cells]
+        expected = [normalized(label) for label in spec.header]
+        if all(
+            value and (value.startswith(label) or label.startswith(value))
+            for value, label in zip(actual, expected, strict=True)
+        ):
+            return index
+    return None
 
 
 def _set_cell(cell: etree._Element, text: str, *, missing: bool = False) -> None:

@@ -23,12 +23,50 @@ from ema.core.office.blocks import (
     Missing,
     Prototypes,
     RenderReport,
+    Table,
 )
 from ema.core.office.region import replace_region
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _CHAPTERS = {section.id: section.chapter for section in CATALOGUE}
 _CAPTION = re.compile(r"^\s*Tabel")
+# The base's own site photos in ch. 3 have no dossier images.
+# Each number is the figure caption anchor stamped by base_anchor, scoped to its section.
+REMOVABLE_PHOTOS = {
+    "ch3.equipment": frozenset(
+        {
+            4,  # Equipment photo.
+            5,  # Equipment photo.
+            6,  # Equipment photo.
+            7,  # Equipment photo.
+            8,  # Equipment photo.
+        }
+    ),
+    "ch3.electricitate": frozenset({9}),  # Electrical station photo.
+    "ch3.gaz": frozenset(
+        {
+            10,  # Gas station photo.
+            11,  # Heating equipment photo.
+            12,  # Heating diagram.
+            13,  # Heating equipment photo.
+        }
+    ),
+    "ch3.carburant": frozenset(
+        {
+            14,  # Vehicle photo.
+            15,  # Vehicle photo.
+            16,  # Vehicle photo.
+            17,  # Fuel storage photo.
+        }
+    ),
+}
+_FIGURE_ANCHOR = re.compile(r"^\s*Fig\.?\s*(?:nr\.?\s*)?(\d+)\.")
+# The base's lamp and boiler-nameplate tables are not filled by Necesar fields.
+REMOVABLE_TABLES = {
+    "ch3.electricitate": (4, "tipullămpii"),  # Lamp type and application table.
+    "ch3.gaz": (5, "parametrii"),  # One boiler's pressure, temperature and power table.
+}
+_TABLE_ANCHOR = re.compile(r"^\s*Tabel\w*\s*(?:nr\.?\s*)?(\d+)\.")
 
 
 def own_region(document: Any, section_id: str, occurrence: int = 0) -> tuple[int, int]:
@@ -105,6 +143,44 @@ def _needed(blocks: list[Block]) -> set[str]:
     return names
 
 
+def _removable(region: list[etree._Element], section_id: str, blocks: list[Block]) -> set[int]:
+    removed: set[int] = set()
+    has_figure = any(isinstance(block, Figure) for block in blocks)
+    has_table = any(isinstance(block, Table) for block in blocks)
+    for index, element in enumerate(region):
+        caption = _FIGURE_ANCHOR.match(_text(element)) if element.tag == W + "p" else None
+        if (
+            caption
+            and int(caption.group(1)) in REMOVABLE_PHOTOS.get(section_id, ())
+            and not has_figure
+        ):
+            removed.add(index)
+            if index and (
+                next(region[index - 1].iter(W + "drawing"), None) is not None
+                or _text(region[index - 1]).strip() == MARKER
+            ):
+                removed.add(index - 1)
+        if element.tag != W + "tbl" or has_table:
+            continue
+        first = element.find(W + "tr")
+        if first is None:
+            continue
+        header = "".join(_text(cell) for cell in first.findall(W + "tc"))
+        slot = REMOVABLE_TABLES.get(section_id)
+        previous = region[index - 1] if index else None
+        anchor = _TABLE_ANCHOR.match(_text(previous)) if previous is not None else None
+        if (
+            slot is not None
+            and anchor is not None
+            and int(anchor.group(1)) == slot[0]
+            and re.sub(r"\W+", "", header.casefold()).startswith(slot[1])
+        ):
+            removed.add(index)
+            if index and _CAPTION.match(_text(region[index - 1])):
+                removed.add(index - 1)
+    return removed
+
+
 def replace_section_body(
     source: Path, output: Path, section_id: str, blocks: list[Block], *, keep_base: bool = False
 ) -> RenderReport:
@@ -132,10 +208,12 @@ def replace_section_body(
             target = output if occurrence == 0 else Path(directory) / f"{occurrence}.docx"
             body_element: Any = document.element
             region: list[etree._Element] = list(body_element.body)[first:end]
+            removable: set[int] = _removable(region, section_id, unit) if keep_base else set()
             keep = {
                 index
                 for index, element in enumerate(region)
                 if keep_base
+                and index not in removable
                 and (
                     element.tag == W + "tbl"
                     or next(element.iter(W + "drawing"), None) is not None
