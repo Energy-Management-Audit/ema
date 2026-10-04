@@ -12,6 +12,7 @@ from ema.audit.measures import compose_measures, validate_measures_form
 from ema.audit.read import read_job
 from ema.audit.render import start_audit_render
 from ema.audit.render_bindings import checked_photo
+from ema.audit.research_stage import start_research
 from ema.audit.visit import start_visit
 from ema.audit.workflow import AuditWorkflow
 from ema.clients.registry import find_by_cui
@@ -65,6 +66,7 @@ def start_audit_stage(ws: Workspace, job: str, stage: str, on_revision: int) -> 
         "draft": start_draft,
         "visit": start_visit,
         "measurements": start_measurements,
+        "research": start_research,
         "audit_final": AuditWorkflow().start_final,
     }.get(stage):
         return starter(ws, job, on_revision=on_revision)
