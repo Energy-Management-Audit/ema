@@ -57,14 +57,17 @@ function PdfEvidence({ evidence }: { evidence: Evidence }) {
   )
 }
 
+/** `marked` replaces the field's own doubt when the panel opens from a 7f data warning. */
 export function EvidencePanel({
   field,
   evidence,
   close,
+  marked,
 }: {
   field: Field
   evidence: Evidence
   close: () => void
+  marked?: string
 }) {
   const ctx = useJob()
   const [edit, setEdit] = useState(false)
@@ -87,6 +90,7 @@ export function EvidencePanel({
       quote
     )
   const reason =
+    marked ??
     field.failure ??
     (field.confidence === 'partial'
       ? 'Valoarea găsită nu se potriveşte exact cu textul din document.'
@@ -150,7 +154,11 @@ export function EvidencePanel({
           <small>Ema nu poate marca valoarea pe această pagină.</small>
         )}
         <SectionKey>
-          {evidence.provenance === 'online' ? 'DE UNDE VINE' : 'DE CE E MARCAT NESIGUR'}
+          {evidence.provenance === 'online'
+            ? 'DE UNDE VINE'
+            : marked
+              ? 'DE CE E MARCAT'
+              : 'DE CE E MARCAT NESIGUR'}
         </SectionKey>
         <p>
           {evidence.provenance === 'online'

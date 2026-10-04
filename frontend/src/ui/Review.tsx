@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { ChevronRight, ExternalLink, File, Sheet, type LucideIcon } from 'lucide-react'
 import { Button } from './Button'
+import { Status } from './Chip'
 import { Icon } from './Icon'
 import { Paper } from './Surface'
 import './review.css'
@@ -38,6 +39,7 @@ export function FieldReviewRow({
   source,
   actions,
   snippet,
+  warn = false,
 }: {
   label: ReactNode
   status: ReactNode
@@ -46,10 +48,13 @@ export function FieldReviewRow({
   source?: ReactNode
   actions?: ReactNode
   snippet?: ReactNode
+  warn?: boolean
 }) {
   const open = snippet !== undefined
   return (
-    <div className={`ema-review-row ${open ? 'ema-review-row--open' : ''}`}>
+    <div
+      className={`ema-review-row ${open ? 'ema-review-row--open' : ''} ${warn ? 'ema-review-row--warn' : ''}`}
+    >
       <div className="ema-review-row__main">
         <div className="ema-review-row__label">
           <span>{label}</span>
@@ -64,6 +69,34 @@ export function FieldReviewRow({
       </div>
       {open && <div className="ema-review-row__snippet">{snippet}</div>}
     </div>
+  )
+}
+
+/** Data warning row "7f": a non-blocking suspicion in the review queue. The 3c row with 3f's
+ * anomaly marking: the field and what looks wrong, the message where the value goes, and both
+ * sources, each opening its page in line. */
+export function DataWarningRow({
+  label,
+  status,
+  message,
+  sources,
+  snippet,
+}: {
+  label: ReactNode
+  status: ReactNode
+  message: ReactNode
+  sources: ReactNode
+  snippet?: ReactNode
+}) {
+  return (
+    <FieldReviewRow
+      warn
+      label={label}
+      status={<Status tone="warn">{status}</Status>}
+      value={<span className="ema-warning-row__message">{message}</span>}
+      source={<div className="ema-warning-row__sources">{sources}</div>}
+      snippet={snippet}
+    />
   )
 }
 
