@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
@@ -77,6 +78,7 @@ MAX_PASSAGES = 6
 MAX_PROCESS_PASSAGES = 12
 # A 3.1.x unit's heading, numbered from 1 in unit order: audit.process_unit.<i>.name.
 PROCESS_UNIT = "audit.process_unit."
+_UNIT_NAME = re.compile(rf"^{re.escape(PROCESS_UNIT)}([1-9]\d*)\.name$")
 
 
 def max_passages(key: str) -> int:
@@ -89,6 +91,12 @@ def passage_key(key: str, number: int) -> str:
 
 def process_unit_name(number: int) -> str:
     return f"{PROCESS_UNIT}{number}.name"
+
+
+def process_unit_number(key: str) -> int | None:
+    """The unit a name key belongs to: `audit.process_unit.2.name` is unit 2."""
+    match = _UNIT_NAME.match(key)
+    return int(match.group(1)) if match else None
 
 
 def fact_key(key: str) -> str:

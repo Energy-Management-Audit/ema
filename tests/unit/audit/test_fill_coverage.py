@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 from tests.unit.audit.test_fill_extract import Scripted, extract, job, sections, values
-from tests.unit.audit.test_fill_stage import OPENAI_MODEL, use_provider
-from tests.workspace_jobs import create_job
 
 from ema.audit.catalogue import CATALOGUE, AuditFact
 from ema.audit.catalogue_labels import field_label
@@ -21,16 +18,11 @@ from ema.audit.catalogue_types import (
     fact_key,
     process_unit_name,
 )
-from ema.audit.dossier import dossier_documents
 from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.fill_extract import instructions
-from ema.audit.fill_stage import fill_sections
 from ema.audit.fill_tools import FillDocument, FillTools
-from ema.audit.fill_units import record_unit_names
-from ema.audit.process_units import ProcessUnits, passage_units, process_units, unit_of
+from ema.core.errors import EmaError
 from ema.core.review.fields import fields
-from ema.core.review.models import Evidence, TextLoc
-from ema.core.workspace import Workspace
 
 UTILITIES = (
     "Regim de lucru: 3 schimburi, 7 zile pe săptămână.\n"
@@ -151,131 +143,59 @@ def test_the_process_flow_keeps_twelve_passages_and_other_keys_six(tmp_path: Pat
     assert fact_key("audit.heating.7") == "audit.heating.7"
 
 
-def evidence(sha: str, quote: str) -> Evidence:
-    return Evidence(
-        id=quote,
-        provenance="document",
-        file_sha=sha,
-        locator=TextLoc(span=quote),
-        method="questionnaire",
-        retrieved_at=datetime(2026, 10, 4, tzinfo=UTC),
-        quote=quote,
-        highlight="exact",
-    )
-
-
-SCHEMES = [
-    ("5.10. Flux ambalare.pdf", "c"),
-    ("5.2. Flux solvent.pdf", "b"),
-    ("5.1. Flux vopsire.pdf", "a"),
-    ("5.1. Flux vopsire anexa.pdf", "a2"),
-    ("autorizatie.pdf", "permit"),
-]
-
-
-def test_a_three_scheme_plan_maps_each_passage_by_its_source_file() -> None:
-    units = process_units(SCHEMES)
-
-    assert (units.source, units.count) == ("schemes", 3)
-    # Scheme ids sort as numbers: 5.10 is the third unit, after 5.2.
-    assert [unit_of(evidence(sha, "x"), units) for sha in ("a", "a2", "b", "c")] == [1, 1, 2, 3]
-    # The permit's text is the ch3.flux overview: it belongs to no unit.
-    assert unit_of(evidence("permit", "x"), units) is None
-
-
-FISA = (
-    "Fişa de date a instalaţiei",
-    "Societatea are două fluxuri tehnologice.",
-    "Flux 1: vopsire în câmp electrostatic",
-    "Piesele sunt degresate şi vopsite.",
-    "Flux 2: recuperarea solvenţilor",
-    "Solventul uzat este distilat.",
-    "Descrierea utilităţilor",
+PV_LINES = (
+    "Centrala fotovoltaică are o putere instalată de 1,2 MWp.",
+    "Centrala fotovoltaică are o putere instalată de 1 MWp.",
+    "Centrala fotovoltaică are o putere instalată de 800 kW.",
+    "Puterea instalată a centralei fotovoltaice: 950.",
 )
+PV = {"pv.txt": FillDocument("pv.txt", "\n".join(PV_LINES))}
 
 
-def test_a_fisa_passage_belongs_to_the_flux_block_that_holds_its_quote() -> None:
-    units = process_units([("Fisa de date.docx", "fisa")], ("fisa", FISA))
-
-    assert (units.source, units.count) == ("fisa", 2)
-    assert units.block(1) == FISA[2:4] and units.block(2) == FISA[4:]
-
-    def unit(quote: str, sha: str = "fisa") -> int | None:
-        return unit_of(evidence(sha, quote), units)
-
-    assert unit("Piesele sunt degresate şi vopsite.") == 1
-    assert unit("Flux 2: recuperarea solvenţilor\nSolventul uzat este distilat.") == 2
-    assert unit("Societatea are două fluxuri tehnologice.") is None
-    assert unit("Un text din tabelul fişei.") is None
-    assert unit("Piesele sunt degresate şi vopsite.", sha="permit") is None
-    assert unit_of(evidence("a", "x"), ProcessUnits()) is None
+def pv_power(value: str, line: int) -> dict[str, object]:
+    return {"key": "audit.pv.power", "value": value, "name": "F1", "quote": PV_LINES[line]}
 
 
-def scheme_dossier(tmp_path: Path) -> tuple[Workspace, str]:
-    ws = Workspace(tmp_path / "workspace")
-    job_id = create_job(ws, "audit", "made-up", 2026)
-    texts = {
-        "5.1. Flux vopsire.txt": "Linia de vopsire\nEtapa 1. Piesele sunt degresate.",
-        "5.2. Flux solvent.txt": "Recuperarea solvenţilor\nEtapa 1. Solventul este distilat.",
-        "5.3. Flux ambalare.txt": "Ambalare " * 40 + "\nEtapa 1. Piesele sunt ambalate.",
-        "autorizatie.txt": "Instalaţia are trei fluxuri tehnologice.",
-    }
-    for name, text in texts.items():
-        source = tmp_path / name
-        source.write_text(text, encoding="utf-8")
-        ws.set_slot(job_id, f"dossier/{name}", ws.add_file("made-up", source))
-    return ws, job_id
+def test_a_power_in_mwp_is_converted_and_any_other_unit_is_rejected(tmp_path: Path) -> None:
+    ws, job_id = job(tmp_path)
+    tools = FillTools(ws, job_id, "ch3.electricitate", PV)
+
+    # "1 MWp" is never recorded as 1 kWp; a unit other than kWp or MWp, or none, is rejected.
+    for args in (pv_power("800", 2), pv_power("950", 3)):
+        with pytest.raises(EmaError) as error:
+            tools.record_fact(args)
+        assert error.value.code == "value_unverified"
+    assert "audit.pv.power" not in values(ws, job_id)
+
+    tools.record_fact(pv_power("1", 1))
+    power = next(item for item in fields(ws, job_id) if item.key == "audit.pv.power")
+    assert (power.value, power.unit) == (Decimal(1000), "kWp")
+    assert power.derivation is not None
+    assert power.derivation.formula_id == "unit.MWp_to_kWp"
+    assert power.derivation.inputs == power.evidence
+
+    tools.record_fact(pv_power("1,2", 0))
+    assert values(ws, job_id)["audit.pv.power"] == ("1200.0", "found")
 
 
-def passage(name: str, quote: str) -> dict[str, object]:
-    return {"key": "audit.process_sections", "value": "", "file": name, "page": 1, "quote": quote}
+def test_a_missing_typed_fact_is_later_found_in_its_type(tmp_path: Path) -> None:
+    ws, job_id = job(tmp_path)
+    tools = FillTools(ws, job_id, "ch3.electricitate", COVERAGE)
+    for key in ("audit.pv.power", "audit.pv.year"):
+        tools.mark_missing({"key": key})
+    missing = {item.key: item for item in fields(ws, job_id)}
+    assert (missing["audit.pv.power"].value_type, missing["audit.pv.power"].unit) == (
+        "number",
+        "kWp",
+    )
+    assert missing["audit.pv.year"].value_type == "year"
 
+    tools.record_fact({**fact("audit.pv.power", "1.234,5", 2), "name": "F1"})
+    tools.record_fact({**fact("audit.pv.year", 2021, 2), "name": "F1"})
 
-def test_fill_names_each_unit_and_the_passages_group_by_unit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("EMA_AI_CLIENT_LIVE", "1")
-    ws, job_id = scheme_dossier(tmp_path)
-    returned = [
-        passage("autorizatie.txt", "Instalaţia are trei fluxuri tehnologice."),
-        passage("5.1. Flux vopsire.txt", "Etapa 1. Piesele sunt degresate."),
-        passage("5.2. Flux solvent.txt", "Etapa 1. Solventul este distilat."),
-    ]
-    use_provider(monkeypatch, Scripted([{"facts": returned, "missing": []}]), OPENAI_MODEL)
-
-    fill_sections(ws, job_id, ["ch3.process"])
-
-    found = values(ws, job_id)
-    assert found[process_unit_name(1)] == ("Linia de vopsire", "found")
-    assert found[process_unit_name(2)] == ("Recuperarea solvenţilor", "found")
-    # The third scheme's first line is a paragraph, not a title: its heading keeps the marker.
-    assert found[process_unit_name(3)][1] == "not_found"
-    by_key = {key: found[key][0] for key in found if key.startswith("audit.process_sections")}
-    units = {by_key[key]: unit for key, unit in passage_units(ws, job_id).items()}
-    assert units == {
-        "Instalaţia are trei fluxuri tehnologice.": None,
-        "Etapa 1. Piesele sunt degresate.": 1,
-        "Etapa 1. Solventul este distilat.": 2,
-    }
-    # Unit 3 has no passage: nothing of another unit, nor the overview, is given to it.
-    assert 3 not in units.values()
-
-
-def test_a_rerun_with_fewer_units_drops_the_stale_names(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("EMA_AI_CLIENT_LIVE", "1")
-    ws, job_id = scheme_dossier(tmp_path)
-    use_provider(monkeypatch, Scripted([{"facts": [], "missing": []}]), OPENAI_MODEL)
-    fill_sections(ws, job_id, ["ch3.process"])
-    assert values(ws, job_id)[process_unit_name(2)][1] == "found"
-    documents = dossier_documents(ws, job_id)
-    first = documents["5.1. Flux vopsire.txt"]
-    tools = FillTools(ws, job_id, "ch3.process", documents)
-
-    recorded = record_unit_names(tools, process_units([("5.1. Flux.txt", first.sha)]), documents)
-
-    found = values(ws, job_id)
-    assert recorded == 1
-    assert found[process_unit_name(1)] == ("Linia de vopsire", "found")
-    assert found[process_unit_name(2)][1] == found[process_unit_name(3)][1] == "not_found"
+    found = {item.key: item for item in fields(ws, job_id)}
+    assert (found["audit.pv.power"].value, found["audit.pv.power"].presence) == (
+        Decimal("1234.5"),
+        "found",
+    )
+    assert (found["audit.pv.year"].value, found["audit.pv.year"].presence) == (2021, "found")

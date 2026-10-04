@@ -3,28 +3,28 @@
 from __future__ import annotations
 
 import hashlib
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from functools import cached_property
 from typing import Any
 
 from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import CATALOGUE, AuditFact, fact_spec
 from ema.audit.catalogue_labels import FACT_TYPES
-from ema.audit.catalogue_types import fact_key, process_unit_name
+from ema.audit.catalogue_types import fact_key, process_unit_number
 from ema.audit.fill_files import file_ids, resolve_name, search, windows
+from ema.audit.fill_values import in_unit, number_in_quote, typed
+from ema.audit.process_units import ProcessUnits, unit_of
 from ema.audit.sections import recompute_ready, set_status
 from ema.core.errors import EmaError
 from ema.core.llm.agent import Tool
 from ema.core.llm.types import ToolSpec
 from ema.core.review.fields import fields, mark_absent, propose
-from ema.core.review.models import Evidence, Field, PdfText, TextLoc
+from ema.core.review.models import Evidence, FieldSpec, PdfText, TextLoc
 from ema.core.review.section_transition import Status
 from ema.core.workspace import Workspace
 
-_NUMBER = re.compile(r"(?<!\w)[+-]?\d[\d .\u00a0]*(?:,\d+)?(?!\w)")
 _FACTS = frozenset(item.value for item in AuditFact)
 _STRUCTURED_SOURCE = {
     "audit.company_name": "audit.company_name",
@@ -107,46 +107,20 @@ class FillDocument:
         return tuple(part for source in sources for part in windows(source)) or ("",)
 
 
-def _number(text: str) -> Decimal | None:
-    """A number as a source writes it: `1.234,5`, `1 234,5` or `1234.5`."""
-    raw = text.strip().replace(" ", "").replace("\u00a0", "")
-    if "," in raw:
-        raw = raw.replace(".", "").replace(",", ".")
-    try:
-        number = Decimal(raw)
-    except InvalidOperation:
-        return None
-    return number if number.is_finite() else None
-
-
-def _typed(key: str, value: str | int | float) -> str | int | Decimal:
-    """The value in its fact's type: a typed fact's number or year, else the text as given."""
-    kind = FACT_TYPES[key][0] if key in FACT_TYPES else None
-    if kind is None:
-        return value if isinstance(value, str) else Decimal(str(value))
-    number = _number(value) if isinstance(value, str) else Decimal(str(value))
-    if kind == "year" and number is not None and number == int(number) and 1900 < number < 2100:
-        return int(number)
-    if kind == "number" and number is not None:
-        return number
-    raise EmaError("fact_type", "Tipul faptului nu este valid.", key)
-
-
-def _number_in_quote(value: object, quote: str) -> bool:
-    try:
-        wanted = Decimal(str(value))
-    except InvalidOperation:
-        return False
-    return any(_number(match.group()) == wanted for match in _NUMBER.finditer(quote))
-
-
 class FillTools:
     def __init__(
-        self, ws: Workspace, job: str, section: str, documents: dict[str, FillDocument]
+        self,
+        ws: Workspace,
+        job: str,
+        section: str,
+        documents: dict[str, FillDocument],
+        units: ProcessUnits | None = None,
     ) -> None:
         if section not in {item.id for item in CATALOGUE}:
             raise EmaError("section_missing", "Secţiunea lipseşte.", section)
         self.ws, self.job, self.section, self.documents = ws, job, section, documents
+        # The process units whose names this section may record, from their own sources only.
+        self.units = units
 
     def _document(self, name: str) -> tuple[str, FillDocument]:
         found = resolve_name(name, list(self.documents))
@@ -223,9 +197,28 @@ class FillTools:
         return [Evidence.model_validate_json(row["data"]) for row in rows]
 
     def _validate_section_fact(self, key: str) -> None:
+        if process_unit_number(key) is not None:
+            if self.section != "ch3.process":
+                raise EmaError("fact_section", "Faptul nu aparţine secţiunii active.", key)
+            return
+        if fact_key(key) not in _FACTS:
+            raise EmaError("fact_unknown", "Faptul nu există în catalog.", key)
         section = next(item for item in CATALOGUE if item.id == self.section)
-        if not any(isinstance(ref, AuditFact) and ref.value == key for ref in section.facts):
-            raise EmaError("fact_section", "Faptul nu aparţine secţiunii active.", key)
+        base = fact_key(key)
+        if not any(isinstance(ref, AuditFact) and ref.value == base for ref in section.facts):
+            raise EmaError("fact_section", "Faptul nu aparţine secţiunii active.", base)
+
+    def _spec(self, key: str, value: object = None) -> FieldSpec:
+        """The same type and unit for a found value and a missing one of the same key."""
+        untyped = "number" if isinstance(value, int | float) else "text"
+        kind, unit = FACT_TYPES.get(key, (untyped, None))
+        return fact_spec(key, kind, chapter=self.section, unit=unit)
+
+    def _unit_evidence(self, key: str, evidence: Evidence) -> None:
+        """A unit's name is quoted from that unit's own file, or its own Fişa `Flux` block."""
+        number = process_unit_number(key)
+        if number is not None and (self.units is None or unit_of(evidence, self.units) != number):
+            raise EmaError("fact_unit", "Citatul nu provine din sursa unităţii.", key)
 
     def _document_evidence(
         self, name: str, quote: str, value: object, page: int | None = None
@@ -239,7 +232,7 @@ class FillTools:
         )
         if not quote or not quoted:
             raise EmaError("evidence_quote", "Fragmentul citat nu apare în fişier.", name)
-        if isinstance(value, int | float | Decimal) and not _number_in_quote(value, quote):
+        if isinstance(value, int | float | Decimal) and not number_in_quote(value, quote):
             raise EmaError("value_unverified", "Numărul nu apare în fragment.", name)
         if isinstance(value, str) and value not in quote:
             raise EmaError("value_unverified", "Textul nu apare în fragment.", name)
@@ -275,13 +268,12 @@ class FillTools:
 
     def record_fact(self, args: dict[str, Any]) -> object:
         key = str(args["key"])
-        if fact_key(key) not in _FACTS:
-            raise EmaError("fact_unknown", "Faptul nu există în catalog.", key)
-        self._validate_section_fact(fact_key(key))
+        self._validate_section_fact(key)
         value = args["value"]
         if isinstance(value, bool) or not isinstance(value, str | int | float):
             raise EmaError("fact_type", "Tipul faptului nu este valid.", key)
-        stored_value = _typed(key, value)
+        stored_value = typed(key, value)
+        derivation = None
         source_key = str(args.get("source_key", ""))
         if source_key:
             if _STRUCTURED_SOURCE.get(key) != source_key:
@@ -289,22 +281,32 @@ class FillTools:
             evidence = self._dataset_evidence(source_key, value)
         else:
             name, quote = str(args["name"]), str(args["quote"])
+            if process_unit_number(key) is not None and "page" not in args:
+                raise EmaError("page_missing", "Pagina cerută lipseşte.", key)
             page = int(args["page"]) if "page" in args else None
             evidence = [self._document_evidence(name, quote, stored_value, page)]
-        kind, unit = FACT_TYPES.get(key, ("text" if isinstance(value, str) else "number", None))
-        spec = fact_spec(key, kind, chapter=self.section, unit=unit)
+            self._unit_evidence(key, evidence[0])
+            if isinstance(stored_value, Decimal) and key in FACT_TYPES:
+                stored_value, derivation = in_unit(key, stored_value, quote, evidence[0].id)
+        spec = self._spec(key, value)
         # An identifier given as a number (a CUI, a CAEN code) is stored as its text.
         stored_value = str(value) if spec.value_type == "text" else stored_value
-        field = propose(self.ws, self.job, spec, stored_value, evidence, state="extracted")
+        field = propose(
+            self.ws,
+            self.job,
+            spec,
+            stored_value,
+            evidence,
+            state="extracted",
+            derivation=derivation,
+        )
         recompute_ready(self.ws, self.job)
         return {"key": field.key, "evidence": field.evidence}
 
     def passage_position(self, args: dict[str, Any]) -> tuple[int, int, int]:
         """Verify a passage quote without recording it; return its file, page and offset."""
         key = str(args["key"])
-        if fact_key(key) not in _FACTS:
-            raise EmaError("fact_unknown", "Faptul nu există în catalog.", key)
-        self._validate_section_fact(fact_key(key))
+        self._validate_section_fact(key)
         name, quote, page = str(args["name"]), str(args["quote"]), int(args["page"])
         self._document_evidence(name, quote, quote, page)
         file_id, document = self._document(name)
@@ -312,28 +314,10 @@ class FillTools:
 
     def mark_missing(self, args: dict[str, Any]) -> object:
         key = str(args["key"])
-        if fact_key(key) not in _FACTS:
-            raise EmaError("fact_unknown", "Faptul nu există în catalog.", key)
-        self._validate_section_fact(fact_key(key))
-        field = mark_absent(
-            self.ws, self.job, fact_spec(key, "text", chapter=self.section), "not_found"
-        )
+        self._validate_section_fact(key)
+        field = mark_absent(self.ws, self.job, self._spec(key), "not_found")
         recompute_ready(self.ws, self.job)
         return {"missing": field.key}
-
-    def record_unit_name(self, number: int, name: str | None, line: str = "") -> Field:
-        """A process unit's heading: the verbatim line of its source file that names it.
-
-        With no such line the field is missing, so the heading keeps its marker.
-        """
-        spec = fact_spec(process_unit_name(number), "text", chapter=self.section)
-        if name is None:
-            field = mark_absent(self.ws, self.job, spec, "not_found")
-        else:
-            evidence = [self._document_evidence(name, line, line)]
-            field = propose(self.ws, self.job, spec, line, evidence, state="extracted")
-        recompute_ready(self.ws, self.job)
-        return field
 
     def mark_later(self, args: dict[str, Any]) -> object:
         reason = str(args["reason"]).strip()

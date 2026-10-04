@@ -85,6 +85,7 @@ STATUS: dict[str, int] = {
     "fact_section": 400,
     "fact_source": 400,
     "fact_type": 400,
+    "fact_unit": 400,
     "fact_unknown": 400,
     "failure_missing": 404,
     "field_changed": 409,

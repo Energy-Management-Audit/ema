@@ -1,22 +1,25 @@
 """The 3.1.x process units of a dossier: its flow schemes, else the Fişa's `Flux` blocks (D3).
 
 A process passage belongs to a unit by the source of its quote, never by a stage name: a scheme
-file's text is that scheme's unit, a Fişa paragraph is the unit of the `Flux` block it sits in.
-Every other source (the permit, a description) is the ch3.flux overview.
+file's text is that scheme's unit, a Fişa quote is the unit of the one `Flux` block that wholly
+holds it. Every other source (the permit, a description) is the ch3.flux overview.
 """
 
 from __future__ import annotations
 
 import re
 import sqlite3
+from bisect import bisect_right
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from itertools import accumulate
 from pathlib import Path
 from typing import Literal
 
 from docx import Document
 
 from ema.audit.catalogue_types import AuditFact, fact_key
+from ema.core.logging import write_event
 from ema.core.review.fields import fields
 from ema.core.review.models import Evidence
 from ema.core.workspace import Workspace
@@ -91,18 +94,50 @@ def unit_of(evidence: Evidence, units: ProcessUnits) -> int | None:
             ),
             None,
         )
-    if units.source != "fisa" or evidence.file_sha != units.fisa_sha or not evidence.quote:
+    spans = _fisa_spans(evidence, units)
+    if len(spans) != 1:
         return None
+    ((first, last),) = spans
+    return first if first == last and first else None
+
+
+def ambiguous(evidence: Evidence, units: ProcessUnits) -> bool:
+    """A Fişa quote found in two blocks, or across a block's end: it is given to no unit."""
+    spans = _fisa_spans(evidence, units)
+    return len({first for first, _ in spans}) > 1 or any(first != last for first, last in spans)
+
+
+def _fisa_spans(evidence: Evidence, units: ProcessUnits) -> set[tuple[int, int]]:
+    """Per place the quote is in the Fişa, the units of its first and last character; 0 is the
+    text before the first `Flux` block. A Word line break is a newline inside one paragraph, so
+    paragraphs are found by their character offsets, never by counting newlines."""
+    quote = evidence.quote
+    if units.source != "fisa" or evidence.file_sha != units.fisa_sha or not quote:
+        return set()
+    offsets = list(accumulate((len(text) + 1 for text in units.paragraphs[:-1]), initial=0))
+
+    def unit(at: int) -> int:
+        paragraph = bisect_right(offsets, at) - 1
+        return sum(start <= paragraph for start in units.starts)
+
     text = "\n".join(units.paragraphs)
-    at = text.find(evidence.quote)
-    if at < 0:
-        return None
-    paragraph = text.count("\n", 0, at)
-    return sum(start <= paragraph for start in units.starts) or None
+    spans: set[tuple[int, int]] = set()
+    at = text.find(quote)
+    while at >= 0:
+        spans.add((unit(at), unit(at + len(quote) - 1)))
+        at = text.find(quote, at + 1)
+    return spans
 
 
 def dossier_units(ws: Workspace, rows: Sequence[Mapping[str, object]]) -> ProcessUnits:
-    """The units of the active dossier slot versions; the Fişa is the last one added."""
+    """The units of the active dossier slot versions; the Fişa is the last one added.
+
+    The Fişa is opened only when there is no flow scheme: a malformed one never hides schemes.
+    """
+    slots = [(str(row["slot"]).removeprefix("dossier/"), str(row["file_sha"])) for row in rows]
+    schemes = process_units(slots)
+    if schemes.source == "schemes":
+        return schemes
     fisas = sorted(
         (
             row
@@ -113,11 +148,10 @@ def dossier_units(ws: Workspace, rows: Sequence[Mapping[str, object]]) -> Proces
         ),
         key=lambda row: float(str(row["added_at"])),
     )
-    fisa = None
-    if fisas:
-        document = Document(str(ws.path(str(fisas[-1]["relative_path"]))))
-        fisa = (str(fisas[-1]["file_sha"]), [paragraph.text for paragraph in document.paragraphs])
-    slots = ((str(row["slot"]).removeprefix("dossier/"), str(row["file_sha"])) for row in rows)
+    if not fisas:
+        return schemes
+    document = Document(str(ws.path(str(fisas[-1]["relative_path"]))))
+    fisa = (str(fisas[-1]["file_sha"]), [paragraph.text for paragraph in document.paragraphs])
     return process_units(slots, fisa)
 
 
@@ -145,6 +179,14 @@ def passage_units(
             str(row["id"]): Evidence.model_validate_json(row["data"])
             for row in db.execute("SELECT id, data FROM evidence WHERE job_id=?", (job,))
         }
+        unplaced = [
+            item.key
+            for item in passages
+            if any(ref in evidence and ambiguous(evidence[ref], units) for ref in item.evidence)
+        ]
+        if unplaced:
+            with ws.job_log(db, job) as handle:
+                write_event(handle, "passage_unit_ambiguous", keys=unplaced)
     return {
         item.key: next(
             (

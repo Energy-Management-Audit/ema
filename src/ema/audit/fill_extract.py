@@ -11,10 +11,12 @@ from pydantic import BaseModel, ConfigDict
 
 from ema.audit.catalogue import Section
 from ema.audit.catalogue_labels import FACT_TYPES, field_label
-from ema.audit.catalogue_types import PASSAGE_FACTS, max_passages
+from ema.audit.catalogue_types import PASSAGE_FACTS, max_passages, process_unit_number
 from ema.audit.fill_files import file_ids, resolve_name
 from ema.audit.fill_passages import PASSAGE_CHARS, drop_stale_passages, record_passages
 from ema.audit.fill_tools import FillDocument, FillTools
+from ema.audit.fill_units import drop_unit_names, unit_name_sources
+from ema.audit.process_units import ProcessUnits
 from ema.core.errors import EmaError
 from ema.core.llm import AgentContext, RecordingProvider, ReplayProvider, complete_json
 from ema.core.llm.types import Provider
@@ -37,6 +39,7 @@ MAX_OUTPUT_TOKENS = 65_536
 # These stop the stage; any other failure of the retry keeps what the first pass verified.
 STOPPING_CODES = frozenset({"ai_budget", "ai_credits", "ai_quota_day"})
 PASSAGE_MARK = "pasaj"
+TITLE_MARK = "titlu"
 TYPE_MARKS = {"number": "număr", "year": "an"}
 
 
@@ -73,8 +76,11 @@ def prompt_tokens(text: str) -> int:
     return len(text) // CHARS_PER_TOKEN
 
 
-def _mark(key: str) -> str:
-    """What the value is: a passage, a number in its unit, a year, or nothing for text."""
+def _mark(key: str, sources: Mapping[str, str]) -> str:
+    """What the value is: a passage, a number in its unit, a year, a unit's title with the files
+    it may be quoted from, or nothing for text."""
+    if key in sources:
+        return f" — {TITLE_MARK} ({sources[key]})"
     if key in PASSAGE_FACTS:
         return f" — {PASSAGE_MARK}"
     if key not in FACT_TYPES:
@@ -83,9 +89,12 @@ def _mark(key: str) -> str:
     return f" — {TYPE_MARKS[kind]}" + (f" ({unit})" if unit else "")
 
 
-def facts_text(facts: Sequence[tuple[str, str]]) -> str:
+def facts_text(facts: Sequence[tuple[str, str]], sources: Mapping[str, str] | None = None) -> str:
     """The facts to establish, one `key — Romanian label — section id` line each."""
-    lines = (f"{key} — {field_label(key)} — {section}{_mark(key)}" for key, section in facts)
+    lines = (
+        f"{key} — {field_label(key)} — {section}{_mark(key, sources or {})}"
+        for key, section in facts
+    )
     return "Fapte de stabilit:\n" + "\n".join(lines)
 
 
@@ -199,6 +208,7 @@ def retry_text(
     facts: Sequence[tuple[str, str]],
     rejected: Sequence[tuple[ExtractedFact, EmaError]],
     documents: Mapping[str, FillDocument],
+    sources: Mapping[str, str] | None = None,
 ) -> str:
     """Only the rejected items, each with its reason and its cited page; never the dossier."""
     items = [
@@ -212,7 +222,7 @@ def retry_text(
     ]
     wanted = [(key, section) for key, section in facts if key in {fact.key for fact, _ in rejected}]
     return (
-        facts_text(wanted)
+        facts_text(wanted, sources)
         + "\n\nFapte respinse:\n"
         + json.dumps(items, ensure_ascii=False, indent=1)
     )
@@ -228,13 +238,21 @@ def extract_facts(  # noqa: C901, PLR0913
     model_id: str,
     artifacts: Path,
     client_live: bool = False,
+    units: ProcessUnits | None = None,
 ) -> ExtractSummary:
-    """Establish every fact of the given sections from the dossier in one pass and one retry."""
-    facts = [(str(fact), section.id) for section in sections for fact in section.facts]
+    """Establish every fact of the given sections from the dossier in one pass and one retry.
+
+    With the dossier's process units, ch3.process also asks each unit's name from its own source.
+    """
+    process = units if any(section.id == "ch3.process" for section in sections) else None
+    sources = unit_name_sources(process, documents)
+    facts = [(str(fact), section.id) for section in sections for fact in section.facts] + [
+        (key, "ch3.process") for key in sources
+    ]
     owner: dict[str, str] = {}
     for key, section in facts:
         owner.setdefault(key, section)
-    tools = {section.id: FillTools(ws, job, section.id, documents) for section in sections}
+    tools = {section.id: FillTools(ws, job, section.id, documents, units) for section in sections}
     call = _Caller(ws, job, provider, model_id, artifacts, client_live)
     verified: set[str] = set()
     passages: dict[str, dict[str, tuple[tuple[int, int, int], ExtractedFact]]] = {}
@@ -265,7 +283,7 @@ def extract_facts(  # noqa: C901, PLR0913
             except EmaError as exc:
                 rejected.append((fact, exc))
 
-    head = facts_text(facts) + "\n\nFişiere:\n"
+    head = facts_text(facts, sources) + "\n\nFişiere:\n"
     ids = file_ids(documents)
     files = [file_text(file_id, documents[name]) for file_id, name in ids.items()]
     if facts and files:
@@ -281,7 +299,7 @@ def extract_facts(  # noqa: C901, PLR0913
     if retry:
         wanted = [(key, section) for key, section in facts if key in first_pass]
         try:
-            verify(call(retry_text(facts, retry, documents), output_tokens(wanted)))
+            verify(call(retry_text(facts, retry, documents, sources), output_tokens(wanted)))
         except EmaError as exc:
             if exc.code in STOPPING_CODES:
                 raise
@@ -289,11 +307,18 @@ def extract_facts(  # noqa: C901, PLR0913
                 write_event(handle, "extract_retry_failed", stage="fill", code=exc.code)
     counts = record_passages(ws, job, tools, owner, passages)
     verified.update(key for key, count in counts.items() if count)
-    # A value found earlier, as from the Necesar info, is never overwritten with missing.
-    found = {item.key for item in fields(ws, job) if item.presence == "found"}
+    # A value found earlier, as from the Necesar info, is never overwritten with missing; a unit's
+    # name is, since its unit is only this dossier's.
+    found = {
+        item.key
+        for item in fields(ws, job)
+        if item.presence == "found" and process_unit_number(item.key) is None
+    }
     missing = tuple(key for key in owner if key not in verified and key not in found)
     for key in missing:
         tools[owner[key]].mark_missing({"key": key})
+    if process is not None:
+        drop_unit_names(tools["ch3.process"], sources)
     drop_stale_passages(tools, owner, counts, found)
     return ExtractSummary(
         call.calls, tuple(key for key in owner if key in verified), first_pass, missing
