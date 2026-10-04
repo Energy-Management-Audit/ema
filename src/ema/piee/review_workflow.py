@@ -77,11 +77,27 @@ def _months_issues(job_fields: list[Field]) -> list[Issue]:
 
 
 def _ownership_issues(job_fields: list[Field]) -> list[Issue]:
-    return [
-        Issue(code="missing", field_id=field.id, message=f"Lipseşte: {field.label}")
+    ownership_fields = {
+        field.key.removeprefix("identity.ownership_"): field
         for field in job_fields
         if field.key in {"identity.ownership_state", "identity.ownership_private"}
-        and (field.review == "rejected" or percent_text(str(field.value)) is None)
+    }
+    shares: dict[str, str | None] = {}
+    for side in ("state", "private"):
+        field = ownership_fields.get(side)
+        shares[side] = (
+            percent_text(str(field.value))
+            if field is not None and field.review != "rejected" and field.value is not None
+            else None
+        )
+    return [
+        Issue(code="missing", field_id=field.id, message=f"Lipseşte: {field.label}")
+        for side, field in ownership_fields.items()
+        if shares[side] is None
+        and (
+            (other := shares["private" if side == "state" else "state"]) is None
+            or Decimal(other[:-1].replace(",", ".")) != 100
+        )
     ]
 
 

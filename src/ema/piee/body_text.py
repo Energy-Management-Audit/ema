@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import math
+import re
+from datetime import date
 from pathlib import Path
 
 from ema.core.office.anchors import AnchorLedger, find
@@ -14,7 +16,7 @@ from ema.energy_data.carriers import Carrier
 from ema.piee.chart_plan import BINDINGS, chart_series
 from ema.piee.dataset import PieeData
 from ema.piee.figure_numbering import REFERENCE
-from ema.piee.identity import ownership
+from ema.piee.identity import SpanText, audit_year, identity_values, ownership
 from ema.piee.number import prototype_number
 from ema.piee.units import display_unit
 
@@ -90,12 +92,39 @@ def _pv_share(data: PieeData, reference: str | None) -> str | None:
     )
 
 
+def _sourced_text(template: str, values: dict[str, str | None]) -> SpanText | None:
+    matches = list(re.finditer(r"\{(client|auditor|year)\}", template))
+    if all(values[match.group(1)] is None for match in matches):
+        return None
+    parts: list[str] = []
+    missing: list[tuple[int, int]] = []
+    cursor = 0
+    length = 0
+    for match in matches:
+        before = template[cursor : match.start()]
+        value = values[match.group(1)] or "n.d."
+        parts.extend((before, value))
+        length += len(before)
+        if values[match.group(1)] is None:
+            missing.append((length, length + 4))
+        length += len(value)
+        cursor = match.end()
+    parts.append(template[cursor:])
+    return SpanText("".join(parts), tuple(missing))
+
+
 def render_body_text(source: Path, data: PieeData, output: Path, ledger: AnchorLedger) -> None:
     parts = read_parts(source)
     root = xml(parts, "word/document.xml")
     fuels = _fuel_names(data)
     reference = REFERENCE.search(visible_text(find([root], "body_162")))
-    replacements: dict[str, str | None] = {
+    auditor = data.anexa.audit.get("auditor")
+    values = {
+        "client": identity_values(data.anexa, date(data.year, 1, 1))["client_name"],
+        "auditor": str(auditor.value).strip() or None if auditor is not None else None,
+        "year": audit_year(data.anexa),
+    }
+    replacements: dict[str, str | SpanText | None] = {
         "body_14": ownership(data.anexa),
         "body_72": f"carburanți ({_joined(fuels)})," if fuels else None,
         "body_83": _electricity(data),
@@ -107,12 +136,30 @@ def render_body_text(source: Path, data: PieeData, output: Path, ledger: AnchorL
         "body_81": None,
         "body_77": None,
         "body_165": None,
-        "body_363": None,
+        "body_363": _sourced_text(
+            "Reprezentanții {client} dau importanță eficienței energetice, fapt dovedit "
+            "și prin realizarea lucrării de Audit energetic pe întregul contur energetic "
+            "în anul {year} ce aparține societății pentru încadrarea în obligațiile "
+            "legii 121/2014.",
+            values,
+        ),
         "body_390": None,
-        "body_414": None,
+        "body_414": _sourced_text(
+            "Audit energetic pe întregul contur aparținând {client} realizat de {auditor} "
+            "în anul {year},",
+            values,
+        ),
     }
     for slot, replacement in replacements.items():
-        set_paragraph_text(find([root], slot), replacement or "n.d.", missing=replacement is None)
+        paragraph = find([root], slot)
+        if isinstance(replacement, SpanText):
+            set_paragraph_text(paragraph, replacement.text)
+            replace_spans(
+                paragraph,
+                tuple(TextSpan(start, end, "n.d.", True) for start, end in replacement.missing),
+            )
+        else:
+            set_paragraph_text(paragraph, replacement or "n.d.", missing=replacement is None)
         ledger.record(slot)
     unit = next(iter(data.dataset.production_unit.values()), "")
     if unit:

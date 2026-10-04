@@ -28,6 +28,7 @@ from tests.golden.piee_case_c_structure import assert_section_sequence
 
 from conftest import artifacts_path
 from ema.consumption_analysis.analysis import Metric, value
+from ema.core.office.anchors import find
 from ema.core.office.chart_series import read_series
 from ema.core.office.package import (
     C,
@@ -35,10 +36,12 @@ from ema.core.office.package import (
     read_parts,
     xml,
 )
+from ema.core.office.run_range import visible_text
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.source import normal
 from ema.piee.compose import compose_draft, load_approved_base
 from ema.piee.dataset import PieeData, load
+from ema.piee.identity import audit_year, ownership
 from ema.piee.number import prototype_number
 
 pytestmark = pytest.mark.golden
@@ -50,13 +53,10 @@ NARRATIVE_SLOTS = {
     "body_81": "client ventilation narrative, no source in the inputs",
     "body_165": "client gas-use narrative, no source in the inputs",
     "body_201": "client fuel-use narrative, no source in the inputs",
-    "body_363": "client audit narrative, no source in the inputs",
     "body_390": "client management narrative, no source in the inputs",
-    "body_414": "client audit-history narrative, no full source in the inputs",  # #47
 }
 MISSING_FIELD_KEYS = {
     "body_11": "identity.registrul_comertului",
-    "body_14": "identity.ownership_state",  # #47: private share exists; state share is missing.
     "site_2_address": "identity.site_2_address",
     "site_1_share": "identity.site_1_production_share",
     "site_2_share": "identity.site_2_production_share",
@@ -267,6 +267,31 @@ def test_delivered_layout_composes_case_c_figures_and_missing_markers(  # noqa: 
     compose_draft(data, artifacts_path("s8", "base"), bookmarked, date(2026, 10, 1))
     _assert_clone_bookmarks(base, bookmarked)
     assert_production_name_is_sourced(data, bookmarked)
+    document = xml(read_parts(bookmarked), "word/document.xml")
+    client = str(data.anexa.identity["name"].value).strip()
+    auditor = str(data.anexa.audit["auditor"].value).strip()
+    year = audit_year(data.anexa)
+    assert year is not None
+    ownership_line = ownership(data.anexa)
+    assert ownership_line is not None
+    assert not ownership_line.missing
+    sourced = {
+        "body_414": (
+            f"Audit energetic pe întregul contur aparținând {client} "
+            f"realizat de {auditor} în anul {year},"
+        ),
+        "body_363": (
+            f"Reprezentanții {client} dau importanță eficienței energetice, fapt dovedit "
+            "și prin realizarea lucrării de Audit energetic pe întregul contur energetic "
+            f"în anul {year} ce aparține societății pentru încadrarea în obligațiile "
+            "legii 121/2014."
+        ),
+        "body_14": ownership_line.text,
+    }
+    for slot, expected in sourced.items():
+        actual = visible_text(find([document], slot))
+        assert actual == expected
+        assert "n.d." not in actual
     mapping = load_approved_base(base)
     narrative = {entry.slot: entry for entry in mapping.elements if entry.slot in NARRATIVE_SLOTS}
     assert set(narrative) == set(NARRATIVE_SLOTS)
@@ -294,10 +319,9 @@ def test_delivered_layout_composes_case_c_figures_and_missing_markers(  # noqa: 
             slots.update(names)
         else:
             absent_identity += paragraph.text.count("n.d.")
-    assert slots == set(NARRATIVE_SLOTS) | {"body_11", "body_14"}
+    assert slots == set(NARRATIVE_SLOTS) | {"body_11"}
     assert set(MISSING_FIELD_KEYS) == {
         "body_11",
-        "body_14",
         "site_2_address",
         "site_1_share",
         "site_2_share",

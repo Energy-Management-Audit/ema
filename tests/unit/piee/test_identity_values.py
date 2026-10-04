@@ -62,11 +62,13 @@ def test_incomplete_address_stays_missing() -> None:
 
 
 @pytest.mark.parametrize("raw", ["0", "1", "DA", "<label>", "Privat", "Stat", "20% text"])
-def test_non_percentage_ownership_is_missing(raw: str) -> None:
+def test_non_percentage_state_gives_integral_private_line(raw: str) -> None:
     anexa = AnexaData(
         identity={
             "ownership_state": _located(raw),
             "ownership_private": _located("100%"),
         }
     )
-    assert identity_values(anexa, date(2026, 1, 2))["ownership"] is None
+    assert identity_values(anexa, date(2026, 1, 2))["ownership"] == (
+        "Companie cu capital integral privat: 100% capital privat."
+    )

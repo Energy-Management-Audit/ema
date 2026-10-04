@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime
 from decimal import Decimal
 from urllib.parse import urlsplit
 
 from ema.core.office.numbers_ro import format_number
 from ema.energy_data.anexa_cells import AnexaData
 from ema.energy_data.source import Located
+
+
+@dataclass(frozen=True)
+class SpanText:
+    text: str
+    missing: tuple[tuple[int, int], ...] = ()
 
 
 def _value(items: dict[str, Located], key: str) -> str | None:
@@ -40,16 +47,46 @@ def percent_text(raw: str | None) -> str | None:
     return value if 0 <= Decimal(value[:-1].replace(",", ".")) <= 100 else None
 
 
-def ownership(anexa: AnexaData) -> str | None:
+def ownership(anexa: AnexaData) -> SpanText | None:
     state = percent_text(_value(anexa.identity, "ownership_state"))
     private = percent_text(_value(anexa.identity, "ownership_private"))
-    if state is None or private is None:
+    if state is None and private is None:
         return None
-    if Decimal(state[:-1].replace(",", ".")) == 0:
-        return f"Companie cu capital integral privat: {private} capital privat."
-    if Decimal(private[:-1].replace(",", ".")) == 0:
-        return f"Companie cu capital integral de stat: {state} capital de stat."
-    return f"Companie cu capital mixt: {state} capital de stat și {private} capital privat."
+    state_number = Decimal(state[:-1].replace(",", ".")) if state is not None else None
+    private_number = Decimal(private[:-1].replace(",", ".")) if private is not None else None
+    if private is not None and (state_number == 0 or (state is None and private_number == 100)):
+        return SpanText(f"Companie cu capital integral privat: {private} capital privat.")
+    if state is not None and (private_number == 0 or (private is None and state_number == 100)):
+        return SpanText(f"Companie cu capital integral de stat: {state} capital de stat.")
+    if state_number == 0:
+        text = "Companie cu capital integral privat: n.d. capital privat."
+        start = text.index("n.d.")
+        return SpanText(text, ((start, start + 4),))
+    if private_number == 0:
+        text = "Companie cu capital integral de stat: n.d. capital de stat."
+        start = text.index("n.d.")
+        return SpanText(text, ((start, start + 4),))
+    text = (
+        f"Companie cu capital mixt: {state or 'n.d.'} capital de stat "
+        f"și {private or 'n.d.'} capital privat."
+    )
+    start = text.index("n.d.") if state is None or private is None else -1
+    return SpanText(text, ((start, start + 4),) if start >= 0 else ())
+
+
+def audit_year(anexa: AnexaData) -> str | None:
+    found = anexa.audit.get("last_audit")
+    if found is None:
+        return None
+    raw = found.value
+    if isinstance(raw, date | datetime):
+        return str(raw.year)
+    if isinstance(raw, int) and not isinstance(raw, bool):
+        return str(raw) if 1990 <= raw <= 2100 else None
+    if isinstance(raw, str):
+        years = set(re.findall(r"\b(?:19|20)\d{2}\b", raw))
+        return next(iter(years)) if len(years) == 1 else None
+    return None
 
 
 def _phone(raw: str | None) -> str | None:
@@ -105,8 +142,6 @@ def identity_values(
     phone, fax = _phone(_value(identity, "phone")), _phone(_value(identity, "fax"))
     caen_code = _value(identity, "caen_code")
     caen_description = _value(identity, "caen_description")
-    auditor = _value(anexa.audit, "auditor")
-    audit_date = _value(anexa.audit, "last_audit")
     site_1 = _value(identity, "site_1_name")
     site_2 = _value(identity, "site_2_name")
     site_1_address = _value(identity, "site_1_address")
@@ -123,7 +158,7 @@ def identity_values(
         "footer_address": footer_address(anexa),
         "cui": re.sub(r"^RO\s*", "", _value(identity, "cui") or "", flags=re.I) or None,
         "registrul_comertului": _value(identity, "registrul_comertului"),
-        "ownership": ownership(anexa),
+        "ownership": line.text if (line := ownership(anexa)) else None,
         "phone": phone,
         "fax": fax,
         "phone_fax": (
@@ -136,8 +171,5 @@ def identity_values(
         "caen": f"{caen_code}: {caen_description}" if caen_code and caen_description else None,
         "contact_person": _value(identity, "consumer_contact_person"),
         "generation_date": generated_on.strftime("%d.%m.%Y"),
-        "audit_reference": (
-            f"realizat de {auditor} la data de {audit_date}" if auditor and audit_date else None
-        ),
         "production_name": production_name,
     }

@@ -19,6 +19,7 @@ from conftest import artifacts_path
 from ema.core.office.numbers_ro import format_number
 from ema.piee.compose import compose_draft
 from ema.piee.dataset import load
+from ema.piee.identity import audit_year
 from ema.piee.tables import _monthly
 
 pytestmark = pytest.mark.golden
@@ -43,9 +44,8 @@ PARAGRAPHS = {
     "body_child_290": "authored_trend_conflicts_with_chart",
     "body_343": "source_policy",
     "body_child_309": "source_policy",
-    "body_363": "unsupported_prose",
+    "body_363": "sourced_base_wording",
     "body_390": "unsupported_prose",
-    "body_414": "unsupported_prose",
     "approved_only_361": "unsupported_prose",
     "body_child_138": "figure_renumbered",
     "identity_423": "figure_renumbered",
@@ -168,7 +168,9 @@ def _table_differences(
     return found
 
 
-def _paragraph_difference(actual: etree._Element, approved: etree._Element, key: str) -> str:
+def _paragraph_difference(
+    actual: etree._Element, approved: etree._Element, key: str, client: str, year: str
+) -> str:
     assert key in PARAGRAPHS, key
     category = PARAGRAPHS[key]
     if category == "figure_renumbered":
@@ -182,11 +184,13 @@ def _paragraph_difference(actual: etree._Element, approved: etree._Element, key:
         "body_124",
         "body_165",
         "body_201",
-        "body_363",
         "body_390",
-        "body_414",
     }:
         assert _text(actual) == "n.d.", key
+    if category == "sourced_base_wording":
+        assert "n.d." not in _text(actual)
+        assert client in _text(actual)
+        assert year in _text(actual)
     if category == "formatting_only":
         assert _formatting_same(actual, approved), key
     return category
@@ -202,6 +206,9 @@ def test_piee_case_a_text_and_tables_have_only_pinned_differences(  # noqa: C901
         next(case.rglob("Necesar*.xls")),
         next(case.rglob("*Prelucrare*.xls*")),
     )
+    client = str(data.anexa.identity["name"].value).strip()
+    year = audit_year(data.anexa)
+    assert year is not None
     monkeypatch.setattr("ema.piee.compose._strip_bookmarks", shutil.copyfile)
     output = tmp_path / "bookmarked.docx"
     compose_draft(data, artifacts_path("s8", "base"), output, date(2026, 9, 19))
@@ -252,7 +259,7 @@ def test_piee_case_a_text_and_tables_have_only_pinned_differences(  # noqa: C901
                 )
                 continue
             key = _slot(actual_node, index + 1)
-            found[key] = _paragraph_difference(actual_node, approved_node, key)
+            found[key] = _paragraph_difference(actual_node, approved_node, key, client, year)
     assert found.keys() == PARAGRAPHS.keys(), sorted(found.keys() ^ PARAGRAPHS.keys())
     assert Counter(found.values()) == Counter(PARAGRAPHS.values())
     # Three renumbered paragraphs now belong to the explicit difference inventory.
