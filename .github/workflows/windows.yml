@@ -3,7 +3,6 @@ name: Windows build
 on:
   push:
     tags: ["v*"]
-    branches: [dev]
     paths:
       - "packaging/**"
       - "pyproject.toml"
@@ -12,7 +11,7 @@ on:
       - "resources/**"
       - "src/ema/__init__.py"
   pull_request:
-    branches: [dev]
+    branches: [prod]
     paths:
       - "packaging/**"
       - ".github/workflows/windows.yml"
