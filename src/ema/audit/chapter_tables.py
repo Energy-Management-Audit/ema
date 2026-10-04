@@ -112,12 +112,17 @@ def _spans(source: Path) -> dict[str, tuple[int, int]]:
 def _table(
     body: Sequence[etree._Element], spans: dict[str, tuple[int, int]], spec: TableSpec
 ) -> int | None:
-    """Find the table whose header identifies this spec, even among other tables."""
+    """Find the table whose header identifies this spec, even among other tables.
+
+    The base build turns header cells into markers, so a table whose header is only markers and
+    whose width matches is the slot when no table carries the spec's header text.
+    """
     start, end = spans.get(spec.section, (0, 0))
 
     def normalized(value: str) -> str:
         return re.sub(r"[^\w]+", "", value.casefold())
 
+    unlabelled: int | None = None
     for index in range(start, end):
         table = body[index]
         if table.tag != W + "tbl":
@@ -128,14 +133,18 @@ def _table(
         cells = header.findall(W + "tc")
         if len(cells) != len(spec.header):
             continue
-        actual = [normalized(_text(cell)) for cell in cells]
+        texts = [_text(cell) for cell in cells]
+        if unlabelled is None and all(not text.replace(MARKER, "").strip() for text in texts):
+            unlabelled = index
+            continue
+        actual = [normalized(text) for text in texts]
         expected = [normalized(label) for label in spec.header]
         if all(
             value and (value.startswith(label) or label.startswith(value))
             for value, label in zip(actual, expected, strict=True)
         ):
             return index
-    return None
+    return unlabelled
 
 
 def _set_cell(cell: etree._Element, text: str, *, missing: bool = False) -> None:
