@@ -12,14 +12,15 @@ from typing import Any
 
 from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import CATALOGUE, AuditFact, fact_spec
-from ema.audit.catalogue_types import fact_key
+from ema.audit.catalogue_labels import FACT_TYPES
+from ema.audit.catalogue_types import fact_key, process_unit_name
 from ema.audit.fill_files import file_ids, resolve_name, search, windows
 from ema.audit.sections import recompute_ready, set_status
 from ema.core.errors import EmaError
 from ema.core.llm.agent import Tool
 from ema.core.llm.types import ToolSpec
 from ema.core.review.fields import fields, mark_absent, propose
-from ema.core.review.models import Evidence, PdfText, TextLoc
+from ema.core.review.models import Evidence, Field, PdfText, TextLoc
 from ema.core.review.section_transition import Status
 from ema.core.workspace import Workspace
 
@@ -106,23 +107,37 @@ class FillDocument:
         return tuple(part for source in sources for part in windows(source)) or ("",)
 
 
+def _number(text: str) -> Decimal | None:
+    """A number as a source writes it: `1.234,5`, `1 234,5` or `1234.5`."""
+    raw = text.strip().replace(" ", "").replace("\u00a0", "")
+    if "," in raw:
+        raw = raw.replace(".", "").replace(",", ".")
+    try:
+        number = Decimal(raw)
+    except InvalidOperation:
+        return None
+    return number if number.is_finite() else None
+
+
+def _typed(key: str, value: str | int | float) -> str | int | Decimal:
+    """The value in its fact's type: a typed fact's number or year, else the text as given."""
+    kind = FACT_TYPES[key][0] if key in FACT_TYPES else None
+    if kind is None:
+        return value if isinstance(value, str) else Decimal(str(value))
+    number = _number(value) if isinstance(value, str) else Decimal(str(value))
+    if kind == "year" and number is not None and number == int(number) and 1900 < number < 2100:
+        return int(number)
+    if kind == "number" and number is not None:
+        return number
+    raise EmaError("fact_type", "Tipul faptului nu este valid.", key)
+
+
 def _number_in_quote(value: object, quote: str) -> bool:
     try:
         wanted = Decimal(str(value))
     except InvalidOperation:
         return False
-    for match in _NUMBER.finditer(quote):
-        raw = match.group().strip().replace(" ", "").replace("\u00a0", "")
-        if not raw:
-            continue
-        if "," in raw:
-            raw = raw.replace(".", "").replace(",", ".")
-        try:
-            if Decimal(raw) == wanted:
-                return True
-        except InvalidOperation:
-            continue
-    return False
+    return any(_number(match.group()) == wanted for match in _NUMBER.finditer(quote))
 
 
 class FillTools:
@@ -224,7 +239,7 @@ class FillTools:
         )
         if not quote or not quoted:
             raise EmaError("evidence_quote", "Fragmentul citat nu apare în fişier.", name)
-        if isinstance(value, int | float) and not _number_in_quote(value, quote):
+        if isinstance(value, int | float | Decimal) and not _number_in_quote(value, quote):
             raise EmaError("value_unverified", "Numărul nu apare în fragment.", name)
         if isinstance(value, str) and value not in quote:
             raise EmaError("value_unverified", "Textul nu apare în fragment.", name)
@@ -266,6 +281,7 @@ class FillTools:
         value = args["value"]
         if isinstance(value, bool) or not isinstance(value, str | int | float):
             raise EmaError("fact_type", "Tipul faptului nu este valid.", key)
+        stored_value = _typed(key, value)
         source_key = str(args.get("source_key", ""))
         if source_key:
             if _STRUCTURED_SOURCE.get(key) != source_key:
@@ -274,13 +290,11 @@ class FillTools:
         else:
             name, quote = str(args["name"]), str(args["quote"])
             page = int(args["page"]) if "page" in args else None
-            evidence = [self._document_evidence(name, quote, value, page)]
-        spec = fact_spec(
-            key,
-            "number" if isinstance(value, int | float) else "text",
-            chapter=self.section,
-        )
-        stored_value = str(value) if spec.value_type == "text" else Decimal(str(value))
+            evidence = [self._document_evidence(name, quote, stored_value, page)]
+        kind, unit = FACT_TYPES.get(key, ("text" if isinstance(value, str) else "number", None))
+        spec = fact_spec(key, kind, chapter=self.section, unit=unit)
+        # An identifier given as a number (a CUI, a CAEN code) is stored as its text.
+        stored_value = str(value) if spec.value_type == "text" else stored_value
         field = propose(self.ws, self.job, spec, stored_value, evidence, state="extracted")
         recompute_ready(self.ws, self.job)
         return {"key": field.key, "evidence": field.evidence}
@@ -306,6 +320,20 @@ class FillTools:
         )
         recompute_ready(self.ws, self.job)
         return {"missing": field.key}
+
+    def record_unit_name(self, number: int, name: str | None, line: str = "") -> Field:
+        """A process unit's heading: the verbatim line of its source file that names it.
+
+        With no such line the field is missing, so the heading keeps its marker.
+        """
+        spec = fact_spec(process_unit_name(number), "text", chapter=self.section)
+        if name is None:
+            field = mark_absent(self.ws, self.job, spec, "not_found")
+        else:
+            evidence = [self._document_evidence(name, line, line)]
+            field = propose(self.ws, self.job, spec, line, evidence, state="extracted")
+        recompute_ready(self.ws, self.job)
+        return field
 
     def mark_later(self, args: dict[str, Any]) -> object:
         reason = str(args["reason"]).strip()

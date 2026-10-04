@@ -10,8 +10,8 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from ema.audit.catalogue import Section
-from ema.audit.catalogue_labels import field_label
-from ema.audit.catalogue_types import MAX_PASSAGES, PASSAGE_FACTS
+from ema.audit.catalogue_labels import FACT_TYPES, field_label
+from ema.audit.catalogue_types import PASSAGE_FACTS, max_passages
 from ema.audit.fill_files import file_ids, resolve_name
 from ema.audit.fill_passages import PASSAGE_CHARS, drop_stale_passages, record_passages
 from ema.audit.fill_tools import FillDocument, FillTools
@@ -23,7 +23,7 @@ from ema.core.resources import resource_path
 from ema.core.review.fields import fields
 from ema.core.workspace import Workspace
 
-PROMPT_VERSION = "audit-extract-v2"
+PROMPT_VERSION = "audit-extract-v3"
 PROMPT_TOKENS = 300_000
 OUTPUT_TOKENS = 8_000
 CHARS_PER_TOKEN = 4
@@ -37,6 +37,7 @@ MAX_OUTPUT_TOKENS = 65_536
 # These stop the stage; any other failure of the retry keeps what the first pass verified.
 STOPPING_CODES = frozenset({"ai_budget", "ai_credits", "ai_quota_day"})
 PASSAGE_MARK = "pasaj"
+TYPE_MARKS = {"number": "număr", "year": "an"}
 
 
 class ExtractedFact(BaseModel):
@@ -65,26 +66,32 @@ class ExtractSummary:
 
 
 def instructions() -> str:
-    return resource_path("audit", "prompts", "extract_v1.txt").read_text(encoding="utf-8").strip()
+    return resource_path("audit", "prompts", "extract_v2.txt").read_text(encoding="utf-8").strip()
 
 
 def prompt_tokens(text: str) -> int:
     return len(text) // CHARS_PER_TOKEN
 
 
+def _mark(key: str) -> str:
+    """What the value is: a passage, a number in its unit, a year, or nothing for text."""
+    if key in PASSAGE_FACTS:
+        return f" — {PASSAGE_MARK}"
+    if key not in FACT_TYPES:
+        return ""
+    kind, unit = FACT_TYPES[key]
+    return f" — {TYPE_MARKS[kind]}" + (f" ({unit})" if unit else "")
+
+
 def facts_text(facts: Sequence[tuple[str, str]]) -> str:
     """The facts to establish, one `key — Romanian label — section id` line each."""
-    lines = (
-        f"{key} — {field_label(key)} — {section}"
-        + (f" — {PASSAGE_MARK}" if key in PASSAGE_FACTS else "")
-        for key, section in facts
-    )
+    lines = (f"{key} — {field_label(key)} — {section}{_mark(key)}" for key, section in facts)
     return "Fapte de stabilit:\n" + "\n".join(lines)
 
 
 def output_tokens(facts: Sequence[tuple[str, str]]) -> int:
     """The output allowance: the short facts, plus every passage a narrative fact may take."""
-    passages = len({key for key, _ in facts if key in PASSAGE_FACTS}) * MAX_PASSAGES
+    passages = sum(max_passages(key) for key in {key for key, _ in facts if key in PASSAGE_FACTS})
     return min(OUTPUT_TOKENS + THINKING_TOKENS + passages * PASSAGE_TOKENS, MAX_OUTPUT_TOKENS)
 
 

@@ -6,7 +6,7 @@ import re
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
-from ema.audit.catalogue_types import MAX_PASSAGES, PASSAGE_FACTS, passage_key
+from ema.audit.catalogue_types import PASSAGE_FACTS, max_passages, passage_key
 from ema.audit.draft_checks import SENTENCE_END
 from ema.audit.fill_tools import FillTools
 from ema.core.logging import write_event
@@ -70,7 +70,7 @@ def record_passages(
 ) -> dict[str, int]:
     """Number each fact's passages by their place in the dossier, cut to the cap, and record.
 
-    What does not fit, a sentence over the cap or a piece past MAX_PASSAGES, is logged.
+    What does not fit, a sentence over the cap or a piece past the fact's passage cap, is logged.
     """
     counts: dict[str, int] = {}
     dropped: list[dict[str, object]] = []
@@ -83,7 +83,7 @@ def record_passages(
             dropped.extend(
                 {"key": key, "reason": "sentence_over_cap", "chars": len(text)} for text in long
             )
-        for number, (piece, fact) in enumerate(pieces[:MAX_PASSAGES], 1):
+        for number, (piece, fact) in enumerate(pieces[: max_passages(key)], 1):
             tools[owner[key]].record_fact(
                 {
                     "key": passage_key(key, number),
@@ -95,9 +95,9 @@ def record_passages(
             )
         dropped.extend(
             {"key": key, "reason": "passage_count", "chars": len(piece)}
-            for piece, _ in pieces[MAX_PASSAGES:]
+            for piece, _ in pieces[max_passages(key) :]
         )
-        counts[key] = min(len(pieces), MAX_PASSAGES)
+        counts[key] = min(len(pieces), max_passages(key))
     if dropped:
         with ws.connect() as db, ws.job_log(db, job) as handle:
             for item in dropped:
@@ -113,6 +113,6 @@ def drop_stale_passages(
 ) -> None:
     """Passages beyond this run's count are a previous dossier's and must not reach a draft."""
     for key in sorted(PASSAGE_FACTS & owner.keys()):
-        for number in range(max(2, counts.get(key, 0) + 1), MAX_PASSAGES + 1):
+        for number in range(max(2, counts.get(key, 0) + 1), max_passages(key) + 1):
             if passage_key(key, number) in found:
                 tools[owner[key]].mark_missing({"key": passage_key(key, number)})
