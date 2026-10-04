@@ -69,4 +69,6 @@ def test_non_percentage_ownership_is_missing(raw: str) -> None:
             "ownership_private": _located("100%"),
         }
     )
-    assert identity_values(anexa, date(2026, 1, 2))["ownership"] is None
+    assert identity_values(anexa, date(2026, 1, 2))["ownership"] == (
+        "Companie cu capital integral privat: 100% capital privat."
+    )

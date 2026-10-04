@@ -100,7 +100,7 @@ def test_pending_calculated_payback_blocks_until_confirmed(tmp_path: Path) -> No
     )
 
 
-def test_invalid_ownership_has_a_missing_review_field(tmp_path: Path) -> None:
+def test_private_integral_ownership_needs_no_state_review_field(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "ws")
     job = create_job(ws, "piee", "synthetic", YEAR + 1)
     data = piee_data()
@@ -113,7 +113,7 @@ def test_invalid_ownership_has_a_missing_review_field(tmp_path: Path) -> None:
     _record_identity(ws, job, data, "a" * 64)
     field = next(item for item in fields(ws, job) if item.key == "identity.ownership_state")
     assert field.presence == "not_found" and field.value is None and field.required
-    assert any(item.field_id == field.id for item in PieeWorkflow().readiness(ws, job).blocking)
+    assert not any(item.field_id == field.id for item in PieeWorkflow().readiness(ws, job).blocking)
 
 
 @pytest.mark.parametrize(

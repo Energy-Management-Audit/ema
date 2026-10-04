@@ -50,7 +50,9 @@ def test_ownership_reads_only_source_percentages(
             item.code == "ownership_flag" and item.detail == "ownership_state"
             for item in data.issues
         )
-        assert identity_values(data, date(2026, 1, 1))["ownership"] is None
+        assert identity_values(data, date(2026, 1, 1))["ownership"] == (
+            "Companie cu capital mixt: n.d. capital de stat și 62,5% capital privat."
+        )
     assert str(data.identity["ownership_private"].value) == "62,5%"
 
 
@@ -60,3 +62,6 @@ def test_a_neighbouring_label_is_never_a_percentage(tmp_path: Path) -> None:
     data = parse_anexa(path)
     assert "ownership_state" not in data.identity
     assert data.identity["ownership_private"].value == "100%"
+    assert identity_values(data, date(2026, 1, 1))["ownership"] == (
+        "Companie cu capital integral privat: 100% capital privat."
+    )
