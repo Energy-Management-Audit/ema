@@ -53,11 +53,13 @@ class ResearchTools:
         section: str,
         guard: OutboundGuard,
         search_backend: SearchBackend,
+        *,
+        cache: bool = True,
     ) -> None:
         if section not in {item.id for item in CATALOGUE}:
             raise EmaError("section_missing", "Secţiunea lipseşte.", section)
         self.ws, self.job, self.section = ws, job, section
-        self.guard, self.search_backend = guard, search_backend
+        self.guard, self.search_backend, self.cache = guard, search_backend, cache
         self.snapshots: dict[str, Snapshot] = {}
 
     def _snapshot(self, sha: str) -> Snapshot:
@@ -74,9 +76,10 @@ class ResearchTools:
             f"clients/{row['client_slug']}/research/search-"
             f"{hashlib.sha256(query.encode()).hexdigest()}.json"
         )
+        cached = self.cache and cache.exists()
         results = (
             json.loads(cache.read_text(encoding="utf-8"))
-            if cache.exists()
+            if cached
             else self.search_backend.search(query)
         )
         allowed: list[dict[str, str]] = []
@@ -91,7 +94,7 @@ class ResearchTools:
                 continue  # the guard already logged the refusal; the URL goes no further
             allowed.append(row)
         results = allowed
-        if not cache.exists():
+        if self.cache and not cached:
             cache.parent.mkdir(parents=True, exist_ok=True)
             cache.write_text(json.dumps(results, ensure_ascii=False), encoding="utf-8")
         return results

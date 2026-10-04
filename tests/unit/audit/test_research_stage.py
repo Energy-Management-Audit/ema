@@ -210,7 +210,7 @@ def test_replayed_search_and_extraction_drive_the_stage_from_the_cli(
     assert evidence.file_sha == hashlib.sha256(TEXT.encode()).hexdigest()
     assert _llm_calls(ws, job) == 1
     done = next(event for event in _log(ws, job) if event.get("event") == "research_done")
-    assert (done["live"], done["models"], done["calls"], done["sourced"]) == (False, 1, 1, 1)
+    assert (done["live"], done["rows"], done["calls"], done["sourced"]) == (False, 1, 1, 1)
 
 
 def test_live_run_records_both_files_and_a_later_run_replays_them(
@@ -220,6 +220,7 @@ def test_live_run_records_both_files_and_a_later_run_replays_them(
     job = _job(ws, [NAME])
     monkeypatch.setenv("EMA_RESEARCH_LIVE", "1")
     monkeypatch.setenv("EMA_BRAVE_API_KEY", "synthetic-key")
+    monkeypatch.setenv("EMA_AI_CLIENT_LIVE", "true")
     live = FakeProvider({"items": [SPEC]})
     monkeypatch.setattr("ema.audit.search_brave.BraveSearch.search", lambda _, query: [HIT])
     monkeypatch.setattr(research_stage, "live_provider", lambda _: (live, MODEL))

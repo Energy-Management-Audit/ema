@@ -75,7 +75,7 @@ class ResearchSummary:
 
     run: str
     live: bool
-    models: int
+    rows: int
     calls: int = 0
     refused: tuple[str, ...] = ()
     sourced: tuple[str, ...] = ()
@@ -117,25 +117,34 @@ def research_sources(ws: Workspace, job: str) -> Sources:
     the latest recorded run, refused before any run when there is none."""
     recorded = latest_recording(ws, job)
     replay: SearchBackend = ReplaySearch(recorded / SEARCH_FILE) if recorded else _NoRecording()
-    search = select_search_backend(load_settings(ws), replay)
-    if search is not replay:
+    settings = load_settings(ws)
+    search = select_search_backend(settings, replay)
+    if search is not replay and settings.ai_client_live:
         provider, model_id = live_provider(ws)
         return Sources(search, provider, model_id, live=True)
     if recorded is None:
         raise EmaError("research_replay_missing", "Înregistrarea cercetării lipseşte.", job)
     provider = ReplayProvider(recorded / EXTRACTION_FILE)
-    return Sources(search, provider, provider.model_id, live=False)
+    return Sources(replay, provider, provider.model_id, live=False)
 
 
 def equipment_rows(ws: Workspace, job: str) -> list[tuple[str, str, str, int]]:
-    """(row number, name, field id, revision) of each distinct Necesar equipment name."""
-    rows: dict[str, tuple[str, str, str, int]] = {}
+    """(row number, name, field id, revision) of each named Necesar equipment row."""
+    rows: list[tuple[str, str, str, int]] = []
     for item in fields(ws, job):
         match = _NAME.fullmatch(item.key)
         if match and isinstance(item.value, str) and item.value.strip():
-            name = " ".join(item.value.split())
-            rows.setdefault(name.casefold(), (match[1], name, item.id, item.revision))
-    return sorted(rows.values(), key=lambda row: int(row[0]))
+            rows.append((match[1], " ".join(item.value.split()), item.id, item.revision))
+    return sorted(rows, key=lambda row: int(row[0]))
+
+
+def by_name(rows: list[tuple[str, str, str, int]]) -> list[tuple[str, list[str]]]:
+    """(name, row numbers) per distinct name, in row order: one search and one extraction
+    item serve every row that repeats a name."""
+    groups: dict[str, tuple[str, list[str]]] = {}
+    for number, name, _, _ in rows:
+        groups.setdefault(name.casefold(), (name, []))[1].append(number)
+    return list(groups.values())
 
 
 def query_for(name: str) -> str:
@@ -174,6 +183,7 @@ def _record(tools: ResearchTools, spec: EquipmentSpec, hits: list[dict[str, str]
 
 
 Hits = list[dict[str, str]]
+Batch = dict[str, tuple[str, list[str], Hits]]  # first row number: name, its rows, excerpts
 
 
 @dataclass
@@ -186,49 +196,43 @@ class _Tally:
     calls: int = 0
 
 
-def _search(
-    tools: ResearchTools, rows: list[tuple[str, str, str, int]], tally: _Tally
-) -> dict[str, tuple[str, Hits]]:
-    """One guarded search per row; the rows with excerpts, by row number."""
-    batch: dict[str, tuple[str, Hits]] = {}
-    for number, name, _, _ in rows:
+def _search(tools: ResearchTools, groups: list[tuple[str, list[str]]], tally: _Tally) -> Batch:
+    """One guarded search per distinct name; the names with excerpts, by first row number."""
+    batch: Batch = {}
+    for name, numbers in groups:
         query = query_for(name)
         try:
             results = cast("Hits", tools.search({"query": query}))
         except EmaError as exc:
-            # The guard logged the refusal; the row is counted, never searched another way.
+            # The guard logged the refusal; the rows are counted, never searched another way.
             if exc.code == "outbound_refused":
-                tally.refused.append(number)
+                tally.refused.extend(numbers)
             else:
-                tally.failed[number] = exc.code
+                tally.failed.update(dict.fromkeys(numbers, exc.code))
             continue
         tally.searched[query] = results
         hits = [hit for hit in results if hit["snippet"]][:RESULTS]
         if hits:
-            batch[number] = (name, hits)
+            batch[numbers[0]] = (name, numbers, hits)
         else:
-            tally.not_found.append(number)
+            tally.not_found.extend(numbers)
     return batch
 
 
-def _read(
-    tools: ResearchTools,
-    context: AgentContext,
-    batch: dict[str, tuple[str, Hits]],
-    tally: _Tally,
-) -> None:
-    """One extraction call for the batch; each spec recorded with its verbatim excerpt."""
+def _read(tools: ResearchTools, context: AgentContext, batch: Batch, tally: _Tally) -> None:
+    """One extraction call for the batch; each spec recorded with its verbatim excerpt and
+    counted for every row that names it."""
     content = {
         "items": [
             {
-                "id": number,
+                "id": key,
                 "equipment": name,
                 "excerpts": [
                     {"n": n, "url": hit["url"], "text": _excerpt(hit)}
                     for n, hit in enumerate(hits, 1)
                 ],
             }
-            for number, (name, hits) in batch.items()
+            for key, (name, _, hits) in batch.items()
         ]
     }
     tally.calls += 1
@@ -240,31 +244,36 @@ def _read(
         estimate_tokens=_estimate,
     )
     specs = {spec.id: spec for spec in reversed(extraction.items) if spec.id in batch}
-    for number, (_, hits) in batch.items():
-        spec = specs.get(number)
+    for key, (_, numbers, hits) in batch.items():
+        spec = specs.get(key)
         if spec is None:
-            tally.not_found.append(number)
+            tally.not_found.extend(numbers)
             continue
         try:
             _record(tools, spec, hits)
         except EmaError as exc:
-            tally.failed[number] = exc.code
+            tally.failed.update(dict.fromkeys(numbers, exc.code))
             continue
-        tally.sourced.append(number)
+        tally.sourced.extend(numbers)
+
+
+def _rows(numbers: list[str]) -> tuple[str, ...]:
+    return tuple(sorted(numbers, key=int))
 
 
 def run_research(
     ctx: StageContext, tools: ResearchTools, context: AgentContext, live: bool
 ) -> ResearchSummary:
-    """Search every equipment row, then read each batch of excerpts with one AI call; a quota
-    or the job budget stops the rest. A failed row never fails the stage."""
+    """Search every distinct equipment name, then read each batch of excerpts with one AI
+    call; a quota or the job budget stops the rest. A failed row never fails the stage."""
     rows = equipment_rows(ctx.ws, ctx.job)
     for _, _, field_id, revision in rows:
         ctx.record_read("fields", field_id, revision)
+    groups = by_name(rows)
     tally = _Tally()
-    stopped: tuple[str, ...] = ()
-    for start in range(0, len(rows), BATCH):
-        batch = _search(tools, rows[start : start + BATCH], tally)
+    stopped: list[str] = []
+    for start in range(0, len(groups), BATCH):
+        batch = _search(tools, groups[start : start + BATCH], tally)
         if live:
             (ctx.artifact_dir() / SEARCH_FILE).write_text(
                 json.dumps({"source": "recorded", "queries": tally.searched}, ensure_ascii=False),
@@ -276,11 +285,12 @@ def run_research(
             _read(tools, context, batch, tally)
         except EmaError as exc:
             code = failure_code(exc)
-            tally.failed.update((number, code) for number in batch)
+            failed = [number for _, numbers, _ in batch.values() for number in numbers]
+            tally.failed.update(dict.fromkeys(failed, code))
             with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
-                write_event(handle, "research_failed", run=ctx.run_id, rows=list(batch), code=code)
+                write_event(handle, "research_failed", run=ctx.run_id, rows=failed, code=code)
             if code in STOPPING:
-                stopped = tuple(row[0] for row in rows[start + BATCH :])
+                stopped = [number for _, numbers in groups[start + BATCH :] for number in numbers]
                 break
     with ctx.ws.connect() as db, ctx.ws.job_log(db, ctx.job) as handle:
         write_event(
@@ -288,7 +298,7 @@ def run_research(
             "research_done",
             run=ctx.run_id,
             live=live,
-            models=len(rows),
+            rows=len(rows),
             calls=tally.calls,
             refused=len(tally.refused),
             sourced=len(tally.sourced),
@@ -299,11 +309,11 @@ def run_research(
         live,
         len(rows),
         tally.calls,
-        tuple(tally.refused),
-        tuple(tally.sourced),
-        tuple(tally.not_found),
+        _rows(tally.refused),
+        _rows(tally.sourced),
+        _rows(tally.not_found),
         tally.failed,
-        stopped,
+        _rows(stopped),
     )
 
 
@@ -347,7 +357,12 @@ def start_research(
             client_live=sources.live,
         )
         tools = ResearchTools(
-            ctx.ws, ctx.job, SECTION, OutboundGuard(ctx.ws, ctx.job), sources.search
+            ctx.ws,
+            ctx.job,
+            SECTION,
+            OutboundGuard(ctx.ws, ctx.job),
+            sources.search,
+            cache=sources.live,  # a replay answers from its recording alone
         )
         before = job_spend(ctx.ws, ctx.job)
         try:
