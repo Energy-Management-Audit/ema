@@ -29,6 +29,7 @@ from ema.core.office.package import (
     xml,
 )
 from ema.core.office.paragraph_properties import keep_paragraph
+from ema.core.office.pie_xml import PieKind, pie_root
 from ema.core.office.workbook import formula_at, formula_cells
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -216,3 +217,62 @@ def build_column_chart_detached(
     )
     write_parts(parts, out)
     return new_part, paragraph
+
+
+def build_pie_chart_detached(  # noqa: PLR0913, PLR0917
+    docx: Path,
+    style_source_part: str,
+    kind: PieKind,
+    labels: tuple[str, ...],
+    values: tuple[float, ...],
+    out: Path,
+    prototype_paragraph: etree._Element,
+) -> tuple[str, etree._Element]:
+    """Build a native pie of share fractions and return its drawing paragraph."""
+    parts = read_parts(docx)
+    root = pie_root(kind, labels, values, representation="normalized")
+    external = root.find(f"{{{C}}}externalData")
+    if external is not None:
+        # pie_root names rId1, which the copied style resources may already hold.
+        del external.attrib[f"{{{R}}}id"]
+    new_part, paragraph = _new_chart(
+        parts,
+        style_source_part,
+        style_source_part,
+        root,
+        detached=True,
+        prototype_paragraph=prototype_paragraph,
+    )
+    write_parts(parts, out)
+    return new_part, paragraph
+
+
+def build_chart_detached(  # noqa: PLR0913
+    docx: Path,
+    part: str,
+    series: list[Series],
+    out: Path,
+    prototype_paragraph: etree._Element,
+    *,
+    title: str | None,
+    column_axis_title: str | None,
+    pie: PieKind | None,
+) -> tuple[str, etree._Element]:
+    """Build the chart a native chart block describes: a pie, a column chart or a clone."""
+    if pie is not None:
+        values = tuple(value for value in series[0].values if value is not None) if series else ()
+        if (
+            len(series) != 1
+            or series[0].name != "Pondere"
+            or len(values) != len(series[0].values)
+            or any(value < 0 for value in values)
+            or abs(sum(values) - 1) > 1e-9
+        ):
+            raise ValueError("a pie chart needs one 'Pondere' series of fractions summing to 1")
+        labels = tuple(series[0].categories)
+        return build_pie_chart_detached(docx, part, pie, labels, values, out, prototype_paragraph)
+    if column_axis_title is not None:
+        return build_column_chart_detached(
+            docx, part, series, column_axis_title, out, prototype_paragraph
+        )
+    return clone_chart_detached(docx, part, series, title, out, prototype_paragraph)

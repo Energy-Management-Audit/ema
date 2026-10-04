@@ -15,6 +15,7 @@ from ema.audit.chapter_four_chart_text import (
     is_turnover_unit,
 )
 from ema.audit.chapter_four_chart_values import chart_series, display_unit, has_chart_data
+from ema.audit.chapter_four_pies import mix_pies, pv_pies
 from ema.consumption_analysis.analysis import Metric
 from ema.consumption_analysis.metric_kind import MetricKind
 from ema.core.office.blocks import Block, Missing, NativeChart, Paragraph
@@ -338,10 +339,7 @@ def _group(
             monthly.extend(
                 (
                     NativeChart("chart", STYLE_PART, series, column_axis_title=unit + "/lună"),
-                    Paragraph(
-                        "chart_caption",
-                        [caption, "", "", ""],
-                    ),
+                    Paragraph("chart_caption", [caption, "", "", ""]),
                 )
             )
     annual_series = chart_series(
@@ -358,15 +356,7 @@ def _group(
         annual.extend(
             (
                 NativeChart("chart", STYLE_PART, annual_series, column_axis_title=axis),
-                Paragraph(
-                    "chart_caption",
-                    [
-                        caption,
-                        "",
-                        "",
-                        "",
-                    ],
-                ),
+                Paragraph("chart_caption", [caption, "", "", ""]),
             )
         )
     else:
@@ -387,6 +377,11 @@ def chapter_chart_groups(
             if group.monthly or group.annual:
                 groups.setdefault(section, []).append(group)
                 number += 1
+        pie = {"ch4.echiv_total": mix_pies, "ch4.electricitate_pv": pv_pies}.get(section)
+        pies = pie(dataset, factors, client, number, skipped) if pie else []
+        if pies:
+            groups.setdefault(section, []).append(ChartGroup(None, [], pies))
+            number += 1
     return groups, skipped
 
 

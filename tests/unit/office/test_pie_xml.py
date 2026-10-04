@@ -41,3 +41,16 @@ def test_pie_rejects_invalid_values(
 ) -> None:
     with pytest.raises(ValueError):
         pie_root("pv", labels, values, representation=representation)
+
+
+def test_pie_accepts_eight_slices_and_rejects_nine() -> None:
+    labels = tuple(f"S{index}" for index in range(9))
+    root = pie_root("mix", labels[:8], (0.125,) * 8)
+    assert len(root.xpath(".//c:dPt", namespaces={"c": C})) == 8
+    assert root.xpath(".//c:dPt//a:srgbClr/@val", namespaces={"c": C, "a": A})[5:] == [
+        "F79646",
+        "2C4D75",
+        "772C2A",
+    ]
+    with pytest.raises(ValueError):
+        pie_root("mix", labels, (1 / 9,) * 9)

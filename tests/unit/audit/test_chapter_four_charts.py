@@ -74,6 +74,8 @@ def test_monthly_gap_caption_letters_and_skipped_variants() -> None:
         "ch4.apa:water_potable:2024:no_data",
         "ch4.apa:water_industrial:2024:no_data",
         "ch4.echiv_gaz:annual:no_data",
+        "ch4.echiv_total:pie:2024:no_data",
+        "ch4.echiv_total:pie:2025:single_carrier",
         "ch4.specific_gaz:annual:no_data",
         "ch4.specific_total:annual:no_data",
         "ch4.intensitate:annual:no_data",
@@ -91,13 +93,13 @@ def test_fuels_share_one_chart_with_one_series_each_and_no_monthly_letter_when_a
     ]
     assert [series.values[0] for series in annual.series] == [1, 2]
     assert _captions(blocks)[0].startswith(
-        "Fig. nr. 4.5 a) Evoluția lunară a consumului de carburant"
+        "Fig. nr. 4.6 a) Evoluția lunară a consumului de carburant"
     )
     water, _ = chart_blocks("ch4.apa", dataset, FACTORS_2026, CLIENT)
     assert _captions(water) == [
-        "Fig. nr. 4.6 b) Evoluția anuală a consumului de apă înregistrat "
+        "Fig. nr. 4.7 b) Evoluția anuală a consumului de apă înregistrat "
         "la nivelul Atelier Exemplu SRL",
-        "Fig. nr. 4.7 b) Evoluția anuală a consumului de apă industrială "
+        "Fig. nr. 4.8 b) Evoluția anuală a consumului de apă industrială "
         "înregistrat la nivelul Atelier Exemplu SRL",
     ]
 
@@ -208,31 +210,31 @@ def test_every_sourced_annual_caption_and_axis_uses_the_contract() -> None:
             "tep/an",
         ),
         "ch4.specific_electric": (
-            "Fig. nr. 4.11 Evoluția anuală a consumului specific echivalent de energie "
+            "Fig. nr. 4.12 Evoluția anuală a consumului specific echivalent de energie "
             "electrică înregistrat la nivelul Atelier Exemplu SRL",
             "tep/t",
         ),
         "ch4.specific_gaz": (
-            "Fig. nr. 4.12 Evoluția anuală a consumului specific echivalent de gaz "
+            "Fig. nr. 4.13 Evoluția anuală a consumului specific echivalent de gaz "
             "natural înregistrat la nivelul Atelier Exemplu SRL",
             "tep/t",
         ),
         "ch4.specific_carburant": (
-            "Fig. nr. 4.13 Evoluția anuală a consumului specific echivalent de "
+            "Fig. nr. 4.14 Evoluția anuală a consumului specific echivalent de "
             "carburant înregistrat la nivelul Atelier Exemplu SRL",
             "tep/t",
         ),
         "ch4.specific_total": (
-            "Fig. nr. 4.14 Evoluția anuală a consumului specific echivalent total de "
+            "Fig. nr. 4.15 Evoluția anuală a consumului specific echivalent total de "
             "energie înregistrat la nivelul Atelier Exemplu SRL",
             "tep/t",
         ),
         "ch4.intensitate": (
-            "Fig. nr. 4.17 Tendința intensității energetice în cadrul Atelier Exemplu SRL",
+            "Fig. nr. 4.18 Tendința intensității energetice în cadrul Atelier Exemplu SRL",
             "tep/mil lei",
         ),
         "ch4.mediu": (
-            "Fig. nr. 4.18 Evoluția anuală a gazelor cu efect de seră înregistrate "
+            "Fig. nr. 4.19 Evoluția anuală a gazelor cu efect de seră înregistrate "
             "la nivelul Atelier Exemplu SRL",
             "t CO₂/an",
         ),
@@ -243,9 +245,9 @@ def test_every_sourced_annual_caption_and_axis_uses_the_contract() -> None:
         assert _charts(chart)[0].column_axis_title == axis
     water = groups["ch4.specific_apa"]
     assert [_captions(group.annual)[0] for group in water] == [
-        "Fig. nr. 4.15 Evoluția anuală a consumului specific de apă înregistrat "
+        "Fig. nr. 4.16 Evoluția anuală a consumului specific de apă înregistrat "
         "la nivelul Atelier Exemplu SRL",
-        "Fig. nr. 4.16 Evoluția anuală a consumului specific de apă industrială "
+        "Fig. nr. 4.17 Evoluția anuală a consumului specific de apă industrială "
         "înregistrat la nivelul Atelier Exemplu SRL",
     ]
     assert [_charts(group.annual)[0].column_axis_title for group in water] == ["m³/t", "m³/t"]
@@ -299,8 +301,8 @@ def test_missing_figures_keep_distinct_group_numbers_and_year_letters():
     assert skipped_year.text.startswith("Fig. nr. 4.2 b) ")
     assert "la nivelul anului 2025: date indisponibile" in skipped_year.text
     missing_gas = groups["ch4.gaz"][0].annual[0]
-    assert isinstance(missing_gas, Missing) and missing_gas.text.startswith("Fig. nr. 4.4 b) ")
-    assert _captions(groups["ch4.carburant"][0].monthly)[0].startswith("Fig. nr. 4.5 a) ")
+    assert isinstance(missing_gas, Missing) and missing_gas.text.startswith("Fig. nr. 4.5 b) ")
+    assert _captions(groups["ch4.carburant"][0].monthly)[0].startswith("Fig. nr. 4.6 a) ")
 
 
 def test_pv_charts_use_only_held_series() -> None:
