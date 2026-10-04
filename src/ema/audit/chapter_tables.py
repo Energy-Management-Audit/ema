@@ -95,7 +95,7 @@ CAPTIONS = {
         Caption("turnover.table", "Cifra de afaceri", "lei"),
         Caption("turnover.chart", "Evoluția cifrei de afaceri", "lei"),
     ),
-    BOILERS_TABLE: (Caption("boilers.table", "Centrale termice"),),
+    BOILERS_TABLE: (Caption("boilers.table", "Echipamente și utilaje"),),
     VEHICLES_TABLE: (Caption("vehicles.table", "Parcul auto"),),
 }
 

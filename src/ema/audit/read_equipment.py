@@ -10,9 +10,8 @@ from ema.core.review.models import Field
 from ema.energy_data.necesar_equipment import NecesarEquipment, Row
 from ema.energy_data.source import normal
 
-# The key families the render reads; a row's number comes second: audit.boiler.<n>.<role>.
-BOILER, FORKLIFT, VEHICLE, TRANSFORMER, EQUIPMENT_ROW = (
-    "audit.boiler.",
+# The key families the render reads; a row's number comes second.
+FORKLIFT, VEHICLE, TRANSFORMER, EQUIPMENT_ROW = (
     "audit.forklift.",
     "audit.vehicle.",
     "audit.transformer.",
@@ -27,15 +26,6 @@ _LABELS = {
         "process": "Proces de fabricație/deservit",
         "count": "Buc.",
         "power": "Putere instalată - kW",
-        "resource": "Resursa consumată",
-    },
-    BOILER: {
-        "name": "Denumire",
-        "process": "Proces deservit",
-        "count": "Număr de bucăţi",
-        "year": "An PIF",
-        "load": "Grad mediu de încărcare",
-        "power": "Putere instalată",
         "resource": "Resursa consumată",
     },
     FORKLIFT: {
@@ -60,7 +50,6 @@ _LABELS = {
 }
 _TITLES = {
     EQUIPMENT_ROW: "Echipament",
-    BOILER: "Centrala termică",
     FORKLIFT: "Autostivuitor",
     VEHICLE: "Autovehicul",
     TRANSFORMER: "Transformator",
@@ -98,7 +87,6 @@ def equipment_fields(equipment: NecesarEquipment, record: Recorder, sha: str) ->
     result: list[Field] = []
     for family, rows in (
         (EQUIPMENT_ROW, equipment.rows),
-        (BOILER, equipment.boilers),
         (FORKLIFT, equipment.forklifts),
         (VEHICLE, equipment.vehicles),
     ):

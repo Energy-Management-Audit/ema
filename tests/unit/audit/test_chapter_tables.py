@@ -231,8 +231,8 @@ def test_drafted_sections_keep_base_tables_captions_and_chart_slots(tmp_path: Pa
     assert "Fig. Evoluția numărului mediu de angajați" in texts
     assert "Tabelul Cifra de afaceri (lei)" in texts
     assert "Fig. Evoluția cifrei de afaceri (lei)" in texts
-    assert "Tabelul Centrale termice" in texts
-    assert CAPTIONS[BOILERS_TABLE][0].title == "Centrale termice"
+    assert "Tabelul Echipamente și utilaje" in texts
+    assert CAPTIONS[BOILERS_TABLE][0].title == "Echipamente și utilaje"
     assert CAPTIONS[VEHICLES_TABLE][0].title == "Parcul auto"
     assert CAPTIONS[BOILERS_TABLE][0].unit is None
     assert CAPTIONS[VEHICLES_TABLE][0].unit is None
@@ -346,6 +346,6 @@ def test_caption_catalogue_has_verbatim_titles_and_units() -> None:
             ("turnover.table", "Cifra de afaceri", "lei"),
             ("turnover.chart", "Evoluția cifrei de afaceri", "lei"),
         ],
-        BOILERS_TABLE: [("boilers.table", "Centrale termice", None)],
+        BOILERS_TABLE: [("boilers.table", "Echipamente și utilaje", None)],
         VEHICLES_TABLE: [("vehicles.table", "Parcul auto", None)],
     }

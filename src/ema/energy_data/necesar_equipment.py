@@ -95,9 +95,12 @@ def _boilers(table: GenericTable) -> list[Row]:
 
 
 def _equipment_rows(table: GenericTable) -> list[Row]:
+    unit_row = next((row for row in table.rows if not _numbered(row, "nr crt")), None)
+    unit = _column(unit_row, "putere instalata") if unit_row is not None else None
+    kilowatts = unit is not None and normal(str(unit.value)) == "kw"
     rows: list[Row] = []
     for row in table.rows:
-        if not _numbered(row, "nr"):
+        if not _numbered(row, "nr crt"):
             continue
         cells = _cells(
             row,
@@ -109,6 +112,11 @@ def _equipment_rows(table: GenericTable) -> list[Row]:
                 "resource": "resursa consumata",
             },
         )
+        if "power" in cells:
+            if kilowatts:
+                cells["power"] = replace(cells["power"], unit="kW")
+            else:
+                del cells["power"]
         if "resource" not in cells:
             resource = next(
                 (
@@ -178,7 +186,10 @@ def _transformers(table: GenericTable) -> list[dict[str, Located]]:
 def read_equipment(info: NecesarInfo) -> NecesarEquipment:
     result = NecesarEquipment()
     for table in info.tables.values():
-        if normal(table.sheet).startswith("echipamente "):
+        if (
+            normal(table.sheet).startswith("echipamente ")
+            and normal(table.sheet) != "echipamente 1"
+        ):
             result.rows.extend(_equipment_rows(table))
         if _has(table, "denumire autovehicul"):
             result.vehicles = _vehicles(table)

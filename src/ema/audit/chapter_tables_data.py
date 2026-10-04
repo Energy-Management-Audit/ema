@@ -7,14 +7,14 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ema.audit.read_equipment import BOILER, EQUIPMENT_ROW, FORKLIFT, VEHICLE
+from ema.audit.read_equipment import EQUIPMENT_ROW, FORKLIFT, VEHICLE
 from ema.core.office.numbers_ro import format_number
 from ema.core.review.models import Field
 
 EMPLOYEES = "audit.employees."
 TURNOVER = "turnover."
 # What the render reads (the stage binds each family, so a new row makes the render stale).
-FAMILIES = (EMPLOYEES, TURNOVER, BOILER, EQUIPMENT_ROW, FORKLIFT, VEHICLE)
+FAMILIES = (EMPLOYEES, TURNOVER, EQUIPMENT_ROW, FORKLIFT, VEHICLE)
 
 # None is a value the sources do not hold: the table shows a red n.d.
 type Cell = str | None
@@ -71,7 +71,7 @@ def yearly(fields: Iterable[Field], family: str) -> YearlyTable:
 
 
 def numbered(fields: Iterable[Field], family: str) -> list[dict[str, Field]]:
-    """The rows of one family in sheet order, each by role: audit.boiler.<n>.<role>."""
+    """The rows of one family in sheet order, each by role."""
     pattern = re.compile(rf"^{re.escape(family)}(\d+)\.(\w+)$")
     rows: dict[int, dict[str, Field]] = {}
     for field in fields:
