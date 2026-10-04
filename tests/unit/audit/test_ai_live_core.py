@@ -208,6 +208,38 @@ def test_provider_maps_gemini_402_credit_error() -> None:
     assert sleeps == [] and len(calls) == 1
 
 
+@pytest.mark.parametrize(
+    ("failure", "expected_code"),
+    [
+        (
+            _api_error(429, _quota("GenerateRequestsPerDayPerProjectPerModel-FreeTier")),
+            "ai_quota_day",
+        ),
+        (
+            errors.APIError(
+                429,
+                {"error": {"code": 429, "message": "exceeded its monthly spending cap"}},
+            ),
+            "ai_credits",
+        ),
+        (_api_error(402), "ai_credits"),
+    ],
+)
+def test_fill_provider_maps_gemini_quota_and_credit_errors_without_retries(
+    failure: errors.APIError, expected_code: str
+) -> None:
+    provider, sleeps, calls = _gemini([failure])
+    provider._transport_retries = False
+
+    with pytest.raises(EmaError) as error:
+        provider.respond("gemini-3.8-flash", MESSAGES, ())
+
+    assert error.value.code == expected_code
+    assert error.value.detail == "gemini-3.8-flash"
+    assert error.value.__cause__ is failure
+    assert sleeps == [] and len(calls) == 1
+
+
 def test_spending_cap_429_fails_at_once_as_credit_error() -> None:
     failure = errors.APIError(
         429,

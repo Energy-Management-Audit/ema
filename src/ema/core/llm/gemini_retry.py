@@ -47,21 +47,24 @@ def _retry_delay(exc: errors.APIError) -> float | None:
     return None
 
 
+def map_quota_or_credit_error(exc: errors.APIError, model: str) -> EmaError | None:
+    """Map Gemini daily quota and exhausted credit errors, independent of retries."""
+    if exc.code == 402 or "monthly spending cap" in str(exc.message).lower():
+        return EmaError("ai_credits", "Creditul furnizorului AI s-a epuizat.", model)
+    if exc.code == 429 and _per_day(exc):
+        return EmaError("ai_quota_day", "Cota zilnică a furnizorului AI s-a epuizat.", model)
+    return None
+
+
 def call_with_retries[T](call: Callable[[], T], model: str, sleep: Callable[[float], None]) -> T:
     for attempt in range(ATTEMPTS):
         last = attempt == ATTEMPTS - 1
         try:
             return call()
         except errors.APIError as exc:
+            if mapped := map_quota_or_credit_error(exc, model):
+                raise mapped from exc
             if exc.code == 429:
-                if "monthly spending cap" in str(exc.message).lower():
-                    raise EmaError(
-                        "ai_credits", "Creditul furnizorului AI s-a epuizat.", model
-                    ) from exc
-                if _per_day(exc):
-                    raise EmaError(
-                        "ai_quota_day", "Cota zilnică a furnizorului AI s-a epuizat.", model
-                    ) from exc
                 delay = _retry_delay(exc)
                 if delay is None or last:
                     raise
