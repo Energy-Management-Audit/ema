@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.catalogue_types import fact_key
 from ema.audit.draft_checks import DraftCheck, DraftReview, check_draft, support_pass
 from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
 from ema.audit.draft_style import configured_style_example
@@ -21,10 +22,19 @@ PROMPT_VERSION = "audit-draft-v2"
 FACT_RULE = "Fiecare nume, număr şi dată vine dintr-un fapt, scris {{f:<key>}}."
 REFERENCE_RULE = "Fiecare paragraf, celulă şi legendă enumeră fact_ids folosite."
 WORDING_RULE = "Nu folosi formulări despre AI sau procesul de redactare."
+SENTENCE_RULE = (
+    "Fiecare propoziţie conţine cel puţin un {{f:<key>}}; nu scrie propoziţii fără fapt "
+    "(introduceri, generalităţi, concluzii)."
+)
+LENGTH_RULE = (
+    "Lungimea urmează faptele: un paragraf pentru fiecare subiect, iar un fapt care este "
+    "un pasaj din sursă se scrie întreg, ca {{f:<key>}}, în paragraful lui."
+)
 INSTRUCTIONS = (
-    "Redactează numai secţiunea cerută. Fiecare nume, număr şi dată trebuie să provină "
-    "dintr-un fapt şi să fie scris ca {{f:<key>}}. Scrie 3–6 propoziţii în registrul "
-    "auditorului. Nu folosi formulări despre AI sau procesul de redactare. "
+    "Redactează numai secţiunea cerută, în registrul auditorului. Fiecare nume, număr şi "
+    "dată trebuie să provină dintr-un fapt şi să fie scris ca {{f:<key>}}. "
+    f"{SENTENCE_RULE} {LENGTH_RULE} "
+    "Nu folosi formulări despre AI sau procesul de redactare. "
     "Fiecare paragraf, celulă şi legendă enumeră fact_ids folosite. "
     "Dacă lipseşte un fapt necesar, foloseşte status missing."
 )
@@ -37,7 +47,7 @@ def recorded_facts(ws: Workspace, job: str, section: str) -> dict[str, Field]:
         return {
             str(row["key"]): Field.model_validate_json(row["data"])
             for row in rows
-            if str(row["key"]) in allowed
+            if fact_key(str(row["key"])) in allowed
         }
 
 
@@ -45,7 +55,7 @@ def draft_task(section: str) -> str:
     title = next(item.title for item in CATALOGUE if item.id == section)
     return (
         f"Redactează secţiunea {section} „{title}”. Câmpul section este exact „{section}”. "
-        f"{FACT_RULE} {REFERENCE_RULE} {WORDING_RULE}"
+        f"{FACT_RULE} {SENTENCE_RULE} {LENGTH_RULE} {REFERENCE_RULE} {WORDING_RULE}"
     )
 
 
@@ -114,7 +124,7 @@ def draft_section_run(  # noqa: PLR0913
         errors = [
             {
                 "rule": issue.code,
-                "rule_text": FACT_RULE,
+                "rule_text": SENTENCE_RULE if issue.code == "uncited_sentence" else FACT_RULE,
                 "location": issue.location,
                 "detail": issue.detail,
             }

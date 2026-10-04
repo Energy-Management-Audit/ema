@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from pydantic import Field as ModelField
 
 from ema.audit.ai_wording import ai_wording
+from ema.audit.catalogue_types import fact_key
 from ema.audit.draft_schema import SECTION_FACTS, DraftText, SectionDraft
 from ema.core.errors import EmaError
 from ema.core.llm.agent import AgentContext
@@ -28,6 +29,11 @@ NAME = re.compile(
 ACRONYM = re.compile(rf"(?<!\w)[{UPPER}]{{2,}}(?!\w)")
 SENTENCE_WORD = re.compile(rf"[{UPPER}][{LOWER}]+(?!\w)")
 FACT_GAP = re.compile(TOKEN.pattern + r"(\s*)")
+# A sentence does not end after an address or legal abbreviation, as in "nr. {{f:...}}".
+ABBREVIATIONS = ("nr", "str", "jud", "loc", "com", "bl", "ap", "art", "alin", "lit", "pct", "tel")
+SENTENCE_END = re.compile(
+    r"(?i)(?<=[.!?])" + "".join(rf"(?<!\b{word}\.)" for word in ABBREVIATIONS) + r"\s+"
+)
 NAME_COMMON = frozenset(
     {
         "Societatea",
@@ -59,6 +65,20 @@ NAME_COMMON = frozenset(
 )
 
 
+def _ends_sentence(fact: Field | None) -> bool:
+    value = "" if fact is None else str(fact.value).rstrip().rstrip("\"'”’»").rstrip()
+    return value.endswith((".", "!", "?"))
+
+
+def _sentences(text: str, facts: dict[str, Field]) -> list[str]:
+    """Sentences of a text, where a fact whose value ends a sentence, as a passage, ends one."""
+    ended = TOKEN.sub(
+        lambda match: match.group(0) + ("." if _ends_sentence(facts.get(match.group(1))) else ""),
+        text,
+    )
+    return [part.strip() for part in SENTENCE_END.split(ended) if part.strip()]
+
+
 def _sentence_marked(text: str, facts: dict[str, Field]) -> str:
     """The text for the name check, without fact references.
 
@@ -68,9 +88,7 @@ def _sentence_marked(text: str, facts: dict[str, Field]) -> str:
     """
 
     def marker(match: re.Match[str]) -> str:
-        fact = facts.get(match.group(1))
-        value = "" if fact is None else str(fact.value).rstrip().rstrip("\"'”’»").rstrip()
-        return ". " if value.endswith((".", "!", "?")) else match.group(2)
+        return ". " if _ends_sentence(facts.get(match.group(1))) else match.group(2)
 
     marked = FACT_GAP.sub(marker, text)
     return ". " + marked if SENTENCE_WORD.match(marked) else marked
@@ -127,7 +145,7 @@ def check_draft(  # noqa: C901, PLR0912
         for key in tokens | declared:
             fact = facts.get(key)
             if (
-                key not in allowed
+                fact_key(key) not in allowed
                 or fact is None
                 or fact.job_id != job
                 or fact.presence != "found"
@@ -155,13 +173,15 @@ def check_draft(  # noqa: C901, PLR0912
         candidates.update(name for name in known_names if name and name in normal_plain)
         for candidate in sorted(candidates):
             fatal.append(DraftReview("literal_name", location, candidate))
-        sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", item.text) if part.strip()]
-        for sentence in sentences:
+        for sentence in _sentences(item.text, facts):
             total += 1
             if TOKEN.search(sentence):
                 cited += 1
             else:
-                review.append(DraftReview("uncited_sentence", location, sentence))
+                # Body text without a fact is filler and goes back to the drafter; a table
+                # cell or caption is a label, which the auditor reviews.
+                issues = fatal if location.startswith("paragraph:") else review
+                issues.append(DraftReview("uncited_sentence", location, sentence))
     for figure_index, figure in enumerate(draft.figures):
         fact = facts.get(figure.fact_id)
         if (

@@ -111,18 +111,66 @@ def test_name_rule_at_fact_boundaries(value: str, text: str, names: set[str]) ->
         for issue in check_draft(
             _draft(text, ["audit.business_activity"], "ch2.activitate"), facts, "synthetic"
         ).fatal
+        if issue.code == "literal_name"
     }
     assert found == {("literal_name", name) for name in names}
 
 
-def test_uncited_and_nonrenderable_items_are_reviewed() -> None:
+def test_an_uncited_body_sentence_is_fatal_filler() -> None:
     facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
     draft = _draft(
         "Societatea {{f:audit.company_name}} produce bunuri. Este modernă.", ["audit.company_name"]
     )
     checked = check_draft(draft, facts, "synthetic")
     assert checked.coverage == 0.5
-    assert [issue.code for issue in checked.review] == ["uncited_sentence"]
+    assert [(issue.code, issue.location, issue.detail) for issue in checked.fatal] == [
+        ("uncited_sentence", "paragraph:0", "Este modernă.")
+    ]
+    assert checked.review == ()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Sediul este pe str. {{f:audit.company_name}}.",
+        "Clădirea de la nr. {{f:audit.company_name}} este în jud. {{f:audit.company_name}}.",
+    ],
+)
+def test_an_abbreviation_does_not_end_a_sentence(text: str) -> None:
+    facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
+    checked = check_draft(_draft(text, ["audit.company_name"]), facts, "synthetic")
+    assert (checked.cited_sentences, checked.total_sentences, checked.fatal) == (1, 1, ())
+
+
+def test_an_uncited_cell_is_reviewed_not_fatal() -> None:
+    facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
+    cited = DraftText(text="{{f:audit.company_name}}", fact_ids=["audit.company_name"])
+    table = DraftTable(caption=cited, rows=[[DraftText(text="Denumire"), cited]])
+    draft = SectionDraft(section="ch2.date_generale", status="drafted", tables=[table])
+    checked = check_draft(draft, facts, "synthetic")
+    assert checked.fatal == ()
+    assert [(issue.code, issue.location) for issue in checked.review] == [
+        ("uncited_sentence", "table:0:0:0")
+    ]
+
+
+def test_a_numbered_passage_is_a_fact_of_its_section() -> None:
+    passage = "Etapa de vopsire începe cu degresarea pieselor."
+    facts = {
+        key: _fact(key, passage)
+        for key in ("audit.process_sections", "audit.process_sections.2", "audit.history.2")
+    }
+    text = "{{f:audit.process_sections}} {{f:audit.process_sections.2}}"
+    ok = _draft(text, ["audit.process_sections", "audit.process_sections.2"], "ch3.process")
+    assert check_draft(ok, facts, "synthetic").fatal == ()
+    foreign = _draft("{{f:audit.history.2}}", ["audit.history.2"], "ch3.process")
+    assert [issue.code for issue in check_draft(foreign, facts, "synthetic").fatal] == [
+        "fact_missing"
+    ]
+
+
+def test_nonrenderable_items_are_reviewed() -> None:
+    facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
     rich = SectionDraft(
         section="ch2.date_generale",
         status="drafted",

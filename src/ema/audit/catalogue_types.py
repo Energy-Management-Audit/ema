@@ -49,6 +49,36 @@ class AuditFact(StrEnum):
     PRODUCTION = "audit.production"
 
 
+# Narrative facts are whole verbatim source passages. A description in several places, as the
+# per-stage process flows, keeps its first passage under the key and each later one under
+# `<key>.<n>`, so a draft writes one paragraph per passage.
+PASSAGE_FACTS = frozenset(
+    {
+        AuditFact.HISTORY,
+        AuditFact.BUSINESS_ACTIVITY,
+        AuditFact.PROCESS_SECTIONS,
+        AuditFact.WATER_SUPPLY,
+        AuditFact.ELECTRICITY_SUPPLY,
+        AuditFact.GAS_SUPPLY,
+        AuditFact.COMPRESSED_AIR,
+        AuditFact.HVAC,
+        AuditFact.LIGHTING,
+    }
+)
+MAX_PASSAGES = 6
+
+
+def passage_key(key: str, number: int) -> str:
+    return key if number == 1 else f"{key}.{number}"
+
+
+def fact_key(key: str) -> str:
+    """The catalogue fact a stored key belongs to: `audit.history.2` is `audit.history`."""
+    base, _, number = key.rpartition(".")
+    numbered = base in PASSAGE_FACTS and number.isdigit() and 2 <= int(number) <= MAX_PASSAGES
+    return base if numbered else key
+
+
 @dataclass(frozen=True)
 class CarrierPattern:
     carriers: tuple[Carrier, ...] = ()

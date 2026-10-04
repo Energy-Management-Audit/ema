@@ -318,14 +318,17 @@ def test_two_absent_sections_clone_sibling_heading_and_body(tmp_path: Path) -> N
     base = tmp_path / "base.docx"
     document.save(str(base))
     current = base
-    for section_id in ("ch2.manager", "ch2.activitate"):
+    for section_id, key in (
+        ("ch2.manager", "audit.energy_manager"),
+        ("ch2.activitate", "audit.business_activity"),
+    ):
         output = tmp_path / f"{section_id}.docx"
         draft = SectionDraft(
             section=section_id,
             status="drafted",
-            paragraphs=[DraftText(text="filled")],
+            paragraphs=[DraftText(text=f"{{{{f:{key}}}}}", fact_ids=[key])],
         )
-        render_section(current, output, draft, FACTS, (), job="synthetic")
+        render_section(current, output, draft, {key: _fact(key, "x")}, (), job="synthetic")
         current = output
     result = Document(str(current))
     headings = [paragraph for paragraph in result.paragraphs if paragraph.text in TITLES.values()]

@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict
 
 from ema.audit.catalogue import Section
 from ema.audit.catalogue_labels import field_label
+from ema.audit.catalogue_types import MAX_PASSAGES, PASSAGE_FACTS, passage_key
 from ema.audit.fill_files import file_ids, resolve_name
 from ema.audit.fill_tools import FillDocument, FillTools
 from ema.core.errors import EmaError
@@ -25,6 +26,9 @@ PROMPT_VERSION = "audit-extract-v1"
 PROMPT_TOKENS = 300_000
 OUTPUT_TOKENS = 8_000
 CHARS_PER_TOKEN = 4
+PASSAGE_CHARS = 3_000
+PASSAGE_TOKENS = PASSAGE_CHARS // CHARS_PER_TOKEN
+PASSAGE_MARK = "pasaj"
 
 
 class ExtractedFact(BaseModel):
@@ -62,8 +66,18 @@ def prompt_tokens(text: str) -> int:
 
 def facts_text(facts: Sequence[tuple[str, str]]) -> str:
     """The facts to establish, one `key — Romanian label — section id` line each."""
-    lines = (f"{key} — {field_label(key)} — {section}" for key, section in facts)
+    lines = (
+        f"{key} — {field_label(key)} — {section}"
+        + (f" — {PASSAGE_MARK}" if key in PASSAGE_FACTS else "")
+        for key, section in facts
+    )
     return "Fapte de stabilit:\n" + "\n".join(lines)
+
+
+def output_tokens(facts: Sequence[tuple[str, str]]) -> int:
+    """The output allowance: the short facts, plus every passage a narrative fact may take."""
+    passages = len({key for key, _ in facts if key in PASSAGE_FACTS}) * MAX_PASSAGES
+    return OUTPUT_TOKENS + passages * PASSAGE_TOKENS
 
 
 def file_text(file_id: str, document: FillDocument) -> str:
@@ -106,7 +120,7 @@ class _Caller:
     client_live: bool
     calls: int = 0
 
-    def __call__(self, content: str) -> Extraction:
+    def __call__(self, content: str, output_limit: int) -> Extraction:
         self.calls += 1
         prompt = instructions()
 
@@ -148,7 +162,7 @@ class _Caller:
                 Extraction,
                 prompt,
                 content,
-                max_output_tokens=OUTPUT_TOKENS,
+                max_output_tokens=output_limit,
                 estimate_tokens=estimate_tokens,
                 on_estimate=log_estimate,
             )
@@ -189,6 +203,30 @@ def retry_text(
     )
 
 
+def _target(
+    fact: ExtractedFact, kept: Sequence[str], verified: set[str]
+) -> tuple[str, str | int | float] | None:
+    """The key and value to record, or None: a narrative fact's next passage is its quote."""
+    if fact.key not in PASSAGE_FACTS:
+        return None if fact.key in verified else (fact.key, fact.value)
+    if fact.quote in kept or len(kept) == MAX_PASSAGES:
+        return None
+    return passage_key(fact.key, len(kept) + 1), fact.quote
+
+
+def _drop_stale_passages(
+    tools: Mapping[str, FillTools],
+    owner: Mapping[str, str],
+    passages: Mapping[str, Sequence[str]],
+    found: set[str],
+) -> None:
+    """Passages beyond this run's count are a previous dossier's and must not reach a draft."""
+    for key in sorted(PASSAGE_FACTS & owner.keys()):
+        for number in range(max(2, len(passages.get(key, ())) + 1), MAX_PASSAGES + 1):
+            if passage_key(key, number) in found:
+                tools[owner[key]].mark_missing({"key": passage_key(key, number)})
+
+
 def extract_facts(  # noqa: PLR0913
     ws: Workspace,
     job: str,
@@ -208,18 +246,23 @@ def extract_facts(  # noqa: PLR0913
     tools = {section.id: FillTools(ws, job, section.id, documents) for section in sections}
     call = _Caller(ws, job, provider, model_id, artifacts, client_live)
     verified: set[str] = set()
+    passages: dict[str, list[str]] = {}
     rejected: list[tuple[ExtractedFact, EmaError]] = []
 
     def verify(extraction: Extraction) -> None:
-        # The first verified fact per key wins; an unrequested key is ignored.
+        # The first verified fact per key wins; an unrequested key is ignored. A narrative
+        # fact keeps each distinct passage, up to MAX_PASSAGES, and its value is the passage.
         for fact in extraction.facts:
-            if fact.key not in owner or fact.key in verified:
+            kept = passages.get(fact.key, [])
+            target = _target(fact, kept, verified) if fact.key in owner else None
+            if target is None:
                 continue
+            key, value = target
             try:
                 tools[owner[fact.key]].record_fact(
                     {
-                        "key": fact.key,
-                        "value": fact.value,
+                        "key": key,
+                        "value": value,
                         "name": fact.file,
                         "page": fact.page,
                         "quote": fact.quote,
@@ -228,6 +271,7 @@ def extract_facts(  # noqa: PLR0913
             except EmaError as exc:
                 rejected.append((fact, exc))
                 continue
+            passages[fact.key] = [*kept, fact.quote]
             verified.add(fact.key)
 
     head = facts_text(facts) + "\n\nFişiere:\n"
@@ -235,16 +279,23 @@ def extract_facts(  # noqa: PLR0913
     files = [file_text(file_id, documents[name]) for file_id, name in ids.items()]
     if facts and files:
         for group in file_groups(instructions() + head, files):
-            verify(call(head + "\n\n".join(group)))
-    retry = [(fact, error) for fact, error in rejected if fact.key not in verified]
+            verify(call(head + "\n\n".join(group), output_tokens(facts)))
+    # A rejected passage is retried even when another passage of its fact was verified.
+    retry = [
+        (fact, error)
+        for fact, error in rejected
+        if fact.key not in verified or fact.key in PASSAGE_FACTS
+    ]
     first_pass = {fact.key: error.code for fact, error in retry}
     if retry:
-        verify(call(retry_text(facts, retry, documents)))
+        wanted = [(key, section) for key, section in facts if key in first_pass]
+        verify(call(retry_text(facts, retry, documents), output_tokens(wanted)))
     # A value found earlier, as from the Necesar info, is never overwritten with missing.
     found = {item.key for item in fields(ws, job) if item.presence == "found"}
     missing = tuple(key for key in owner if key not in verified and key not in found)
     for key in missing:
         tools[owner[key]].mark_missing({"key": key})
+    _drop_stale_passages(tools, owner, passages, found)
     return ExtractSummary(
         call.calls, tuple(key for key in owner if key in verified), first_pass, missing
     )
