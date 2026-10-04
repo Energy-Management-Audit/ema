@@ -264,7 +264,41 @@ def _measure_columns(sheet: Sheet, header: int, result: AnexaData) -> dict[str, 
     return columns
 
 
-def _measures(sheet: Sheet, kind: str, result: AnexaData) -> list[Measure]:  # noqa: C901
+def _measure_row_cells(
+    sheet: Sheet,
+    row: int,
+    year_col: int,
+    columns: dict[str, int],
+    description: Located,
+    issues: list[ReaderIssue],
+) -> tuple[CellValue, dict[str, CellValue]] | None:
+    row_issues: list[ReaderIssue] = []
+    year_cell = cell_at(sheet, row, year_col, row_issues)
+    raw_values = {key: cell_at(sheet, row, col, row_issues) for key, col in columns.items()}
+    if skip_placeholder(description, raw_values.values(), issues):
+        return None
+    issues.extend(row_issues)
+    return year_cell, raw_values
+
+
+def _measure_values(raw: dict[str, CellValue], issues: list[ReaderIssue]) -> dict[str, Located]:
+    values: dict[str, Located] = {}
+    for key, unit in (
+        ("payback_years", "ani"),
+        ("investment_thousand_lei", "mii lei"),
+        ("saving_mwh", "MWh/an"),
+        ("saving_tep", "tep/an"),
+        ("saving_thousand_lei", "mii lei/an"),
+    ):
+        if key not in raw:
+            continue
+        value = number(raw[key], issues, unit=unit)
+        if value is not None:
+            values[key] = value
+    return values
+
+
+def _measures(sheet: Sheet, kind: str, result: AnexaData) -> list[Measure]:
     items: list[Measure] = []
     location = _measure_header(sheet, kind, result)
     if location is None:
@@ -281,31 +315,16 @@ def _measures(sheet: Sheet, kind: str, result: AnexaData) -> list[Measure]:  # n
             ("descrierea", "masuri pe termen", "total", "data trimiterii")
         ):
             continue
-        row_issues: list[ReaderIssue] = []
-        year_cell = cell_at(sheet, row, year_col, row_issues)
-        raw_values = {key: cell_at(sheet, row, col, row_issues) for key, col in columns.items()}
-        if skip_placeholder(description, (year_cell, *raw_values.values()), result.issues):
+        cells = _measure_row_cells(sheet, row, year_col, columns, description, result.issues)
+        if cells is None:
             continue
-        result.issues.extend(row_issues)
+        year_cell, raw_values = cells
         year = _measure_year(year_cell)
         if year is None:
             result.issues.append(
                 ReaderIssue("commissioning_year_missing", str(description.value), year_cell.ref)
             )
-        values: dict[str, Located] = {}
-        for key, unit in (
-            ("payback_years", "ani"),
-            ("investment_thousand_lei", "mii lei"),
-            ("saving_mwh", "MWh/an"),
-            ("saving_tep", "tep/an"),
-            ("saving_thousand_lei", "mii lei/an"),
-        ):
-            col = columns.get(key)
-            if col is None:
-                continue
-            value = number(raw_values[key], result.issues, unit=unit)
-            if value is not None:
-                values[key] = value
+        values = _measure_values(raw_values, result.issues)
         if not values:
             result.issues.append(
                 ReaderIssue("values_missing", str(description.value), description.ref)

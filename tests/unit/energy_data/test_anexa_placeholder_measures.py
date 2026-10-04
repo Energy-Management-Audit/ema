@@ -61,6 +61,8 @@ def test_solution_placeholder_rows_are_skipped_before_number_conversion(
     sheet["H6"] = 60
     sheet["B7"] = "x x x"
     sheet["E7"] = 10
+    sheet["B8"] = "xxx"
+    sheet["C8"] = 2028
     path = tmp_path / "measures.xlsx"
     workbook.save(path)
 
@@ -78,6 +80,7 @@ def test_solution_placeholder_rows_are_skipped_before_number_conversion(
         if issue.code == "measure_placeholder"
     ] == [("measure_placeholder", "x x x", f"{sheet_name}!B7")]
     assert not any(issue.ref is not None and issue.ref.row == 5 for issue in parsed.issues)
+    assert not any(issue.ref is not None and issue.ref.row == 8 for issue in parsed.issues)
 
 
 def test_audit_placeholder_rows_are_skipped_before_number_conversion(tmp_path: Path) -> None:

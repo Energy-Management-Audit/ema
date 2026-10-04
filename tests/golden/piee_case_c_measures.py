@@ -160,6 +160,7 @@ def compare_measure_tables(produced: list[Table], authored: list[Table], data: P
     for row, source in enumerate(data.anexa.audit_measures, 2):
         assert normal(audit.cell(row, 0).text) == normal(str(source.description.value))
         assert _number(audit.cell(row, 1).text) == _measure_number(source, "saving_tep")
+        # python-docx grid columns repeat merged cells: 4 is investment, 6 is payback.
         assert _number(audit.cell(row, 4).text) == _measure_number(
             source, "investment_thousand_lei"
         )
