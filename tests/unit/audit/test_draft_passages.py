@@ -10,6 +10,8 @@ from tests.workspace_jobs import create_job
 from ema.audit.draft_agent import (
     INSTRUCTIONS,
     LENGTH_RULE,
+    PASSAGE_RULE,
+    PROMPT_VERSION,
     SENTENCE_RULE,
     draft_section_replay,
     draft_section_run,
@@ -40,11 +42,8 @@ DRAFT = SectionDraft(
     status="drafted",
     paragraphs=[
         paragraph("{{f:audit.process_sections}}", "audit.process_sections"),
-        paragraph(
-            "Etapa următoare: {{f:audit.process_sections.2}} {{f:audit.process_sections.3}}",
-            "audit.process_sections.2",
-            "audit.process_sections.3",
-        ),
+        paragraph("Etapa următoare: {{f:audit.process_sections.2}}", "audit.process_sections.2"),
+        paragraph("{{f:audit.process_sections.3}}", "audit.process_sections.3"),
     ],
 )
 
@@ -84,6 +83,13 @@ def test_the_task_asks_for_cited_sentences_and_length_by_facts() -> None:
     assert "3–6" not in INSTRUCTIONS
     assert "nu scrie propoziţii fără fapt" in SENTENCE_RULE
     assert "un paragraf pentru fiecare subiect" in LENGTH_RULE
+    assert PASSAGE_RULE in INSTRUCTIONS
+    assert "câte un pasaj în fiecare paragraf, în ordinea numerelor" in PASSAGE_RULE
+
+
+def test_the_prompt_version_keys_recordings_of_this_task() -> None:
+    # Recordings are keyed by version: one made for an earlier prompt is never replayed.
+    assert PROMPT_VERSION == "audit-draft-v3"
 
 
 def test_a_multi_paragraph_draft_over_numbered_passages_is_accepted(tmp_path: Path) -> None:
@@ -98,12 +104,8 @@ def test_a_multi_paragraph_draft_over_numbered_passages_is_accepted(tmp_path: Pa
     blocks = draft_blocks(accepted, recorded_facts(ws, job, SECTION), ())
     assert [block.segments for block in blocks if isinstance(block, Paragraph)] == [
         [PASSAGES["audit.process_sections"]],
-        [
-            "Etapa următoare: "
-            + PASSAGES["audit.process_sections.2"]
-            + " "
-            + PASSAGES["audit.process_sections.3"]
-        ],
+        ["Etapa următoare: " + PASSAGES["audit.process_sections.2"]],
+        [PASSAGES["audit.process_sections.3"]],
     ]
 
 
@@ -140,5 +142,5 @@ def test_replay_reproduces_the_passage_draft_offline(tmp_path: Path) -> None:
 
     assert accepted == DRAFT
     assert (check.fatal, flags) == ((), ())
-    # Each passage ends a sentence: one in the first paragraph, two in the second.
+    # One passage a paragraph, and each ends its sentence.
     assert check.total_sentences == 3

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from pydantic import Field as ModelField
 
 from ema.audit.ai_wording import ai_wording
-from ema.audit.catalogue_types import fact_key
+from ema.audit.catalogue_types import PASSAGE_FACTS, fact_key
 from ema.audit.draft_schema import SECTION_FACTS, DraftText, SectionDraft
 from ema.core.errors import EmaError
 from ema.core.llm.agent import AgentContext
@@ -29,10 +29,18 @@ NAME = re.compile(
 ACRONYM = re.compile(rf"(?<!\w)[{UPPER}]{{2,}}(?!\w)")
 SENTENCE_WORD = re.compile(rf"[{UPPER}][{LOWER}]+(?!\w)")
 FACT_GAP = re.compile(TOKEN.pattern + r"(\s*)")
-# A sentence does not end after an address or legal abbreviation, as in "nr. {{f:...}}".
+# A sentence does not end after an address or legal abbreviation, as in "nr. {{f:...}}", or
+# after an initial, as in "S.R.L.".
 ABBREVIATIONS = ("nr", "str", "jud", "loc", "com", "bl", "ap", "art", "alin", "lit", "pct", "tel")
 SENTENCE_END = re.compile(
-    r"(?i)(?<=[.!?])" + "".join(rf"(?<!\b{word}\.)" for word in ABBREVIATIONS) + r"\s+"
+    r"(?i)(?<=[.!?])"
+    + "".join(rf"(?<!\b{word}\.)" for word in ABBREVIATIONS)
+    + r"(?<!\b[^\W\d_]\.)\s+"
+)
+FACT_BREAK = re.compile(r"(" + TOKEN.pattern + r")\s+")
+# A value such as "Firma Exemplu S.R.L." or "nr." stops on an abbreviation, not a sentence end.
+ABBREVIATED_END = re.compile(
+    rf"(?i)(?:(?<![^\s.])(?:[{UPPER}{LOWER}]\.)+|\b(?:{'|'.join(ABBREVIATIONS)})\.)$"
 )
 NAME_COMMON = frozenset(
     {
@@ -65,18 +73,40 @@ NAME_COMMON = frozenset(
 )
 
 
-def _ends_sentence(fact: Field | None) -> bool:
+def _ends_sentence(key: str, fact: Field | None) -> bool:
+    """A passage ends a sentence; a short value does only when its stop is not an abbreviation."""
     value = "" if fact is None else str(fact.value).rstrip().rstrip("\"'”’»").rstrip()
-    return value.endswith((".", "!", "?"))
+    if not value.endswith((".", "!", "?")):
+        return False
+    return fact_key(key) in PASSAGE_FACTS or not ABBREVIATED_END.search(value)
 
 
-def _sentences(text: str, facts: dict[str, Field]) -> list[str]:
-    """Sentences of a text, where a fact whose value ends a sentence, as a passage, ends one."""
-    ended = TOKEN.sub(
-        lambda match: match.group(0) + ("." if _ends_sentence(facts.get(match.group(1))) else ""),
-        text,
+def sentence_parts(text: str, facts: dict[str, Field]) -> list[str]:
+    """The sentences of a draft text, with their fact references, as the checks see them.
+
+    A stop ends a sentence unless it closes an abbreviation; a reference whose value ends a
+    sentence, as a passage, ends one too. Rendering splits with this same rule, so a flag on one
+    sentence never reaches its neighbour.
+    """
+    gaps = [(match.start(), match.end()) for match in SENTENCE_END.finditer(text)]
+    gaps.extend(
+        (match.end(1), match.end())
+        for match in FACT_BREAK.finditer(text)
+        if _ends_sentence(match.group(2), facts.get(match.group(2)))
     )
-    return [part.strip() for part in SENTENCE_END.split(ended) if part.strip()]
+    parts: list[str] = []
+    start = 0
+    for gap_start, gap_end in sorted(set(gaps)):
+        if gap_start >= start:
+            parts.append(text[start:gap_start])
+            start = gap_end
+    parts.append(text[start:])
+    return [part.strip() for part in parts if part.strip()]
+
+
+def token_only(text: str) -> bool:
+    """Text that is nothing but fact references, as a passage paragraph: the source speaks."""
+    return bool(TOKEN.search(text)) and not re.sub(r"[\s.,;:!?]", "", TOKEN.sub("", text))
 
 
 def _sentence_marked(text: str, facts: dict[str, Field]) -> str:
@@ -88,7 +118,7 @@ def _sentence_marked(text: str, facts: dict[str, Field]) -> str:
     """
 
     def marker(match: re.Match[str]) -> str:
-        return ". " if _ends_sentence(facts.get(match.group(1))) else match.group(2)
+        return ". " if _ends_sentence(match.group(1), facts.get(match.group(1))) else match.group(2)
 
     marked = FACT_GAP.sub(marker, text)
     return ". " + marked if SENTENCE_WORD.match(marked) else marked
@@ -122,6 +152,31 @@ def _texts(draft: SectionDraft) -> list[tuple[str, DraftText]]:
         )
     result.extend((f"figure:{i}:caption", figure.caption) for i, figure in enumerate(draft.figures))
     return result
+
+
+def _passage_number(key: str) -> int:
+    """A passage's place among its fact's passages; 0 for a fact that is not a passage."""
+    base = fact_key(key)
+    if base not in PASSAGE_FACTS:
+        return 0
+    return 1 if base == key else int(key.rpartition(".")[2])
+
+
+def _passage_layout(draft: SectionDraft) -> list[DraftReview]:
+    """One body paragraph per passage, and a fact's passages in their source order."""
+    issues: list[DraftReview] = []
+    last: dict[str, int] = {}
+    for index, item in enumerate(draft.paragraphs):
+        location = f"paragraph:{index}"
+        passages = [key for key in TOKEN.findall(item.text) if _passage_number(key)]
+        if item.kind == "body" and len(passages) > 1:
+            issues.append(DraftReview("passage_paragraph", location, ", ".join(passages)))
+        for key in passages:
+            number, base = _passage_number(key), fact_key(key)
+            if number <= last.get(base, 0):
+                issues.append(DraftReview("passage_order", location, key))
+            last[base] = max(number, last.get(base, 0))
+    return issues
 
 
 def check_draft(  # noqa: C901, PLR0912
@@ -173,15 +228,17 @@ def check_draft(  # noqa: C901, PLR0912
         candidates.update(name for name in known_names if name and name in normal_plain)
         for candidate in sorted(candidates):
             fatal.append(DraftReview("literal_name", location, candidate))
-        for sentence in _sentences(item.text, facts):
+        body = location.startswith("paragraph:") and item.kind == "body"
+        for sentence in sentence_parts(item.text, facts):
             total += 1
             if TOKEN.search(sentence):
                 cited += 1
             else:
-                # Body text without a fact is filler and goes back to the drafter; a table
-                # cell or caption is a label, which the auditor reviews.
-                issues = fatal if location.startswith("paragraph:") else review
+                # Body text without a fact is filler and goes back to the drafter; a bullet,
+                # caption or table cell is a label, which the auditor reviews.
+                issues = fatal if body else review
                 issues.append(DraftReview("uncited_sentence", location, sentence))
+    fatal.extend(_passage_layout(draft))
     for figure_index, figure in enumerate(draft.figures):
         fact = facts.get(figure.fact_id)
         if (
@@ -199,7 +256,7 @@ def check_draft(  # noqa: C901, PLR0912
         for index in range(len(draft.figures))
     )
     for key in draft.missing_fact_ids:
-        if key not in allowed or (
+        if fact_key(key) not in allowed or (
             key in facts and (facts[key].job_id != job or facts[key].presence == "found")
         ):
             fatal.append(DraftReview("missing_status_invalid", "section", key))
@@ -230,15 +287,18 @@ def support_pass(
     context: AgentContext, draft: SectionDraft, facts: dict[str, Field]
 ) -> tuple[DraftReview, ...]:
     items = _texts(draft)
-    request: list[dict[str, Any]] = []
-    for location, item in items:
-        request.append(
-            {
-                "location": location,
-                "text": item.text,
-                "facts": {key: str(facts[key].value) for key in item.fact_ids if key in facts},
-            }
-        )
+    # A text that is only fact references, as a passage paragraph, claims nothing of its own.
+    request: list[dict[str, Any]] = [
+        {
+            "location": location,
+            "text": item.text,
+            "facts": {key: str(facts[key].value) for key in item.fact_ids if key in facts},
+        }
+        for location, item in items
+        if not token_only(item.text)
+    ]
+    if not request:
+        return ()
     result = complete_json(
         context,
         SupportResult,
@@ -259,4 +319,5 @@ def support_pass(
     return tuple(
         DraftReview("unsupported", flag.location, flag.reason, flag.sentence)
         for flag in result.flags
+        if not token_only(flag.sentence)
     )

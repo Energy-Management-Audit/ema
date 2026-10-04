@@ -160,8 +160,14 @@ def test_a_numbered_passage_is_a_fact_of_its_section() -> None:
         key: _fact(key, passage)
         for key in ("audit.process_sections", "audit.process_sections.2", "audit.history.2")
     }
-    text = "{{f:audit.process_sections}} {{f:audit.process_sections.2}}"
-    ok = _draft(text, ["audit.process_sections", "audit.process_sections.2"], "ch3.process")
+    ok = SectionDraft(
+        section="ch3.process",
+        status="drafted",
+        paragraphs=[
+            DraftText(text=f"{{{{f:{key}}}}}", fact_ids=[key])
+            for key in ("audit.process_sections", "audit.process_sections.2")
+        ],
+    )
     assert check_draft(ok, facts, "synthetic").fatal == ()
     foreign = _draft("{{f:audit.history.2}}", ["audit.history.2"], "ch3.process")
     assert [issue.code for issue in check_draft(foreign, facts, "synthetic").fatal] == [

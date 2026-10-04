@@ -22,8 +22,10 @@ from ema.audit.fill_extract import (
     OUTPUT_TOKENS,
     PASSAGE_CHARS,
     PASSAGE_TOKENS,
+    PROMPT_VERSION,
     instructions,
     output_tokens,
+    split_passage,
 )
 from ema.audit.fill_tools import FillDocument
 from ema.core.llm import ReplayProvider
@@ -67,6 +69,11 @@ def test_the_prompt_states_the_passage_rule_with_the_code_limits() -> None:
         "audit.hvac",
         "audit.lighting",
     }
+
+
+def test_the_prompt_version_keys_recordings_of_the_passage_prompt() -> None:
+    assert PROMPT_VERSION == "audit-extract-v2"
+    assert f"up to {PASSAGE_CHARS} characters" in instructions() and PASSAGE_CHARS == 1_500
 
 
 def test_a_long_passage_verifies_whole_and_page_exact(tmp_path: Path) -> None:
@@ -174,3 +181,81 @@ def test_replay_reproduces_the_recorded_passages_offline(tmp_path: Path) -> None
     assert replayed == recorded
     assert values(again_ws, again_job) == values(ws, job_id)
     assert values(ws, job_id)["audit.process_sections.2"] == (STAGES[1].strip(), "found")
+
+
+# A long description: twelve sentences of about 380 characters on one page, 4 600 in all.
+LONG = " ".join(
+    f"Fraza {number}: "
+    + "instalaţia de vopsire în câmp electrostatic primeşte piesele degresate şi uscate, " * 4
+    + "apoi le predă cuptorului de polimerizare."
+    for number in range(1, 13)
+)
+LONG_FLOW = {"lung.pdf": FillDocument("lung.pdf", "", page_texts=(LONG,))}
+
+
+def test_a_passage_over_the_cap_is_split_at_sentence_ends(tmp_path: Path) -> None:
+    ws, job_id = job(tmp_path)
+    assert len(LONG) > 4_000
+    provider = Scripted([{"facts": [passage(1, quote=LONG)], "missing": []}])
+
+    extract(ws, job_id, sections("ch3.process"), provider, LONG_FLOW)
+
+    found = values(ws, job_id)
+    keys = ["audit.process_sections"] + [f"audit.process_sections.{n}" for n in (2, 3, 4)]
+    pieces = [found[key][0] for key in keys]
+    assert "audit.process_sections.5" not in found
+    assert " ".join(pieces) == LONG
+    assert all(len(piece) <= PASSAGE_CHARS and piece.endswith(".") for piece in pieces)
+    assert all(piece.startswith("Fraza ") for piece in pieces)
+    assert log_events(ws, job_id, "passage_dropped") == []
+    with ws.connect() as db:
+        rows = db.execute("SELECT data FROM evidence").fetchall()
+    quotes = {json.loads(row["data"])["quote"]: json.loads(row["data"]) for row in rows}
+    assert all(quotes[piece]["locator"]["page"] == 1 for piece in pieces)
+
+
+def test_what_does_not_fit_is_dropped_whole_and_logged() -> None:
+    sentence = "Linia de vopsire are " + "o cabină şi un cuptor, " * 70 + "în hala nouă."
+    assert len(sentence) > PASSAGE_CHARS
+    pieces, dropped = split_passage(f"Primul paragraf.\n\n{sentence} Ultima frază.")
+    assert (pieces, dropped) == (["Primul paragraf.", "Ultima frază."], [sentence])
+
+
+def test_pieces_past_the_passage_count_are_logged(tmp_path: Path) -> None:
+    ws, job_id = job(tmp_path)
+    returned = [passage(1, quote=LONG, file="F2")] + [passage(page) for page in range(1, 6)]
+    flows = {**FLOW, **LONG_FLOW}
+    provider = Scripted([{"facts": returned, "missing": []}])
+
+    extract(ws, job_id, sections("ch3.process"), provider, flows)
+
+    found = values(ws, job_id)
+    assert found[f"audit.process_sections.{MAX_PASSAGES}"][0].startswith("Fraza 1:")
+    dropped = log_events(ws, job_id, "passage_dropped")
+    # Five stage passages, then four pieces of the long one: the last three do not fit.
+    assert [(item["key"], item["reason"]) for item in dropped] == [
+        ("audit.process_sections", "passage_count")
+    ] * 3
+
+
+def test_passages_are_numbered_by_their_place_after_the_retry(tmp_path: Path) -> None:
+    ws, job_id = job(tmp_path)
+    slipped = passage(1, quote=STAGES[0].strip().replace("demineralizată", "demineralizata"))
+    provider = Scripted(
+        [
+            {"facts": [passage(3), slipped, passage(2)], "missing": []},
+            {"facts": [passage(1)], "missing": []},
+        ]
+    )
+
+    extract(ws, job_id, sections("ch3.process"), provider, FLOW)
+
+    found = values(ws, job_id)
+    keys = ["audit.process_sections", "audit.process_sections.2", "audit.process_sections.3"]
+    assert [found[key][0] for key in keys] == [STAGES[page].strip() for page in range(3)]
+
+
+def test_a_passage_is_never_cut_after_an_initial() -> None:
+    pieces, dropped = split_passage(("Firma Exemplu S.R.L. vopseşte piese. " * 80).strip())
+    assert dropped == [] and len(pieces) > 1
+    assert all(piece.endswith("piese.") and len(piece) <= PASSAGE_CHARS for piece in pieces)

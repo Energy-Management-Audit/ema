@@ -18,7 +18,7 @@ from ema.core.resources import resource_path
 from ema.core.review.models import Field
 from ema.core.workspace import Workspace
 
-PROMPT_VERSION = "audit-draft-v2"
+PROMPT_VERSION = "audit-draft-v3"
 FACT_RULE = "Fiecare nume, număr şi dată vine dintr-un fapt, scris {{f:<key>}}."
 REFERENCE_RULE = "Fiecare paragraf, celulă şi legendă enumeră fact_ids folosite."
 WORDING_RULE = "Nu folosi formulări despre AI sau procesul de redactare."
@@ -30,10 +30,19 @@ LENGTH_RULE = (
     "Lungimea urmează faptele: un paragraf pentru fiecare subiect, iar un fapt care este "
     "un pasaj din sursă se scrie întreg, ca {{f:<key>}}, în paragraful lui."
 )
+PASSAGE_RULE = (
+    "Un pasaj ({{f:<key>}}, {{f:<key>.2}} …) stă în paragraful lui, câte un pasaj în fiecare "
+    "paragraf, în ordinea numerelor."
+)
+RULE_TEXT = {
+    "uncited_sentence": SENTENCE_RULE,
+    "passage_paragraph": PASSAGE_RULE,
+    "passage_order": PASSAGE_RULE,
+}
 INSTRUCTIONS = (
     "Redactează numai secţiunea cerută, în registrul auditorului. Fiecare nume, număr şi "
     "dată trebuie să provină dintr-un fapt şi să fie scris ca {{f:<key>}}. "
-    f"{SENTENCE_RULE} {LENGTH_RULE} "
+    f"{SENTENCE_RULE} {LENGTH_RULE} {PASSAGE_RULE} "
     "Nu folosi formulări despre AI sau procesul de redactare. "
     "Fiecare paragraf, celulă şi legendă enumeră fact_ids folosite. "
     "Dacă lipseşte un fapt necesar, foloseşte status missing."
@@ -55,7 +64,8 @@ def draft_task(section: str) -> str:
     title = next(item.title for item in CATALOGUE if item.id == section)
     return (
         f"Redactează secţiunea {section} „{title}”. Câmpul section este exact „{section}”. "
-        f"{FACT_RULE} {SENTENCE_RULE} {LENGTH_RULE} {REFERENCE_RULE} {WORDING_RULE}"
+        f"{FACT_RULE} {SENTENCE_RULE} {LENGTH_RULE} {PASSAGE_RULE} {REFERENCE_RULE} "
+        f"{WORDING_RULE}"
     )
 
 
@@ -124,7 +134,7 @@ def draft_section_run(  # noqa: PLR0913
         errors = [
             {
                 "rule": issue.code,
-                "rule_text": SENTENCE_RULE if issue.code == "uncited_sentence" else FACT_RULE,
+                "rule_text": RULE_TEXT.get(issue.code, FACT_RULE),
                 "location": issue.location,
                 "detail": issue.detail,
             }

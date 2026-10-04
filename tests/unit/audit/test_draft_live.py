@@ -17,6 +17,7 @@ from ema.audit.catalogue import CATALOGUE
 from ema.audit.draft_agent import (
     FACT_RULE,
     LENGTH_RULE,
+    PASSAGE_RULE,
     REFERENCE_RULE,
     SENTENCE_RULE,
     WORDING_RULE,
@@ -40,7 +41,7 @@ SECTION = "ch2.date_generale"
 TASK = (
     "Redactează secţiunea ch2.date_generale „Date generale”. "
     "Câmpul section este exact „ch2.date_generale”. "
-    f"{FACT_RULE} {SENTENCE_RULE} {LENGTH_RULE} {REFERENCE_RULE} {WORDING_RULE}"
+    f"{FACT_RULE} {SENTENCE_RULE} {LENGTH_RULE} {PASSAGE_RULE} {REFERENCE_RULE} {WORDING_RULE}"
 )
 TITLES = {section.id: section.title for section in CATALOGUE}
 
