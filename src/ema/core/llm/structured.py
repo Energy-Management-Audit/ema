@@ -27,6 +27,7 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
     estimate_tokens: Callable[[list[dict[str, Any]]], int] | None = None,
     on_estimate: Callable[[int, float, float], None] | None = None,
     schema_retries: int = 1,
+    thinking_tokens: int | None = None,
 ) -> T:
     if context.provider.name != "replay" and not (context.synthetic or context.client_live):
         raise EmaError("ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", "")
@@ -76,7 +77,9 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
 
         budget_on_estimate = log_draft_estimate
     for attempt in range(schema_retries + 1):
-        kwargs: dict[str, Any] = {"attachments": attachments} if images else {}
+        kwargs: dict[str, Any] = ({"attachments": attachments} if images else {}) | (
+            {"thinking_tokens": thinking_tokens} if thinking_tokens is not None else {}
+        )
         response = call_with_budget(
             context,
             model,
@@ -102,6 +105,9 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
             ),
             on_estimate=budget_on_estimate,
         )
+        if response.finish_reason == "MAX_TOKENS":
+            logging.getLogger(__name__).warning("ai_truncated section=%s", context.section)
+            raise EmaError("ai_truncated", "Răspunsul AI a fost întrerupt.", context.section)
         try:
             return schema.model_validate(json.loads(response.text or ""))
         except (ValidationError, ValueError) as exc:

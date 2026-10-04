@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from ema.audit.catalogue_types import PASSAGE_FACTS, AuditFact, fact_key
 from ema.audit.draft_checks import ANY_TOKEN, DraftCheck, DraftReview, check_draft
-from ema.audit.draft_plan import Group, SectionPlan
+from ema.audit.draft_plan import MAX_OUTPUT_TOKENS, THINKING_TOKENS, Group, SectionPlan
 from ema.audit.draft_prompt import (
     PROMPT_VERSION,
     SUPPORT_VERSION,
@@ -168,29 +168,34 @@ def run_group(
     plans = {plan.section: plan for plan in group.sections}
     requested = list(plans)
 
-    def call(content: dict[str, object], sections: Sequence[str]) -> dict[str, SectionDraft]:
+    def call(
+        content: dict[str, object], sections: Sequence[str], output_tokens: int
+    ) -> dict[str, SectionDraft]:
         answer = complete_json(
             context,
             ChapterDraft,
             instructions(),
             json.dumps(content, ensure_ascii=False),
-            max_output_tokens=group.allowance,
+            max_output_tokens=output_tokens,
             schema_retries=0,
+            thinking_tokens=THINKING_TOKENS,
         )
         return _picked(ws, job, group, answer, sections)
 
     try:
-        drafts = call(chapter_request(group, used), requested)
+        drafts = call(chapter_request(group, used), requested, group.allowance)
     except EmaError as exc:
-        if exc.code != "ai_schema":
+        if exc.code not in {"ai_schema", "ai_truncated"}:
             return GroupResult(failed=dict.fromkeys(requested, exc))
-        # An answer that is not the schema, a truncated one too, omits every section.
+        retry_tokens = MAX_OUTPUT_TOKENS if exc.code == "ai_truncated" else group.allowance
         drafts = {}
+    else:
+        retry_tokens = group.allowance
     accepted, errors = _sorted(drafts, requested, plans, used, units, job)
     failed: dict[str, EmaError] = {}
     if errors:
         try:
-            again = call(retry_request(group, used, drafts, errors), list(errors))
+            again = call(retry_request(group, used, drafts, errors), list(errors), retry_tokens)
         except EmaError as exc:
             failed = dict.fromkeys(errors, exc)
         else:

@@ -36,6 +36,7 @@ class Exchange:
     output_tokens: int
     provider_content: dict[str, Any] | None = None
     cached_input_tokens: int = 0
+    finish_reason: str | None = None
 
 
 class Provider(Protocol):
@@ -52,4 +53,5 @@ class Provider(Protocol):
         *,
         prompt_version: str = "",
         attachments: Mapping[str, bytes] | None = None,
+        thinking_tokens: int | None = None,
     ) -> Exchange: ...

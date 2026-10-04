@@ -56,6 +56,7 @@ class FakeLive:
         *,
         prompt_version: str = "",
         attachments: Mapping[str, bytes] | None = None,
+        thinking_tokens: int | None = None,
     ) -> Exchange:
         self.models.append(model)
         self.synthetic.append(synthetic)

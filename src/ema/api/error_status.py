@@ -13,6 +13,7 @@ STATUS: dict[str, int] = {
     "ai_prompt_size": 413,
     "ai_quota_day": 429,
     "ai_schema": 502,
+    "ai_truncated": 502,
     "ai_unavailable": 503,
     "already_undone": 409,
     "alternative_missing": 404,

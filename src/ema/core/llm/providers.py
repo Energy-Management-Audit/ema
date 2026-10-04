@@ -117,8 +117,9 @@ class OpenAIProvider:
         *,
         prompt_version: str = "",
         attachments: Mapping[str, bytes] | None = None,
+        thinking_tokens: int | None = None,
     ) -> Exchange:
-        del prompt_version
+        del prompt_version, thinking_tokens
         if not synthetic and not self._client_live:
             raise EmaError(
                 "ai_client_disabled", "Documentele clientului nu pot fi trimise la AI.", ""
@@ -200,6 +201,7 @@ class GeminiProvider:
         *,
         prompt_version: str = "",
         attachments: Mapping[str, bytes] | None = None,
+        thinking_tokens: int | None = None,
     ) -> Exchange:
         del prompt_version
         if not synthetic and not self._client_live:
@@ -250,6 +252,8 @@ class GeminiProvider:
             "system_instruction": "\n".join(system),
             "max_output_tokens": max_output_tokens,
         }
+        if thinking_tokens is not None:
+            config["thinking_config"] = types.ThinkingConfig(thinking_budget=thinking_tokens)
         if tools:
             declarations = [
                 types.FunctionDeclaration(
@@ -302,4 +306,5 @@ class GeminiProvider:
             if candidate and candidate.content
             else None,
             (usage.cached_content_token_count or 0) if usage else 0,
+            candidate.finish_reason.name if candidate and candidate.finish_reason else None,
         )
