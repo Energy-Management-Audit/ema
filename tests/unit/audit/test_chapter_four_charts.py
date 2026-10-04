@@ -65,12 +65,10 @@ def test_monthly_gap_caption_letters_and_skipped_variants() -> None:
     assert _charts(chart_blocks("ch4.gaz", dataset, FACTORS_2026, CLIENT)[0]) == []
     groups, skipped = chapter_chart_groups(dataset, FACTORS_2026, CLIENT)
     assert skipped == [
-        "ch4.electricitate_pv:electricity_pv",
-        "ch4.echiv_pv:electricity_pv",
-        "ch4.specific_pv:electricity_pv",
         "ch4.apa:water_storm",
         "ch4.specific_apa:water_storm",
         "ch4.electricitate:2025:no_data",
+        "ch4.electricitate_pv:2024:no_data",
         "ch4.gaz:2024:no_data",
         "ch4.gaz:annual:no_data",
         "ch4.apa:water_potable:2024:no_data",
@@ -93,13 +91,13 @@ def test_fuels_share_one_chart_with_one_series_each_and_no_monthly_letter_when_a
     ]
     assert [series.values[0] for series in annual.series] == [1, 2]
     assert _captions(blocks)[0].startswith(
-        "Fig. nr. 4.4 a) Evoluția lunară a consumului de carburant"
+        "Fig. nr. 4.5 a) Evoluția lunară a consumului de carburant"
     )
     water, _ = chart_blocks("ch4.apa", dataset, FACTORS_2026, CLIENT)
     assert _captions(water) == [
-        "Fig. nr. 4.5 b) Evoluția anuală a consumului de apă înregistrat "
+        "Fig. nr. 4.6 b) Evoluția anuală a consumului de apă înregistrat "
         "la nivelul Atelier Exemplu SRL",
-        "Fig. nr. 4.6 b) Evoluția anuală a consumului de apă industrială "
+        "Fig. nr. 4.7 b) Evoluția anuală a consumului de apă industrială "
         "înregistrat la nivelul Atelier Exemplu SRL",
     ]
 
@@ -301,5 +299,16 @@ def test_missing_figures_keep_distinct_group_numbers_and_year_letters():
     assert skipped_year.text.startswith("Fig. nr. 4.2 b) ")
     assert "la nivelul anului 2025: date indisponibile" in skipped_year.text
     missing_gas = groups["ch4.gaz"][0].annual[0]
-    assert isinstance(missing_gas, Missing) and missing_gas.text.startswith("Fig. nr. 4.3 b) ")
-    assert _captions(groups["ch4.carburant"][0].monthly)[0].startswith("Fig. nr. 4.4 a) ")
+    assert isinstance(missing_gas, Missing) and missing_gas.text.startswith("Fig. nr. 4.4 b) ")
+    assert _captions(groups["ch4.carburant"][0].monthly)[0].startswith("Fig. nr. 4.5 a) ")
+
+
+def test_pv_charts_use_only_held_series() -> None:
+    dataset = _dataset()
+    groups, skipped = chapter_chart_groups(dataset, FACTORS_2026, CLIENT)
+    raw = groups["ch4.electricitate_pv"][0]
+    assert any(isinstance(block, NativeChart) for block in raw.annual)
+    assert all(not isinstance(block, NativeChart) for block in raw.monthly)
+    assert "ch4.electricitate_pv:2024:no_data" in skipped
+    assert groups["ch4.echiv_pv"]
+    assert groups["ch4.specific_pv"]

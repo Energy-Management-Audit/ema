@@ -148,6 +148,17 @@ def _text_width(document: DocumentObject) -> int:
     return width
 
 
+def _keep_first_half(table: etree._Element) -> None:
+    header = table.find(W + "tr")
+    if header is None or "Ianuarie" not in "".join(
+        part.text or "" for part in header.iter(W + "t")
+    ):
+        return
+    for row in table.findall(W + "tr"):
+        for paragraph in row.findall(".//" + W + "p"):
+            keep_paragraph(paragraph, "keepNext")
+
+
 def format_chapter_four(document: DocumentObject, *, missing_text: str = MISSING_TEXT) -> None:
     """Apply the final layout only inside chapter four; source headings stay in place."""
     spans = heading_spans_document(document)
@@ -171,12 +182,14 @@ def format_chapter_four(document: DocumentObject, *, missing_text: str = MISSING
             _table(
                 node, width, missing_text, grow_values=production_start <= index < production_end
             )
+            _keep_first_half(node)
         elif node.tag == W + "p":
             text = "".join(item.text or "" for item in node.iter(W + "t"))
             if index in headings or text in labels or node.find(".//" + W + "drawing") is not None:
                 keep_paragraph(node, "keepNext")
             if text.startswith(("Fig. nr. 4.", "Tabelul 4.")):
                 keep_paragraph(node, "keepLines")
+                keep_paragraph(node, "keepNext")
 
 
 def _value_widths(table: etree._Element, widths: list[int]) -> list[int]:

@@ -2979,6 +2979,14 @@
             "title": "Code",
             "type": "string"
           },
+          "evidence_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
           "field_id": {
             "anyOf": [
               {

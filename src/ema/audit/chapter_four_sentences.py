@@ -1,0 +1,359 @@
+"""Arithmetic-only Romanian chapter-four statements and their source record."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from itertools import pairwise
+from pathlib import Path
+
+from ema.core.office.blocks import Paragraph
+from ema.core.office.numbers_ro import format_number
+from ema.energy_data.calc import annual, change, energy_intensity, shares, tep, tep_total
+from ema.energy_data.carriers import CARRIER_NAMES_RO, Carrier, counts_in_total
+from ema.energy_data.factors import FactorTable
+from ema.energy_data.model import Derived, EnergyDataset
+
+
+@dataclass(frozen=True)
+class SentenceDerivation:
+    template_id: str
+    text: str
+    inputs: tuple[tuple[str, float], ...]
+    formula: str
+    factor_version: str
+    tep_factors: tuple[tuple[str, float], ...]
+
+
+@dataclass(frozen=True)
+class SentencePlan:
+    sections: dict[str, list[Paragraph]]
+    derivations: list[SentenceDerivation]
+    notes: list[str]
+
+
+def write_sentence_record(path: Path, plan: SentencePlan) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "sentences": [
+                    {
+                        "template_id": item.template_id,
+                        "text": item.text,
+                        "inputs": item.inputs,
+                        "formula": item.formula,
+                        "factor_version": item.factor_version,
+                        "tep_factors": item.tep_factors,
+                    }
+                    for item in plan.derivations
+                ],
+                "notes": plan.notes,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def change_refusal(previous: Derived, current: Derived) -> str | None:
+    """One refusal rule for both chapter text and review warnings."""
+    if previous.unit != current.unit:
+        return "unități diferite"
+    result = change(previous, current)
+    if "year.not_consecutive" in result.missing:
+        return "ani neconsecutivi"
+    if "previous.zero" in result.missing:
+        return "bază zero"
+    if result.value is None:
+        return "date insuficiente"
+    return None
+
+
+def _add(  # noqa: PLR0913
+    sections: dict[str, list[Paragraph]],
+    records: list[SentenceDerivation],
+    section: str,
+    template: str,
+    text: str,
+    formula: str,
+    *inputs: Derived,
+    factors: FactorTable,
+    dataset: EnergyDataset,
+) -> None:
+    sections.setdefault(section, []).append(Paragraph("body", [text]))
+    records.append(
+        SentenceDerivation(
+            template,
+            text,
+            tuple(
+                (key, float(value.value))
+                for value in inputs
+                if value.value is not None
+                for key in value.inputs
+            ),
+            formula,
+            factors.version,
+            tuple(
+                (key, factor.per_unit)
+                for value in inputs
+                for key in value.inputs
+                if (parts := key.split("."))[0] == "carrier"
+                and len(parts) >= 3
+                and (series := dataset.carriers.get(Carrier(parts[1]), {}).get(int(parts[2])))
+                and (
+                    reading := series.months.get(int(parts[3]))
+                    if len(parts) == 4
+                    else series.annual
+                )
+                and (factor := factors.tep_factor(Carrier(parts[1]), reading.unit, int(parts[2])))
+            ),
+        )
+    )
+
+
+def _section(carrier: Carrier) -> str | None:
+    if carrier == Carrier.electricity_grid:
+        return "ch4.electricitate"
+    if carrier == Carrier.electricity_pv:
+        return "ch4.electricitate_pv"
+    if carrier == Carrier.natural_gas:
+        return "ch4.gaz"
+    if carrier in {Carrier.diesel, Carrier.petrol, Carrier.lpg, Carrier.fuel_oil, Carrier.clu}:
+        return "ch4.carburant"
+    return None
+
+
+def _source_value(dataset: EnergyDataset, key: str) -> float | None:
+    parts = key.split(".")
+    if len(parts) >= 3 and parts[0] == "carrier" and parts[1] in Carrier._value2member_map_:
+        series = dataset.carriers.get(Carrier(parts[1]), {}).get(int(parts[2]))
+        reading = (
+            series.months.get(int(parts[3]))
+            if series and len(parts) == 4
+            else (series.annual if series else None)
+        )
+        return reading.value if reading else None
+    if len(parts) == 2 and parts[0] == "turnover":
+        reading = dataset.turnover_lei.get(int(parts[1]))
+        return reading.value if reading else None
+    if len(parts) >= 3 and parts[0] == "production":
+        series = dataset.production.get(parts[1], {}).get(int(parts[2]))
+        reading = (
+            series.months.get(int(parts[3]))
+            if series and len(parts) == 4
+            else (series.annual if series else None)
+        )
+        return reading.value if reading else None
+    return None
+
+
+def sentence_plan(  # noqa: C901, PLR0912, PLR0915
+    dataset: EnergyDataset, factors: FactorTable
+) -> SentencePlan:
+    sections: dict[str, list[Paragraph]] = {}
+    records: list[SentenceDerivation] = []
+    notes: list[str] = []
+    energy_years = tuple(
+        year
+        for year in dataset.years
+        if any(
+            year in series
+            and annual(series[year], "carrier", carrier.value, year).value is not None
+            for carrier, series in dataset.carriers.items()
+            if counts_in_total(carrier)
+        )
+    )
+    for carrier, series in dataset.carriers.items():
+        section = _section(carrier)
+        if section is None:
+            continue
+        years = sorted(series)
+        for previous_year, year in pairwise(years):
+            before = annual(series[previous_year], "carrier", carrier.value, previous_year)
+            after = annual(series[year], "carrier", carrier.value, year)
+            reason = change_refusal(before, after)
+            if reason:
+                notes.append(f"{carrier.value}: {previous_year}–{year}: {reason}")
+                continue
+            difference = change(before, after)
+            assert difference.value is not None
+            rounded = round(difference.value, 2)
+            if rounded == 0:
+                text = (
+                    f"Consumul de {CARRIER_NAMES_RO[carrier]} a rămas constant "
+                    f"în {year} față de {previous_year}."
+                )
+            else:
+                verb = "a crescut" if rounded > 0 else "a scăzut"
+                text = (
+                    f"Consumul de {CARRIER_NAMES_RO[carrier]} {verb} cu "
+                    f"{format_number(abs(rounded), 2)} % în {year} față de {previous_year}."
+                )
+            _add(
+                sections,
+                records,
+                section,
+                "carrier_change",
+                text,
+                "change.year",
+                before,
+                after,
+                factors=factors,
+                dataset=dataset,
+            )
+    for year in energy_years:
+        total = tep_total(dataset, factors, year)
+        for carrier, share in shares(dataset, factors, year).items():
+            if share.value is None or total.value is None:
+                notes.append(f"pondere: {carrier.value}: {year}: date insuficiente")
+                continue
+            part = tep(dataset, factors, carrier, year)
+            text = (
+                f"Ponderea consumului de {CARRIER_NAMES_RO[carrier]} în totalul de energie "
+                f"din {year} a fost de {format_number(share.value, 2)} %."
+            )
+            _add(
+                sections,
+                records,
+                "ch4.echiv_total",
+                "carrier_share",
+                text,
+                "part / total * 100",
+                part,
+                total,
+                factors=factors,
+                dataset=dataset,
+            )
+    for previous_year, year in pairwise(energy_years):
+        before = energy_intensity(dataset, factors, previous_year, filed=False)
+        after = energy_intensity(dataset, factors, year, filed=False)
+        reason = change_refusal(before, after)
+        if reason:
+            notes.append(f"intensitate: {previous_year}–{year}: {reason}")
+            continue
+        difference = change(before, after)
+        assert difference.value is not None
+        rounded = round(difference.value, 2)
+        if rounded == 0:
+            text = f"Intensitatea energetică a rămas constantă în {year} față de {previous_year}."
+        else:
+            direction = "a crescut" if rounded > 0 else "a scăzut"
+            text = (
+                f"Intensitatea energetică {direction} cu {format_number(abs(rounded), 2)} % "
+                f"în {year} față de {previous_year}."
+            )
+        _add(
+            sections,
+            records,
+            "ch4.intensitate",
+            "intensity_change",
+            text,
+            "change.year",
+            before,
+            after,
+            factors=factors,
+            dataset=dataset,
+        )
+    if energy_years:
+        year = energy_years[-1]
+        values = [
+            (carrier, share)
+            for carrier, share in shares(dataset, factors, year).items()
+            if share.value is not None and counts_in_total(carrier)
+        ]
+        if values:
+            carrier, biggest = max(values, key=lambda item: (item[1].value or 0, item[0].value))
+            text = (
+                f"Cea mai mare pondere în consumul total de energie din {year} o are "
+                f"{CARRIER_NAMES_RO[carrier]}: {format_number(biggest.value or 0, 2)} %."
+            )
+            _add(
+                sections,
+                records,
+                "ch4.concluzii",
+                "largest_share",
+                text,
+                "max(share.carrier)",
+                biggest,
+                factors=factors,
+                dataset=dataset,
+            )
+        if len(energy_years) >= 2:
+            previous_year = energy_years[-2]
+            before, after = (
+                tep_total(dataset, factors, candidate) for candidate in (previous_year, year)
+            )
+            total_reason = change_refusal(before, after)
+            if total_reason is None:
+                difference = change(before, after)
+                assert difference.value is not None
+                rounded = round(difference.value, 2)
+                if rounded == 0:
+                    text = (
+                        f"Consumul total echivalent a rămas constant "
+                        f"în {year} față de {previous_year}."
+                    )
+                else:
+                    direction = "a crescut" if rounded > 0 else "a scăzut"
+                    text = (
+                        f"Consumul total echivalent {direction} cu "
+                        f"{format_number(abs(rounded), 2)} % în {year} față de {previous_year}."
+                    )
+                _add(
+                    sections,
+                    records,
+                    "ch4.concluzii",
+                    "total_change",
+                    text,
+                    "change.year",
+                    before,
+                    after,
+                    factors=factors,
+                    dataset=dataset,
+                )
+            else:
+                notes.append(f"total: {previous_year}–{year}: {total_reason}")
+            before_i = energy_intensity(dataset, factors, previous_year, filed=False)
+            after_i = energy_intensity(dataset, factors, year, filed=False)
+            if change_refusal(before_i, after_i) is None:
+                difference_i = change(before_i, after_i)
+                assert difference_i.value is not None
+                direction_i = (
+                    "creștere"
+                    if round(difference_i.value, 2) > 0
+                    else "scădere"
+                    if round(difference_i.value, 2) < 0
+                    else "stabilitate"
+                )
+                text_i = (
+                    f"Intensitatea energetică a înregistrat o tendință de {direction_i} în {year}."
+                )
+                _add(
+                    sections,
+                    records,
+                    "ch4.concluzii",
+                    "intensity_direction",
+                    text_i,
+                    "sign(change.year)",
+                    before_i,
+                    after_i,
+                    factors=factors,
+                    dataset=dataset,
+                )
+    sourced = [
+        SentenceDerivation(
+            item.template_id,
+            item.text,
+            tuple(
+                (key, value)
+                for key, _ in dict(item.inputs).items()
+                if (value := _source_value(dataset, key)) is not None
+            ),
+            item.formula,
+            item.factor_version,
+            item.tep_factors,
+        )
+        for item in records
+    ]
+    return SentencePlan(sections, sourced, notes)

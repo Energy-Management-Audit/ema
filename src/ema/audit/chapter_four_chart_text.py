@@ -53,6 +53,7 @@ MONTHS = (
 STYLE_PART = "__chapter_four_chart_style__"
 SUBJECT = {
     Carrier.electricity_grid: "consumului de energie electrică din SEN",
+    Carrier.electricity_pv: "consumului de energie electrică fotovoltaică",
     Carrier.natural_gas: "consumului de gaz natural",
     Carrier.water_potable: "consumului de apă",
     Carrier.water_industrial: "consumului de apă industrială",
