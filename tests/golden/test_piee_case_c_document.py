@@ -41,7 +41,7 @@ from ema.energy_data.carriers import Carrier
 from ema.energy_data.source import normal
 from ema.piee.compose import compose_draft, load_approved_base
 from ema.piee.dataset import PieeData, load
-from ema.piee.identity import audit_year
+from ema.piee.identity import audit_year, ownership
 from ema.piee.number import prototype_number
 
 pytestmark = pytest.mark.golden
@@ -272,7 +272,9 @@ def test_delivered_layout_composes_case_c_figures_and_missing_markers(  # noqa: 
     auditor = str(data.anexa.audit["auditor"].value).strip()
     year = audit_year(data.anexa)
     assert year is not None
-    private = str(data.anexa.identity["ownership_private"].value).strip()
+    ownership_line = ownership(data.anexa)
+    assert ownership_line is not None
+    assert not ownership_line.missing
     sourced = {
         "body_414": (
             f"Audit energetic pe întregul contur aparținând {client} "
@@ -284,7 +286,7 @@ def test_delivered_layout_composes_case_c_figures_and_missing_markers(  # noqa: 
             f"în anul {year} ce aparține societății pentru încadrarea în obligațiile "
             "legii 121/2014."
         ),
-        "body_14": f"Companie cu capital integral privat: {private} capital privat.",
+        "body_14": ownership_line.text,
     }
     for slot, expected in sourced.items():
         actual = visible_text(find([document], slot))
