@@ -9,20 +9,25 @@ from pydantic_core.core_schema import ValidatorFunctionWrapHandler
 
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.catalogue_types import fact_key
-from ema.audit.read_equipment import BOILER, TRANSFORMER
+from ema.audit.read_equipment import EQUIPMENT_ROW, TRANSFORMER
 
 SECTION_FACTS = {
     section.id: frozenset(str(fact) for fact in section.facts)
     for section in CATALOGUE
     if section.chapter in (2, 3) and section.parent is not None
 }
-# Necesar rows the ch. 3 prose describes from their facts: transformers have no table (#81); a
-# boiler's count and power are printed by the boilers table, so the prose refers to it (D4).
-SECTION_FAMILIES = {"ch3.electricitate": (TRANSFORMER,), "ch3.gaz": (BOILER,)}
+# Necesar rows the ch. 3 prose describes from their facts: transformers have no table (#81); an
+# equipment row's count and power are printed by the equipment table, so the prose refers to it
+# (D4). Gas-fired equipment may also be named in the gas section.
+SECTION_FAMILIES = {
+    "ch3.electricitate": (TRANSFORMER,),
+    "ch3.equipment": (EQUIPMENT_ROW,),
+    "ch3.gaz": (EQUIPMENT_ROW,),
+}
 
 
 def _table_quantity(key: str) -> bool:
-    return key.startswith(BOILER) and key.rpartition(".")[2] in {"count", "power"}
+    return key.startswith(EQUIPMENT_ROW) and key.rpartition(".")[2] in {"count", "power"}
 
 
 def citable(section: str, key: str) -> bool:

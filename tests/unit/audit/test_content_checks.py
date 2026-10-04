@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 
 from PIL import Image
@@ -11,11 +12,11 @@ from tests.workspace_jobs import create_job
 from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.catalogue_types import PrefixPattern
-from ema.audit.content_checks import content_issues
+from ema.audit.content_checks import _has_arithmetic_conclusion, content_issues
 from ema.audit.sections import Status, set_status
 from ema.audit.workflow import AuditWorkflow
 from ema.core.review import decide, mark_absent, propose
-from ema.core.review.models import FieldSpec
+from ema.core.review.models import Field, FieldSpec
 from ema.core.workspace import Workspace
 
 
@@ -131,3 +132,21 @@ def test_active_panel_device_needs_individual_confirmation(tmp_path: Path) -> No
     ws.remove_version(job, slot, version.version)
     with ws.connect() as db:
         assert content_issues(db, job) == []
+
+
+def test_arithmetic_conclusion_uses_reviewed_carrier_values() -> None:
+    reading = Field(
+        id="energy",
+        job_id="synthetic",
+        key="carrier.electricity_grid.2025",
+        label="Electricitate",
+        value_type="number",
+        unit="MWh",
+        value=Decimal(10),
+        state="supplied",
+        presence="found",
+        evidence=["source"],
+    )
+    assert _has_arithmetic_conclusion({reading.key: reading})
+    rejected = reading.model_copy(update={"review": "rejected"})
+    assert not _has_arithmetic_conclusion({rejected.key: rejected})

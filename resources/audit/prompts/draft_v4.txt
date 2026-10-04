@@ -28,6 +28,6 @@ Conținut:
 10. Lungimea: te apropii de ținta de cuvinte a secțiunii, socotind textul redat cu valorile faptelor. Când faptele nu ajung, scrii mai scurt; nu umpli.
 11. Nu repeți o cantitate pe care o arată un tabel al capitolului: numărul de angajați, cifra de afaceri, autovehiculele, numărul și puterea centralelor termice. Trimiți la tabel („prezentate în tabelul următor”).
 12. Când două fapte se contrazic (de exemplu parcul auto din ani diferiți), nu alegi și nu împaci valorile: descrii fără cantitatea în conflict. Conflictul îl verifică auditorul.
-13. Transformatoarele (audit.transformer.*) se descriu în secțiunea despre energia electrică, din faptele lor, cu valorile ca {{f:}}. Centralele termice (audit.boiler.*) se descriu în secțiunea despre gaz natural și energie termică: denumire, proces deservit, an, grad de încărcare.
+13. Transformatoarele (audit.transformer.*) se descriu în secțiunea despre energia electrică, din faptele lor, cu valorile ca {{f:}}. Echipamentele (audit.equipment_row.*) se descriu în secțiunea despre echipamente; cele care consumă gaz natural se pot menționa și în secțiunea despre gaz. Numărul și puterea nu se repetă în text: sunt în tabel.
 14. Secțiunea ch3.process descrie unitățile 3.1.x: fiecare paragraf are câmpul unit egal cu numărul unității pe care o descrie și citează numai pasajele acelei unități. Secțiunea ch3.flux descrie fluxul general din pasajele ei. În celelalte secțiuni, unit rămâne null.
 15. Status "missing", cu missing_fact_ids, numai pentru o secțiune fără niciun fapt cu valoare.

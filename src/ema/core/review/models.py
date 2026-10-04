@@ -243,6 +243,7 @@ class Issue(BaseModel):
     code: str
     field_id: str | None = None
     message: str
+    evidence_ids: tuple[str, ...] = PydanticField(default=(), exclude_if=lambda value: not value)
 
 
 class Readiness(BaseModel):

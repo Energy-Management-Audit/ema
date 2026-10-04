@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ema.audit.read_equipment import BOILER, FORKLIFT, TRANSFORMER, VEHICLE
+from ema.audit.read_equipment import EQUIPMENT_ROW, FORKLIFT, TRANSFORMER, VEHICLE
 from ema.core.office.numbers_ro import format_number
 from ema.core.review.models import Field
 
@@ -15,7 +15,7 @@ EMPLOYEES = "audit.employees."
 TURNOVER = "turnover."
 # What the render reads (the stage binds each family, so a new row makes the render stale); the
 # transformers have no table, the ch. 3 draft cites them.
-FAMILIES = (EMPLOYEES, TURNOVER, BOILER, FORKLIFT, VEHICLE, TRANSFORMER)
+FAMILIES = (EMPLOYEES, TURNOVER, EQUIPMENT_ROW, FORKLIFT, VEHICLE, TRANSFORMER)
 
 # None is a value the sources do not hold: the table shows a red n.d.
 type Cell = str | None
@@ -72,7 +72,7 @@ def yearly(fields: Iterable[Field], family: str) -> YearlyTable:
 
 
 def numbered(fields: Iterable[Field], family: str) -> list[dict[str, Field]]:
-    """The rows of one family in sheet order, each by role: audit.boiler.<n>.<role>."""
+    """The rows of one family in sheet order, each by role."""
     pattern = re.compile(rf"^{re.escape(family)}(\d+)\.(\w+)$")
     rows: dict[int, dict[str, Field]] = {}
     for field in fields:
@@ -87,16 +87,16 @@ def _joined(*parts: Cell) -> Cell:
 
 
 def boiler_rows(fields: Iterable[Field]) -> list[list[Cell]]:
-    """Denumire, proces, buc., putere kW; the sheet names no consumed resource."""
+    """Rows for the general equipment table in Necesar sheet order."""
     return [
         [
             shown(row.get("name")),
             shown(row.get("process")),
             shown(row.get("count")),
             shown(row.get("power")),
-            None,
+            shown(row.get("resource")),
         ]
-        for row in numbered(fields, BOILER)
+        for row in numbered(fields, EQUIPMENT_ROW)
     ]
 
 

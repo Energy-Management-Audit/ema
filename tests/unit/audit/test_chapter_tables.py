@@ -79,18 +79,26 @@ def test_money_prints_as_in_her_documents() -> None:
     assert yearly([field], "turnover.").rows == [["2025", "405.087.623,00"]]
 
 
-def test_boilers_have_no_resource_and_vehicles_then_forklifts_are_one_row_each() -> None:
+def test_equipment_rows_keep_sheet_order_resource_and_missing_cells() -> None:
     fields = [
-        *_row("audit.boiler.", 1, name="Centrala A", process="Incalzire", count=2, power=500),
-        *_row("audit.boiler.", 2, process="Apa calda", count=1),
+        *_row("audit.equipment_row.", 2, name="Compresor", process="Aer", count=1, power=25),
+        *_row(
+            "audit.equipment_row.",
+            1,
+            name="Centrala A",
+            process="Incalzire",
+            count=2,
+            power=500,
+            resource="gaz",
+        ),
         *_row("audit.vehicle.", 1, name="Autoturism", maker="Marca Z", type="308", count=42),
         *_row("audit.forklift.", 1, name="MARCA : Marca X", fuel="electric"),
         *_row("audit.forklift.", 1, type="TIP : ERE 220 / SERIA : 90120354"),
         *_row("audit.forklift.", 2, type="TIP : TFG 316"),
     ]
     assert boiler_rows(fields) == [
-        ["Centrala A", "Incalzire", "2", "500", None],
-        [None, "Apa calda", "1", None, None],
+        ["Centrala A", "Incalzire", "2", "500", "gaz"],
+        ["Compresor", "Aer", "1", "25", None],
     ]
     assert vehicle_rows(fields) == [
         ["Autoturism Marca Z 308", "42", None],
@@ -205,8 +213,8 @@ def test_drafted_sections_keep_base_tables_captions_and_chart_slots(tmp_path: Pa
     fields = [
         _field("audit.employees.2025", 7),
         _field("turnover.2025", 900),
-        _field("audit.boiler.1.name", "Centrală"),
-        _field("audit.boiler.1.count", 2),
+        _field("audit.equipment_row.1.name", "Centrală"),
+        _field("audit.equipment_row.1.count", 2),
     ]
     write_tables(current, filled, chapter="ch2", fields=fields)
     write_tables(filled, current, chapter="ch3", fields=fields)
@@ -223,8 +231,8 @@ def test_drafted_sections_keep_base_tables_captions_and_chart_slots(tmp_path: Pa
     assert "Fig. Evoluția numărului mediu de angajați" in texts
     assert "Tabelul Cifra de afaceri (lei)" in texts
     assert "Fig. Evoluția cifrei de afaceri (lei)" in texts
-    assert "Tabelul Centrale termice" in texts
-    assert CAPTIONS[BOILERS_TABLE][0].title == "Centrale termice"
+    assert "Tabelul Echipamente și utilaje" in texts
+    assert CAPTIONS[BOILERS_TABLE][0].title == "Echipamente și utilaje"
     assert CAPTIONS[VEHICLES_TABLE][0].title == "Parcul auto"
     assert CAPTIONS[BOILERS_TABLE][0].unit is None
     assert CAPTIONS[VEHICLES_TABLE][0].unit is None
@@ -338,6 +346,6 @@ def test_caption_catalogue_has_verbatim_titles_and_units() -> None:
             ("turnover.table", "Cifra de afaceri", "lei"),
             ("turnover.chart", "Evoluția cifrei de afaceri", "lei"),
         ],
-        BOILERS_TABLE: [("boilers.table", "Centrale termice", None)],
+        BOILERS_TABLE: [("boilers.table", "Echipamente și utilaje", None)],
         VEHICLES_TABLE: [("vehicles.table", "Parcul auto", None)],
     }

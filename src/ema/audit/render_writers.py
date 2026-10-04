@@ -15,6 +15,7 @@ from ema.audit.chapter_five import ChapterFivePlan
 from ema.audit.chapter_five_render import render_chapter_five
 from ema.audit.chapter_four import render_chapter_four
 from ema.audit.chapter_four_blocks import _written
+from ema.audit.chapter_four_sentences import sentence_plan, write_sentence_record
 from ema.audit.chapter_six import ChapterSixPlan, render_chapter_six
 from ema.audit.chapter_tables import write_charts, write_tables
 from ema.audit.draft_checks import DraftReview
@@ -29,6 +30,7 @@ from ema.core.jobs import StageContext
 from ema.core.jobs.reads import run_current
 from ema.core.review.models import Field
 from ema.core.workspace import SlotVersion, Workspace
+from ema.energy_data.factors import AUDIT_FACTORS_2026
 from ema.energy_data.necesar import parse_necesar_info, to_dataset
 
 
@@ -201,6 +203,9 @@ def write_four(  # noqa: PLR0913
         chart_source=chart_source,
         client=client_name,
         texts=texts,
+    )
+    write_sentence_record(
+        target.parent / "ch4-sentences.json", sentence_plan(dataset, AUDIT_FACTORS_2026)
     )
     charts_skipped.extend(skipped)
 

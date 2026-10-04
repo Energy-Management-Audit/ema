@@ -134,6 +134,7 @@ def _specs(dataset: EnergyDataset) -> tuple[list[_Spec], list[str]]:  # noqa: C9
             )
     raw = (
         ("ch4.electricitate", (Carrier.electricity_grid,)),
+        ("ch4.electricitate_pv", (Carrier.electricity_pv,)),
         ("ch4.gaz", (Carrier.natural_gas,)),
         ("ch4.carburant", tuple(carrier for carrier in dataset.carriers if carrier in FUEL)),
         (
@@ -180,11 +181,19 @@ def _specs(dataset: EnergyDataset) -> tuple[list[_Spec], list[str]]:  # noqa: C9
                 result.append(spec)
     for section, carriers in (
         ("ch4.echiv_electric", (Carrier.electricity_grid,)),
+        ("ch4.echiv_pv", (Carrier.electricity_pv,)),
         ("ch4.echiv_gaz", (Carrier.natural_gas,)),
         ("ch4.echiv_carburant", tuple(carrier for carrier in dataset.carriers if carrier in FUEL)),
     ):
         available = tuple(carrier for carrier in carriers if carrier in dataset.carriers)
-        spec = _carrier_spec(dataset, section, available, kind="tep", annual_text=ANNUAL[section])
+        spec = _carrier_spec(
+            dataset,
+            section,
+            available,
+            kind="tep",
+            annual_text=ANNUAL.get(section),
+            subject="consumului echivalent de energie electrică fotovoltaică",
+        )
         if spec is not None:
             result.append(spec)
     result.append(
@@ -211,6 +220,7 @@ def _specs(dataset: EnergyDataset) -> tuple[list[_Spec], list[str]]:  # noqa: C9
     else:
         for section, carriers in (
             ("ch4.specific_electric", (Carrier.electricity_grid,)),
+            ("ch4.specific_pv", (Carrier.electricity_pv,)),
             ("ch4.specific_gaz", (Carrier.natural_gas,)),
             (
                 "ch4.specific_carburant",
@@ -224,7 +234,8 @@ def _specs(dataset: EnergyDataset) -> tuple[list[_Spec], list[str]]:  # noqa: C9
                 available,
                 kind="specific",
                 product=product,
-                annual_text=ANNUAL[section],
+                annual_text=ANNUAL.get(section),
+                subject="consumului specific de energie electrică fotovoltaică",
             )
             if spec is not None:
                 result.append(spec)
@@ -272,15 +283,6 @@ def _specs(dataset: EnergyDataset) -> tuple[list[_Spec], list[str]]:  # noqa: C9
             ),
         )
     )
-    if Carrier.electricity_pv in dataset.carriers:
-        skipped.extend(
-            f"{section}:electricity_pv"
-            for section in (
-                "ch4.electricitate_pv",
-                "ch4.echiv_pv",
-                "ch4.specific_pv",
-            )
-        )
     if Carrier.water_storm in dataset.carriers:
         skipped.extend(f"{section}:water_storm" for section in ("ch4.apa", "ch4.specific_apa"))
     return result, skipped

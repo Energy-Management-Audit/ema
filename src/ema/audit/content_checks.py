@@ -5,9 +5,45 @@ from __future__ import annotations
 import sqlite3
 
 from ema.audit.ai_wording import ai_wording
+from ema.audit.chapter_four_sentences import sentence_plan
+from ema.audit.render_dataset import reviewed_dataset
 from ema.audit.visit import slug
 from ema.core.review.models import Field, Issue
 from ema.core.review.section_transition import SectionState, Status
+from ema.energy_data.carriers import Carrier
+from ema.energy_data.factors import AUDIT_FACTORS_2026
+from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
+
+
+def _has_arithmetic_conclusion(fields: dict[str, Field]) -> bool:
+    readings: dict[Carrier, dict[int, CarrierSeries]] = {}
+    for key, field in fields.items():
+        parts = key.split(".")
+        if (
+            len(parts) not in {3, 4}
+            or parts[0] != "carrier"
+            or parts[1] not in Carrier._value2member_map_
+            or not parts[2].isdigit()
+            or field.unit is None
+            or field.value_type != "number"
+        ):
+            continue
+        carrier, year = Carrier(parts[1]), int(parts[2])
+        years = readings.setdefault(carrier, {})
+        series = years.setdefault(year, CarrierSeries())
+        reading = Reading(float(field.value) if field.value is not None else None, field.unit)
+        if len(parts) == 3:
+            years[year] = CarrierSeries(series.months, reading)
+        elif parts[3].isdigit() and 1 <= int(parts[3]) <= 12:
+            series.months[int(parts[3])] = reading
+    if not readings:
+        return False
+    years = tuple(sorted({year for series in readings.values() for year in series}))
+    dataset = reviewed_dataset(EnergyDataset(years, readings), fields.values())
+    try:
+        return bool(sentence_plan(dataset, AUDIT_FACTORS_2026).sections.get("ch4.concluzii"))
+    except ValueError:
+        return False
 
 
 def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
@@ -80,7 +116,9 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
                     message=f"Textul menţionează AI („{wording}”): {field.label}",
                 )
             )
-        if field.value is None or field.review == "rejected":
+        if (field.value is None or field.review == "rejected") and not (
+            key == "narrative.ch4.concluzii" and _has_arithmetic_conclusion(fields)
+        ):
             issues.append(
                 Issue(
                     code="narrative_missing",

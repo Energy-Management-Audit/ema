@@ -237,11 +237,14 @@ def test_listed_ids_include_citations() -> None:
     [
         ("ch3.electricitate", "audit.transformer.1.putere_nominala", True),
         ("ch3.apa", "audit.transformer.1.putere_nominala", False),
-        ("ch3.gaz", "audit.boiler.2.name", True),
-        ("ch3.gaz", "audit.boiler.2.year", True),
-        # The boilers table prints these; the prose refers to it (D4).
-        ("ch3.gaz", "audit.boiler.2.count", False),
-        ("ch3.gaz", "audit.boiler.2.power", False),
+        ("ch3.equipment", "audit.equipment_row.2.name", True),
+        ("ch3.equipment", "audit.equipment_row.2.process", True),
+        ("ch3.gaz", "audit.equipment_row.2.name", True),
+        ("ch3.gaz", "audit.equipment_row.2.resource", True),
+        ("ch3.apa", "audit.equipment_row.2.name", False),
+        # The equipment table prints these; the prose refers to it (D4).
+        ("ch3.equipment", "audit.equipment_row.2.count", False),
+        ("ch3.gaz", "audit.equipment_row.2.power", False),
         ("ch3.gaz", "audit.heating.2", True),
     ],
 )

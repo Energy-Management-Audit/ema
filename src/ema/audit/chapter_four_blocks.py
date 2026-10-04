@@ -8,6 +8,8 @@ from dataclasses import replace
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.chapter_four_chart_text import is_turnover_unit
 from ema.audit.chapter_four_chart_values import display_unit
+from ema.audit.chapter_four_intensity import intensity_table
+from ema.audit.chapter_four_sentences import sentence_plan
 from ema.audit.chapter_four_water import without_empty_water
 from ema.consumption_analysis.analysis import Metric, SectionPlan, TablePlan, analyze, value
 from ema.core.office.blocks import (
@@ -111,34 +113,36 @@ def _monthly(  # noqa: PLR0913
         if metric.kind in {"tep", "tep_total"}
         else "carrier"
     )
-    for first, proto in ((1, "months_first"), (7, "months_second")):
-        metrics = tuple(replace(metric, month=month) for month in range(first, first + 6))
-        plan = TablePlan(proto, metrics, years, grouping=True)
-        table = analyze(dataset, factors, (SectionPlan(section, stage, (plan,)),))[0].blocks[0]
-        assert isinstance(table, Table)
-        table = replace(table, missing_text=TABLE_MISSING_TEXT)
-        caption_id = f"{section}:{metric.carriers}:{metric.product}:{first}"
-        result.append(
-            Caption(
-                "caption",
-                "tab",
-                caption_id,
-                [
-                    "Tabelul ",
-                    Ref("tab", caption_id),
-                    ". ",
-                    *([label] if isinstance(label, str) else label),
-                ],
+    for year in years:
+        for first, proto in ((1, "months_first"), (7, "months_second")):
+            metrics = tuple(replace(metric, month=month) for month in range(first, first + 6))
+            plan = TablePlan(proto, metrics, (year,), grouping=True)
+            table = analyze(dataset, factors, (SectionPlan(section, stage, (plan,)),))[0].blocks[0]
+            assert isinstance(table, Table)
+            table = replace(table, missing_text=TABLE_MISSING_TEXT)
+            caption_id = f"{section}:{metric.carriers}:{metric.product}:{year}:{first}"
+            result.append(
+                Caption(
+                    "caption",
+                    "tab",
+                    caption_id,
+                    [
+                        "Tabelul ",
+                        Ref("tab", caption_id),
+                        ". ",
+                        *([label] if isinstance(label, str) else label),
+                        f" – {year} ({unit})" if unit else f" – {year}",
+                    ],
+                )
             )
-        )
-        result.append(table)
-        if any(
-            isinstance(segment, Num) and segment.value is None
-            for row in table.rows
-            for cell in row
-            for segment in cell
-        ):
-            result.append(Missing("body", TABLE_MISSING_NOTE))
+            result.append(table)
+            if any(
+                isinstance(segment, Num) and segment.value is None
+                for row in table.rows
+                for cell in row
+                for segment in cell
+            ):
+                result.append(Missing("body", TABLE_MISSING_NOTE))
     result.extend(_annual(dataset, factors, metric, years, unit, "Total anual"))
     return result
 
@@ -301,7 +305,7 @@ def _written(text: str | None) -> list[Block]:
     return [Paragraph("body", [part]) for part in paragraphs]
 
 
-def chapter_four_blocks(  # noqa: C901
+def chapter_four_blocks(  # noqa: C901, PLR0912
     dataset: EnergyDataset,
     factors: FactorTable,
     *,
@@ -331,6 +335,7 @@ def chapter_four_blocks(  # noqa: C901
         "ch4.specific_apa": WATER_CARRIERS,
     }
     dataset = without_empty_water(dataset)
+    sentences = sentence_plan(dataset, factors).sections
     no_water = not any(carrier in WATER_CARRIERS for carrier in dataset.carriers)
     for section in (item for item in CATALOGUE if item.id.startswith("ch4.")):
         if no_water and section.id in {"ch4.apa", "ch4.specific_apa"}:
@@ -368,6 +373,7 @@ def chapter_four_blocks(  # noqa: C901
         elif section.id == "ch4.specific_total":
             blocks.extend(_specific(dataset, factors, None))
         elif section.id == "ch4.intensitate":
+            blocks.extend(intensity_table(dataset, factors))
             blocks.extend(
                 _annual(
                     dataset,
@@ -381,5 +387,13 @@ def chapter_four_blocks(  # noqa: C901
         elif section.id == "ch4.mediu":
             blocks.extend(_emissions(dataset, factors, notes))
         elif section.id in {"ch4.concluzii", "ch4.eficienta", "ch4.bilant_real"}:
-            blocks.extend(_written((texts or {}).get(section.id)))
+            written = (texts or {}).get(section.id)
+            arithmetic = sentences.get(section.id, [])
+            blocks.extend(arithmetic)
+            if written:
+                blocks.extend(_written(written))
+            elif not arithmetic:
+                blocks.extend(_written(None))
+        if section.id not in {"ch4.concluzii", "ch4.eficienta", "ch4.bilant_real"}:
+            blocks.extend(sentences.get(section.id, []))
     return blocks
