@@ -20,6 +20,7 @@ from ema.core.office.blocks import (
     Block,
     ElementLocator,
     Figure,
+    Missing,
     Prototypes,
     RenderReport,
 )
@@ -112,7 +113,8 @@ def replace_section_body(
     count = sum(item.section_id == section_id for item, _, _ in heading_spans_document(document))
     if not count:
         raise EmaError("draft_prototype", "Secţiunea lipseşte din bază.", section_id)
-    # Repeated process headings are separate 3.1.x units, all fed by the accepted draft.
+    # Repeated process headings are separate 3.1.x units. Until the draft maps its passages to
+    # stages, it fills the first unit and the others keep the marker rather than repeat it.
     with TemporaryDirectory() as directory:
         current = source
         report: RenderReport | None = None
@@ -120,7 +122,8 @@ def replace_section_body(
             document = Document(str(current))
             first, end = own_region(document, section_id, occurrence)
             elements = _prototypes(document, section_id, first, end)
-            if missing := sorted(_needed(blocks) - set(elements)):
+            unit: list[Block] = blocks if occurrence == 0 else [Missing("body", MARKER)]
+            if missing := sorted(_needed(unit) - set(elements)):
                 raise EmaError(
                     "draft_prototype",
                     "Baza nu are un model pentru conţinutul secţiunii.",
@@ -152,7 +155,7 @@ def replace_section_body(
                 target,
                 ElementLocator(first),
                 ElementLocator(end + 1),
-                blocks,
+                unit,
                 Prototypes(elements, _CHAPTERS[section_id], MARKER),
                 keep_old=keep,
             )

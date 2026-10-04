@@ -368,7 +368,7 @@ def test_two_absent_sections_clone_sibling_heading_and_body(tmp_path: Path) -> N
     ]
 
 
-def test_process_draft_fills_every_repeated_subsection(tmp_path: Path) -> None:
+def test_process_draft_fills_the_first_unit_and_marks_the_others(tmp_path: Path) -> None:
     document = Document()
     document.add_paragraph(TITLES["ch3"], style="Heading 1")
     document.add_paragraph(TITLES["ch3.flux"], style="Heading 2")
@@ -396,4 +396,4 @@ def test_process_draft_fills_every_repeated_subsection(tmp_path: Path) -> None:
         (),
         job="synthetic",
     )
-    assert _texts(output).count("proces test.") == 2
+    assert _texts(output).count("proces test.") == 1
