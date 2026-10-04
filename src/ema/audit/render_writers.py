@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from ema.audit.catalogue_types import fact_key
 from ema.audit.chapter_five import ChapterFivePlan
 from ema.audit.chapter_five_render import render_chapter_five
 from ema.audit.chapter_four import render_chapter_four
@@ -108,12 +109,26 @@ def _draft(
         (folder / f"{section}.json").read_text(encoding="utf-8")
     )
     review = folder / f"{section}.draft-review.json"
-    items: list[dict[str, str]] = (
+    items: list[dict[str, str | None]] = (
         json.loads(review.read_text(encoding="utf-8"))["review"] if review.is_file() else []
     )
-    return draft, tuple(
-        DraftReview(item["code"], item["location"], item["detail"]) for item in items
+    return draft, review_flags(items)
+
+
+def review_flags(items: list[dict[str, str | None]]) -> tuple[DraftReview, ...]:
+    """The stored review, with the flagged sentence the render marks in place of its paragraph."""
+    return tuple(
+        DraftReview(
+            str(item["code"]), str(item["location"]), str(item["detail"]), item.get("sentence")
+        )
+        for item in items
     )
+
+
+def section_facts(section: str, by_key: dict[str, Field]) -> dict[str, Field]:
+    """The facts a section's draft may cite, numbered passages of its narrative facts included."""
+    allowed = SECTION_FACTS.get(section, ())
+    return {key: field for key, field in by_key.items() if fact_key(key) in allowed}
 
 
 def drafted_sections(ws: Workspace, job: str, *, ctx: StageContext | None = None) -> set[str]:
@@ -136,8 +151,7 @@ def write_draft(  # noqa: PLR0913
     ctx: StageContext | None = None,
 ) -> None:
     draft, flags = _draft(ws, job, section, ctx)
-    facts = {key: by_key[key] for key in SECTION_FACTS.get(section, ()) if key in by_key}
-    render_section(source, target, draft, facts, flags, job=job)
+    render_section(source, target, draft, section_facts(section, by_key), flags, job=job)
 
 
 def write_chapter_tables(

@@ -6,6 +6,7 @@ from ema.audit.catalogue_analysis import ANALYSIS
 from ema.audit.catalogue_general import GENERAL
 from ema.audit.catalogue_labels import FACT_LABELS, fact_spec, field_label
 from ema.audit.catalogue_types import (
+    PASSAGE_FACTS,
     AuditFact,
     CarrierPattern,
     Condition,
@@ -174,6 +175,7 @@ __all__ = [
     "CATALOGUE",
     "FACT_LABELS",
     "NOT_SECTIONS",
+    "PASSAGE_FACTS",
     "AuditFact",
     "CarrierPattern",
     "Condition",

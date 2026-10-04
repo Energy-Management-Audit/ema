@@ -18,7 +18,7 @@ from ema.audit.base import build_base
 from ema.audit.base_package import package_issues, scrub_package, unreviewed_bullets
 from ema.audit.base_toc import refresh_toc
 from ema.audit.base_units import heading_spans_document
-from ema.audit.catalogue import CATALOGUE
+from ema.audit.catalogue import CATALOGUE, PASSAGE_FACTS
 from ema.audit.chapter_tables_data import FAMILIES
 from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.render_bindings import binding_values, cover_labels, cover_photo, fill_bindings
@@ -129,8 +129,8 @@ def _read_fields(
     ctx: StageContext, keys: Iterable[str], db: sqlite3.Connection | None = None
 ) -> list[Field]:
     """The fields the render uses, with their membership bound: a key looked up is recorded even
-    when absent, and each iterated family by the (key, revision) set it holds, so an insertion,
-    a deletion or a decision in any of them makes the render stale."""
+    when absent, and each iterated family (a narrative fact's numbered passages <key>.2 ... too)
+    by its (key, revision) set, so an insertion, deletion or decision makes the render stale."""
     looked_up = set(keys)
     if db is None:
         with ctx.ws.connect() as connection:
@@ -139,15 +139,16 @@ def _read_fields(
     rows = db.execute(
         "SELECT key,data FROM fields WHERE job_id=? ORDER BY key", (ctx.job,)
     ).fetchall()
+    families = (*ITERATED, *sorted(f"{key}." for key in looked_up if key in PASSAGE_FACTS))
     reads = [("fields.key", f"{ctx.job}:{key}") for key in sorted(looked_up)]
-    reads += [("fields.prefix", f"{ctx.job}:{prefix}") for prefix in ITERATED]
+    reads += [("fields.prefix", f"{ctx.job}:{prefix}") for prefix in families]
     recorded = [(table, row_id, revision(db, table, row_id) or 0) for table, row_id in reads]
     for table, row_id, value in recorded:
         ctx.record_read(table, row_id, value)
     return [
         Field.model_validate_json(row["data"])
         for row in rows
-        if str(row["key"]) in looked_up or str(row["key"]).startswith(ITERATED)
+        if str(row["key"]) in looked_up or str(row["key"]).startswith(families)
     ]
 
 

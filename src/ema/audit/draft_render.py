@@ -34,16 +34,20 @@ from ema.core.office.blocks import Block, Caption, Missing, Num, Paragraph, Ref,
 from ema.core.office.numbers_ro import format_number
 from ema.core.review.models import Field
 
+# Internal codes a reader never sees: the enum value's wording, and units the prose names itself.
+ENUM_TEXT = {"below_1000_tep": "sub 1.000 tep", "at_least_1000_tep": "de cel puţin 1.000 tep"}
+UNSPOKEN_UNITS = frozenset({"persons"})
+
 
 def _value(field: Field) -> str:
     if field.value_type in {"number", "year"}:
         return format_number(
             Decimal(str(field.value)),
             0 if field.value_type == "year" else field.decimals,
-            field.unit,
+            None if field.unit in UNSPOKEN_UNITS else field.unit,
             False if field.value_type == "year" else field.grouping,
         )
-    return str(field.value)
+    return ENUM_TEXT.get(str(field.value), str(field.value))
 
 
 def _resolved(text: str, facts: dict[str, Field]) -> str:
