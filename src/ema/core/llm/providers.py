@@ -9,13 +9,14 @@ from collections.abc import Callable, Mapping
 from typing import Any, cast
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 from pydantic import SecretStr
 
 from ema.core.errors import EmaError
-from ema.core.llm.gemini_retry import call_with_retries
+from ema.core.llm.gemini_retry import call_with_retries, map_quota_or_credit_error
 from ema.core.llm.models import selected_model
 from ema.core.llm.types import Exchange, ToolCall, ToolSpec
 
@@ -277,6 +278,10 @@ class GeminiProvider:
                 else generate()
             )
         except Exception as exc:
+            if isinstance(exc, genai_errors.APIError) and (
+                mapped := map_quota_or_credit_error(exc, model)
+            ):
+                raise mapped from exc
             if credit_error := _credit_error(exc, model):
                 raise credit_error from exc
             raise
