@@ -43,8 +43,8 @@ def test_audit_case_a_ten_sourced_equipment_models(reference_library: Path, tmp_
         {
             field.value.strip()
             for field in fields(ws, job)
-            if field.key.startswith("audit.equipment.")
-            and field.key.endswith(".denumire")
+            if field.key.startswith("audit.equipment_row.")
+            and field.key.endswith(".name")
             and isinstance(field.value, str)
             and field.value.strip()
         }

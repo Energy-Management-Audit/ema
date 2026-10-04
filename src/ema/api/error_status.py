@@ -187,6 +187,8 @@ STATUS: dict[str, int] = {
     "replay_exhausted": 409,
     "replay_invalid": 422,
     "replay_request_mismatch": 409,
+    "research_failed": 500,
+    "research_replay_missing": 409,
     "restore_exists": 409,
     "review_row_missing": 500,
     "run_missing": 404,

@@ -81,6 +81,7 @@ ROUTE_ERRORS: dict[tuple[str, str], tuple[str, ...]] = {
         "visit_missing",
         "measures_form_missing",
         "measures_form_invalid",
+        "research_replay_missing",
     ),
     ("POST", "/jobs/{job_id}/conflicts/{conflict_id}"): (
         "job_missing",
