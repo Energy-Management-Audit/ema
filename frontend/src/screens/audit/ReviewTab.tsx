@@ -20,6 +20,7 @@ import { Button } from '../../ui/Button.tsx'
 import { EmaWidget, EmptyState, FailureNotice } from '../../ui/Feedback.tsx'
 import { SectionKey } from '../../ui/Surface.tsx'
 import { AuditFieldRow } from './AuditFieldRow.tsx'
+import { DataWarnings } from './DataWarnings.tsx'
 
 /** 3c: design handoff screen component. */
 export function ReviewTab({ field, outline }: { field: string | null; outline: AuditOutline }) {
@@ -185,6 +186,7 @@ export function ReviewTab({ field, outline }: { field: string | null; outline: A
           Acceptate {all.filter(decided).length}
         </button>
       </div>
+      {filter !== 'accepted' && <DataWarnings />}
       {grouped.map(([chapter, fields]) => (
         <section className="audit-review-group" key={chapter}>
           <SectionKey>

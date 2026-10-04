@@ -69,6 +69,29 @@
   font-size: 17px;
   letter-spacing: -0.01em;
 }
+.ema-review-row--warn.ema-review-row--open {
+  box-shadow: inset 0 0 0 1.5px rgb(var(--amber-rgb) / 0.8);
+}
+.ema-warning-row__message {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ema-warning-row__sources {
+  display: flex;
+  flex: 0 1 250px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+.ema-warning-row__sources .ema-source-btn {
+  max-width: 100%;
+}
+.ema-source-btn__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .ema-review-row__snippet {
   display: flex;
   gap: 18px;

@@ -8,9 +8,18 @@ from statistics import median
 
 from ema.audit.chapter_four_sentences import change_refusal
 from ema.core.review.models import Field, Issue
+from ema.energy_data.carriers import CARRIER_NAMES_RO, Carrier
 from ema.energy_data.model import Derived
+from ema.energy_data.prelucrare_tables import MONTHS
 
 QUARTER_FACTOR = 2.5
+
+
+def _carrier(code: str) -> Carrier | None:
+    try:
+        return Carrier(code)
+    except ValueError:
+        return None
 
 
 def _number(field: Field | None) -> float | None:
@@ -65,6 +74,7 @@ def _paired_flags(fields: Mapping[str, Field]) -> list[Issue]:
 
 
 def _series(fields: Mapping[str, Field]) -> dict[str, dict[int, Field]]:
+    """Monthly series by their auditor-facing label, e.g. `motorină 2025`."""
     result: dict[str, dict[int, Field]] = {}
     for key, field in fields.items():
         parts = key.split(".")
@@ -74,9 +84,10 @@ def _series(fields: Mapping[str, Field]) -> dict[str, dict[int, Field]]:
             or not all(part.isdigit() for part in parts[2:])
         ):
             continue
+        carrier = _carrier(parts[1])
         month = int(parts[3])
-        if 1 <= month <= 12:
-            result.setdefault(".".join(parts[:3]), {})[month] = field
+        if carrier is not None and 1 <= month <= 12:
+            result.setdefault(f"{CARRIER_NAMES_RO[carrier]} {parts[2]}", {})[month] = field
     return result
 
 
@@ -89,7 +100,7 @@ def _monthly_flags(name: str, months: dict[int, Field]) -> list[Issue]:
         if _number(second) not in (None, 0) and _number(first) == _number(second):
             issue = _issue(
                 "data_month_repeat",
-                f"Luni consecutive egale: {name}, {month} şi {month + 1}.",
+                f"Luni consecutive egale: {name}, {MONTHS[month - 1]} şi {MONTHS[month]}.",
                 first,
                 second,
             )
@@ -112,7 +123,7 @@ def _monthly_flags(name: str, months: dict[int, Field]) -> list[Issue]:
             continue
         issue = _issue(
             "data_quarter_in_month",
-            f"Consum concentrat într-o lună: {name}, luna {month}.",
+            f"Consum concentrat într-o lună: {name}, luna {MONTHS[month - 1]}.",
             field,
             next(
                 (
@@ -133,11 +144,13 @@ def flags(fields: Mapping[str, Field]) -> list[Issue]:
     result = _paired_flags(fields)
     for name, months in sorted(_series(fields).items()):
         result.extend(_monthly_flags(name, months))
-    annual: dict[str, list[tuple[int, Field]]] = {}
+    annual: dict[Carrier, list[tuple[int, Field]]] = {}
     for key, field in fields.items():
         parts = key.split(".")
         if len(parts) == 3 and parts[0] == "carrier" and parts[2].isdigit():
-            annual.setdefault(parts[1], []).append((int(parts[2]), field))
+            carrier = _carrier(parts[1])
+            if carrier is not None:
+                annual.setdefault(carrier, []).append((int(parts[2]), field))
     for carrier, values in annual.items():
         ordered = sorted(values)
         for (earlier, before), (later, after) in pairwise(ordered):
@@ -149,7 +162,7 @@ def flags(fields: Mapping[str, Field]) -> list[Issue]:
             if reason in {"bază zero", "ani neconsecutivi", "unități diferite"}:
                 issue = _issue(
                     "data_change_refused",
-                    f"Schimbare omisă: {carrier}, {earlier}–{later}: {reason}.",
+                    f"Schimbare omisă: {CARRIER_NAMES_RO[carrier]}, {earlier}–{later}: {reason}.",
                     before,
                     after,
                 )
