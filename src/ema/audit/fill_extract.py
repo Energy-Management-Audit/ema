@@ -31,6 +31,13 @@ CHARS_PER_TOKEN = 4
 PASSAGE_CHARS = 1_500
 # Romanian text and JSON escapes run nearer two characters a token than four.
 PASSAGE_TOKENS = PASSAGE_CHARS // 2
+# Gemini counts its thinking against the output limit: an audit-case-a retry thought past 16k
+# tokens and its JSON was cut off (10-04).
+THINKING_TOKENS = 24_000
+# The output ceiling the provider reports for the curated Gemini model (models.get, 10-04).
+MAX_OUTPUT_TOKENS = 65_536
+# These stop the stage; any other failure of the retry keeps what the first pass verified.
+STOPPING_CODES = frozenset({"ai_budget", "ai_credits", "ai_quota_day"})
 PARAGRAPH_BREAK = re.compile(r"\n\s*\n")
 PASSAGE_MARK = "pasaj"
 
@@ -81,7 +88,7 @@ def facts_text(facts: Sequence[tuple[str, str]]) -> str:
 def output_tokens(facts: Sequence[tuple[str, str]]) -> int:
     """The output allowance: the short facts, plus every passage a narrative fact may take."""
     passages = len({key for key, _ in facts if key in PASSAGE_FACTS}) * MAX_PASSAGES
-    return OUTPUT_TOKENS + passages * PASSAGE_TOKENS
+    return min(OUTPUT_TOKENS + THINKING_TOKENS + passages * PASSAGE_TOKENS, MAX_OUTPUT_TOKENS)
 
 
 def file_text(file_id: str, document: FillDocument) -> str:
@@ -368,7 +375,13 @@ def extract_facts(  # noqa: C901, PLR0913
     first_pass = {fact.key: error.code for fact, error in retry}
     if retry:
         wanted = [(key, section) for key, section in facts if key in first_pass]
-        verify(call(retry_text(facts, retry, documents), output_tokens(wanted)))
+        try:
+            verify(call(retry_text(facts, retry, documents), output_tokens(wanted)))
+        except EmaError as exc:
+            if exc.code in STOPPING_CODES:
+                raise
+            with ws.connect() as db, ws.job_log(db, job) as handle:
+                write_event(handle, "extract_retry_failed", stage="fill", code=exc.code)
     counts = _record_passages(ws, job, tools, owner, passages)
     verified.update(key for key, count in counts.items() if count)
     # A value found earlier, as from the Necesar info, is never overwritten with missing.

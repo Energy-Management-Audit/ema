@@ -16,13 +16,16 @@ from tests.unit.audit.test_fill_extract import (
     values,
 )
 
+from ema.audit.catalogue import CATALOGUE
 from ema.audit.catalogue_labels import field_label
 from ema.audit.catalogue_types import MAX_PASSAGES, PASSAGE_FACTS
 from ema.audit.fill_extract import (
+    MAX_OUTPUT_TOKENS,
     OUTPUT_TOKENS,
     PASSAGE_CHARS,
     PASSAGE_TOKENS,
     PROMPT_VERSION,
+    THINKING_TOKENS,
     instructions,
     output_tokens,
     split_passage,
@@ -131,15 +134,17 @@ def test_a_rejected_passage_is_retried_when_another_one_verified(tmp_path: Path)
     retry = provider.sent[1][1]["content"]
     assert retry.startswith("Fapte de stabilit:\naudit.process_sections — ")
     assert provider.max_output_tokens == [
-        OUTPUT_TOKENS + MAX_PASSAGES * PASSAGE_TOKENS,
-        OUTPUT_TOKENS + MAX_PASSAGES * PASSAGE_TOKENS,
+        OUTPUT_TOKENS + THINKING_TOKENS + MAX_PASSAGES * PASSAGE_TOKENS,
+        OUTPUT_TOKENS + THINKING_TOKENS + MAX_PASSAGES * PASSAGE_TOKENS,
     ]
 
 
 def test_the_allowance_and_preflight_price_every_passage(tmp_path: Path) -> None:
     wanted = sections("ch2.istorie", "ch2.activitate", "ch2.localizare")
     facts = [(str(fact), item.id) for item in wanted for fact in item.facts]
-    assert output_tokens(facts) == OUTPUT_TOKENS + 2 * MAX_PASSAGES * PASSAGE_TOKENS
+    assert (
+        output_tokens(facts) == OUTPUT_TOKENS + THINKING_TOKENS + 2 * MAX_PASSAGES * PASSAGE_TOKENS
+    )
     ws, job_id = job(tmp_path)
     provider = Scripted([{"facts": [], "missing": []}])
 
@@ -259,3 +264,8 @@ def test_a_passage_is_never_cut_after_an_initial() -> None:
     pieces, dropped = split_passage(("Firma Exemplu S.R.L. vopseşte piese. " * 80).strip())
     assert dropped == [] and len(pieces) > 1
     assert all(piece.endswith("piese.") and len(piece) <= PASSAGE_CHARS for piece in pieces)
+
+
+def test_the_allowance_never_exceeds_the_model_output_ceiling() -> None:
+    facts = [(str(fact), item.id) for item in CATALOGUE for fact in item.facts]
+    assert output_tokens(facts) == MAX_OUTPUT_TOKENS
