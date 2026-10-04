@@ -198,6 +198,59 @@ def test_drafted_sections_keep_base_tables_captions_and_chart_slots(tmp_path: Pa
     assert result.tables[2].rows[2].cells[1].text == "Centrală"
     texts = [paragraph.text for paragraph in result.paragraphs]
     assert texts.count("proza nouă") == 2
-    assert texts.count("Tabelul [de completat]") == 3
-    assert texts.count("Fig. [de completat]") == 2
+    assert texts.count("Tabelul [de completat]") == 0
+    assert texts.count("Fig. [de completat]") == 0
+    assert "Tabelul Numărul mediu de angajați (angajați)" in texts
+    assert "Fig. Evoluția numărului mediu de angajați (angajați)" in texts
+    assert "Tabelul Cifra de afaceri (lei)" in texts
+    assert "Fig. Evoluția cifrei de afaceri (lei)" in texts
     assert texts.count("[de completat]") == 2
+
+
+def test_unfilled_table_keeps_its_caption_marker(tmp_path: Path) -> None:
+    document = Document()
+    document.add_paragraph(TITLES["ch2"], style="Heading 1")
+    document.add_paragraph(TITLES["ch2.date_generale"], style="Heading 2")
+    document.add_paragraph("Tabelul [de completat]", style="Caption")
+    table = document.add_table(rows=2, cols=2)
+    for row in table.rows:
+        for cell in row.cells:
+            cell.text = "antet"
+    document.add_paragraph("[de completat]")
+    document.add_paragraph("Fig. [de completat]", style="Caption")
+    document.add_paragraph(TITLES["ch3"], style="Heading 1")
+    source, target = tmp_path / "base.docx", tmp_path / "out.docx"
+    document.save(source)
+    write_tables(source, target, chapter="ch2", fields=[])
+    texts = [paragraph.text for paragraph in Document(target).paragraphs]
+    assert "Tabelul [de completat]" in texts
+    assert "Fig. [de completat]" in texts
+
+
+def test_filled_caption_uses_the_base_title(tmp_path: Path) -> None:
+    document = Document()
+    document.add_paragraph(TITLES["ch2"], style="Heading 1")
+    document.add_paragraph(TITLES["ch2.date_generale"], style="Heading 2")
+    table_caption = document.add_paragraph("Tabelul 2.1 Numărul personalului", style="Caption")
+    table = document.add_table(rows=2, cols=2)
+    for row in table.rows:
+        for cell in row.cells:
+            cell.text = "antet"
+    document.add_paragraph("[de completat]")
+    chart_caption = document.add_paragraph("Fig. nr. 2.1 Evoluția personalului", style="Caption")
+    document.add_paragraph(TITLES["ch3"], style="Heading 1")
+    base, source, target = (tmp_path / name for name in ("base.docx", "source.docx", "out.docx"))
+    document.save(base)
+    table_caption.text = "Tabelul 2.1 [de completat]"
+    chart_caption.text = "Fig. nr. 2.1 [de completat]"
+    document.save(source)
+    write_tables(
+        source,
+        target,
+        chapter="ch2",
+        fields=[_field("audit.employees.2025", 7)],
+        caption_source=base,
+    )
+    texts = [paragraph.text for paragraph in Document(target).paragraphs]
+    assert "Tabelul 2.1 Numărul personalului (angajați)" in texts
+    assert "Fig. nr. 2.1 Evoluția personalului (angajați)" in texts
