@@ -207,7 +207,7 @@ def test_unavailable_support_fails_the_section_closed(
 
 def test_support_output_is_bounded_per_sentence(tmp_path: Path) -> None:
     _, support, _, _ = _run(tmp_path, [CH2_DRAFT])
-    assert support.limits == [16_000 + 40]
+    assert support.limits == [16_000 + 120]
 
 
 def test_an_answer_off_the_schema_takes_the_one_retry(tmp_path: Path) -> None:

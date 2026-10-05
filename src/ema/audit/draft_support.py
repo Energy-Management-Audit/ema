@@ -43,9 +43,11 @@ SUPPORT_PROMPT = (
     "client, or is technically wrong. Do not infer missing facts. Keep each reason under "
     "fifteen words."
 )
-# Per sentence: a verdict of at most 40 tokens, after the model's thinking (D2).
+# Per sentence: a verdict of at most 120 tokens (kind and reason), after the model's thinking
+# (D2). A call asks for at most 32,000 tokens of verdicts; a larger group is asked in batches.
 THINKING_TOKENS = 16_000
-VERDICT_TOKENS = 40
+VERDICT_TOKENS = 120
+MAX_VERDICT_TOKENS = 32_000
 MAX_OUTPUT_TOKENS = 65_536
 INTRO_WITHOUT_ITEMS = "list introduction without supported items"
 
@@ -102,26 +104,31 @@ def support_pass(
     flags: dict[str, list[DraftReview]] = {draft.section: [] for draft in drafts}
     if not sentences:
         return {section: () for section in flags}
+    request = support_request(drafts, facts)
+    size = MAX_VERDICT_TOKENS // VERDICT_TOKENS
+    verdicts: dict[tuple[str, int], Verdict] = {}
     try:
-        result = complete_json(
-            context,
-            SupportVerdicts,
-            SUPPORT_PROMPT,
-            json.dumps(support_request(drafts, facts), ensure_ascii=False),
-            max_output_tokens=support_allowance(len(sentences)),
-            schema_retries=0,
-        )
-        verdicts: dict[tuple[str, int], Verdict] = {}
-        for verdict in result.verdicts:
-            key = (verdict.location, verdict.sentence_index)
-            if key in verdicts:
-                # Two verdicts leave the sentence undecided: the whole answer is off the schema.
-                raise EmaError(
-                    "ai_schema",
-                    "Răspunsul AI nu respectă formatul cerut.",
-                    f"duplicate verdict {verdict.location}#{verdict.sentence_index}",
-                )
-            verdicts[key] = verdict
+        for start in range(0, len(request), size):
+            batch = request[start : start + size]
+            result = complete_json(
+                context,
+                SupportVerdicts,
+                SUPPORT_PROMPT,
+                json.dumps(batch, ensure_ascii=False),
+                max_output_tokens=support_allowance(len(batch)),
+                schema_retries=0,
+                thinking_tokens=THINKING_TOKENS,
+            )
+            for verdict in result.verdicts:
+                key = (verdict.location, verdict.sentence_index)
+                if key in verdicts:
+                    # Two verdicts leave the sentence undecided: the answer is off the schema.
+                    raise EmaError(
+                        "ai_schema",
+                        "Răspunsul AI nu respectă formatul cerut.",
+                        f"duplicate verdict {verdict.location}#{verdict.sentence_index}",
+                    )
+                verdicts[key] = verdict
     except EmaError as exc:
         raise EmaError(
             "support_unavailable",

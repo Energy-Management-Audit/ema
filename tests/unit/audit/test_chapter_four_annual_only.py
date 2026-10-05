@@ -1,14 +1,31 @@
 """Annual-only carriers keep their yearly evidence without empty monthly output."""
 
 import re
+from pathlib import Path
 
 import pytest
+from docx import Document
+from lxml import etree
 
+from ema.audit.chapter_four_annual import annual_carrier_table
 from ema.audit.chapter_four_blocks import chapter_four_blocks
 from ema.audit.chapter_four_chart_placement import place_chart_groups
 from ema.audit.chapter_four_charts import chapter_chart_groups, chart_blocks
 from ema.consumption_analysis.analysis import Metric, value
-from ema.core.office.blocks import Caption, Missing, NativeChart, Num, Paragraph, Ref, Table
+from ema.core.office.blocks import (
+    Caption,
+    ElementLocator,
+    Missing,
+    NativeChart,
+    Num,
+    Paragraph,
+    Prototypes,
+    Ref,
+    Table,
+    render,
+)
+from ema.core.office.missing_text import TABLE_MISSING_TEXT
+from ema.core.office.package import read_parts, write_parts
 from ema.energy_data.carriers import CARRIER_NAMES_RO, Carrier
 from ema.energy_data.factors import FACTORS_2026
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
@@ -66,14 +83,14 @@ def test_annual_only_fuels_have_annual_tables_charts_and_contiguous_captions() -
         charts = [block for block in body if isinstance(block, NativeChart)]
         assert len(tables) == len(captions) == 2
         assert len(charts) == 1
-        assert all(table.header == [["Anul", f"Valoare ({unit})"]] for table in tables)
+        assert all(table.header == [["Anul", "2023", "2024", "2025"]] for table in tables)
         assert all(
-            [row[0][0] for row in table.rows] == ["2023", "2024", "2025"] for table in tables
+            len(table.rows) == 1 and table.rows[0][0] == [f"Valoare ({unit})"] for table in tables
         )
         assert all(
-            isinstance(row[1][0], Num) and row[1][0].value is not None
+            isinstance(cell[0], Num) and cell[0].value is not None
             for table in tables
-            for row in table.rows
+            for cell in table.rows[0][1:]
         )
         for carrier in (Carrier.petrol, Carrier.diesel):
             sentence = (
@@ -92,9 +109,10 @@ def test_annual_only_fuels_have_annual_tables_charts_and_contiguous_captions() -
     specific_tables = [block for block in specific if isinstance(block, Table)]
     specific_captions = [block for block in specific if isinstance(block, Caption)]
     assert len(specific_tables) == len(specific_captions) == 2
-    assert all(table.header == [["Anul", "Valoare (tep/mii tone)"]] for table in specific_tables)
+    assert all(table.header == [["Anul", "2023", "2024", "2025"]] for table in specific_tables)
     assert all(
-        [row[0][0] for row in table.rows] == ["2023", "2024", "2025"] for table in specific_tables
+        table.rows == [[["Valoare (tep/mii tone)"], *table.rows[0][1:]]]
+        for table in specific_tables
     )
     assert len([block for block in specific if isinstance(block, NativeChart)]) == 1
     for carrier in (Carrier.petrol, Carrier.diesel):
@@ -165,3 +183,66 @@ def test_annual_only_fuels_leave_annual_tep_total_unchanged() -> None:
                 for y in annual_dataset.years
             ]
         )
+
+
+W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def _emissions_base(path: Path, columns: int) -> tuple[Prototypes, ElementLocator]:
+    """A base whose "emissions" prototype is horizontal: Sursa plus one column per year."""
+    doc = Document()
+    doc.add_heading("4.3 Test", level=2)
+    caption = doc.add_paragraph("Tabelul 4.1. Exemplu")
+    table = doc.add_table(rows=2, cols=columns)
+    for row in table.rows:
+        for cell in row.cells:
+            cell.text = "x"
+    doc.save(path)
+    prototypes = Prototypes({"caption": caption._p, "emissions": table._tbl}, chapter=4)
+    parts = read_parts(path)
+    root = etree.fromstring(parts["word/document.xml"])
+    body = root.find(W + "body")
+    assert body is not None
+    for node in list(body)[1:-1]:
+        body.remove(node)
+    parts["word/document.xml"] = etree.tostring(root, encoding="UTF-8")
+    write_parts(parts, path)
+    return prototypes, ElementLocator(1)
+
+
+@pytest.mark.parametrize("years", [(2023, 2024, 2025), (2024, 2025)])
+def test_the_annual_table_renders_on_the_horizontal_emissions_prototype(
+    tmp_path: Path, years: tuple[int, ...]
+) -> None:
+    dataset = EnergyDataset(
+        years,
+        {
+            Carrier.diesel: {
+                year: CarrierSeries(annual=None if year == 2024 else Reading(3, "t"))
+                for year in years
+            }
+        },
+        {},
+        {},
+    )
+    blocks = annual_carrier_table(
+        dataset,
+        FACTORS_2026,
+        Metric("carrier", (Carrier.diesel,)),
+        years,
+        "t",
+        label="Motorină",
+        section="ch4.carburant",
+    )
+    source, out = tmp_path / "base.docx", tmp_path / "out.docx"
+    prototypes, locator = _emissions_base(source, len(years) + 1)
+    render(source, out, locator, blocks, prototypes)
+    body = etree.fromstring(read_parts(out)["word/document.xml"]).find(W + "body")
+    assert body is not None
+    table = next(node for node in body if node.tag == W + "tbl")
+    rows = [
+        ["".join(text.text or "" for text in cell.iter(W + "t")) for cell in row.findall(W + "tc")]
+        for row in table.findall(W + "tr")
+    ]
+    printed = ["3,00" if year != 2024 else TABLE_MISSING_TEXT for year in years]
+    assert rows == [["Anul", *map(str, years)], ["Valoare (t)", *printed]]
