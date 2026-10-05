@@ -187,7 +187,11 @@ def run_group(
     except EmaError as exc:
         if exc.code not in {"ai_schema", "ai_truncated"}:
             return GroupResult(failed=dict.fromkeys(requested, exc))
-        retry_tokens = MAX_OUTPUT_TOKENS if exc.code == "ai_truncated" else group.allowance
+        retry_tokens = (
+            min(MAX_OUTPUT_TOKENS, 2 * group.allowance)
+            if exc.code == "ai_truncated"
+            else group.allowance
+        )
         drafts = {}
     else:
         retry_tokens = group.allowance

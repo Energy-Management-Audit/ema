@@ -1,4 +1,5 @@
-"""Mechanical traceability checks of a section draft: every name and number from a token."""
+"""Mechanical traceability checks of a section draft: every number from a token, every name
+from a token or a fact the text cites."""
 
 from __future__ import annotations
 
@@ -30,6 +31,7 @@ NAME = re.compile(
 )
 ACRONYM = re.compile(rf"(?<!\w)[{UPPER}]{{2,}}(?!\w)")
 SENTENCE_WORD = re.compile(rf"[{UPPER}][{LOWER}]+(?!\w)")
+CEDILLAS = str.maketrans("şţ", "st")
 FACT_GAP = re.compile(TOKEN.pattern + r"(\s*)")
 # A sentence does not end after an address or legal abbreviation, as in "nr. {{f:...}}", or
 # after an initial, as in "S.R.L.".
@@ -115,6 +117,11 @@ def folded(text: str) -> str:
     return "".join(
         char for char in unicodedata.normalize("NFKD", text) if not unicodedata.combining(char)
     ).casefold()
+
+
+def traced(text: str) -> str:
+    """Text as a name is matched against a cited value: folded, cedillas plain, spaces single."""
+    return " ".join(folded(text).translate(CEDILLAS).split())
 
 
 def literal_number(plain: str) -> bool:
@@ -233,6 +240,15 @@ def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> Draft
         }
         normal_plain = unicodedata.normalize("NFKC", plain).casefold()
         candidates.update(name for name in known_names if name and name in normal_plain)
+        # A name the item's cited passage holds is traceable, whether quoted or paraphrased (#137).
+        values = [
+            traced(str(facts[key].value))
+            for key in tokens
+            if citable_fact(draft.section, key, facts.get(key), job)
+        ]
+        candidates = {
+            name for name in candidates if not any(traced(name) in value for value in values)
+        }
         fatal.extend(DraftReview("literal_name", location, name) for name in sorted(candidates))
         for sentence in sentence_parts(item.text, facts):
             total += 1

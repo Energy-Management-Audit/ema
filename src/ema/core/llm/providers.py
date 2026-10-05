@@ -253,7 +253,12 @@ class GeminiProvider:
             "max_output_tokens": max_output_tokens,
         }
         if thinking_tokens is not None:
-            config["thinking_config"] = types.ThinkingConfig(thinking_budget=thinking_tokens)
+            # Gemini 3 ignores a token budget and thinks past it; it honours a level (#137).
+            config["thinking_config"] = (
+                types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)
+                if model.startswith("gemini-3")
+                else types.ThinkingConfig(thinking_budget=thinking_tokens)
+            )
         if tools:
             declarations = [
                 types.FunctionDeclaration(
@@ -307,4 +312,5 @@ class GeminiProvider:
             else None,
             (usage.cached_content_token_count or 0) if usage else 0,
             candidate.finish_reason.name if candidate and candidate.finish_reason else None,
+            (usage.thoughts_token_count or 0) if usage else 0,
         )

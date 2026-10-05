@@ -126,6 +126,7 @@ class ReplayProvider:
                 content,
                 int(usage.get("cachedContentTokenCount", 0)),
                 row["candidates"][0].get("finishReason"),
+                int(usage.get("thoughtsTokenCount", 0)),
             )
         message = row["choices"][0]["message"]
         usage = row["usage"]

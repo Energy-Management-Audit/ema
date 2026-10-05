@@ -22,7 +22,7 @@ def test_v10_approval_survives_upgrade_with_null_delivery_timestamp():
         db.execute("PRAGMA user_version=10")
         db.commit()
         migrate(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 12
+        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 13
         assert db.execute("SELECT * FROM approvals").fetchone() == (*row, None)
         migrate(db)
         assert db.execute("SELECT * FROM approvals").fetchone() == (*row, None)

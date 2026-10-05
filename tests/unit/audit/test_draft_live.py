@@ -219,7 +219,7 @@ def test_live_switch_off_sends_nothing(
     assert live.calls == []
 
 
-def test_one_call_per_chapter_drafts_its_sections_and_records_each_group(
+def test_one_call_per_chapter_drafts_chapter_three_first_and_records_each_group(
     tmp_path: Path, live: FakeLive
 ) -> None:
     ws = Workspace(tmp_path / "ws")
@@ -229,10 +229,11 @@ def test_one_call_per_chapter_drafts_its_sections_and_records_each_group(
 
     assert state == "ready"
     assert summary.drafted == dict.fromkeys((SECTION, CH2_OTHER, *CH3), "drafted")
+    # Chapter 3 goes first, so chapter 2 retries cannot spend its budget (#137).
     assert [(kind, names) for kind, names, _ in live.calls] == [
-        ("draft", (SECTION, CH2_OTHER)),
-        ("support", ()),
         ("draft", CH3),
+        ("support", ()),
+        ("draft", (SECTION, CH2_OTHER)),
         ("support", ()),
     ]
     # No audit base is configured, so each section counts as an unmeasured one.
@@ -264,7 +265,7 @@ def test_a_two_chapter_job_takes_at_most_six_logical_calls(tmp_path: Path, live:
     assert live.logical() == ["draft", "retry", "support"] * 2
     assert _logical_calls(ws, job) == 6
     # The retry carries only the failing section.
-    assert [names for kind, names, _ in live.calls if kind == "retry"] == [(SECTION,), (CH3[0],)]
+    assert [names for kind, names, _ in live.calls if kind == "retry"] == [(CH3[0],), (SECTION,)]
 
 
 def test_an_omitted_section_is_retried_then_fails_alone(tmp_path: Path, live: FakeLive) -> None:
@@ -278,17 +279,26 @@ def test_an_omitted_section_is_retried_then_fails_alone(tmp_path: Path, live: Fa
     assert summary.failed == {CH2_OTHER: "draft_incomplete"}
     assert set(summary.drafted) == {SECTION, *CH3}
     assert ("retry", (CH2_OTHER,)) in [(kind, names) for kind, names, _ in live.calls]
+    with ws.connect() as db:
+        log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")
+    (event,) = [json.loads(line) for line in log.splitlines() if '"draft_failed"' in line]
+    # The failure carries its issue codes, not only "draft_incomplete".
+    assert (event["section"], event["code"], event["detail"]) == (
+        CH2_OTHER,
+        "draft_incomplete",
+        "omitted",
+    )
 
 
 def test_day_quota_stops_the_remaining_groups(tmp_path: Path, live: FakeLive) -> None:
-    live.modes[SECTION] = "quota"
+    live.modes[CH3[0]] = "quota"
     ws = Workspace(tmp_path / "ws")
     job = _two_chapters(ws)
 
     summary, _ = _run(ws, job)
 
-    assert summary.failed == {SECTION: "ai_quota_day", CH2_OTHER: "ai_quota_day"}
-    assert summary.stopped == CH3
+    assert summary.failed == dict.fromkeys(CH3, "ai_quota_day")
+    assert summary.stopped == (SECTION, CH2_OTHER)
     assert summary.drafted == {}
     assert live.logical() == ["draft"]
 
@@ -307,8 +317,8 @@ def test_the_budget_stops_the_next_group_before_its_call(
 
     summary, _ = _run(ws, job)
 
-    assert set(summary.drafted) == {SECTION, CH2_OTHER}
-    assert summary.failed == dict.fromkeys(CH3, "ai_budget")
+    assert set(summary.drafted) == set(CH3)
+    assert summary.failed == dict.fromkeys((SECTION, CH2_OTHER), "ai_budget")
     assert live.logical() == ["draft", "support"]
     assert job_spend(ws, job) == pytest.approx(0.4)
 
@@ -347,7 +357,7 @@ def test_job_budget_spent_earlier_stops_the_stage_before_any_call(
     summary, _ = _run(ws, job)
 
     assert set(summary.failed.values()) == {"ai_budget"}
-    assert summary.stopped == CH3
+    assert summary.stopped == (SECTION, CH2_OTHER)
     assert live.calls == []
     with ws.connect() as db:
         log = (ws.job_path(db, job) / "log.jsonl").read_text(encoding="utf-8")

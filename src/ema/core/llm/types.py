@@ -37,6 +37,8 @@ class Exchange:
     provider_content: dict[str, Any] | None = None
     cached_input_tokens: int = 0
     finish_reason: str | None = None
+    # Thinking tokens, already counted in output_tokens.
+    thoughts_tokens: int = 0
 
 
 class Provider(Protocol):

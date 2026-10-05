@@ -15,6 +15,7 @@ from ema.core.errors import EmaError
 from ema.core.llm.models import Model, selected_model
 from ema.core.llm.replay import ReplayProvider
 from ema.core.llm.types import Exchange, Provider, ToolSpec
+from ema.core.logging import write_event
 from ema.core.workspace import Workspace
 from ema.core.workspace.lock import job_ai_lock
 
@@ -84,8 +85,9 @@ def record_call(
 ) -> None:
     with context.ws.connect() as db:
         db.execute(
-            "INSERT INTO llm_calls(job_id,section,provider,model,prompt_version,"
-            "input_tokens,output_tokens,estimated_cost_usd,duration_ms) VALUES(?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO llm_calls(job_id,section,provider,model,prompt_version,input_tokens,"
+            "output_tokens,thoughts_tokens,estimated_cost_usd,duration_ms) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?)",
             (
                 context.job,
                 context.section,
@@ -94,6 +96,7 @@ def record_call(
                 context.prompt_version,
                 exchange.input_tokens,
                 exchange.output_tokens,
+                exchange.thoughts_tokens,
                 cost,
                 duration_ms,
             ),
@@ -129,6 +132,7 @@ def call_with_budget(
     *,
     estimate: Callable[[], tuple[int, float]] | None = None,
     on_estimate: Callable[[int, float, float], None] | None = None,
+    thinking_tokens: int | None = None,
 ) -> Exchange:
     """Serialize a job's budget check and recorded provider exchange."""
     with context.ws.connect() as db:
@@ -151,6 +155,15 @@ def call_with_budget(
             model.cost(exchange.input_tokens, exchange.output_tokens, exchange.cached_input_tokens),
             int((time.monotonic() - started) * 1000),
         )
+        if thinking_tokens is not None and exchange.thoughts_tokens > thinking_tokens:
+            with context.ws.connect() as db, context.ws.job_log(db, context.job) as handle:
+                write_event(
+                    handle,
+                    "ai_thinking_over_cap",
+                    section=context.section,
+                    thoughts=exchange.thoughts_tokens,
+                    cap=thinking_tokens,
+                )
         return exchange
 
 

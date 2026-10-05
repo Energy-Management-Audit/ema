@@ -81,9 +81,11 @@ class RecordingProvider:
                         ),
                     }
                 ],
+                # Gemini counts thoughts apart from candidates; replay adds them back.
                 "usageMetadata": {
                     "promptTokenCount": response.input_tokens,
-                    "candidatesTokenCount": response.output_tokens,
+                    "candidatesTokenCount": response.output_tokens - response.thoughts_tokens,
+                    "thoughtsTokenCount": response.thoughts_tokens,
                     "cachedContentTokenCount": response.cached_input_tokens,
                 },
             }
