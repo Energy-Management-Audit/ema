@@ -94,6 +94,9 @@ def equipment_fields(equipment: NecesarEquipment, record: Recorder, sha: str) ->
             result.extend(_record_row(record, sha, family, number, row))
     for number, unit in enumerate(equipment.transformers, 1):
         for label, cell in unit.items():
+            numeric = isinstance(cell.value, int | float) and not isinstance(cell.value, bool)
+            kind = "year" if numeric and normal(label).startswith("an ") else None
+            unit_match = re.search(r"\[([^]]+)\]", label)
             result.append(
                 record(
                     f"{TRANSFORMER}{number}.{_property(label)}",
@@ -101,8 +104,8 @@ def equipment_fields(equipment: NecesarEquipment, record: Recorder, sha: str) ->
                     sha,
                     "questionnaire",
                     chapter="ch3",
-                    value_type=None,
-                    unit=None,
+                    value_type=kind,
+                    unit=cell.unit or (unit_match.group(1) if numeric and unit_match else None),
                     decimals=None,
                 )
             )
