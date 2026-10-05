@@ -180,6 +180,7 @@ def _production(dataset: EnergyDataset, factors: FactorTable, client: str) -> li
 def _specific(
     dataset: EnergyDataset,
     factors: FactorTable,
+    section: str,
     allowed: frozenset[Carrier] | None,
     *,
     water: bool = False,
@@ -207,7 +208,8 @@ def _specific(
                 continue
             label = TITLES[carrier] if carrier is not None else "Consum total"
             result.append(Paragraph("body", [label]))
-            if carrier is not None and annual_only(dataset.carriers[carrier]):
+            yearly = carrier is not None and annual_only(dataset.carriers[carrier])
+            if carrier is not None and yearly:
                 result.append(annual_only_sentence(carrier))
             unit = ("m³" if water else "tep") + "/" + dataset.production_unit[product]
             products = [
@@ -219,6 +221,12 @@ def _specific(
                 )
             ]
             name = dataset.production_name.get(product, "") if len(products) > 1 else None
+            if carrier is not None and yearly:
+                result.extend(
+                    annual_carrier_table(
+                        dataset, factors, metric, years, unit, label=label, section=section
+                    )
+                )
             result.extend(_annual(dataset, factors, metric, years, unit, label, product_name=name))
     return result or [Missing("body", "[de completat]")]
 
@@ -340,12 +348,13 @@ def chapter_four_blocks(  # noqa: C901, PLR0912
                 _specific(
                     dataset,
                     factors,
+                    section.id,
                     specific[section.id],
                     water=section.id == "ch4.specific_apa",
                 )
             )
         elif section.id == "ch4.specific_total":
-            blocks.extend(_specific(dataset, factors, None))
+            blocks.extend(_specific(dataset, factors, section.id, None))
         elif section.id == "ch4.intensitate":
             blocks.extend(intensity_table(dataset, factors))
             blocks.extend(

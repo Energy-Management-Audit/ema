@@ -89,16 +89,22 @@ def test_annual_only_fuels_have_annual_tables_charts_and_contiguous_captions() -
         }
         assert not any(isinstance(block, Table) and block.proto != "emissions" for block in body)
     specific = _section(blocks, "ch4.specific_carburant")
-    assert not any(isinstance(block, Table) for block in specific)
-    assert len([block for block in specific if isinstance(block, NativeChart)]) == 1
+    specific_tables = [block for block in specific if isinstance(block, Table)]
+    specific_captions = [block for block in specific if isinstance(block, Caption)]
+    assert len(specific_tables) == len(specific_captions) == 2
+    assert all(table.header == [["Anul", "Valoare (tep/mii tone)"]] for table in specific_tables)
     assert all(
-        Paragraph(
+        [row[0][0] for row in table.rows] == ["2023", "2024", "2025"] for table in specific_tables
+    )
+    assert len([block for block in specific if isinstance(block, NativeChart)]) == 1
+    for carrier in (Carrier.petrol, Carrier.diesel):
+        sentence = Paragraph(
             "body",
             [f"Pentru {CARRIER_NAMES_RO[carrier]} au fost transmise numai consumurile anuale."],
         )
-        in specific
-        for carrier in (Carrier.petrol, Carrier.diesel)
-    )
+        caption = next(c for c in specific_captions if carrier.value in c.id)
+        assert specific.index(sentence) < specific.index(caption)
+        assert caption.segments[:2] == ["Tabelul ", Ref("tab", caption.id)]
     table_ids = [block.id for block in blocks if isinstance(block, Caption)]
     assert len(table_ids) == len(set(table_ids))
     figure_numbers = [
@@ -124,6 +130,8 @@ def test_mixed_fuel_chart_keeps_monthly_carrier_and_all_annual_carriers() -> Non
     }
     blocks, skipped = chart_blocks("ch4.carburant", dataset, FACTORS_2026, "Client")
     charts = [block for block in blocks if isinstance(block, NativeChart)]
+    section = _section(chapter_four_blocks(dataset, FACTORS_2026), "ch4.carburant")
+    assert len([block for block in section if isinstance(block, Table)]) == 8
     assert not skipped
     assert len(charts) == 4
     assert all(

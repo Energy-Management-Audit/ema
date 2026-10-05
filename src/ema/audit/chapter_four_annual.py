@@ -58,22 +58,32 @@ def annual_carrier_table(  # noqa: PLR0913
     section: str,
 ) -> list[Block]:
     carrier = metric.carriers[0]
-    caption_id = f"{section}:{carrier.value}:annual"
+    caption_id = (
+        f"{section}:{carrier.value}:{metric.product}:annual"
+        if metric.product
+        else f"{section}:{carrier.value}:annual"
+    )
+    shown_unit, scale = display_unit(dataset, factors, (metric,), unit, years)
     rows: list[list[list[Segment]]] = []
     for year in years:
         number, fact = value(dataset, factors, metric, year, filed=False)
-        rows.append([[str(year)], [Num(number, 2, fact=fact)]])
+        rows.append(
+            [
+                [str(year)],
+                [Num(number * scale if number is not None else None, 2, fact=fact, scale=scale)],
+            ]
+        )
     return [
         Caption(
             "caption",
             "tab",
             caption_id,
-            ["Tabelul ", Ref("tab", caption_id), f". {label} ({unit})"],
+            ["Tabelul ", Ref("tab", caption_id), f". {label} ({shown_unit})"],
         ),
         Table(
             "emissions",
             rows,
-            header=[["Anul", f"Valoare ({unit})"]],
+            header=[["Anul", f"Valoare ({shown_unit})"]],
             missing_text=TABLE_MISSING_TEXT,
         ),
     ]
