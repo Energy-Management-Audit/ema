@@ -12,7 +12,7 @@ from tests.unit.audit.test_draft_checks import _fact
 from tests.unit.audit.test_draft_structured import DraftProvider, SupportProvider
 from tests.workspace_jobs import create_job
 
-from ema.audit import draft_chapter
+from ema.audit import draft_chapter, draft_plan
 from ema.audit.draft_agent import chapter_groups
 from ema.audit.draft_chapter import Passes, run_group, unit_issues
 from ema.audit.draft_plan import (
@@ -74,8 +74,12 @@ def _run(
     return provider, support, used, result, ws, job
 
 
-QUOTED = _draft(FLUX, "{{f:audit.equipment}}", "audit.equipment")
-FLOW = _draft(FLUX, "{{f:audit.process_sections}}", "audit.process_sections")
+DESCRIBED = _draft(FLUX, "Linia are utilaje {{c:audit.equipment}}.", "audit.equipment")
+FLOW = _draft(
+    FLUX,
+    "Piesele sunt spălate înainte de vopsire {{c:audit.process_sections}}.",
+    "audit.process_sections",
+)
 PARAPHRASED = _draft(
     CONSUMERS,
     "Consumatorii principali sunt utilajele liniei {{c:audit.equipment}}.",
@@ -126,9 +130,9 @@ def test_the_truncation_retry_never_asks_past_the_output_limit(
     assert provider.limits[1] == 20_000
 
 
-def test_a_passage_used_by_an_earlier_section_goes_back_with_what_is_used(tmp_path: Path) -> None:
-    provider, _, _, result, _, _ = _run(
-        tmp_path, [FLUX, CONSUMERS], [[QUOTED, PARAPHRASED], PARAPHRASED]
+def test_two_sections_may_not_describe_one_passage(tmp_path: Path) -> None:
+    provider, _, used, result, _, _ = _run(
+        tmp_path, [FLUX, CONSUMERS], [[DESCRIBED, PARAPHRASED], PARAPHRASED]
     )
     retry = provider.requests[1]
     assert [item["section"] for item in retry["request"]["sections"]] == [CONSUMERS]
@@ -136,20 +140,28 @@ def test_a_passage_used_by_an_earlier_section_goes_back_with_what_is_used(tmp_pa
         (CONSUMERS, "passage_reused")
     ]
     assert retry["request"]["used_passages"] == ["audit.equipment"]
-    assert retry["request"]["opening_sentences"] == {FLUX: "{{f:audit.equipment}}"}
-    assert result.failed[CONSUMERS].code == "draft_incomplete"  # type: ignore[attr-defined]
-
-
-def test_two_sections_may_not_paraphrase_one_passage(tmp_path: Path) -> None:
-    described = _draft(FLUX, "Linia are utilaje {{c:audit.equipment}}.", "audit.equipment")
-    provider, _, used, result, _, _ = _run(
-        tmp_path, [FLUX, CONSUMERS], [[described, PARAPHRASED], PARAPHRASED]
-    )
-    assert [(error["section"], error["rule"]) for error in provider.requests[1]["errors"]] == [
-        (CONSUMERS, "passage_reused")
-    ]
+    assert retry["request"]["opening_sentences"] == {
+        FLUX: "Linia are utilaje {{c:audit.equipment}}."
+    }
     assert set(result.drafted) == {FLUX}  # type: ignore[attr-defined]
+    assert result.failed[CONSUMERS].code == "draft_incomplete"  # type: ignore[attr-defined]
     assert used.passages == {"audit.equipment"}
+
+
+def test_unavailable_support_fails_every_section_of_the_group(tmp_path: Path) -> None:
+    # #143 fix round 1: none is accepted; each fails as support_unavailable and is redrafted
+    # on the next run.
+    ws = Workspace(tmp_path / "ws")
+    job = _job(ws, {"audit.equipment": EQUIPMENT, "audit.process_sections": "Piesele se spală."})
+    (group,), units = chapter_groups(ws, job, [FLUX, CONSUMERS])
+    provider, support = DraftProvider([[FLOW, PARAPHRASED]]), SupportProvider("not json")
+    passes = Passes(provider, support, default_model("openai").id, synthetic=True)
+    result = run_group(ws, job, group, passes, Used(), units)
+    assert result.drafted == {}
+    assert {section: exc.code for section, exc in result.failed.items()} == {
+        FLUX: "support_unavailable",
+        CONSUMERS: "support_unavailable",
+    }
 
 
 def test_unknown_and_duplicate_sections_are_dropped_and_logged(tmp_path: Path) -> None:
@@ -180,14 +192,15 @@ def test_unknown_and_duplicate_sections_are_dropped_and_logged(tmp_path: Path) -
 
 
 def test_a_section_still_failing_after_the_retry_fails_alone(tmp_path: Path) -> None:
-    filler = _draft(CONSUMERS, "Consumatorii sunt diverşi.")
+    counted = _draft(CONSUMERS, "Linia are două cuptoare.")
     provider, support, _, result, _, _ = _run(
-        tmp_path, [FLUX, CONSUMERS], [[QUOTED, filler], filler]
+        tmp_path, [FLUX, CONSUMERS], [[DESCRIBED, counted], counted]
     )
     assert set(result.drafted) == {FLUX}  # type: ignore[attr-defined]
     assert result.failed[CONSUMERS].code == "draft_incomplete"  # type: ignore[attr-defined]
-    # The accepted section only quotes its passage, which claims nothing to support.
-    assert (len(provider.requests), support.calls) == (2, 0)
+    # One support pass, over the accepted section only.
+    assert (len(provider.requests), support.calls) == (2, 1)
+    assert [item["location"] for item in support.requests[0]] == [f"{FLUX}:paragraph:0"]
 
 
 UNITS = {
@@ -242,16 +255,22 @@ def test_a_process_paragraph_cites_only_its_own_unit() -> None:
     assert [issue.code for issue in unit_issues(other, flux, UNITS)] == ["unit_outside"]
 
 
-def test_the_target_scales_her_own_words_by_the_facts_found() -> None:
+def test_a_section_with_a_fact_aims_at_her_full_length() -> None:
+    # #143 D5: her base section's own words, however few of its facts the dossier holds.
     facts = {"audit.water_supply": _fact("audit.water_supply", "reţea")}
     utilities = plan_section("ch3.utilitati", facts, Example("exemplu", 400), {})
     water = plan_section("ch3.apa", facts, Example("exemplu", 120), {})
-    assert (utilities.target, water.target) == (100, 120)
+    assert (utilities.target, water.target) == (400, 120)
     assert plan_section("ch3.apa", facts, None, {}).target is None
+    assert plan_section("ch3.apa", {}, Example("exemplu", 120), {}).target is None
     rejected = {
         "audit.water_supply": facts["audit.water_supply"].model_copy(update={"review": "rejected"})
     }
     assert plan_section("ch3.apa", rejected, Example("exemplu", 120), {}).target is None
+
+
+def test_the_share_scaling_is_gone() -> None:
+    assert not hasattr(draft_plan, "_share")
 
 
 def test_the_allowance_and_the_split_follow_the_targets() -> None:
@@ -273,14 +292,34 @@ def test_the_allowance_and_the_split_follow_the_targets() -> None:
     ]
 
 
-def test_her_longest_chapter_plans_as_one_group() -> None:
-    # Her longest chapter holds about 10,800 words of targets. One group per chapter keeps a
-    # two-chapter job at six logical calls at most: a draft, a retry and a support pass each.
-    plans = [SectionPlan(f"ch3.{index}", {}, 1350, "") for index in range(8)]
-    assert sum(plan.target or 0 for plan in plans) == 10_800
+# Own words of each ch. 3 section in the configured audit base (audit-01), measured by
+# style_examples; the sections it gives no own text count as UNMEASURED_WORDS.
+BASE_CH3_WORDS = {
+    "ch3.flux": 10,
+    "ch3.process": 1404,
+    "ch3.utilitati": 14,
+    "ch3.apa": 315,
+    "ch3.electricitate": 855,
+    "ch3.gaz": 537,
+    "ch3.carburant": 163,
+    "ch3.contorizare": 35,
+    "ch3.automatizare": 83,
+    "ch3.equipment": 330,
+}
+UNMEASURED_CH3 = ("ch3.aer_comprimat", "ch3.climatizare", "ch3.iluminat", "ch3.parc_auto")
+
+
+def test_chapter_three_at_full_length_still_plans_as_one_group() -> None:
+    # #143 D6: every ch. 3 section with a fact, at full length, and ch3.process at her unit text
+    # for each of audit-case-a's six process units (test_s10b_audit_base).
+    plans = [
+        SectionPlan(section, {}, words * 6 if section == "ch3.process" else words, "")
+        for section, words in BASE_CH3_WORDS.items()
+    ] + [SectionPlan(section, {}, None, "") for section in (*UNMEASURED_CH3, CONSUMERS)]
+    assert sum(plan.target or 0 for plan in plans) == 10_766
     (group,) = split(3, plans)
-    assert len(group.sections) == 8
-    assert group.allowance < MAX_OUTPUT_TOKENS
+    assert len(group.sections) == 15
+    assert group.allowance == allowance([10_766, *[None] * 5]) < MAX_OUTPUT_TOKENS
 
 
 def test_later_groups_receive_the_passages_earlier_groups_used(tmp_path: Path) -> None:

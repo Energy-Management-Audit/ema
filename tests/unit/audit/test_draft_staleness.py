@@ -65,7 +65,7 @@ def test_two_groups_with_a_filtered_shared_fact_publish_current_and_render_accep
         if item["section"] == "ch3.flux":
             result["paragraphs"] = [
                 DraftText(
-                    text="valoarea este {{f:audit.process_sections}}.",
+                    text="Valoarea este descrisă {{c:audit.process_sections}}.",
                     fact_ids=["audit.process_sections"],
                 ).model_dump()
             ]

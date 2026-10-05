@@ -52,7 +52,7 @@ CH3_DRAFT = SectionDraft(
     status="drafted",
     paragraphs=[
         DraftText(
-            text="Fluxul {{f:audit.process_sections}} este descris.",
+            text="Fluxul de asamblare este descris {{c:audit.process_sections}}.",
             fact_ids=["audit.process_sections"],
         )
     ],

@@ -15,23 +15,22 @@ from ema.audit.draft_schema import SectionDraft
 from ema.core.resources import resource_path
 from ema.core.review.models import Field
 
-PROMPT_VERSION = "audit-draft-v4"
+PROMPT_VERSION = "audit-draft-v5"
 SUPPORT_VERSION = PROMPT_VERSION + "-support"
 # The prompt's numbered rule each check enforces: a retry quotes it beside the error.
 RULES = {
     "literal_name": 1,
     "literal_number": 2,
-    "uncited_sentence": 4,
     "fact_refs": 5,
     "fact_missing": 6,
     "ai_mention": 7,
-    "passage_paragraph": 8,
-    "passage_order": 8,
+    "passage_verbatim": 8,
     "passage_reused": 9,
     "unit_missing": 14,
     "unit_passage": 14,
     "unit_outside": 14,
     "missing_status_invalid": 15,
+    "status_invalid": 16,
 }
 OMITTED_RULE = (
     "Fiecare secțiune cerută apare o singură dată în sections, cu id-ul ei exact, într-un "
@@ -42,7 +41,7 @@ _TITLES = {section.id: section.title for section in CATALOGUE}
 
 @cache
 def instructions() -> str:
-    return resource_path("audit", "prompts", "draft_v4.txt").read_text(encoding="utf-8").strip()
+    return resource_path("audit", "prompts", "draft_v5.txt").read_text(encoding="utf-8").strip()
 
 
 def rule_text(code: str) -> str:
