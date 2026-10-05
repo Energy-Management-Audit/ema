@@ -102,7 +102,11 @@ def test_corrected_month_recomputes_only_its_year(tmp_path: Path) -> None:
 def test_rejected_month_becomes_absent(tmp_path: Path) -> None:
     dataset = _parsed(tmp_path)
     result = reviewed_dataset(
-        dataset, [_field("carrier.natural_gas.2024.02", Decimal(10), review="rejected")]
+        dataset,
+        [
+            _field("carrier.natural_gas.2024.02", Decimal(10), review="rejected"),
+            _field("carrier.natural_gas.2024.03", Decimal(10), review="pending"),
+        ],
     )
     assert result.carriers[GAS][2024].months[2] == Reading(None, "MWh")
     assert 2024 not in result.filed_indicators["tep_total"]

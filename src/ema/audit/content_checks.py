@@ -5,13 +5,14 @@ from __future__ import annotations
 import sqlite3
 
 from ema.audit.ai_wording import ai_wording
+from ema.audit.carrier_gap import blocked_message
 from ema.audit.chapter_four_sentences import sentence_plan
 from ema.audit.render_dataset import reviewed_dataset
 from ema.audit.visit import slug
 from ema.core.review.models import Field, Issue
 from ema.core.review.section_transition import SectionState, Status
 from ema.energy_data.calc import tep
-from ema.energy_data.carriers import CARRIER_NAMES_RO, Carrier, counts_in_total
+from ema.energy_data.carriers import Carrier, counts_in_total
 from ema.energy_data.factors import AUDIT_FACTORS_2026, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
 
@@ -81,6 +82,7 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
     issues: list[Issue] = []
     dataset = _fields_dataset(fields)
     blockers = total_blockers(dataset, AUDIT_FACTORS_2026) if dataset is not None else []
+    series_by_carrier = dataset.carriers if dataset is not None else {}
     for carrier, year in blockers:
         key = f"carrier.{carrier.value}.{year}"
         annual = fields.get(key)
@@ -100,9 +102,8 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
             Issue(
                 code="data_total_blocked",
                 field_id=field_id,
-                message=(
-                    f"Totalul de energie din {year} lipseşte: completaţi cantitatea de "
-                    f"{CARRIER_NAMES_RO[carrier]}."
+                message=blocked_message(
+                    db, job, fields, series_by_carrier[carrier][year], carrier, year
                 ),
             )
         )

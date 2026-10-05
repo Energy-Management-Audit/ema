@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from typing import Any
 
 from ema.core.review.fields import decided
 from ema.core.review.models import Field
-from ema.energy_data.carriers import Carrier
+from ema.energy_data.carriers import Carrier, counts_in_total
 from ema.energy_data.model import CarrierSeries, EnergyDataset, FiledValue, Reading
+
+# Where a carrier's yearly spend sits among the Necesar's economic rows; the others have none.
+COST_KEYS: dict[Carrier, str] = {
+    Carrier.electricity_grid: "electricity_costs_lei",
+    Carrier.purchased_heat: "heat_costs_lei",
+    Carrier.natural_gas: "gas_costs_lei",
+    Carrier.diesel: "diesel_costs_lei",
+    Carrier.petrol: "petrol_costs_lei",
+    Carrier.lpg: "lpg_costs_lei",
+}
 
 
 def _value(field: Field) -> tuple[bool, Any]:
@@ -53,6 +63,33 @@ def _series(
     return True
 
 
+def carrier_cost(by_key: Mapping[str, Field], carrier: Carrier, year: int) -> Field | None:
+    """The carrier's positive, unrejected spend for the year: proof that the fuel was used."""
+    name = COST_KEYS.get(carrier)
+    field = by_key.get(f"audit.economics.{name}.{year}") if name else None
+    if field is None or field.review == "rejected" or field.value is None:
+        return None
+    return field if float(field.value) > 0 else None
+
+
+def _readings(series: CarrierSeries) -> list[Reading]:
+    return [*series.months.values(), *([series.annual] if series.annual else [])]
+
+
+def quantity_empty(series: CarrierSeries) -> bool:
+    """No positive quantity anywhere in the year: absent, or the sum of empty cells."""
+    return all(not reading.value for reading in _readings(series))
+
+
+def _marked_unused(by_key: Mapping[str, Field], carrier: Carrier, year: int) -> bool:
+    prefix = f"carrier.{carrier.value}.{year}"
+    annual = by_key.get(prefix)
+    months = [field for key, field in by_key.items() if key.startswith(f"{prefix}.")]
+    return (annual is not None and annual.review == "rejected") or (
+        bool(months) and all(field.review == "rejected" for field in months)
+    )
+
+
 class _Overlay:
     def __init__(self, dataset: EnergyDataset, fields: Iterable[Field]) -> None:
         self.dataset = dataset
@@ -92,6 +129,26 @@ class _Overlay:
             if _series(table, year, month, field.unit, value):
                 self.changed.add((carrier, year))
 
+    def settle_use(self) -> None:
+        """A carrier with no quantity in a year is dropped, unless its spend proves it was used."""
+        for carrier, years in list(self.carriers.items()):
+            if not counts_in_total(carrier):
+                continue
+            for year, series in list(years.items()):
+                if _marked_unused(self.by_key, carrier, year):
+                    del years[year]
+                    self.changed.add((carrier, year))
+                elif not quantity_empty(series):
+                    continue
+                elif carrier_cost(self.by_key, carrier, year) is None:
+                    del years[year]
+                else:
+                    if readings := _readings(series):
+                        years[year] = CarrierSeries(annual=Reading(None, readings[0].unit))
+                    self.changed.add((carrier, year))
+            if not years:
+                del self.carriers[carrier]
+
     def settle_filed(self) -> None:
         for carrier, year in self.changed:
             self.indicators.get("tep_total", {}).pop(year, None)
@@ -116,6 +173,10 @@ class _Overlay:
 def reviewed_dataset(dataset: EnergyDataset, fields: Iterable[Field]) -> EnergyDataset:
     """Decided values replace parsed ones; a rejected value is absent; the rest is untouched.
 
+    A counted carrier with no quantity in a year has no series that year, so ch. 4 and the content
+    checks agree; with a positive spend for that year its quantity stays missing instead. The
+    auditor's rejection of the year marks the fuel as not used.
+
     A changed carrier value drops the filed tep of that year so ch. 4 recomputes it instead of
     printing a stale total; untouched filed values keep their cell source.
     """
@@ -124,6 +185,7 @@ def reviewed_dataset(dataset: EnergyDataset, fields: Iterable[Field]) -> EnergyD
         counts, value = _value(field)
         if counts:
             overlay.apply(field, value)
+    overlay.settle_use()
     overlay.settle_filed()
     return replace(
         dataset,
