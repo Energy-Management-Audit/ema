@@ -124,7 +124,7 @@ def _toc_entry(prototype: Any, title: str, bookmark: str, number: str = "", leve
     return entry
 
 
-DEFAULT_TOC = ' TOC \\o "1-3" \\h \\z \\u '
+DEFAULT_TOC = ' TOC \\o "1-2" \\h \\z \\u '
 
 
 def _field_run(kind: str, level: int = 1) -> Any:
@@ -278,6 +278,12 @@ def _drop_blank_before_first_chapter(entries: list[Any], body: list[Any], spans:
         element.getparent().remove(element)
 
 
+def _insert_after(anchor: Any, entries: list[Any]) -> None:
+    for entry in entries:
+        anchor.addnext(entry)
+        anchor = entry
+
+
 def refresh_toc(document: Any) -> None:
     _clear_toc_italics(document)
     root = document.element.body
@@ -318,6 +324,8 @@ def refresh_toc(document: Any) -> None:
         if level > 3:
             continue
         normalize_body_heading(heading, level)
+        if level > 2:  # her audits list levels 1-2 only
+            continue
         heading_text = re.sub(r"^\s*\d+(?:\.\d+)*[.\s-]+", "", _text(heading))
         title = heading_text.upper() if level == 1 else titles[item.section_id]
         if level > 1 and (item.section_id == "ch3.process" or "{" in title):
@@ -326,13 +334,10 @@ def refresh_toc(document: Any) -> None:
         _bookmark(heading, bookmark, number)
         entries.append(_toc_entry(prototypes[min(level, 2)], title, bookmark, label, level))
         number += 1
-    previous = toc_heading
-    for entry in entries:
-        previous.addnext(entry)
-        previous = entry
+    _insert_after(toc_heading, entries)
     for element in toc:
         if not element.xpath('.//w:br[@w:type="page"]'):
             root.remove(element)
-    _wrap_in_field(entries, instruction)
+    _wrap_in_field(entries, re.sub(r'\\o\s+"1-\d+"', r'\\o "1-2"', instruction))
     _drop_blank_before_first_chapter(entries, body, spans)
     _follow_measures_chapter(body, spans, numbers)
