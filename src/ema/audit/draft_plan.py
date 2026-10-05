@@ -3,7 +3,8 @@
 
 A chapter whose targets exceed one call's output allowance splits, in catalogue order, into
 consecutive groups under it. The process passages split by unit (D3): ch3.process gets those of
-the 3.1.x units, ch3.flux the overview.
+the 3.1.x units, ch3.flux the overview. When no passage has a unit, ch3.process gets them all as
+one pool (#155 D1).
 """
 
 from __future__ import annotations
@@ -59,13 +60,25 @@ def _process_passage(key: str) -> bool:
     return fact_key(key) == AuditFact.PROCESS_SECTIONS
 
 
+def pooled(facts: Mapping[str, Field], units: Mapping[str, int | None]) -> bool:
+    """No process passage has a unit: they come from the permit and the description rather
+    than the flow schemes, so the overview would starve ch3.process of every one (#155 D1)."""
+    passages = [key for key in facts if _process_passage(key)]
+    return bool(passages) and all(units.get(key) is None for key in passages)
+
+
 def offered(
     section: str, facts: Mapping[str, Field], units: Mapping[str, int | None]
 ) -> dict[str, Field]:
-    """The section's facts, with each process passage given to its unit or to the overview."""
+    """The section's facts, with each process passage given to its unit or to the overview;
+    pooled, every passage goes to ch3.process."""
     if section not in {"ch3.flux", "ch3.process"}:
         return dict(facts)
     overview = section == "ch3.flux"
+    if pooled(facts, units):
+        return {
+            key: field for key, field in facts.items() if not (overview and _process_passage(key))
+        }
     return {
         key: field
         for key, field in facts.items()
@@ -84,11 +97,18 @@ def plan_section(
     general text making up the length the facts leave (#143 D5); none without one.
 
     A 3.1.x unit is a copy of the base's unit text, so ch3.process aims at that length for each
-    unit that has passages.
+    unit that has passages; pooled, at two units' length in unit 1, since her audits describe at
+    least two production sections.
     """
     own = offered(section, facts, units)
+    pool = section == "ch3.process" and pooled(facts, units)
     grouped: tuple[tuple[int, tuple[str, ...]], ...] = ()
-    if section == "ch3.process":
+    described = 0
+    if pool:
+        keys = sorted(key for key, field in own.items() if _process_passage(key) and usable(field))
+        grouped = ((1, tuple(keys)),)
+        described = 2 * bool(keys)
+    elif section == "ch3.process":
         grouped = tuple(
             (
                 number,
@@ -102,10 +122,11 @@ def plan_section(
             )
             for number in range(1, unit_count + 1)
         )
+        described = sum(bool(keys) for _, keys in grouped)
     if example is None or not example.words:
         target = None
     elif section == "ch3.process":
-        target = example.words * sum(bool(keys) for _, keys in grouped) or None
+        target = example.words * described or None
     else:
         target = example.words if any(usable(field) for field in own.values()) else None
     return SectionPlan(section, own, target, example.text if example else "", grouped)

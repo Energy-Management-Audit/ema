@@ -62,6 +62,8 @@ def unit_issues(
     """A ch3.process paragraph names its unit and cites only that unit's passages (D3)."""
     issues: list[DraftReview] = []
     count = len(plan.units)
+    # The plan's own pools, not the raw map: a pooled plan puts unitless passages in unit 1.
+    pools = dict(plan.units)
     for index, item in enumerate(draft.paragraphs):
         location = f"paragraph:{index}"
         if draft.section != "ch3.process":
@@ -74,7 +76,7 @@ def unit_issues(
         issues.extend(
             DraftReview("unit_passage", location, key)
             for key in ANY_TOKEN.findall(item.text)
-            if fact_key(key) == AuditFact.PROCESS_SECTIONS and units.get(key) != item.unit
+            if fact_key(key) == AuditFact.PROCESS_SECTIONS and key not in pools[item.unit]
         )
     return issues
 

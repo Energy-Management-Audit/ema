@@ -35,7 +35,7 @@ from ema.core.review.models import Evidence, Manual
 from ema.core.workspace import Workspace
 
 EQUIPMENT = "Linia are un cuptor de polimerizare şi o cabină de vopsire."
-FLUX, CONSUMERS = "ch3.flux", "ch3.consumatori"
+FLUX, CONSUMERS, PROCESS = "ch3.flux", "ch3.consumatori", "ch3.process"
 
 
 def _job(ws: Workspace, facts: dict[str, str]) -> str:
@@ -75,11 +75,13 @@ def _run(
 
 
 DESCRIBED = _draft(FLUX, "Linia are utilaje {{c:audit.equipment}}.", "audit.equipment")
+# Without a dossier no passage has a unit: the process passages pool in unit 1 (#155 D1).
 FLOW = _draft(
-    FLUX,
+    PROCESS,
     "Piesele sunt spălate înainte de vopsire {{c:audit.process_sections}}.",
     "audit.process_sections",
 )
+FLOW.paragraphs[0].unit = 1
 PARAPHRASED = _draft(
     CONSUMERS,
     "Consumatorii principali sunt utilajele liniei {{c:audit.equipment}}.",
@@ -88,9 +90,11 @@ PARAPHRASED = _draft(
 
 
 def test_one_call_drafts_two_sections(tmp_path: Path) -> None:
-    provider, support, used, result, _, _ = _run(tmp_path, [FLUX, CONSUMERS], [[FLOW, PARAPHRASED]])
-    assert [item["section"] for item in provider.requests[0]["sections"]] == [FLUX, CONSUMERS]
-    assert set(result.drafted) == {FLUX, CONSUMERS}  # type: ignore[attr-defined]
+    provider, support, used, result, _, _ = _run(
+        tmp_path, [PROCESS, CONSUMERS], [[FLOW, PARAPHRASED]]
+    )
+    assert [item["section"] for item in provider.requests[0]["sections"]] == [PROCESS, CONSUMERS]
+    assert set(result.drafted) == {PROCESS, CONSUMERS}  # type: ignore[attr-defined]
     assert (len(provider.requests), support.calls) == (1, 1)
     # A paraphrased passage is used as much as a quoted one.
     assert used.passages == {"audit.process_sections", "audit.equipment"}
@@ -112,8 +116,8 @@ class TruncatedDraft(DraftProvider):
 
 def test_truncated_chapter_retries_once_with_twice_the_allowance(tmp_path: Path) -> None:
     provider = TruncatedDraft()
-    _, _, _, result, _, _ = _run(tmp_path, [FLUX, CONSUMERS], [], provider)
-    assert set(result.drafted) == {FLUX, CONSUMERS}  # type: ignore[attr-defined]
+    _, _, _, result, _, _ = _run(tmp_path, [PROCESS, CONSUMERS], [], provider)
+    assert set(result.drafted) == {PROCESS, CONSUMERS}  # type: ignore[attr-defined]
     assert 2 * provider.limits[0] < MAX_OUTPUT_TOKENS == 65_536
     assert provider.limits[1] == min(65_536, 2 * provider.limits[0])
     assert provider.thinking == [THINKING_TOKENS, THINKING_TOKENS]
@@ -125,7 +129,7 @@ def test_the_truncation_retry_never_asks_past_the_output_limit(
 ) -> None:
     monkeypatch.setattr(draft_chapter, "MAX_OUTPUT_TOKENS", 20_000)
     provider = TruncatedDraft()
-    _run(tmp_path, [FLUX, CONSUMERS], [], provider)
+    _run(tmp_path, [PROCESS, CONSUMERS], [], provider)
     assert 2 * provider.limits[0] > 20_000
     assert provider.limits[1] == 20_000
 
@@ -153,20 +157,20 @@ def test_unavailable_support_fails_every_section_of_the_group(tmp_path: Path) ->
     # on the next run.
     ws = Workspace(tmp_path / "ws")
     job = _job(ws, {"audit.equipment": EQUIPMENT, "audit.process_sections": "Piesele se spală."})
-    (group,), units = chapter_groups(ws, job, [FLUX, CONSUMERS])
+    (group,), units = chapter_groups(ws, job, [PROCESS, CONSUMERS])
     provider, support = DraftProvider([[FLOW, PARAPHRASED]]), SupportProvider("not json")
     passes = Passes(provider, support, default_model("openai").id, synthetic=True)
     result = run_group(ws, job, group, passes, Used(), units)
     assert result.drafted == {}
     assert {section: exc.code for section, exc in result.failed.items()} == {
-        FLUX: "support_unavailable",
+        PROCESS: "support_unavailable",
         CONSUMERS: "support_unavailable",
     }
 
 
 def test_unknown_and_duplicate_sections_are_dropped_and_logged(tmp_path: Path) -> None:
     unknown = _draft("ch3.apa", "Apa vine din reţea {{c:audit.equipment}}.", "audit.equipment")
-    second = _draft(FLUX, "Fluxul are utilaje {{c:audit.equipment}}.", "audit.equipment")
+    second = _draft(PROCESS, "Fluxul are utilaje {{c:audit.equipment}}.", "audit.equipment")
     answer = json.dumps(
         {
             "sections": [
@@ -177,8 +181,8 @@ def test_unknown_and_duplicate_sections_are_dropped_and_logged(tmp_path: Path) -
             ]
         }
     )
-    provider, _, _, result, ws, job = _run(tmp_path, [FLUX, CONSUMERS], [answer, PARAPHRASED])
-    assert result.drafted[FLUX].draft == FLOW  # type: ignore[attr-defined]
+    provider, _, _, result, ws, job = _run(tmp_path, [PROCESS, CONSUMERS], [answer, PARAPHRASED])
+    assert result.drafted[PROCESS].draft == FLOW  # type: ignore[attr-defined]
     assert result.drafted[CONSUMERS].draft == PARAPHRASED  # type: ignore[attr-defined]
     assert [error["rule"] for error in provider.requests[1]["errors"]] == ["omitted"]
     with ws.connect() as db:
@@ -186,7 +190,7 @@ def test_unknown_and_duplicate_sections_are_dropped_and_logged(tmp_path: Path) -
     (event,) = [json.loads(line) for line in log.splitlines() if "draft_section_dropped" in line]
     assert event["sections"] == [
         {"section": CONSUMERS, "reason": "malformed"},
-        {"section": FLUX, "reason": "duplicate"},
+        {"section": PROCESS, "reason": "duplicate"},
         {"section": "ch3.apa", "reason": "unknown"},
     ]
 
@@ -253,6 +257,38 @@ def test_a_process_paragraph_cites_only_its_own_unit() -> None:
     other.paragraphs[0].unit = 1
     flux = plan_section(FLUX, PASSAGES, None, UNITS)
     assert [issue.code for issue in unit_issues(other, flux, UNITS)] == ["unit_outside"]
+
+
+UNITLESS: dict[str, int | None] = dict.fromkeys(UNITS)
+
+
+def test_unitless_passages_pool_on_the_process_and_leave_the_flux() -> None:
+    # #155 D1: two units' length in unit 1; the flux keeps only its other facts.
+    process = plan_section("ch3.process", PASSAGES, Example("", 100), UNITLESS, 6)
+    assert process.units == ((1, tuple(sorted(UNITLESS))),)
+    assert set(process.facts) == {*UNITLESS, "audit.equipment"}
+    assert process.target == 200
+    flux = plan_section(FLUX, PASSAGES, Example("", 10), UNITLESS)
+    assert set(flux.facts) == {"audit.equipment"}
+    only = {key: PASSAGES[key] for key in UNITLESS}
+    assert plan_section(FLUX, only, Example("", 10), UNITLESS) == (
+        SectionPlan(FLUX, {}, None, "", ())
+    )
+    # An unreadable dossier gives no units at all: the same pool.
+    assert plan_section("ch3.process", PASSAGES, None, {}, 1).units == process.units
+
+
+def test_a_pooled_paragraph_may_cite_any_passage_of_the_pool() -> None:
+    plan = plan_section("ch3.process", PASSAGES, None, UNITLESS, 6)
+    text = " ".join(f"{{{{f:{key}}}}}" for key in UNITLESS)
+    draft = SectionDraft(
+        section="ch3.process",
+        status="drafted",
+        paragraphs=[DraftText(text=text, fact_ids=list(UNITLESS), unit=1)],
+    )
+    assert unit_issues(draft, plan, UNITLESS) == []
+    draft.paragraphs[0].unit = 2
+    assert [issue.code for issue in unit_issues(draft, plan, UNITLESS)] == ["unit_missing"]
 
 
 def test_a_section_with_a_fact_aims_at_her_full_length() -> None:

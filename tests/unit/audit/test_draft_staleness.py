@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -49,28 +48,22 @@ def test_two_groups_with_a_filtered_shared_fact_publish_current_and_render_accep
     def two_groups(ws: Workspace, job: str, selected: list[str], facts=None):
         groups, units = original_groups(ws, job, selected, facts)
         (group,) = groups
-        assert "audit.process_sections" in group.sections[0].facts
-        assert "audit.process_sections" not in group.sections[1].facts
+        # No dossier, so no passage has a unit: the passage pools on ch3.process (#155 D1).
+        assert "audit.process_sections" not in group.sections[0].facts
+        assert "audit.process_sections" in group.sections[1].facts
         flux, process = group.sections
-        return [
-            Group("3-1", 3, (flux,)),
-            Group("3-2", 3, (replace(process, units=((1, ()),)),)),
-        ], units
+        return [Group("3-1", 3, (flux,)), Group("3-2", 3, (process,))], units
 
     monkeypatch.setattr(draft_live, "chapter_groups", two_groups)
     original_draft = FakeLive._draft
 
     def draft(item: dict[str, Any], *, invalid: bool) -> dict[str, Any]:
         result = original_draft(item, invalid=invalid)
-        if item["section"] == "ch3.flux":
-            result["paragraphs"] = [
-                DraftText(
-                    text="Valoarea este descrisă {{c:audit.process_sections}}.",
-                    fact_ids=["audit.process_sections"],
-                ).model_dump()
-            ]
-        elif item["section"] == "ch3.process":
-            result["paragraphs"][0]["unit"] = 1
+        key = "audit.equipment" if item["section"] == "ch3.flux" else "audit.process_sections"
+        paragraph = DraftText(text=f"Valoarea este descrisă {{{{c:{key}}}}}.", fact_ids=[key])
+        if item["section"] == "ch3.process":
+            paragraph.unit = 1
+        result["paragraphs"] = [paragraph.model_dump()]
         return result
 
     monkeypatch.setattr(live, "_draft", draft)

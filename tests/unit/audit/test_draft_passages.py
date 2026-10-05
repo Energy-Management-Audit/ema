@@ -21,8 +21,8 @@ from ema.core.review.fields import propose
 from ema.core.review.models import Evidence, Manual
 from ema.core.workspace import Workspace
 
-# Passages from no flow scheme or Fişa block are the overview, which ch3.flux describes (D3).
-SECTION = "ch3.flux"
+# Passages from no flow scheme or Fişa block pool in the first 3.1.x unit (#155 D1).
+SECTION = "ch3.process"
 PASSAGES = {
     "audit.process_sections": "Piesele sunt degresate într-o baie alcalină şi clătite.",
     "audit.process_sections.2": "Piesele uscate trec în cabina de vopsire electrostatică.",
@@ -31,7 +31,7 @@ PASSAGES = {
 
 
 def paragraph(text: str, *keys: str, kind: Literal["body", "bullet"] = "body") -> DraftText:
-    return DraftText(text=text, fact_ids=list(keys), kind=kind)
+    return DraftText(text=text, fact_ids=list(keys), kind=kind, unit=1)
 
 
 INTRO = "Vopsirea în câmp electrostatic asigură o acoperire uniformă a pieselor metalice."

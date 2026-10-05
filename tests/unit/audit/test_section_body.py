@@ -330,7 +330,7 @@ def test_two_absent_sections_clone_sibling_heading_and_body(tmp_path: Path) -> N
     ]
 
 
-def test_process_draft_fills_the_first_unit_and_marks_the_others(tmp_path: Path) -> None:
+def test_a_unitless_process_draft_fills_the_first_unit_and_drops_the_others(tmp_path: Path) -> None:
     document = Document()
     document.add_paragraph(TITLES["ch3"], style="Heading 1")
     document.add_paragraph(TITLES["ch3.flux"], style="Heading 2")
@@ -360,6 +360,7 @@ def test_process_draft_fills_the_first_unit_and_marks_the_others(tmp_path: Path)
         job="synthetic",
     )
     assert _texts(output).count("proces test.") == 1
+    assert "DESCRIEREA SECȚIEI Beta" not in _texts(output)
 
 
 def test_each_process_unit_renders_only_its_own_paragraphs(tmp_path: Path) -> None:

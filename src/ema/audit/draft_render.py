@@ -211,9 +211,14 @@ def render_section(
         if _insert_absent_section(document, draft.section, spans):
             source = Path(directory) / "with-section.docx"
             document.save(str(source))
-        by_unit = draft.section == "ch3.process" and any(
-            item.unit is not None for item in draft.paragraphs
+        process = draft.section == "ch3.process"
+        # #155 D2: a draft over the single pool of unitless passages belongs to unit 1 alone.
+        pooled = (
+            process
+            and bool(draft.paragraphs)
+            and all(item.unit in {None, 1} for item in draft.paragraphs)
         )
+        by_unit = process and not pooled and any(item.unit is not None for item in draft.paragraphs)
         replace_section_body(
             source,
             output,
@@ -221,6 +226,7 @@ def render_section(
             draft_blocks(draft, facts, issues),
             keep_base=True,
             unit_blocks=partial(draft_blocks, draft, facts, issues) if by_unit else None,
+            pooled=pooled,
         )
     return check
 
