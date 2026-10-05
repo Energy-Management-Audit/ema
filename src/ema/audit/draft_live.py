@@ -84,8 +84,9 @@ def _draft_all(
     drafted: dict[str, str] = {}
     failed: dict[str, str] = {}
     ctx.record_input(prompt=PROMPT_VERSION, model=model_id)
+    facts = job_facts(ctx.ws, ctx.job)
     recompute_ready(ctx.ws, ctx.job)
-    groups, units = chapter_groups(ctx.ws, ctx.job, sections)
+    groups, units = chapter_groups(ctx.ws, ctx.job, sections, facts)
     # Chapter 3 first: budget spent on chapter 2 retries no longer leaves it undrafted (#137).
     groups = sorted(groups, key=lambda group: -group.chapter)
     used = {2: Used(), 3: Used()}
@@ -94,7 +95,7 @@ def _draft_all(
         passes = live_passes(provider, model_id, ctx.artifact_dir(), group.id)
         result = run_group(ctx.ws, ctx.job, group, passes, used[group.chapter], units)
         for section, done in result.drafted.items():
-            write_section(ctx, done, ready=True)
+            write_section(ctx, done, ready=True, facts=facts)
             drafted[section] = done.draft.status
         for section, exc in result.failed.items():
             failed[section] = failure_code(exc)
