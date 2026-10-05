@@ -258,8 +258,8 @@ def test_exhausted_budget_leaves_no_notes_and_a_warning(
     [
         (PANEL, []),
         ("Tabloul general TG 1 alimentează hala, conform cerințelor ANRE.", []),
-        # A capitalised word after the opening one makes it a name candidate (fix round 1).
-        ("Tabloul TG 1 alimentează hala.", ["literal_name"]),
+        # An ordinary opening word may precede a name the label holds (fix round 2).
+        ("Tabloul TG 1 alimentează hala.", []),
         ("Textul a fost generat automat pentru acest tablou.", ["ai_wording"]),
         ("Tabloul alimentează hala. Este important. Măsurătorile îl descriu.", ["length"]),
         (" ".join(["cuvânt"] * 46) + ".", ["length"]),

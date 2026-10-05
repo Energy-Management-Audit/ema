@@ -57,8 +57,8 @@ MAX_WORDS = 45
 TOKENS_PER_NOTE = 250
 ACTIVITY_FACTS = frozenset({AuditFact.BUSINESS_ACTIVITY, AuditFact.CAEN_DESCRIPTION})
 DIGITS = re.compile(r"\d+")
-# A sentence's opening capitalised words, as "Compresorul" or "Atlas Copco".
-OPENING = re.compile(rf"^[{UPPER}][\w-]*(?:\s+[{UPPER}][\w-]*)*")
+# A sentence's opening capitalised word, as "Compresorul" or "ABB".
+OPENING = re.compile(rf"^[{UPPER}][\w-]*")
 
 
 class EquipmentNote(BaseModel):
@@ -119,20 +119,16 @@ def activity(facts: Mapping[str, Field]) -> list[str]:
 
 
 def _openings(text: str) -> list[str]:
-    """Opening words that look like a name: followed by another capitalised word, all caps, or
-    with a digit. One ordinary capitalised word, as "Compresorul", only starts a sentence."""
+    """Opening words that look like a name: all caps or with a digit. An ordinary capitalised
+    word, as "Compresorul", only starts a sentence; the words after it are name candidates
+    already, so "Atlas Copco" still fails on "Copco"."""
     found: list[str] = []
     for sentence in sentence_parts(text, {}):
         match = OPENING.match(sentence)
         if match is None:
             continue
-        words = match.group().split()
-        first = words[0]
-        if (
-            len(words) > 1
-            or any(char.isdigit() for char in first)
-            or (len(first) >= 2 and first.isupper())
-        ):
+        first = match.group()
+        if any(char.isdigit() for char in first) or (len(first) >= 2 and first.isupper()):
             found.append(first)
     return found
 
