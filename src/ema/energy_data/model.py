@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -59,6 +60,15 @@ class CarrierSeries:
     def __post_init__(self) -> None:
         if any(not 1 <= month <= 12 for month in self.months):
             raise ValueError("month must be 1..12")
+
+
+def annual_only(series_by_year: Mapping[int, CarrierSeries]) -> bool:
+    return bool(series_by_year) and all(
+        series.annual is not None
+        and series.annual.value is not None
+        and all(reading.value is None for reading in series.months.values())
+        for series in series_by_year.values()
+    )
 
 
 @dataclass(frozen=True)

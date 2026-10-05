@@ -6,8 +6,9 @@ from collections.abc import Mapping
 from dataclasses import replace
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.chapter_four_annual import annual as _annual
+from ema.audit.chapter_four_annual import annual_carrier_table, annual_only_sentence
 from ema.audit.chapter_four_chart_text import is_turnover_unit
-from ema.audit.chapter_four_chart_values import display_unit
 from ema.audit.chapter_four_intensity import intensity_table
 from ema.audit.chapter_four_sentences import sentence_plan
 from ema.audit.chapter_four_water import without_empty_water
@@ -22,10 +23,10 @@ from ema.core.office.blocks import (
     Segment,
     Table,
 )
-from ema.core.office.missing_text import MISSING_TEXT, TABLE_MISSING_NOTE, TABLE_MISSING_TEXT
+from ema.core.office.missing_text import TABLE_MISSING_NOTE, TABLE_MISSING_TEXT
 from ema.energy_data.carriers import CARRIER_NAMES_RO, WATER_CARRIERS, Carrier, counts_in_total
 from ema.energy_data.factors import FactorTable
-from ema.energy_data.model import EnergyDataset
+from ema.energy_data.model import EnergyDataset, annual_only
 
 TITLES = {
     Carrier.electricity_grid: "Consumul de energie electrică din rețea",
@@ -55,44 +56,6 @@ ELECTRIC = frozenset({Carrier.electricity_grid})
 PV = frozenset({Carrier.electricity_pv})
 GAS = frozenset({Carrier.natural_gas})
 FUEL = frozenset({Carrier.diesel, Carrier.petrol, Carrier.lpg, Carrier.fuel_oil, Carrier.clu})
-
-
-def _annual(  # noqa: PLR0913
-    dataset: EnergyDataset,
-    factors: FactorTable,
-    metric: Metric,
-    years: tuple[int, ...],
-    unit: str,
-    label: str,
-    *,
-    product_name: str | None = None,
-) -> list[Block]:
-    result: list[Block] = []
-    numbers = [value(dataset, factors, metric, year, filed=False) for year in years]
-    shown_unit, scale = display_unit(dataset, factors, (metric,), unit, years)
-    for year, (number, fact) in zip(years, numbers, strict=True):
-        if metric.kind in {"specific", "water_specific", "intensity"}:
-            if number is None:
-                product = f"{product_name or MISSING_TEXT}: " if product_name is not None else ""
-                result.append(Missing("body", f"{product}pentru anul {year}: {MISSING_TEXT};"))
-                continue
-            prefix: list[Segment] = (
-                [product_name or Num(None, 0), ": "] if product_name is not None else []
-            )
-            result.append(
-                Paragraph(
-                    "body",
-                    [
-                        *prefix,
-                        f"pentru anul {year} s-a înregistrat o valoare de ",
-                        Num(number * scale, 2, shown_unit, fact, scale=scale),
-                        ";",
-                    ],
-                )
-            )
-        else:
-            result.append(Paragraph("body", [f"{label} {year}: ", Num(number, 2, unit, fact), "."]))
-    return result
 
 
 def _monthly(  # noqa: PLR0913
@@ -168,7 +131,16 @@ def _carriers(
         series = dataset.carriers[carrier][years[0]]
         reading = series.annual or next(iter(series.months.values()), None)
         unit = "tep" if equivalent else reading.unit if reading else ""
-        result.extend(_monthly(dataset, factors, section, metric, years, label, unit=unit))
+        if annual_only(dataset.carriers[carrier]):
+            result.append(annual_only_sentence(carrier))
+            result.extend(
+                annual_carrier_table(
+                    dataset, factors, metric, years, unit, label=label, section=section
+                )
+            )
+            result.extend(_annual(dataset, factors, metric, years, unit, "Total anual"))
+        else:
+            result.extend(_monthly(dataset, factors, section, metric, years, label, unit=unit))
     return result or [Missing("body", "[de completat]")]
 
 
@@ -208,6 +180,7 @@ def _production(dataset: EnergyDataset, factors: FactorTable, client: str) -> li
 def _specific(
     dataset: EnergyDataset,
     factors: FactorTable,
+    section: str,
     allowed: frozenset[Carrier] | None,
     *,
     water: bool = False,
@@ -235,6 +208,9 @@ def _specific(
                 continue
             label = TITLES[carrier] if carrier is not None else "Consum total"
             result.append(Paragraph("body", [label]))
+            yearly = carrier is not None and annual_only(dataset.carriers[carrier])
+            if carrier is not None and yearly:
+                result.append(annual_only_sentence(carrier))
             unit = ("m³" if water else "tep") + "/" + dataset.production_unit[product]
             products = [
                 key
@@ -245,6 +221,12 @@ def _specific(
                 )
             ]
             name = dataset.production_name.get(product, "") if len(products) > 1 else None
+            if carrier is not None and yearly:
+                result.extend(
+                    annual_carrier_table(
+                        dataset, factors, metric, years, unit, label=label, section=section
+                    )
+                )
             result.extend(_annual(dataset, factors, metric, years, unit, label, product_name=name))
     return result or [Missing("body", "[de completat]")]
 
@@ -366,12 +348,13 @@ def chapter_four_blocks(  # noqa: C901, PLR0912
                 _specific(
                     dataset,
                     factors,
+                    section.id,
                     specific[section.id],
                     water=section.id == "ch4.specific_apa",
                 )
             )
         elif section.id == "ch4.specific_total":
-            blocks.extend(_specific(dataset, factors, None))
+            blocks.extend(_specific(dataset, factors, section.id, None))
         elif section.id == "ch4.intensitate":
             blocks.extend(intensity_table(dataset, factors))
             blocks.extend(
