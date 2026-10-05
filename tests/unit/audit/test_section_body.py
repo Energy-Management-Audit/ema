@@ -113,7 +113,7 @@ def test_paragraphs_replace_the_whole_region_whatever_its_length(tmp_path: Path)
     assert _texts(output)[1] == "Introducerea capitolului"
 
 
-def test_flagged_items_and_missing_status_become_markers(tmp_path: Path) -> None:
+def test_a_flagged_item_is_dropped_and_missing_status_is_a_marker(tmp_path: Path) -> None:
     base, output = _base(tmp_path / "base.docx"), tmp_path / "out.docx"
     draft = _draft(
         paragraphs=[
@@ -124,7 +124,7 @@ def test_flagged_items_and_missing_status_become_markers(tmp_path: Path) -> None
     flagged = (DraftReview("unsupported", "paragraph:0", "claim"),)
     render_section(base, output, draft, FACTS, flagged, job="synthetic")
     written = _section(output)
-    assert written == ["[de completat]", "Firma Atelier Exemplu.", "Tabelul 2. [de completat]"]
+    assert written == ["Firma Atelier Exemplu.", "Tabelul 2. [de completat]"]
     missing = SectionDraft(
         section="ch2.date_generale",
         status="missing",
@@ -144,14 +144,15 @@ def test_flagged_items_and_missing_status_become_markers(tmp_path: Path) -> None
 @pytest.mark.parametrize(
     ("flagged", "expected"),
     [
-        ((1,), "prima Atelier Exemplu. [de completat] ultima Atelier Exemplu."),
+        ((1,), "prima Atelier Exemplu. ultima Atelier Exemplu."),
+        # A section left without text is the marker.
         ((0, 1, 2), "[de completat]"),
-        ((0,), "[de completat] mijloc Atelier Exemplu. ultima Atelier Exemplu."),
-        ((2,), "prima Atelier Exemplu. mijloc Atelier Exemplu. [de completat]"),
-        ((0, 1), "[de completat] ultima Atelier Exemplu."),
+        ((0,), "mijloc Atelier Exemplu. ultima Atelier Exemplu."),
+        ((2,), "prima Atelier Exemplu. mijloc Atelier Exemplu."),
+        ((0, 1), "ultima Atelier Exemplu."),
     ],
 )
-def test_only_flagged_sentences_become_markers(
+def test_only_flagged_sentences_are_dropped(
     tmp_path: Path, flagged: tuple[int, ...], expected: str
 ) -> None:
     sentences = [f"{word} {{{{f:audit.company_name}}}}." for word in ("prima", "mijloc", "ultima")]
@@ -169,15 +170,15 @@ def test_only_flagged_sentences_become_markers(
     [
         (
             "mijloc {{f:audit.company_name}}. ultima {{f:audit.company_name}}",
-            "prima Atelier Exemplu. [de completat]",
+            "prima Atelier Exemplu.",
         ),
         (
             "mijloc {{f:audit.company_name}}",
-            "prima Atelier Exemplu. [de completat] ultima Atelier Exemplu.",
+            "prima Atelier Exemplu. ultima Atelier Exemplu.",
         ),
     ],
 )
-def test_fragment_flags_mark_overlapping_sentences(
+def test_fragment_flags_drop_overlapping_sentences(
     tmp_path: Path, flag: str, expected: str
 ) -> None:
     text = " ".join(
@@ -242,7 +243,7 @@ def test_draft_creates_absent_activity_section(tmp_path: Path) -> None:
         status="drafted",
         paragraphs=[
             DraftText(
-                text="activitatea {{f:audit.business_activity}}.",
+                text="activitatea industrială {{c:audit.business_activity}}.",
                 fact_ids=["audit.business_activity"],
             )
         ],
@@ -287,7 +288,7 @@ def test_two_absent_sections_clone_sibling_heading_and_body(tmp_path: Path) -> N
         draft = SectionDraft(
             section=section_id,
             status="drafted",
-            paragraphs=[DraftText(text=f"{{{{f:{key}}}}}", fact_ids=[key])],
+            paragraphs=[DraftText(text=f"Descriere {{{{c:{key}}}}}.", fact_ids=[key])],
         )
         render_section(current, output, draft, {key: _fact(key, "x")}, (), job="synthetic")
         current = output
@@ -345,7 +346,8 @@ def test_process_draft_fills_the_first_unit_and_marks_the_others(tmp_path: Path)
         status="drafted",
         paragraphs=[
             DraftText(
-                text="proces {{f:audit.process_sections}}.", fact_ids=["audit.process_sections"]
+                text="proces test {{c:audit.process_sections}}.",
+                fact_ids=["audit.process_sections"],
             )
         ],
     )
@@ -376,8 +378,8 @@ def test_each_process_unit_renders_only_its_own_paragraphs(tmp_path: Path) -> No
         section="ch3.process",
         status="drafted",
         paragraphs=[
-            DraftText(text=f"prima {{{{f:{keys[0]}}}}}.", fact_ids=[keys[0]], unit=1),
-            DraftText(text=f"urmează {{{{f:{keys[1]}}}}}.", fact_ids=[keys[1]], unit=2),
+            DraftText(text=f"prima etapă {{{{c:{keys[0]}}}}}.", fact_ids=[keys[0]], unit=1),
+            DraftText(text=f"urmează vopsirea {{{{c:{keys[1]}}}}}.", fact_ids=[keys[1]], unit=2),
         ],
     )
     facts = {key: _fact(key, f"etapa {index}") for index, key in enumerate(keys, 1)}
@@ -385,7 +387,7 @@ def test_each_process_unit_renders_only_its_own_paragraphs(tmp_path: Path) -> No
     texts = _texts(output)
     units = [texts.index(f"DESCRIEREA SECȚIEI {name}") for name in ("Alpha", "Beta", "Gamma")]
     assert [texts[index + 1] for index in units] == [
-        "prima etapa 1.",
-        "urmează etapa 2.",
+        "prima etapă.",
+        "urmează vopsirea.",
         "[de completat]",
     ]

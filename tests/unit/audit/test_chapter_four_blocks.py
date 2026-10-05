@@ -312,7 +312,8 @@ def test_year_blocks_have_two_six_month_tables_with_unit_captions() -> None:
         (2024, 2025),
         {
             Carrier.electricity_grid: {
-                year: CarrierSeries(annual=Reading(10, "MWh")) for year in (2024, 2025)
+                year: CarrierSeries({1: Reading(10, "MWh")}, Reading(10, "MWh"))
+                for year in (2024, 2025)
             }
         },
         turnover_lei={year: Reading(1_000_000, "lei") for year in (2024, 2025)},

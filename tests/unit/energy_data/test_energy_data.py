@@ -15,7 +15,14 @@ from ema.energy_data.calc import (
 )
 from ema.energy_data.carriers import ALIASES, Carrier, carrier_for
 from ema.energy_data.factors import FACTORS_2026, Factor, FactorTable
-from ema.energy_data.model import CarrierSeries, Derived, EnergyDataset, Reading, field_key
+from ema.energy_data.model import (
+    CarrierSeries,
+    Derived,
+    EnergyDataset,
+    Reading,
+    annual_only,
+    field_key,
+)
 from ema.energy_data.reconcile import reconcile
 
 
@@ -104,6 +111,20 @@ def test_annual_only_carrier_uses_filed_total_and_contributes_to_share() -> None
     assert monthly.value is None
     assert monthly.missing == (field_key("carrier", pv.value, year, 1),)
     assert shares(ds, factors, year)[pv].value == pytest.approx(25)
+
+
+def test_annual_only_requires_annual_values_and_no_monthly_values() -> None:
+    annual = Reading(0, "t")
+    empty_month = Reading(None, "t")
+    assert annual_only(
+        {2024: CarrierSeries(annual=annual), 2025: CarrierSeries({1: empty_month}, annual)}
+    )
+    assert not annual_only(
+        {2024: CarrierSeries(annual=annual), 2025: CarrierSeries({1: Reading(1, "t")}, annual)}
+    )
+    assert not annual_only({2024: CarrierSeries({1: empty_month})})
+    assert not annual_only({2024: CarrierSeries(annual=Reading(None, "t"))})
+    assert not annual_only({})
 
 
 def test_absent_and_present_without_data_are_distinct() -> None:

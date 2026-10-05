@@ -1,18 +1,17 @@
-"""Draft checks over passages: sentence ends, labels, layout, support and sentence rendering."""
+"""Draft checks over passages: sentence ends, uncited text, support and sentence rendering."""
 
 import json
 from pathlib import Path
 from typing import Any, Literal
 
 import pytest
+from tests.audit_replay import audit_job_with_facts
 from tests.unit.audit.test_draft_checks import _draft, _fact
-from tests.unit.audit.test_draft_passages import PASSAGES, passage_job
+from tests.unit.audit.test_draft_passages import PASSAGES
 from tests.unit.audit.test_draft_structured import DraftProvider
 
-from ema.audit.base_anchor import MARKER
 from ema.audit.draft_agent import draft_section_run
 from ema.audit.draft_checks import DraftReview, check_draft
-from ema.audit.draft_prompt import rule_text
 from ema.audit.draft_render import draft_blocks
 from ema.audit.draft_schema import DraftText, SectionDraft
 from ema.core.llm.models import default_model
@@ -49,75 +48,22 @@ def test_a_value_ending_on_an_abbreviation_does_not_end_the_sentence(name: str) 
 def test_a_value_ending_a_sentence_still_ends_one() -> None:
     facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu.")}
     draft = _draft("{{f:audit.company_name}} Produce piese.", ["audit.company_name"])
-    fatal = check_draft(draft, facts, "synthetic").fatal
-    assert [(issue.code, issue.detail) for issue in fatal] == [
-        ("uncited_sentence", "Produce piese.")
-    ]
+    checked = check_draft(draft, facts, "synthetic")
+    assert (checked.fatal, checked.cited_sentences, checked.total_sentences) == ((), 1, 2)
 
 
-@pytest.mark.parametrize(("kind", "fatal"), [("body", True), ("bullet", False)])
-def test_only_an_uncited_body_paragraph_is_fatal(kind: Kind, fatal: bool) -> None:
+@pytest.mark.parametrize("kind", ["body", "bullet"])
+def test_an_uncited_paragraph_of_either_kind_passes(kind: Kind) -> None:
+    # #143 D2: uncited_sentence is gone; the support pass judges general text instead.
     draft = section(
-        text("{{f:audit.process_sections}}", "audit.process_sections"),
+        text(
+            "Piesele sunt degresate şi clătite {{c:audit.process_sections}}.",
+            "audit.process_sections",
+        ),
         text("Etapele procesului", kind=kind),
     )
     checked = check_draft(draft, FACTS, "synthetic")
-    issues = checked.fatal if fatal else checked.review
-    assert [(issue.code, issue.location) for issue in issues] == [
-        ("uncited_sentence", "paragraph:1")
-    ]
-    assert (checked.review if fatal else checked.fatal) == ()
-
-
-def test_two_passages_in_one_body_paragraph_are_fatal() -> None:
-    draft = section(
-        text(
-            "{{f:audit.process_sections}} {{f:audit.process_sections.2}}",
-            "audit.process_sections",
-            "audit.process_sections.2",
-        )
-    )
-    fatal = check_draft(draft, FACTS, "synthetic").fatal
-    assert [(issue.code, issue.location, issue.detail) for issue in fatal] == [
-        ("passage_paragraph", "paragraph:0", "audit.process_sections, audit.process_sections.2")
-    ]
-
-
-def test_passages_out_of_source_order_are_fatal() -> None:
-    draft = section(
-        text("{{f:audit.process_sections.2}}", "audit.process_sections.2"),
-        text("{{f:audit.process_sections}}", "audit.process_sections"),
-        text("{{f:audit.process_sections.3}}", "audit.process_sections.3"),
-    )
-    fatal = check_draft(draft, FACTS, "synthetic").fatal
-    assert [(issue.code, issue.location, issue.detail) for issue in fatal] == [
-        ("passage_order", "paragraph:1", "audit.process_sections")
-    ]
-
-
-def test_a_misplaced_passage_goes_back_with_the_passage_rule(tmp_path: Path) -> None:
-    ws = Workspace(tmp_path / "ws")
-    job = passage_job(ws)
-    ordered = section(
-        text("{{f:audit.process_sections}}", "audit.process_sections"),
-        text("{{f:audit.process_sections.2}}", "audit.process_sections.2"),
-    )
-    reversed_ = section(*reversed(ordered.paragraphs))
-    provider = DraftProvider([reversed_, ordered])
-    _, accepted, _, _ = draft_section_run(
-        ws,
-        job,
-        SECTION,
-        provider,
-        Support("{}"),
-        model_id=default_model("openai").id,
-        synthetic=True,
-    )
-    assert accepted == ordered
-    assert [(error["rule"], error["rule_text"]) for error in provider.requests[1]["errors"]] == [
-        ("passage_order", rule_text("passage_order"))
-    ]
-    assert "în ordinea numerelor" in rule_text("passage_order")
+    assert (checked.fatal, checked.review) == ((), ())
 
 
 @pytest.mark.parametrize(
@@ -141,41 +87,57 @@ class Support:
         return Exchange(self.flags, (), 1, 1)
 
 
-def test_a_passage_only_paragraph_is_not_checked_or_flagged(tmp_path: Path) -> None:
+CH2 = "ch2.date_generale"
+
+
+def test_a_value_only_paragraph_is_not_checked_or_flagged(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "ws")
-    job = passage_job(ws)
-    draft = section(
-        text("{{f:audit.process_sections}}", "audit.process_sections"),
-        text("Etapa următoare: {{f:audit.process_sections.2}}", "audit.process_sections.2"),
+    job = audit_job_with_facts(ws)
+    lead_in = "Societatea {{f:audit.company_name}} produce ambalaje."
+    draft = SectionDraft(
+        section=CH2,
+        status="drafted",
+        paragraphs=[
+            text("{{f:audit.company_name}}", "audit.company_name"),
+            text(lead_in, "audit.company_name"),
+        ],
     )
-    lead_in = "Etapa următoare: {{f:audit.process_sections.2}}"
     verdicts = [
-        {"location": f"{SECTION}:paragraph:0", "sentence_index": 0, "supported": False},
-        {"location": f"{SECTION}:paragraph:1", "sentence_index": 0, "supported": False},
+        {
+            "location": f"{CH2}:paragraph:{index}",
+            "sentence_index": 0,
+            "kind": "client",
+            "supported": False,
+        }
+        for index in (0, 1)
     ]
     support = Support(json.dumps({"verdicts": verdicts}))
     _, _, _, flags = draft_section_run(
         ws,
         job,
-        SECTION,
+        CH2,
         DraftProvider([draft]),
         support,
         model_id=default_model("openai").id,
         synthetic=True,
     )
-    assert [item["location"] for item in support.requests[0]] == [f"{SECTION}:paragraph:1"]
+    assert [item["location"] for item in support.requests[0]] == [f"{CH2}:paragraph:1"]
     assert [(flag.location, flag.sentence) for flag in flags] == [("paragraph:1", lead_in)]
 
 
-def test_a_section_of_passages_only_needs_no_support_call(tmp_path: Path) -> None:
+def test_a_section_of_values_only_needs_no_support_call(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "ws")
-    job = passage_job(ws)
-    draft = section(text("{{f:audit.process_sections}}", "audit.process_sections"))
+    job = audit_job_with_facts(ws)
+    draft = SectionDraft(
+        section=CH2,
+        status="drafted",
+        paragraphs=[text("{{f:audit.company_name}}", "audit.company_name")],
+    )
     support = Support('{"verdicts": []}')
     _, _, _, flags = draft_section_run(
         ws,
         job,
-        SECTION,
+        CH2,
         DraftProvider([draft]),
         support,
         model_id=default_model("openai").id,
@@ -187,19 +149,20 @@ def test_a_section_of_passages_only_needs_no_support_call(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     "flag",
     [
-        "Uscarea urmează în {{f:audit.equipment}}",
-        "{{f:audit.process_sections}} Uscarea urmează în {{f:audit.equipment}}",
+        "Uscarea urmează în cuptor {{c:audit.equipment}}",
+        "{{f:audit.company_name}} Uscarea urmează în cuptor {{c:audit.equipment}}",
     ],
 )
-def test_a_flag_on_the_next_sentence_keeps_the_passage(flag: str) -> None:
+def test_a_flag_on_the_next_sentence_keeps_the_value_and_leaves_no_marker(flag: str) -> None:
+    facts = FACTS | {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu.")}
     draft = section(
         text(
-            "{{f:audit.process_sections}} Uscarea urmează în {{f:audit.equipment}}.",
-            "audit.process_sections",
+            "{{f:audit.company_name}} Uscarea urmează în cuptor {{c:audit.equipment}}.",
+            "audit.company_name",
             "audit.equipment",
         )
     )
     issues = (DraftReview("unsupported", "paragraph:0", "claim", flag),)
-    (block,) = draft_blocks(draft, FACTS, issues)
+    (block,) = draft_blocks(draft, facts, issues)
     assert isinstance(block, Paragraph)
-    assert block.segments == [f"{PASSAGES['audit.process_sections']} {MARKER}"]
+    assert block.segments == ["Atelier Exemplu."]

@@ -1,4 +1,4 @@
-"""Synthetic Draft v4 single-section path: the chapter request, checker retry, fail-closed
+"""Synthetic Draft v5 single-section path: the chapter request, checker retry, fail-closed
 support and runtime style redaction."""
 
 import json
@@ -69,6 +69,7 @@ class SupportProvider:
             {
                 "location": item["location"],
                 "sentence_index": item["sentence_index"],
+                "kind": "client",
                 "supported": (item["location"], item["sentence_index"]) not in self.refused,
                 "reason": "claim",
             }
@@ -114,11 +115,8 @@ def test_literal_name_retry_carries_rule(tmp_path: Path) -> None:
     assert len(provider.requests) == 2
     assert support.calls == 1
     rules = {(error["rule"], error["rule_text"]) for error in provider.requests[1]["errors"]}
-    assert rules == {
-        ("literal_name", rule_text("literal_name")),
-        ("uncited_sentence", rule_text("uncited_sentence")),
-    }
-    assert rule_text("literal_name").startswith("Orice nume, număr")
+    assert rules == {("literal_name", rule_text("literal_name"))}
+    assert rule_text("literal_name").startswith("Orice număr, dată, cantitate")
     assert [item["section"] for item in provider.requests[1]["request"]["sections"]] == [SECTION]
 
 
@@ -170,47 +168,41 @@ def test_a_refused_sentence_is_flagged_alone(tmp_path: Path) -> None:
     assert support.requests[0][1]["facts"] == {"audit.employees": "85"}
 
 
-def test_unavailable_support_marks_only_sentences_that_cite(tmp_path: Path) -> None:
-    cited = "Societatea are personal propriu {{c:audit.employees}}."
-    mixed = "Firma {{f:audit.company_name}} are personal calificat {{c:audit.employees}}."
-    valued = "Societatea {{f:audit.company_name}} are {{f:audit.employees}} angajați."
+@pytest.mark.parametrize(
+    ("response", "cause"),
+    [
+        ("not json", "ai_schema"),
+        (
+            json.dumps(
+                {
+                    "verdicts": [
+                        {
+                            "location": f"{SECTION}:paragraph:0",
+                            "sentence_index": 0,
+                            "kind": "client",
+                            "supported": True,
+                        }
+                    ]
+                    * 2
+                }
+            ),
+            "ai_schema",
+        ),
+    ],
+)
+def test_unavailable_support_fails_the_section_closed(
+    tmp_path: Path, response: str, cause: str
+) -> None:
+    # #143 fix round 1: no verdict, no prose; a value-only sentence is no exception.
+    valued = "Societatea {{f:audit.company_name}} folosește echipamente moderne."
     draft = SectionDraft(
         section=SECTION,
         status="drafted",
-        paragraphs=[
-            DraftText(text=cited, fact_ids=["audit.employees"]),
-            DraftText(text=mixed, fact_ids=["audit.company_name", "audit.employees"]),
-            DraftText(text=valued, fact_ids=["audit.company_name", "audit.employees"]),
-        ],
+        paragraphs=[DraftText(text=valued, fact_ids=["audit.company_name"])],
     )
-    _, _, accepted, flags = _run(tmp_path, [draft], SupportProvider("not json"))
-    assert accepted == draft
-    assert [(flag.code, flag.location, flag.detail) for flag in flags] == [
-        ("unsupported", "paragraph:0", "support_unavailable"),
-        ("unsupported", "paragraph:1", "support_unavailable"),
-        ("support_unavailable", "section", "ai_schema"),
-    ]
-
-
-def test_two_verdicts_for_one_sentence_fail_the_pass_closed(tmp_path: Path) -> None:
-    location = f"{SECTION}:paragraph:0"
-    verdicts = [
-        {"location": location, "sentence_index": 0, "supported": supported, "reason": ""}
-        for supported in (True, True)
-    ]
-    cited = "Societatea are personal propriu {{c:audit.employees}}."
-    draft = SectionDraft(
-        section=SECTION,
-        status="drafted",
-        paragraphs=[DraftText(text=cited, fact_ids=["audit.employees"])],
-    )
-    support = SupportProvider(json.dumps({"verdicts": verdicts}))
-    _, _, accepted, flags = _run(tmp_path, [draft], support)
-    assert accepted == draft
-    assert [(flag.code, flag.location, flag.detail) for flag in flags] == [
-        ("unsupported", "paragraph:0", "support_unavailable"),
-        ("support_unavailable", "section", "ai_schema"),
-    ]
+    with pytest.raises(EmaError) as error:
+        _run(tmp_path, [draft], SupportProvider(response))
+    assert (error.value.code, error.value.detail) == ("support_unavailable", cause)
 
 
 def test_support_output_is_bounded_per_sentence(tmp_path: Path) -> None:

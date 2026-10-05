@@ -205,7 +205,7 @@ def test_drafted_sections_keep_base_tables_captions_and_chart_slots(tmp_path: Pa
         draft = SectionDraft(
             section=section,
             status="drafted",
-            paragraphs=[DraftText(text=f"proza {{{{f:{key}}}}}", fact_ids=[key])],
+            paragraphs=[DraftText(text=f"proza recentă {{{{c:{key}}}}}", fact_ids=[key])],
         )
         render_section(current, output, draft, {key: _fact(key, "nouă")}, (), job="synthetic")
         current = output
@@ -224,7 +224,7 @@ def test_drafted_sections_keep_base_tables_captions_and_chart_slots(tmp_path: Pa
     assert result.tables[1].rows[1].cells[1].text == "900"
     assert result.tables[2].rows[2].cells[1].text == "Centrală"
     texts = [paragraph.text for paragraph in result.paragraphs]
-    assert texts.count("proza nouă") == 2
+    assert texts.count("proza recentă") == 2
     assert texts.count("Tabelul [de completat]") == 0
     assert texts.count("Fig. [de completat]") == 0
     assert "Tabelul Numărul mediu de angajați" in texts

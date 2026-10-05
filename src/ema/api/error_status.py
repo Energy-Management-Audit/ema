@@ -208,6 +208,7 @@ STATUS: dict[str, int] = {
     "stale_revision": 409,
     "status_invalid": 409,
     "support_invalid": 400,
+    "support_unavailable": 502,
     "transition_forbidden": 409,
     "trust_reason": 400,
     "unsupported_format": 415,

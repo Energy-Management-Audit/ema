@@ -11,23 +11,24 @@ Registrul auditorului:
 - unde exemplul are o enumerare (etape, utilități, echipamente, consumatori), scrii o propoziție de introducere, apoi câte un element pe paragraf, cu kind "bullet";
 - numai paragrafe (kind "body") și elemente de listă (kind "bullet"); niciun tabel.
 
-Trasabilitate (obligatoriu):
-1. Orice nume, număr, dată, cantitate sau valoare din text vine dintr-un fapt și se scrie {{f:<cheie>}}. La redare tokenul devine textul faptului, cu unitatea lui, deci unitatea nu se mai scrie o dată.
-2. Niciun număr scris cu cifre sau în litere în afara unui token: nu folosi unu, una, doi, două, trei, patru, cinci, șase, șapte, opt, nouă, zece, sută, sute, mie, mii, milion, nici numerale ordinale („a doua”). „Nouă” cu sensul de „new” se înlocuiește cu „recentă” sau „modernizată”.
-3. Când descrii conținutul unui fapt cu cuvintele tale, fără să-i reproduci valoarea, îl citezi cu {{c:<cheie>}} înaintea semnului de punctuație de la sfârșitul propoziției. {{c:…}} nu apare în raport. Reformularea spune numai ce spune faptul: fără cauze, aprecieri, comparații sau cantități în plus.
-4. Fiecare propoziție dintr-un paragraf "body" conține cel puțin un {{f:…}} sau un {{c:…}}, inclusiv propoziția care introduce o listă („Fluxul tehnologic cuprinde următoarele etape {{c:audit.process_sections}}:”). Nu scrie introduceri, generalități sau concluzii fără fapt.
+Fapte și text general (obligatoriu):
+1. Orice număr, dată, cantitate, valoare măsurată sau contractuală și orice nume propriu al clientului (societatea, furnizorii, amplasamentele, mărcile și modelele echipamentelor, autorizațiile și numerele lor) vine dintr-un fapt și se scrie {{f:<cheie>}}. La redare tokenul devine textul faptului, cu unitatea lui, deci unitatea nu se mai scrie o dată.
+2. Niciun număr scris cu cifre sau în litere în afara unui token: nu folosi unu, una, doi, două, trei, patru, cinci, șase, șapte, opt, nouă, zece, sută, sute, mie, mii, milion, nici numerale ordinale („a doua”). „Nouă” cu sensul de „new” se înlocuiește cu „recentă” sau „modernizată”. Singura excepție sunt referințele normative, scrise exact așa: Legea nr. 121/2014, SR EN ISO 50001, SR EN 16247 și pragul de 1.000 tep.
+3. Când descrii clientul pe baza unui fapt, fără să-i reproduci valoarea, citezi faptul cu {{c:<cheie>}} înaintea semnului de punctuație de la sfârșitul propoziției. {{c:…}} nu apare în raport. Reformularea spune numai ce spune faptul: fără cauze, aprecieri, comparații sau cantități în plus.
+4. Propozițiile generale sunt permise și așteptate și nu au citare. Ele explică ce face o etapă de proces, un tip de echipament sau o utilitate; prezintă practica uzuală și cadrul normativ (Legea nr. 121/2014, SR EN ISO 50001, SR EN 16247); introduc liste și tabele și leagă ideile. O propoziție generală nu afirmă și nu lasă să se înțeleagă ca fapt nimic despre acest client pe care niciun fapt nu îl susține.
 5. fact_ids enumeră exact cheile tokenurilor din paragraf, {{f:}} și {{c:}}.
 6. Citezi numai faptele cu valoare ale secțiunii. O cheie din lista fără valoare nu se citează.
 7. Fără nicio formulare despre AI, despre redactare, despre surse de lucru sau despre verificări; fără avertismente.
 
 Pasaje (fapte cu cheie numerotată, de exemplu audit.history, audit.history.2):
-8. Un pasaj se redă întreg, ca {{f:<cheie>}}, câte un pasaj pe paragraf, în ordinea numerelor; sau se descrie cu cuvintele tale și se citează cu {{c:<cheie>}}, când textul lui are nevoie de diacritice sau de o listă.
-9. Un pasaj redat cu {{f:}} sau descris cu {{c:}} într-o secțiune nu se mai folosește în altă secțiune a capitolului.
+8. Un pasaj se rescrie întotdeauna în registrul auditorului, cu diacritice și cu gramatica corectată, și se citează cu {{c:<cheie>}}. Un pasaj nu se redă niciodată cu {{f:}}. O enumerare dintr-un pasaj devine elemente de listă, cu kind "bullet".
+9. Un pasaj descris într-o secțiune nu se mai folosește în altă secțiune a capitolului (used_passages).
 
 Conținut:
-10. Lungimea: te apropii de ținta de cuvinte a secțiunii, socotind textul redat cu valorile faptelor. Când faptele nu ajung, scrii mai scurt; nu umpli.
+10. Lungimea: scrii până la ținta de cuvinte a secțiunii, socotind textul redat cu valorile faptelor. Unde faptele sunt puține, dezvolți cu explicații generale după regula 4. Nu umpli niciodată prin repetare.
 11. Nu repeți o cantitate pe care o arată un tabel al capitolului: numărul de angajați, cifra de afaceri, autovehiculele, numărul și puterea centralelor termice. Trimiți la tabel („prezentate în tabelul următor”).
 12. Când două fapte se contrazic (de exemplu parcul auto din ani diferiți), nu alegi și nu împaci valorile: descrii fără cantitatea în conflict. Conflictul îl verifică auditorul.
 13. Transformatoarele (audit.transformer.*) se descriu în secțiunea despre energia electrică, din faptele lor, cu valorile ca {{f:}}. Echipamentele (audit.equipment_row.*) se descriu în secțiunea despre echipamente; cele care consumă gaz natural se pot menționa și în secțiunea despre gaz. Numărul și puterea nu se repetă în text: sunt în tabel.
 14. Secțiunea ch3.process descrie unitățile 3.1.x: fiecare paragraf are câmpul unit egal cu numărul unității pe care o descrie și citează numai pasajele acelei unități. Secțiunea ch3.flux descrie fluxul general din pasajele ei. În celelalte secțiuni, unit rămâne null.
 15. Status "missing", cu missing_fact_ids, numai pentru o secțiune fără niciun fapt cu valoare.
+16. O secțiune fără niciun fapt cu valoare rămâne cu status "missing": textul general singur nu face o secțiune.

@@ -1,4 +1,5 @@
-"""Draft trust boundary: references, missing facts and names (rendering: test_section_body)."""
+"""Draft trust boundary: references, missing facts, numbers and names (rendering:
+test_section_body)."""
 
 import pytest
 
@@ -38,7 +39,7 @@ def test_rejects_literal_number_name_ai_and_unknown_fact() -> None:
             ["audit.company_name"],
             "literal_number",
         ),
-        ("Societatea Inventata are sediul aici.", [], "literal_name"),
+        ("Societatea Atelier Exemplu are sediul aici.", [], "literal_name"),
         (
             "Societatea {{f:audit.company_name}} folosește un algoritm AI.",
             ["audit.company_name"],
@@ -78,7 +79,9 @@ def test_sentence_start_after_a_sentence_fact_is_not_a_name() -> None:
         ("„Produce piese.”  ", "{{f:audit.business_activity}} Aceste etape continuă.", set()),
         ("Produce piese.", "{{f:audit.business_activity}}Aceste etape continuă.", set()),
         ("Produce piese.", "{{f:audit.business_activity}}  Aceste etape continuă.", set()),
+        # An acronym is shaped like a name: fatal even uncited (#143 fix round 1).
         ("Produce piese.", "{{f:audit.business_activity}} ACME are sediul aici.", {"ACME"}),
+        ("piese", "Societatea ACME produce {{f:audit.business_activity}}.", {"ACME"}),
         (
             "piese turnate",
             "Societatea produce {{f:audit.business_activity}} Inventata.",
@@ -104,17 +107,15 @@ def test_name_rule_at_fact_boundaries(value: str, text: str, names: set[str]) ->
     assert found == {("literal_name", name) for name in names}
 
 
-def test_an_uncited_body_sentence_is_fatal_filler() -> None:
+def test_an_uncited_general_sentence_passes() -> None:
     facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
     draft = _draft(
-        "Societatea {{f:audit.company_name}} produce bunuri. Este modernă.", ["audit.company_name"]
+        "Societatea {{f:audit.company_name}} produce bunuri. Auditul energetic analizează "
+        "consumurile de energie ale unei organizaţii.",
+        ["audit.company_name"],
     )
     checked = check_draft(draft, facts, "synthetic")
-    assert checked.coverage == 0.5
-    assert [(issue.code, issue.location, issue.detail) for issue in checked.fatal] == [
-        ("uncited_sentence", "paragraph:0", "Este modernă.")
-    ]
-    assert checked.review == ()
+    assert (checked.fatal, checked.review, checked.coverage) == ((), (), 0.5)
 
 
 @pytest.mark.parametrize(
@@ -130,7 +131,7 @@ def test_an_abbreviation_does_not_end_a_sentence(text: str) -> None:
     assert (checked.cited_sentences, checked.total_sentences, checked.fatal) == (1, 1, ())
 
 
-def test_an_uncited_bullet_is_reviewed_not_fatal() -> None:
+def test_an_uncited_bullet_passes() -> None:
     facts = {"audit.company_name": _fact("audit.company_name", "Atelier Exemplu")}
     draft = SectionDraft(
         section="ch2.date_generale",
@@ -138,10 +139,7 @@ def test_an_uncited_bullet_is_reviewed_not_fatal() -> None:
         paragraphs=[DraftText(text="ambalare şi depozitare", kind="bullet")],
     )
     checked = check_draft(draft, facts, "synthetic")
-    assert checked.fatal == ()
-    assert [(issue.code, issue.location) for issue in checked.review] == [
-        ("uncited_sentence", "paragraph:0")
-    ]
+    assert (checked.fatal, checked.review) == ((), ())
 
 
 def test_a_numbered_passage_is_a_fact_of_its_section() -> None:
@@ -154,12 +152,14 @@ def test_a_numbered_passage_is_a_fact_of_its_section() -> None:
         section="ch3.process",
         status="drafted",
         paragraphs=[
-            DraftText(text=f"{{{{f:{key}}}}}", fact_ids=[key])
+            DraftText(text=f"Piesele sunt vopsite {{{{c:{key}}}}}.", fact_ids=[key])
             for key in ("audit.process_sections", "audit.process_sections.2")
         ],
     )
     assert check_draft(ok, facts, "synthetic").fatal == ()
-    foreign = _draft("{{f:audit.history.2}}", ["audit.history.2"], "ch3.process")
+    foreign = _draft(
+        "Piesele sunt vopsite {{c:audit.history.2}}.", ["audit.history.2"], "ch3.process"
+    )
     assert [issue.code for issue in check_draft(foreign, facts, "synthetic").fatal] == [
         "fact_missing"
     ]

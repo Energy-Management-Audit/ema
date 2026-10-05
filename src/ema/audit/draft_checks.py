@@ -1,5 +1,5 @@
-"""Mechanical traceability checks of a section draft: every number from a token, every name
-from a token or a fact the text cites."""
+"""Mechanical traceability checks of a section draft: every number from a token, every client
+name from a token or a fact the text cites; general sentences need no citation (#143)."""
 
 from __future__ import annotations
 
@@ -21,9 +21,15 @@ CITE_GAP = re.compile(r"\s*" + CITE.pattern)
 NUMBER = re.compile(r"\d")
 # Romanian number words, matched on text folded to plain letters so that "două", "doua", "şase"
 # and "șase" are one word: a quantity spelled out is a number outside a fact token (D1).
+# Ordinals from the second up and fractions state an order or a share as much as a cardinal
+# does; "primul", "prima" and "ultimul" stay free for "în primul rând" and ordered stages.
 NUMBER_WORD = re.compile(
-    r"\b(?:unu|una|doi|doua|trei|patru|cinci|sase|sapte|opt|noua|zece|suta|sute|mie|mii"
-    r"|milion|milioane|(?:un|doi|doua|trei|pai|patru|cinci|sai|sapte|opt|noua)(?:sprezece|zeci))\b"
+    r"\b(?:zero|unu|una|doi|doua|trei|patru|cinci|sase|sapte|opt|noua|zece|suta|sute|mie|mii"
+    r"|milion|milioane|(?:un|doi|doua|trei|pai|patru|cinci|sai|sapte|opt|noua)(?:sprezece|zeci)"
+    r"|doilea|treilea|patrulea|cincilea|saselea|saptelea|optulea|noualea|zecelea"
+    r"|treia|patra|cincea|sasea|saptea|zecea|a opta(?!\s+pentru)"
+    r"|jumatat(?:e|ea|ii|i|ile|ilor)|treim(?:e|ea|ii|i|ile|ilor)|sfert(?:ul|ului|uri|urile|urilor)?"
+    r"|dubl(?:u|ul|ului|a|e|ei|i|ii|ilor)|tripl(?:u|ul|ului|a|e|ei|i|ii|ilor))\b"
 )
 UPPER = "A-ZĂÂÎȘȚŞŢ"
 LOWER = "a-zăâîșțşţ"
@@ -33,6 +39,28 @@ NAME = re.compile(
 ACRONYM = re.compile(rf"(?<!\w)[{UPPER}]{{2,}}(?!\w)")
 SENTENCE_WORD = re.compile(rf"[{UPPER}][{LOWER}]+(?!\w)")
 CEDILLAS = str.maketrans("şţ", "st")
+# The regulatory references a general sentence may print in figures (D3), each only in the
+# words that make it a reference: the law, the standard, or the threshold.
+REFERENCE_NUMBERS = ("121/2014", "50001", "16247", "1.000 tep", "1000 tep")
+_THRESHOLD = (
+    r"(?i:\b(?:prag|pragul|sub|peste|depășește|depăşeşte|inferior|superior)\b)"
+    r"(?:\s+[^\s\d]+){0,3}\s+"
+)
+_REFERENCE_CONTEXT = {
+    "121/2014": r"\b[Ll]eg(?:ea|ii)\s+(?:nr\.\s*)?",
+    "50001": r"\bISO\s+",
+    "16247": r"\bEN\s+",
+    "1.000 tep": _THRESHOLD,
+    "1000 tep": _THRESHOLD,
+}
+REFERENCES = tuple(
+    re.compile(
+        f"({_REFERENCE_CONTEXT[number]}){re.escape(number)}"
+        + (r"(?:-\d+)?" if number == "16247" else "")
+        + r"(?![\w/]|[.,]\d)"
+    )
+    for number in REFERENCE_NUMBERS
+)
 FACT_GAP = re.compile(TOKEN.pattern + r"(\s*)")
 # A sentence does not end after an address or legal abbreviation, as in "nr. {{f:...}}", or
 # after an initial, as in "S.R.L.".
@@ -66,6 +94,7 @@ NAME_COMMON = frozenset(
         "Etapa",
         # Regulator, register and legal-form acronyms and units an audit uses as plain words.
         "ANRE",
+        "SEN",
         "CAEN",
         "CUI",
         "SRL",
@@ -74,7 +103,55 @@ NAME_COMMON = frozenset(
         "TEP",
         "MWh",
         "kWh",
+        # The law, standards and institutions a general sentence names (D3); a candidate inside
+        # one of these phrases, as "EN ISO" or "Energetic Național", is part of it.
+        "Legea",
+        "Legii",
+        "SR EN ISO",
+        "Sistemul Energetic Național",
+        "Ministerul Energiei",
+        "Ministerului Energiei",
     }
+) | frozenset(
+    # Generic technical and institutional terms only, never a client, supplier or site: a
+    # general sentence may write these in capitals.
+    {
+        "LED",
+        "GPL",
+        "UE",
+        "Uniunea Europeană",
+        "HVAC",
+        "CTA",
+        "PT",
+        "MT",
+        "JT",
+        "IT",
+        "SCADA",
+        "PLC",
+        "AC",
+        "CC",
+        "CET",
+        "CHP",
+        "PIF",
+        "kWp",
+        "VFD",
+        "TGD",
+        "TD",
+        "BMS",
+        "UPS",
+        "PCS",
+        "COP",
+        "EER",
+        "SCOP",
+        "SEER",
+        "NOx",
+        "CO2",
+        "CO₂",
+    }
+)
+# A capitalised word before a legal form is a company's name, wherever it stands.
+LEGAL_NAME = re.compile(
+    rf"(?<!\w)[{UPPER}][{UPPER}{LOWER}-]*(?=\s+(?:S\.R\.L\.|S\.A\.|SRL|SA)(?!\w))"
 )
 
 
@@ -125,8 +202,14 @@ def traced(text: str) -> str:
     return " ".join(folded(text).translate(CEDILLAS).split())
 
 
+COMMON = tuple(traced(name) for name in NAME_COMMON)
+
+
 def literal_number(plain: str) -> bool:
-    """Text outside fact tokens that states a quantity: a digit or a Romanian number word."""
+    """Text outside fact tokens that states a quantity: a digit or a Romanian number word,
+    a regulatory reference aside (D3)."""
+    for reference in REFERENCES:
+        plain = reference.sub(r"\1 ", plain)
     return bool(NUMBER.search(plain) or NUMBER_WORD.search(folded(plain)))
 
 
@@ -178,44 +261,48 @@ def texts(draft: SectionDraft) -> list[tuple[str, DraftText]]:
     return [(f"paragraph:{i}", paragraph) for i, paragraph in enumerate(draft.paragraphs)]
 
 
-def _passage_number(key: str) -> int:
-    """A passage's place among its fact's passages; 0 for a fact that is not a passage."""
-    base = fact_key(key)
-    if base not in PASSAGE_FACTS:
-        return 0
-    return 1 if base == key else int(key.rpartition(".")[2])
+def _names(sentence: str, facts: dict[str, Field], known: set[str]) -> dict[str, bool]:
+    """The sentence's name candidates, once each, as written where the text has them, and
+    whether each has a proper name's shape: several capitalised words, an acronym, or a word
+    before a legal form. Generic terms are not candidates."""
+    plain = ANY_TOKEN.sub("", sentence)
+    found: dict[str, tuple[str, bool]] = {}
+    for name, shaped in (
+        *(
+            (name, " " in name)
+            for name in NAME.findall(_sentence_marked(CITE_GAP.sub("", sentence), facts))
+        ),
+        *((name, True) for name in ACRONYM.findall(plain)),
+        *((name, True) for name in LEGAL_NAME.findall(plain)),
+        *((name, False) for name in sorted(known) if in_quote(name, traced(plain))),
+    ):
+        first, before = found.get(traced(name), (name, False))
+        found[traced(name)] = (first, shaped or before)
+    return {
+        name: shaped
+        for key, (name, shaped) in found.items()
+        if not any(in_quote(key, common) for common in COMMON)
+    }
 
 
-def _passage_layout(draft: SectionDraft) -> list[DraftReview]:
-    """One body paragraph per passage, and a fact's passages in their source order."""
-    issues: list[DraftReview] = []
-    last: dict[str, int] = {}
-    for index, item in enumerate(draft.paragraphs):
-        location = f"paragraph:{index}"
-        passages = [key for key in TOKEN.findall(item.text) if _passage_number(key)]
-        if item.kind == "body" and len(passages) > 1:
-            issues.append(DraftReview("passage_paragraph", location, ", ".join(passages)))
-        for key in passages:
-            number, base = _passage_number(key), fact_key(key)
-            if number <= last.get(base, 0):
-                issues.append(DraftReview("passage_order", location, key))
-            last[base] = max(number, last.get(base, 0))
-    return issues
+def _passage(key: str) -> bool:
+    """A key of a passage fact, its first passage numbered or not."""
+    base, _, number = key.rpartition(".")
+    return fact_key(key) in PASSAGE_FACTS or (base in PASSAGE_FACTS and number.isdigit())
 
 
 def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> DraftCheck:
     fatal: list[DraftReview] = []
-    review: list[DraftReview] = []
-    known_names = {
-        unicodedata.normalize("NFKC", str(field.value)).casefold()
+    known = {
+        traced(str(field.value))
         for field in facts.values()
         if field.key.endswith(("company_name", "client_name")) and field.job_id == job
-    }
-    common = {name.casefold() for name in NAME_COMMON}
+    } - {""}
+    # Any value the section is offered is client data: an uncited sentence may not name it.
+    offered = [traced(str(field.value)) for field in facts.values() if field.value is not None]
     cited = total = 0
     for location, item in texts(draft):
         tokens = set(ANY_TOKEN.findall(item.text))
-        plain = ANY_TOKEN.sub("", item.text)
         if tokens != set(item.fact_ids):
             fatal.append(DraftReview("fact_refs", location, "tokens and listed fact ids differ"))
         fatal.extend(
@@ -223,7 +310,13 @@ def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> Draft
             for key in sorted(tokens | set(item.fact_ids))
             if not citable_fact(draft.section, key, facts.get(key), job)
         )
-        if literal_number(plain):
+        # A passage is rewritten in her register and cited, never printed as the source has it.
+        fatal.extend(
+            DraftReview("passage_verbatim", location, key)
+            for key in sorted(set(TOKEN.findall(item.text)))
+            if _passage(key)
+        )
+        if literal_number(ANY_TOKEN.sub("", item.text)):
             fatal.append(DraftReview("literal_number", location, "number outside fact reference"))
         resolved = TOKEN.sub(
             lambda match: str(facts[match.group(1)].value) if match.group(1) in facts else "",
@@ -231,42 +324,40 @@ def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> Draft
         )
         if ai_wording(resolved):
             fatal.append(DraftReview("ai_mention", location, "AI or disclaimer wording"))
-        candidates = {
-            candidate
-            for candidate in (
-                *NAME.findall(_sentence_marked(CITE_GAP.sub("", item.text), facts)),
-                *ACRONYM.findall(plain),
-            )
-            if candidate.casefold() not in common
-        }
-        normal_plain = unicodedata.normalize("NFKC", plain).casefold()
-        candidates.update(name for name in known_names if name and name in normal_plain)
-        # A name the item's cited passage holds, as whole words, is traceable whether quoted or
+        # A name the item's cited facts hold, as whole words, is traceable whether quoted or
         # paraphrased (#137).
         values = [
             traced(str(facts[key].value))
             for key in tokens
             if citable_fact(draft.section, key, facts.get(key), job)
         ]
-        candidates = {
-            name
-            for name in candidates
-            if not any(in_quote(traced(name), value) for value in values)
-        }
-        fatal.extend(DraftReview("literal_name", location, name) for name in sorted(candidates))
+        names: set[str] = set()
         for sentence in sentence_parts(item.text, facts):
             total += 1
             if ANY_TOKEN.search(sentence):
                 cited += 1
+                names |= {
+                    name
+                    for name in _names(sentence, facts, known)
+                    if not any(in_quote(traced(name), value) for value in values)
+                }
             else:
-                # Body text without a fact is filler and goes back to the drafter; a bullet is a
-                # label, which the auditor reviews.
-                issues = fatal if item.kind == "body" else review
-                issues.append(DraftReview("uncited_sentence", location, sentence))
-    fatal.extend(_passage_layout(draft))
+                # A general sentence names generic terms freely; a client's name, or anything
+                # shaped like a proper name, fails whatever the support pass would say.
+                names |= {
+                    name
+                    for name, shaped in _names(sentence, facts, known).items()
+                    if shaped or any(in_quote(traced(name), value) for value in (*known, *offered))
+                }
+        fatal.extend(DraftReview("literal_name", location, name) for name in sorted(names))
+    if draft.status == "drafted" and not any(
+        citable_fact(draft.section, key, field, job) for key, field in facts.items()
+    ):
+        # General text alone does not make a section (v5 rule 16).
+        fatal.append(DraftReview("status_invalid", "section", "no usable fact"))
     for key in draft.missing_fact_ids:
         if not citable(draft.section, key) or (
             key in facts and (facts[key].job_id != job or facts[key].presence == "found")
         ):
             fatal.append(DraftReview("missing_status_invalid", "section", key))
-    return DraftCheck(cited / total if total else 0.0, cited, total, tuple(fatal), tuple(review))
+    return DraftCheck(cited / total if total else 0.0, cited, total, tuple(fatal), ())

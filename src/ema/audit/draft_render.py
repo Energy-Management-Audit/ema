@@ -38,6 +38,7 @@ from ema.core.review.models import Field
 # Internal codes a reader never sees: the enum value's wording, and units the prose names itself.
 ENUM_TEXT = {"below_1000_tep": "sub 1.000 tep", "at_least_1000_tep": "de cel puţin 1.000 tep"}
 UNSPOKEN_UNITS = frozenset({"persons"})
+UNSUPPORTED = "unsupported"
 
 
 def rendered_value(field: Field) -> str:
@@ -67,31 +68,34 @@ def _resolved(text: str, facts: dict[str, Field]) -> str:
     return re.sub(TOKEN.pattern + r"(\.?)", replace, CITE_GAP.sub("", text))
 
 
+def kept(
+    item: DraftText, location: str, issues: tuple[DraftReview, ...], facts: dict[str, Field]
+) -> list[str]:
+    """The item's sentences the render keeps: all but the unsupported ones, which the draft
+    review lists (D4); none when a flag covers the whole item."""
+    relevant = [
+        issue for issue in issues if issue.location == location and issue.code == UNSUPPORTED
+    ]
+    if any(issue.sentence is None for issue in relevant):
+        return []
+    flagged = [support_text(issue.sentence or "") for issue in relevant]
+    return [
+        sentence
+        for sentence in sentence_parts(item.text, facts)
+        # A verified fact standing alone is the source's own text; a flag never erases it.
+        if token_only(sentence)
+        or not any(
+            flag and (flag in support_text(sentence) or support_text(sentence) in flag)
+            for flag in flagged
+        )
+    ]
+
+
 def _paragraph(
     item: DraftText, location: str, issues: tuple[DraftReview, ...], facts: dict[str, Field]
-) -> Block:
-    relevant = [issue for issue in issues if issue.location == location]
-    if any(issue.code != "uncited_sentence" and issue.sentence is None for issue in relevant):
-        return Missing(item.kind, MARKER)
-    flagged = [
-        support_text(issue.sentence if issue.sentence is not None else issue.detail)
-        for issue in relevant
-    ]
-    rendered: list[str] = []
-    for sentence in sentence_parts(item.text, facts):
-        normalized = support_text(sentence)
-        # A verified passage standing alone is the source's own text; a flag never erases it.
-        value = (
-            MARKER
-            if not token_only(sentence)
-            and any(flag and (flag in normalized or normalized in flag) for flag in flagged)
-            else _resolved(sentence, facts)
-        )
-        if value != MARKER or not rendered or rendered[-1] != MARKER:
-            rendered.append(value)
-    if rendered == [MARKER]:
-        return Missing(item.kind, MARKER)
-    return Paragraph(item.kind, [" ".join(rendered)])
+) -> Block | None:
+    sentences = [_resolved(sentence, facts) for sentence in kept(item, location, issues, facts)]
+    return Paragraph(item.kind, [" ".join(sentences)]) if sentences else None
 
 
 def draft_blocks(
@@ -100,11 +104,13 @@ def draft_blocks(
     issues: tuple[DraftReview, ...],
     unit: int | None = None,
 ) -> list[Block]:
-    """The section as blocks, a flagged text as the marker; with a unit, only that unit's text."""
+    """The section as blocks, unsupported sentences dropped; with a unit, only that unit's
+    text. A section left empty is the marker."""
     blocks: list[Block] = [
-        _paragraph(item, f"paragraph:{index}", issues, facts)
+        block
         for index, item in enumerate(draft.paragraphs)
         if unit is None or item.unit == unit
+        if (block := _paragraph(item, f"paragraph:{index}", issues, facts)) is not None
     ]
     if draft.status == "missing" or not blocks:
         blocks.append(Missing("body", MARKER))
@@ -189,7 +195,13 @@ def render_section(
         raise ValueError("output must not overwrite audit base")
     check = check_draft(draft, facts, job)
     if check.fatal:
-        raise EmaError("draft_invalid", "Redactarea nu a trecut verificările.", draft.section)
+        detail = f"{draft.section}: " + "; ".join(
+            f"{issue.code} {issue.detail}" for issue in check.fatal
+        )
+        if any(issue.code == "passage_verbatim" for issue in check.fatal):
+            # A draft stored under an earlier prompt printed its passages whole.
+            detail += ". Refaceţi redactarea capitolului (versiunea nouă a promptului)."
+        raise EmaError("draft_invalid", "Redactarea nu a trecut verificările.", detail)
     issues = (*check.review, *flags)
     output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory() as directory:
