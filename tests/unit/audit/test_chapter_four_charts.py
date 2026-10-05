@@ -68,11 +68,8 @@ def test_monthly_gap_caption_letters_and_skipped_variants() -> None:
         "ch4.apa:water_storm",
         "ch4.specific_apa:water_storm",
         "ch4.electricitate:2025:no_data",
-        "ch4.electricitate_pv:2024:no_data",
         "ch4.gaz:2024:no_data",
         "ch4.gaz:annual:no_data",
-        "ch4.apa:water_potable:2024:no_data",
-        "ch4.apa:water_industrial:2024:no_data",
         "ch4.echiv_gaz:annual:no_data",
         "ch4.echiv_total:pie:2024:no_data",
         "ch4.echiv_total:pie:2025:single_carrier",
@@ -97,9 +94,9 @@ def test_fuels_share_one_chart_with_one_series_each_and_no_monthly_letter_when_a
     )
     water, _ = chart_blocks("ch4.apa", dataset, FACTORS_2026, CLIENT)
     assert _captions(water) == [
-        "Fig. nr. 4.7 b) Evoluția anuală a consumului de apă înregistrat "
+        "Fig. nr. 4.7 Evoluția anuală a consumului de apă înregistrat "
         "la nivelul Atelier Exemplu SRL",
-        "Fig. nr. 4.8 b) Evoluția anuală a consumului de apă industrială "
+        "Fig. nr. 4.8 Evoluția anuală a consumului de apă industrială "
         "înregistrat la nivelul Atelier Exemplu SRL",
     ]
 
@@ -262,17 +259,11 @@ def test_empty_and_zero_charts_hold_markers_and_report_no_data() -> None:
     assert blocks == [
         Missing(
             "body",
-            "Fig. nr. 4.1 a) Evoluția lunară a consumului de energie electrică "
-            "din SEN înregistrat de către Atelier Exemplu SRL la nivelul anului 2025: "
-            "date indisponibile",
-        ),
-        Missing(
-            "body",
-            "Fig. nr. 4.1 b) Evoluția anuală a consumului de energie electrică "
+            "Fig. nr. 4.1 Evoluția anuală a consumului de energie electrică "
             "din SEN înregistrat la nivelul Atelier Exemplu SRL: date indisponibile",
         ),
     ]
-    assert skipped == ["ch4.electricitate:2025:no_data", "ch4.electricitate:annual:no_data"]
+    assert skipped == ["ch4.electricitate:annual:no_data"]
 
 
 def test_scaled_values_keep_gaps_and_source_product_name() -> None:
@@ -310,7 +301,7 @@ def test_pv_charts_use_only_held_series() -> None:
     groups, skipped = chapter_chart_groups(dataset, FACTORS_2026, CLIENT)
     raw = groups["ch4.electricitate_pv"][0]
     assert any(isinstance(block, NativeChart) for block in raw.annual)
-    assert all(not isinstance(block, NativeChart) for block in raw.monthly)
-    assert "ch4.electricitate_pv:2024:no_data" in skipped
+    assert raw.monthly == []
+    assert "ch4.electricitate_pv:2024:no_data" not in skipped
     assert groups["ch4.echiv_pv"]
     assert groups["ch4.specific_pv"]

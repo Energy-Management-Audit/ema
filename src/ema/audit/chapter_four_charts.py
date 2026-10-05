@@ -22,7 +22,7 @@ from ema.core.office.blocks import Block, Missing, NativeChart, Paragraph
 from ema.core.office.missing_text import MISSING_TEXT
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FactorTable
-from ema.energy_data.model import EnergyDataset
+from ema.energy_data.model import EnergyDataset, annual_only
 
 
 @dataclass(frozen=True)
@@ -327,9 +327,16 @@ def _group(
     metrics = tuple(metric for _, metric in spec.series)
     unit, scale = display_unit(dataset, factors, metrics, spec.unit, spec.years)
     letter = 0
-    if spec.monthly:
+    monthly_series = tuple(
+        (label, metric)
+        for label, metric in spec.series
+        if spec.production
+        or not metric.carriers
+        or not annual_only(dataset.carriers[metric.carriers[0]])
+    )
+    if spec.monthly and monthly_series:
         for year in spec.years:
-            series = chart_series(dataset, factors, spec.series, scale, list(MONTHS), year)
+            series = chart_series(dataset, factors, monthly_series, scale, list(MONTHS), year)
             caption = _caption(spec, client, k, chr(ord("a") + letter), year)
             letter += 1
             if not has_chart_data(series):
@@ -348,11 +355,9 @@ def _group(
     annual: list[Block] = []
     caption = _caption(spec, client, k, chr(ord("a") + letter) if letter else None, None)
     if has_chart_data(annual_series):
-        axis = (
-            unit
-            if spec.series[0][1].kind in {"specific", "water_specific", "intensity"}
-            else unit + "/an"
-        )
+        axis = unit
+        if spec.series[0][1].kind not in {"specific", "water_specific", "intensity"}:
+            axis += "/an"
         annual.extend(
             (
                 NativeChart("chart", STYLE_PART, annual_series, column_axis_title=axis),
