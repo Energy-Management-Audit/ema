@@ -12,12 +12,15 @@ from tests.workspace_jobs import create_job
 from ema.audit.applicability import fact_fields
 from ema.audit.catalogue import CATALOGUE
 from ema.audit.catalogue_types import PrefixPattern
-from ema.audit.content_checks import _has_arithmetic_conclusion, content_issues
+from ema.audit.content_checks import _has_arithmetic_conclusion, content_issues, total_blockers
 from ema.audit.sections import Status, set_status
 from ema.audit.workflow import AuditWorkflow
 from ema.core.review import decide, mark_absent, propose
 from ema.core.review.models import Field, FieldSpec
 from ema.core.workspace import Workspace
+from ema.energy_data.carriers import Carrier
+from ema.energy_data.factors import AUDIT_FACTORS_2026
+from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
 
 
 def _job(tmp_path: Path) -> tuple[Workspace, str]:
@@ -150,3 +153,80 @@ def test_arithmetic_conclusion_uses_reviewed_carrier_values() -> None:
     assert _has_arithmetic_conclusion({reading.key: reading})
     rejected = reading.model_copy(update={"review": "rejected"})
     assert not _has_arithmetic_conclusion({rejected.key: rejected})
+
+
+def test_total_blockers_only_lists_counted_carriers_with_missing_tep() -> None:
+    dataset = EnergyDataset(
+        (2024,),
+        {
+            Carrier.lpg: {2024: CarrierSeries(annual=Reading(None, "t"))},
+            Carrier.electricity_grid: {2024: CarrierSeries(annual=Reading(10, "MWh"))},
+            Carrier.water_potable: {2024: CarrierSeries(annual=Reading(None, "m3"))},
+            Carrier.electricity_cogen: {2024: CarrierSeries(annual=Reading(None, "MWh"))},
+        },
+    )
+    assert total_blockers(dataset, AUDIT_FACTORS_2026) == [(Carrier.lpg, 2024)]
+    complete = EnergyDataset(
+        (2024,),
+        {Carrier.electricity_grid: {2024: CarrierSeries(annual=Reading(10, "MWh"))}},
+    )
+    assert total_blockers(complete, AUDIT_FACTORS_2026) == []
+
+
+def test_total_blocker_issues_point_to_carrier_fields_and_replace_ch4_gap(tmp_path: Path) -> None:
+    ws, job = _job(tmp_path)
+    gas = mark_absent(
+        ws,
+        job,
+        FieldSpec(
+            key="carrier.natural_gas.2024", label="Gaze naturale", value_type="number", unit="MWh"
+        ),
+        "not_found",
+    )
+    monthly = mark_absent(
+        ws,
+        job,
+        FieldSpec(key="carrier.lpg.2024.01", label="GPL ianuarie", value_type="number", unit="t"),
+        "not_found",
+    )
+    mark_absent(
+        ws,
+        job,
+        FieldSpec(key="carrier.lpg.2024.02", label="GPL februarie", value_type="number", unit="t"),
+        "not_found",
+    )
+    annual = mark_absent(
+        ws,
+        job,
+        FieldSpec(key="carrier.lpg.2025", label="GPL", value_type="number", unit="t"),
+        "not_found",
+    )
+    mark_absent(
+        ws,
+        job,
+        FieldSpec(key="carrier.lpg.2025.01", label="GPL ianuarie", value_type="number", unit="t"),
+        "not_found",
+    )
+    mark_absent(ws, job, "narrative.ch4.concluzii", "not_found")
+    other = mark_absent(ws, job, "narrative.ch5.summary", "not_found")
+    with ws.connect() as db:
+        assert [
+            (issue.code, issue.field_id, issue.message) for issue in content_issues(db, job)
+        ] == [
+            (
+                "data_total_blocked",
+                monthly.id,
+                "Totalul de energie din 2024 lipseşte: completaţi cantitatea de GPL.",
+            ),
+            (
+                "data_total_blocked",
+                gas.id,
+                "Totalul de energie din 2024 lipseşte: completaţi cantitatea de gaze naturale.",
+            ),
+            (
+                "data_total_blocked",
+                annual.id,
+                "Totalul de energie din 2025 lipseşte: completaţi cantitatea de GPL.",
+            ),
+            ("narrative_missing", other.id, "Textul lipseşte: narrative.ch5.summary"),
+        ]

@@ -10,12 +10,13 @@ from ema.audit.render_dataset import reviewed_dataset
 from ema.audit.visit import slug
 from ema.core.review.models import Field, Issue
 from ema.core.review.section_transition import SectionState, Status
-from ema.energy_data.carriers import Carrier
-from ema.energy_data.factors import AUDIT_FACTORS_2026
+from ema.energy_data.calc import tep
+from ema.energy_data.carriers import CARRIER_NAMES_RO, Carrier, counts_in_total
+from ema.energy_data.factors import AUDIT_FACTORS_2026, FactorTable
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
 
 
-def _has_arithmetic_conclusion(fields: dict[str, Field]) -> bool:
+def _fields_dataset(fields: dict[str, Field]) -> EnergyDataset | None:
     readings: dict[Carrier, dict[int, CarrierSeries]] = {}
     for key, field in fields.items():
         parts = key.split(".")
@@ -37,13 +38,30 @@ def _has_arithmetic_conclusion(fields: dict[str, Field]) -> bool:
         elif parts[3].isdigit() and 1 <= int(parts[3]) <= 12:
             series.months[int(parts[3])] = reading
     if not readings:
-        return False
+        return None
     years = tuple(sorted({year for series in readings.values() for year in series}))
-    dataset = reviewed_dataset(EnergyDataset(years, readings), fields.values())
+    return reviewed_dataset(EnergyDataset(years, readings), fields.values())
+
+
+def _has_arithmetic_conclusion(fields: dict[str, Field]) -> bool:
+    dataset = _fields_dataset(fields)
+    if dataset is None:
+        return False
     try:
         return bool(sentence_plan(dataset, AUDIT_FACTORS_2026).sections.get("ch4.concluzii"))
     except ValueError:
         return False
+
+
+def total_blockers(dataset: EnergyDataset, factors: FactorTable) -> list[tuple[Carrier, int]]:
+    return [
+        (carrier, year)
+        for year in dataset.years
+        for carrier in sorted(dataset.carriers)
+        if counts_in_total(carrier)
+        and year in dataset.carriers[carrier]
+        and tep(dataset, factors, carrier, year).value is None
+    ]
 
 
 def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
@@ -61,6 +79,33 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
         int(count_field.value) if count_field and count_field.value is not None else None
     )
     issues: list[Issue] = []
+    dataset = _fields_dataset(fields)
+    blockers = total_blockers(dataset, AUDIT_FACTORS_2026) if dataset is not None else []
+    for carrier, year in blockers:
+        key = f"carrier.{carrier.value}.{year}"
+        annual = fields.get(key)
+        field_id = (
+            annual.id
+            if annual is not None
+            else next(
+                (
+                    field.id
+                    for field_key, field in sorted(fields.items())
+                    if field_key.startswith(f"{key}.") and field_key[len(key) + 1 :].isdigit()
+                ),
+                None,
+            )
+        )
+        issues.append(
+            Issue(
+                code="data_total_blocked",
+                field_id=field_id,
+                message=(
+                    f"Totalul de energie din {year} lipseşte: completaţi cantitatea de "
+                    f"{CARRIER_NAMES_RO[carrier]}."
+                ),
+            )
+        )
     active_slots = [
         (str(row["name"]), str(row["file_sha"]))
         for row in db.execute(
@@ -117,7 +162,7 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
                 )
             )
         if (field.value is None or field.review == "rejected") and not (
-            key == "narrative.ch4.concluzii" and _has_arithmetic_conclusion(fields)
+            key == "narrative.ch4.concluzii" and (blockers or _has_arithmetic_conclusion(fields))
         ):
             issues.append(
                 Issue(
