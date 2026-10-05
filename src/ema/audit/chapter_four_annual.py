@@ -64,14 +64,11 @@ def annual_carrier_table(  # noqa: PLR0913
         else f"{section}:{carrier.value}:annual"
     )
     shown_unit, scale = display_unit(dataset, factors, (metric,), unit, years)
-    rows: list[list[list[Segment]]] = []
+    cells: list[list[Segment]] = [[f"Valoare ({shown_unit})"]]
     for year in years:
         number, fact = value(dataset, factors, metric, year, filed=False)
-        rows.append(
-            [
-                [str(year)],
-                [Num(number * scale if number is not None else None, 2, fact=fact, scale=scale)],
-            ]
+        cells.append(
+            [Num(number * scale if number is not None else None, 2, fact=fact, scale=scale)]
         )
     return [
         Caption(
@@ -80,10 +77,11 @@ def annual_carrier_table(  # noqa: PLR0913
             caption_id,
             ["Tabelul ", Ref("tab", caption_id), f". {label} ({shown_unit})"],
         ),
+        # Horizontal, like the emissions prototype it is drawn on: one column per year.
         Table(
             "emissions",
-            rows,
-            header=[["Anul", f"Valoare ({shown_unit})"]],
+            [cells],
+            header=[["Anul", *[str(year) for year in years]]],
             missing_text=TABLE_MISSING_TEXT,
         ),
     ]
