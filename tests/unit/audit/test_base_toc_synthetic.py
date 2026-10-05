@@ -164,17 +164,17 @@ def test_entries_use_list_counters_catalogue_case_and_explicit_formatting(monkey
             ("ch4.echiv_pv", 1, "heading in lower case"),
         ],
     )
-    _add_list(document, paragraphs[1:])
+    _add_list(document, paragraphs[1:], pattern="4.%1.", start="3")
     for _ in range(2):
         refresh_toc(document)
         entries = _entries(document)
         assert [_text(entry) for entry in entries] == [
             "Cuprins0",
             "4.ANALIZA ENERGIEI0",
-            "4.3.1.Analiza consumului total echivalent de energie electrică din SEN0",
-            "4.3.2.Analiza consumului echivalent de energie electrică fotovoltaică0",
+            "4.3.Analiza consumului total echivalent de energie electrică din SEN0",
+            "4.4.Analiza consumului echivalent de energie electrică fotovoltaică0",
         ]
-        for entry, level in zip(entries, [1, 1, 3, 3], strict=True):
+        for entry, level in zip(entries, [1, 1, 2, 2], strict=True):
             for run in entry.iter(qn("w:r")):
                 properties = run.find(qn("w:rPr"))
                 assert properties is not None
@@ -198,7 +198,7 @@ def test_refresh_clears_italic_toc3_style_and_generated_runs(monkeypatch):
     document, *_ = _fixture()
     toc3 = document.styles.add_style("TOC3", WD_STYLE_TYPE.PARAGRAPH)
     toc3.font.italic = True
-    _headings(document, monkeypatch, [("ch4.echiv_electric", 2, "4.3.1. Energia")])
+    _headings(document, monkeypatch, [("ch4.echiv_electric", 1, "4.3. Energia")])
 
     refresh_toc(document)
 
@@ -209,7 +209,7 @@ def test_refresh_clears_italic_toc3_style_and_generated_runs(monkeypatch):
     )
     assert style.find(f"{qn('w:rPr')}/{qn('w:i')}").get(qn("w:val")) == "0"
     entries = _entries(document)
-    assert any(entry.pPr.pStyle.get(qn("w:val")) == "TOC3" for entry in entries)
+    assert any(entry.pPr.pStyle.get(qn("w:val")) == "TOC2" for entry in entries)
     for entry in entries:
         for run in entry.iter(qn("w:r")):
             properties = run.find(qn("w:rPr"))
@@ -263,17 +263,17 @@ def test_repeated_process_toc_entries_keep_each_process_name(monkeypatch):
         monkeypatch,
         [
             ("ch3", 0, "3. Descrierea situației existente"),
-            ("ch3.process", 2, "3.2.1. DESCRIEREA SECȚIEI Atelier Alpha"),
-            ("ch3.process", 2, "3.2.2. DESCRIEREA SECȚIEI Atelier Beta"),
-            ("ch6.measure", 2, "6.1.1. Lighting retrofit"),
+            ("ch3.process", 1, "3.2. DESCRIEREA SECȚIEI Atelier Alpha"),
+            ("ch3.process", 1, "3.3. DESCRIEREA SECȚIEI Atelier Beta"),
+            ("ch6.measure", 1, "6.1. Lighting retrofit"),
         ],
     )
     for _ in range(2):
         refresh_toc(document)
         assert [_text(entry) for entry in _entries(document)][2:] == [
-            "3.2.1.Descrierea secției Atelier Alpha0",
-            "3.2.2.Descrierea secției Atelier Beta0",
-            "5.1.1.Lighting retrofit0",
+            "3.2.Descrierea secției ATELIER ALPHA0",
+            "3.3.Descrierea secției ATELIER BETA0",
+            "5.1.Lighting retrofit0",
         ]
 
 
@@ -297,3 +297,30 @@ def test_body_levels_one_and_two_are_uppercase_and_level_three_keeps_base_case(m
         "4.3.2. Analiza energiei fotovoltaice",
     ]
     assert "Analiza bilanțului energetic real" in _text(_entries(document)[2])
+
+
+def test_toc_lists_levels_one_and_two_only_but_still_normalises_level_three(monkeypatch):
+    document, *_ = _fixture()
+    paragraphs = _headings(
+        document,
+        monkeypatch,
+        [
+            ("ch4", 0, "4. Analiza energiei"),
+            ("ch4.bilant_real", 1, "4.7. bilanțul energetic real"),
+            ("ch4.echiv_electric", 2, "4.3.1. ANALIZA ENERGIEI DIN SEN"),
+        ],
+    )
+    refresh_toc(document)
+    entries = _entries(document)
+    assert [entry.pPr.pStyle.get(qn("w:val")) for entry in entries] == ["TOC1", "TOC1", "TOC2"]
+    assert not any("SEN" in _text(entry) for entry in entries)
+    assert not paragraphs[2].xpath("./w:bookmarkStart")
+    assert _text(paragraphs[2]) == "4.3.1. ANALIZA ENERGIEI DIN SEN"
+    instructions = [
+        node.text
+        for node in document.element.iter(qn("w:instrText"))
+        if (node.text or "").strip().startswith("TOC")
+    ]
+    assert len(instructions) == 1
+    assert '\\o "1-2"' in instructions[0]
+    assert '\\o "1-3"' not in instructions[0]
