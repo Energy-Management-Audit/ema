@@ -65,7 +65,7 @@ class FakeLive:
             self.calls.append(("support", (), max_output_tokens))
             verdicts = [
                 {"location": item["location"], "sentence_index": item["sentence_index"]}
-                | {"supported": True, "reason": ""}
+                | {"kind": "client", "supported": True, "reason": ""}
                 for item in request
             ]
             return Exchange(self.support_response or json.dumps({"verdicts": verdicts}), (), 1, 1)
