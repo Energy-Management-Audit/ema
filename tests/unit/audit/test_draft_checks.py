@@ -248,6 +248,21 @@ def test_a_name_no_cited_fact_holds_is_still_a_literal_name() -> None:
     assert _history(passage, text) == [("literal_name", "Cooperativa Meşteşugarilor")]
 
 
+@pytest.mark.parametrize(
+    ("passage", "name", "issues"),
+    [
+        # A name inside a longer cited word is not in the passage.
+        ("Contractul aparţine firmei Orionis.", "Orion", [("literal_name", "Orion")]),
+        ("Instalaţia aparţine firmei Orion SRL din zonă.", "Orion", []),
+        ("Instalaţia aparţine firmei Ţesătoria Orion SRL.", "Țesătoria Orion", []),
+    ],
+)
+def test_a_cited_name_matches_whole_words_only(
+    passage: str, name: str, issues: list[tuple[str, str]]
+) -> None:
+    assert _history(passage, f"Contractul este al firmei {name} {{{{c:{HISTORY}}}}}.") == issues
+
+
 def test_a_number_the_cited_passage_holds_is_still_a_literal_number() -> None:
     passage = "Fabrica a fost preluată de Asociaţia Ţesătorilor în anul 1998."
     text = f"Unitatea a fost preluată de Asociaţia Ţesătorilor în 1998 {{{{c:{HISTORY}}}}}."
