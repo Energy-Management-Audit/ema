@@ -24,6 +24,7 @@ RESOURCE_FILES = (
     ("audit", "measurement_phrases.json"),
     ("audit", "prompts", "extract_v2.txt"),
     ("audit", "prompts", "draft_v4.txt"),
+    ("audit", "prompts", "ch5_equipment_v1.txt"),
     ("consumption_analysis", "phrases.jsonl"),
     ("consumption_analysis", "trend_rules.json"),
     ("llm", "models.toml"),
