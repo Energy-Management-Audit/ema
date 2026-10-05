@@ -148,6 +148,22 @@ def test_two_sections_may_not_describe_one_passage(tmp_path: Path) -> None:
     assert used.passages == {"audit.equipment"}
 
 
+def test_unavailable_support_fails_every_section_of_the_group(tmp_path: Path) -> None:
+    # #143 fix round 1: none is accepted; each fails as support_unavailable and is redrafted
+    # on the next run.
+    ws = Workspace(tmp_path / "ws")
+    job = _job(ws, {"audit.equipment": EQUIPMENT, "audit.process_sections": "Piesele se spală."})
+    (group,), units = chapter_groups(ws, job, [FLUX, CONSUMERS])
+    provider, support = DraftProvider([[FLOW, PARAPHRASED]]), SupportProvider("not json")
+    passes = Passes(provider, support, default_model("openai").id, synthetic=True)
+    result = run_group(ws, job, group, passes, Used(), units)
+    assert result.drafted == {}
+    assert {section: exc.code for section, exc in result.failed.items()} == {
+        FLUX: "support_unavailable",
+        CONSUMERS: "support_unavailable",
+    }
+
+
 def test_unknown_and_duplicate_sections_are_dropped_and_logged(tmp_path: Path) -> None:
     unknown = _draft("ch3.apa", "Apa vine din reţea {{c:audit.equipment}}.", "audit.equipment")
     second = _draft(FLUX, "Fluxul are utilaje {{c:audit.equipment}}.", "audit.equipment")

@@ -30,6 +30,7 @@ RULES = {
     "unit_passage": 14,
     "unit_outside": 14,
     "missing_status_invalid": 15,
+    "status_invalid": 16,
 }
 OMITTED_RULE = (
     "Fiecare secțiune cerută apare o singură dată în sections, cu id-ul ei exact, într-un "

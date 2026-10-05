@@ -21,9 +21,15 @@ CITE_GAP = re.compile(r"\s*" + CITE.pattern)
 NUMBER = re.compile(r"\d")
 # Romanian number words, matched on text folded to plain letters so that "două", "doua", "şase"
 # and "șase" are one word: a quantity spelled out is a number outside a fact token (D1).
+# Ordinals from the second up and fractions state an order or a share as much as a cardinal
+# does; "primul", "prima" and "ultimul" stay free for "în primul rând" and ordered stages.
 NUMBER_WORD = re.compile(
-    r"\b(?:unu|una|doi|doua|trei|patru|cinci|sase|sapte|opt|noua|zece|suta|sute|mie|mii"
-    r"|milion|milioane|(?:un|doi|doua|trei|pai|patru|cinci|sai|sapte|opt|noua)(?:sprezece|zeci))\b"
+    r"\b(?:zero|unu|una|doi|doua|trei|patru|cinci|sase|sapte|opt|noua|zece|suta|sute|mie|mii"
+    r"|milion|milioane|(?:un|doi|doua|trei|pai|patru|cinci|sai|sapte|opt|noua)(?:sprezece|zeci)"
+    r"|doilea|treilea|patrulea|cincilea|saselea|saptelea|optulea|noualea|zecelea"
+    r"|treia|patra|cincea|sasea|saptea|zecea|a opta(?!\s+pentru)"
+    r"|jumatat(?:e|ea|ii|i|ile|ilor)|treim(?:e|ea|ii|i|ile|ilor)|sfert(?:ul|ului|uri|urile|urilor)?"
+    r"|dubl(?:u|ul|ului|a|e|ei|i|ii|ilor)|tripl(?:u|ul|ului|a|e|ei|i|ii|ilor))\b"
 )
 UPPER = "A-ZĂÂÎȘȚŞŢ"
 LOWER = "a-zăâîșțşţ"
@@ -33,10 +39,27 @@ NAME = re.compile(
 ACRONYM = re.compile(rf"(?<!\w)[{UPPER}]{{2,}}(?!\w)")
 SENTENCE_WORD = re.compile(rf"[{UPPER}][{LOWER}]+(?!\w)")
 CEDILLAS = str.maketrans("şţ", "st")
-# The regulatory references a general sentence may print in figures (D3).
+# The regulatory references a general sentence may print in figures (D3), each only in the
+# words that make it a reference: the law, the standard, or the threshold.
 REFERENCE_NUMBERS = ("121/2014", "50001", "16247", "1.000 tep", "1000 tep")
-REFERENCE = re.compile(
-    r"(?<![\w.,/])(?:" + "|".join(map(re.escape, REFERENCE_NUMBERS)) + r")(?![\w/]|[.,]\d)"
+_THRESHOLD = (
+    r"(?i:\b(?:prag|pragul|sub|peste|depășește|depăşeşte|inferior|superior)\b)"
+    r"(?:\s+[^\s\d]+){0,3}\s+"
+)
+_REFERENCE_CONTEXT = {
+    "121/2014": r"\b[Ll]eg(?:ea|ii)\s+(?:nr\.\s*)?",
+    "50001": r"\bISO\s+",
+    "16247": r"\bEN\s+",
+    "1.000 tep": _THRESHOLD,
+    "1000 tep": _THRESHOLD,
+}
+REFERENCES = tuple(
+    re.compile(
+        f"({_REFERENCE_CONTEXT[number]}){re.escape(number)}"
+        + (r"(?:-\d+)?" if number == "16247" else "")
+        + r"(?![\w/]|[.,]\d)"
+    )
+    for number in REFERENCE_NUMBERS
 )
 FACT_GAP = re.compile(TOKEN.pattern + r"(\s*)")
 # A sentence does not end after an address or legal abbreviation, as in "nr. {{f:...}}", or
@@ -89,6 +112,46 @@ NAME_COMMON = frozenset(
         "Ministerul Energiei",
         "Ministerului Energiei",
     }
+) | frozenset(
+    # Generic technical and institutional terms only, never a client, supplier or site: a
+    # general sentence may write these in capitals.
+    {
+        "LED",
+        "GPL",
+        "UE",
+        "Uniunea Europeană",
+        "HVAC",
+        "CTA",
+        "PT",
+        "MT",
+        "JT",
+        "IT",
+        "SCADA",
+        "PLC",
+        "AC",
+        "CC",
+        "CET",
+        "CHP",
+        "PIF",
+        "kWp",
+        "VFD",
+        "TGD",
+        "TD",
+        "BMS",
+        "UPS",
+        "PCS",
+        "COP",
+        "EER",
+        "SCOP",
+        "SEER",
+        "NOx",
+        "CO2",
+        "CO₂",
+    }
+)
+# A capitalised word before a legal form is a company's name, wherever it stands.
+LEGAL_NAME = re.compile(
+    rf"(?<!\w)[{UPPER}][{UPPER}{LOWER}-]*(?=\s+(?:S\.R\.L\.|S\.A\.|SRL|SA)(?!\w))"
 )
 
 
@@ -145,7 +208,8 @@ COMMON = tuple(traced(name) for name in NAME_COMMON)
 def literal_number(plain: str) -> bool:
     """Text outside fact tokens that states a quantity: a digit or a Romanian number word,
     a regulatory reference aside (D3)."""
-    plain = REFERENCE.sub(" ", plain)
+    for reference in REFERENCES:
+        plain = reference.sub(r"\1 ", plain)
     return bool(NUMBER.search(plain) or NUMBER_WORD.search(folded(plain)))
 
 
@@ -197,19 +261,27 @@ def texts(draft: SectionDraft) -> list[tuple[str, DraftText]]:
     return [(f"paragraph:{i}", paragraph) for i, paragraph in enumerate(draft.paragraphs)]
 
 
-def _names(sentence: str, facts: dict[str, Field], known: set[str]) -> set[str]:
-    """The sentence's name candidates, once each: title-case runs, acronyms and known client
-    names, as written where the text has them."""
+def _names(sentence: str, facts: dict[str, Field], known: set[str]) -> dict[str, bool]:
+    """The sentence's name candidates, once each, as written where the text has them, and
+    whether each has a proper name's shape: several capitalised words, an acronym, or a word
+    before a legal form. Generic terms are not candidates."""
     plain = ANY_TOKEN.sub("", sentence)
-    found: dict[str, str] = {}
-    for name in (
-        *NAME.findall(_sentence_marked(CITE_GAP.sub("", sentence), facts)),
-        *ACRONYM.findall(plain),
-        *(name for name in sorted(known) if in_quote(name, traced(plain))),
+    found: dict[str, tuple[str, bool]] = {}
+    for name, shaped in (
+        *(
+            (name, " " in name)
+            for name in NAME.findall(_sentence_marked(CITE_GAP.sub("", sentence), facts))
+        ),
+        *((name, True) for name in ACRONYM.findall(plain)),
+        *((name, True) for name in LEGAL_NAME.findall(plain)),
+        *((name, False) for name in sorted(known) if in_quote(name, traced(plain))),
     ):
-        found.setdefault(traced(name), name)
+        first, before = found.get(traced(name), (name, False))
+        found[traced(name)] = (first, shaped or before)
     return {
-        name for key, name in found.items() if not any(in_quote(key, common) for common in COMMON)
+        name: shaped
+        for key, (name, shaped) in found.items()
+        if not any(in_quote(key, common) for common in COMMON)
     }
 
 
@@ -270,13 +342,19 @@ def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> Draft
                     if not any(in_quote(traced(name), value) for value in values)
                 }
             else:
-                # A general sentence names institutions and standards freely, never the client.
+                # A general sentence names generic terms freely; a client's name, or anything
+                # shaped like a proper name, fails whatever the support pass would say.
                 names |= {
                     name
-                    for name in _names(sentence, facts, known)
-                    if any(in_quote(traced(name), value) for value in (*known, *offered))
+                    for name, shaped in _names(sentence, facts, known).items()
+                    if shaped or any(in_quote(traced(name), value) for value in (*known, *offered))
                 }
         fatal.extend(DraftReview("literal_name", location, name) for name in sorted(names))
+    if draft.status == "drafted" and not any(
+        citable_fact(draft.section, key, field, job) for key, field in facts.items()
+    ):
+        # General text alone does not make a section (v5 rule 16).
+        fatal.append(DraftReview("status_invalid", "section", "no usable fact"))
     for key in draft.missing_fact_ids:
         if not citable(draft.section, key) or (
             key in facts and (facts[key].job_id != job or facts[key].presence == "found")

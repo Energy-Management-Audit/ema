@@ -39,6 +39,8 @@ def test_the_reference_numbers_are_the_plan_literals() -> None:
         "Auditul se desfăşoară după SR EN 16247.",
         "Obligaţia se aplică peste pragul de 1.000 tep.",
         "Obligaţia se aplică peste pragul de 1000 tep.",
+        "Auditul se desfăşoară după SR EN 16247-1.",
+        "Consumul este sub pragul legal de 1.000 tep.",
     ],
 )
 def test_a_regulatory_reference_is_not_a_literal_number(text: str) -> None:
@@ -51,7 +53,12 @@ def test_a_regulatory_reference_is_not_a_literal_number(text: str) -> None:
         "Linia funcţionează din 1998.",
         "Societatea are o sută de utilaje.",
         "Auditul urmează Legea nr. 121/20145.",
-        "Auditul se desfăşoară după SR EN 16247-1.",
+        # A reference number outside its reference is a quantity (fix round 1).
+        "Societatea are 50001 kWh consumați.",
+        "Firma are 121/2014 angajați.",
+        "Societatea consumă anual 1000 tep.",
+        "Consumul societății este de 1.000 tep.",
+        "Auditul urmează standardul 16247.",
     ],
 )
 def test_a_number_in_an_uncited_sentence_fails(text: str) -> None:

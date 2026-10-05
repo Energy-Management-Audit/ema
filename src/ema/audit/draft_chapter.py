@@ -225,7 +225,11 @@ def run_group(
         synthetic=passes.synthetic,
         client_live=passes.client_live,
     )
-    flags = support_pass(support_context, [draft for draft, _ in ordered], facts)
+    try:
+        flags = support_pass(support_context, [draft for draft, _ in ordered], facts)
+    except EmaError as exc:
+        # No verdict, no prose: the group's sections stay markers until the next run.
+        return GroupResult(failed={**failed, **{draft.section: exc for draft, _ in ordered}})
     return GroupResult(
         {
             draft.section: Drafted(draft, check, flags[draft.section], plans[draft.section].facts)

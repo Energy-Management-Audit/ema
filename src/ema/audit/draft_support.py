@@ -2,15 +2,15 @@
 
 A client sentence is supported by the facts it cites; a general one unless it states or implies
 something about the client, or is technically wrong. A sentence without a verdict is
-unsupported. When the pass cannot run, or answers a sentence twice, every sentence that cites a
-fact without printing it, or cites none, is unsupported; one whose facts are all rendered keeps
-its text.
+unsupported. When the pass cannot run, or answers a sentence twice, no section of the group is
+accepted: each fails as support_unavailable and is drafted again on the next run.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from itertools import takewhile
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -18,12 +18,12 @@ from pydantic import Field as ModelField
 
 from ema.audit.draft_checks import (
     ANY_TOKEN,
-    CITE,
     DraftReview,
     sentence_parts,
     texts,
     token_only,
 )
+from ema.audit.draft_render import kept
 from ema.audit.draft_schema import SectionDraft
 from ema.core.errors import EmaError
 from ema.core.llm.agent import AgentContext
@@ -47,6 +47,7 @@ SUPPORT_PROMPT = (
 THINKING_TOKENS = 16_000
 VERDICT_TOKENS = 40
 MAX_OUTPUT_TOKENS = 65_536
+INTRO_WITHOUT_ITEMS = "list introduction without supported items"
 
 
 class Verdict(BaseModel):
@@ -95,8 +96,8 @@ def support_request(drafts: Sequence[SectionDraft], facts: dict[str, Field]) -> 
 def support_pass(
     context: AgentContext, drafts: Sequence[SectionDraft], facts: dict[str, Field]
 ) -> dict[str, tuple[DraftReview, ...]]:
-    """Per section, its unsupported sentences, which the render drops; a failed pass marks
-    every sentence that does not print all it rests on."""
+    """Per section, its unsupported sentences, which the render drops, with any list
+    introduction left without items; a pass that cannot run raises support_unavailable."""
     sentences = _sentences(drafts, facts)
     flags: dict[str, list[DraftReview]] = {draft.section: [] for draft in drafts}
     if not sentences:
@@ -122,17 +123,39 @@ def support_pass(
                 )
             verdicts[key] = verdict
     except EmaError as exc:
-        for section, location, _, sentence in sentences:
-            if CITE.search(sentence) or not ANY_TOKEN.search(sentence):
-                flags[section].append(
-                    DraftReview("unsupported", location, "support_unavailable", sentence)
-                )
-        for items in flags.values():
-            items.append(DraftReview("support_unavailable", "section", exc.code))
-        return {section: tuple(items) for section, items in flags.items()}
+        raise EmaError(
+            "support_unavailable",
+            "Verificarea redactării nu a rulat; secţiunea se reface la următoarea redactare.",
+            exc.code,
+        ) from exc
     for section, location, index, sentence in sentences:
         given = verdicts.get((f"{section}:{location}", index))
         if given is None or not given.supported:
             reason = given.reason if given is not None else "no verdict"
             flags[section].append(DraftReview("unsupported", location, reason, sentence))
+    for draft in drafts:
+        flags[draft.section].extend(orphan_intros(draft, tuple(flags[draft.section]), facts))
     return {section: tuple(items) for section, items in flags.items()}
+
+
+def orphan_intros(
+    draft: SectionDraft, flags: tuple[DraftReview, ...], facts: dict[str, Field]
+) -> list[DraftReview]:
+    """A list introduction whose items were all dropped goes with them, and the review says so."""
+    found: list[DraftReview] = []
+    for index, item in enumerate(draft.paragraphs):
+        following = draft.paragraphs[index + 1 :]
+        bullets = list(takewhile(lambda paragraph: paragraph.kind == "bullet", following))
+        if item.kind != "body" or not bullets:
+            continue
+        if any(
+            kept(bullet, f"paragraph:{index + offset}", flags, facts)
+            for offset, bullet in enumerate(bullets, 1)
+        ):
+            continue
+        sentences = kept(item, f"paragraph:{index}", flags, facts)
+        if sentences and sentences[-1].rstrip().endswith(":"):
+            found.append(
+                DraftReview("unsupported", f"paragraph:{index}", INTRO_WITHOUT_ITEMS, sentences[-1])
+            )
+    return found

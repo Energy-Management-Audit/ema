@@ -17,7 +17,7 @@ from ema.audit.draft_render import render_section, review_payload
 from ema.audit.draft_schema import DraftText, SectionDraft
 
 KEPT = "Societatea {{f:audit.company_name}} produce ambalaje."
-SUPPLIER = "Energia electrică este furnizată de ELNOR."
+SUPPLIER = "Energia electrică este furnizată de Elnor."
 REASON = "Names a supplier no fact states."
 
 
@@ -48,7 +48,7 @@ DRAFT = SectionDraft(
 def test_a_supplier_no_fact_names_passes_the_checks_and_the_support_pass_flags_it(
     tmp_path: Path,
 ) -> None:
-    # ELNOR is in no fact: the literal-name check lets it through; the support pass decides.
+    # A single capitalised word no fact holds passes the name check; the support pass decides.
     assert check_draft(DRAFT, FACTS, "synthetic").fatal == ()
     _, _, accepted, flags = _run(tmp_path, [DRAFT], SupportProvider(_verdicts("general")))
     assert accepted == DRAFT
@@ -68,7 +68,7 @@ def test_an_unsupported_sentence_is_dropped_without_a_marker_and_listed(
     )
     written = _section(output)
     assert written[0] == "Societatea Atelier Exemplu produce ambalaje."
-    assert not any(MARKER in text or "ELNOR" in text for text in written[:-1])
+    assert not any(MARKER in text or "Elnor" in text for text in written[:-1])
     review = review_payload(DRAFT, check, flags)["review"]
     assert review == [
         {"code": "unsupported", "location": "paragraph:0", "detail": REASON, "sentence": SUPPLIER}

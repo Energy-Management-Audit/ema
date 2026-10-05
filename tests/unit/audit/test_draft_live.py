@@ -16,6 +16,7 @@ from ema.audit.draft_live import DraftSummary, start_draft
 from ema.audit.draft_plan import allowance
 from ema.audit.draft_schema import SECTION_FACTS, DraftText, SectionDraft
 from ema.audit.draft_stage import draft_section
+from ema.audit.sections import get_status
 from ema.audit.stages import start_audit_stage
 from ema.cli import app
 from ema.core.errors import EmaError
@@ -193,15 +194,17 @@ def test_a_recorded_chapter_replays_offline(
     assert both.value.code == "replay_invalid"
 
 
-def test_support_error_keeps_written_and_queued_draft(tmp_path: Path, live: FakeLive) -> None:
+def test_support_error_fails_the_section_and_writes_no_draft(
+    tmp_path: Path, live: FakeLive
+) -> None:
     live.support_response = "not json"
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
-    result = draft_section(ws, job, SECTION)
-    assert result.draft_status == "drafted"
-    assert result.draft_path.is_file()
-    assert any(flag.code == "support_unavailable" for flag in result.review)
-    assert result.section_status == "drafted"
+    with pytest.raises(EmaError) as error:
+        draft_section(ws, job, SECTION)
+    assert error.value.code == "draft_failed"
+    assert error.value.detail == "ai_schema"
+    assert get_status(ws, job, SECTION).status.value != "drafted"
 
 
 def test_live_switch_off_sends_nothing(

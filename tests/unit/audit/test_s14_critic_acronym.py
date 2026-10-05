@@ -31,9 +31,13 @@ def test_an_acronym_client_name_outside_its_token_is_rejected() -> None:
     ) == ["ACME"]
 
 
-def test_an_acronym_no_fact_holds_is_left_to_the_support_pass() -> None:
-    # #143 D2: an uncited sentence fails only on a name the section's facts hold.
-    assert _names("ELNOR livrează energie.", []) == []
+def test_an_acronym_no_fact_holds_is_still_a_name() -> None:
+    # #143 fix round 1: an acronym is shaped like a proper name, cited or not.
+    assert _names("ELNOR livrează energie.", []) == ["ELNOR"]
     assert _names("Firma ELNOR are personal {{c:audit.employees}}.", ["audit.employees"]) == [
         "ELNOR"
     ]
+
+
+def test_a_generic_technical_acronym_passes() -> None:
+    assert _names("Iluminatul LED și sistemele HVAC reduc consumul.", []) == []

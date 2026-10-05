@@ -68,26 +68,34 @@ def _resolved(text: str, facts: dict[str, Field]) -> str:
     return re.sub(TOKEN.pattern + r"(\.?)", replace, CITE_GAP.sub("", text))
 
 
-def _paragraph(
+def kept(
     item: DraftText, location: str, issues: tuple[DraftReview, ...], facts: dict[str, Field]
-) -> Block | None:
-    """The text without its unsupported sentences, which the draft review lists (D4); None
-    when nothing is left."""
+) -> list[str]:
+    """The item's sentences the render keeps: all but the unsupported ones, which the draft
+    review lists (D4); none when a flag covers the whole item."""
     relevant = [
         issue for issue in issues if issue.location == location and issue.code == UNSUPPORTED
     ]
     if any(issue.sentence is None for issue in relevant):
-        return None
+        return []
     flagged = [support_text(issue.sentence or "") for issue in relevant]
-    kept: list[str] = []
-    for sentence in sentence_parts(item.text, facts):
-        normalized = support_text(sentence)
+    return [
+        sentence
+        for sentence in sentence_parts(item.text, facts)
         # A verified fact standing alone is the source's own text; a flag never erases it.
-        if token_only(sentence) or not any(
-            flag and (flag in normalized or normalized in flag) for flag in flagged
-        ):
-            kept.append(_resolved(sentence, facts))
-    return Paragraph(item.kind, [" ".join(kept)]) if kept else None
+        if token_only(sentence)
+        or not any(
+            flag and (flag in support_text(sentence) or support_text(sentence) in flag)
+            for flag in flagged
+        )
+    ]
+
+
+def _paragraph(
+    item: DraftText, location: str, issues: tuple[DraftReview, ...], facts: dict[str, Field]
+) -> Block | None:
+    sentences = [_resolved(sentence, facts) for sentence in kept(item, location, issues, facts)]
+    return Paragraph(item.kind, [" ".join(sentences)]) if sentences else None
 
 
 def draft_blocks(
@@ -187,7 +195,13 @@ def render_section(
         raise ValueError("output must not overwrite audit base")
     check = check_draft(draft, facts, job)
     if check.fatal:
-        raise EmaError("draft_invalid", "Redactarea nu a trecut verificările.", draft.section)
+        detail = f"{draft.section}: " + "; ".join(
+            f"{issue.code} {issue.detail}" for issue in check.fatal
+        )
+        if any(issue.code == "passage_verbatim" for issue in check.fatal):
+            # A draft stored under an earlier prompt printed its passages whole.
+            detail += ". Refaceţi redactarea capitolului (versiunea nouă a promptului)."
+        raise EmaError("draft_invalid", "Redactarea nu a trecut verificările.", detail)
     issues = (*check.review, *flags)
     output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory() as directory:

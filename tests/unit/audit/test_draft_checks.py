@@ -79,8 +79,8 @@ def test_sentence_start_after_a_sentence_fact_is_not_a_name() -> None:
         ("„Produce piese.”  ", "{{f:audit.business_activity}} Aceste etape continuă.", set()),
         ("Produce piese.", "{{f:audit.business_activity}}Aceste etape continuă.", set()),
         ("Produce piese.", "{{f:audit.business_activity}}  Aceste etape continuă.", set()),
-        # An uncited sentence may name what no fact holds: the support pass judges it (#143).
-        ("Produce piese.", "{{f:audit.business_activity}} ACME are sediul aici.", set()),
+        # An acronym is shaped like a name: fatal even uncited (#143 fix round 1).
+        ("Produce piese.", "{{f:audit.business_activity}} ACME are sediul aici.", {"ACME"}),
         ("piese", "Societatea ACME produce {{f:audit.business_activity}}.", {"ACME"}),
         (
             "piese turnate",
