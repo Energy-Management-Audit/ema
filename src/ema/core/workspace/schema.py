@@ -3,7 +3,7 @@
 import sqlite3
 import time
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 def migrate(db: sqlite3.Connection) -> None:  # noqa: C901, PLR0912
@@ -214,6 +214,21 @@ def migrate(db: sqlite3.Connection) -> None:  # noqa: C901, PLR0912
                    AND u.sha = COALESCE(slot_versions.converted_from, slot_versions.file_sha))
              WHERE original_name IS NULL;
             PRAGMA user_version = 12;
+            COMMIT;
+        """)
+        version = 12
+    if version == 12:
+        # As at v8, historical migration fixtures model only their tables under test.
+        columns = {row[1] for row in db.execute("PRAGMA table_info(llm_calls)")}
+        add = (
+            "ALTER TABLE llm_calls ADD COLUMN thoughts_tokens INTEGER;"
+            if columns and "thoughts_tokens" not in columns
+            else ""
+        )
+        db.executescript(f"""
+            BEGIN IMMEDIATE;
+            {add}
+            PRAGMA user_version = 13;
             COMMIT;
         """)
         return

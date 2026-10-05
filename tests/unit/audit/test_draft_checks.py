@@ -191,15 +191,82 @@ def test_a_number_outside_a_value_token_fails_even_when_a_cited_fact_holds_it() 
     )
 
 
-def test_a_name_prints_only_from_a_value_token() -> None:
+def test_a_name_prints_from_a_value_token() -> None:
     assert (
         _codes("Societatea {{f:audit.company_name}} produce ambalaje.", ["audit.company_name"])
         == set()
     )
-    # D1: a name the cited fact holds is still a literal name outside its value token.
-    assert "literal_name" in _codes(
-        "Firma Atelier Exemplu produce ambalaje {{c:audit.company_name}}.", ["audit.company_name"]
+
+
+HISTORY = "audit.history"
+
+
+def _history(passage: str, text: str) -> list[tuple[str, str]]:
+    facts = {HISTORY: _fact(HISTORY, passage)}
+    checked = check_draft(_draft(text, [HISTORY], "ch2.istorie"), facts, "synthetic")
+    return [(issue.code, issue.detail) for issue in checked.fatal]
+
+
+@pytest.mark.parametrize(
+    ("passage", "name"),
+    [
+        # Cedilla in the passage, comma below in the draft, and the reverse.
+        (
+            "Fabrica a fost preluată de Asociaţia Ţesătorilor Ştiinţifici.",
+            "Asociația Țesătorilor Științifici",
+        ),
+        (
+            "Fabrica a fost preluată de Asociația Țesătorilor Științifici.",
+            "Asociaţia Ţesătorilor Ştiinţifici",
+        ),
+        # A passage typed without diacritics, or broken over a line.
+        (
+            "Fabrica a fost preluata de Asociatia Tesatorilor Stiintifici.",
+            "Asociaţia Ţesătorilor Ştiinţifici",
+        ),
+        (
+            "Fabrica a fost preluată de Asociaţia\n  Ţesătorilor Ştiinţifici.",
+            "Asociația Țesătorilor Științifici",
+        ),
+    ],
+)
+def test_a_name_the_cited_passage_holds_is_traceable(passage: str, name: str) -> None:
+    # D5 (#137) supersedes ai-parity D1 for names: a paraphrase may name what its passage names.
+    assert _history(passage, f"Unitatea a fost preluată de {name} {{{{c:{HISTORY}}}}}.") == []
+    assert (
+        _codes(
+            "Firma Atelier Exemplu produce ambalaje {{c:audit.company_name}}.",
+            ["audit.company_name"],
+        )
+        == set()
     )
+
+
+def test_a_name_no_cited_fact_holds_is_still_a_literal_name() -> None:
+    passage = "Fabrica a fost preluată de Asociaţia Ţesătorilor Ştiinţifici."
+    text = f"Unitatea a fost preluată de Cooperativa Meşteşugarilor {{{{c:{HISTORY}}}}}."
+    assert _history(passage, text) == [("literal_name", "Cooperativa Meşteşugarilor")]
+
+
+@pytest.mark.parametrize(
+    ("passage", "name", "issues"),
+    [
+        # A name inside a longer cited word is not in the passage.
+        ("Contractul aparţine firmei Orionis.", "Orion", [("literal_name", "Orion")]),
+        ("Instalaţia aparţine firmei Orion SRL din zonă.", "Orion", []),
+        ("Instalaţia aparţine firmei Ţesătoria Orion SRL.", "Țesătoria Orion", []),
+    ],
+)
+def test_a_cited_name_matches_whole_words_only(
+    passage: str, name: str, issues: list[tuple[str, str]]
+) -> None:
+    assert _history(passage, f"Contractul este al firmei {name} {{{{c:{HISTORY}}}}}.") == issues
+
+
+def test_a_number_the_cited_passage_holds_is_still_a_literal_number() -> None:
+    passage = "Fabrica a fost preluată de Asociaţia Ţesătorilor în anul 1998."
+    text = f"Unitatea a fost preluată de Asociaţia Ţesătorilor în 1998 {{{{c:{HISTORY}}}}}."
+    assert [code for code, _ in _history(passage, text)] == ["literal_number"]
 
 
 @pytest.mark.parametrize(

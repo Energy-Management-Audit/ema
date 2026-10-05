@@ -104,6 +104,7 @@ def complete_json[T: BaseModel](  # noqa: PLR0913
                 else None
             ),
             on_estimate=budget_on_estimate,
+            thinking_tokens=thinking_tokens,
         )
         if response.finish_reason == "MAX_TOKENS":
             logging.getLogger(__name__).warning("ai_truncated section=%s", context.section)

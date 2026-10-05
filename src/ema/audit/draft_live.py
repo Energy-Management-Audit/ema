@@ -79,12 +79,15 @@ def _draft_all(
     skipped: list[str],
     absent: list[str],
 ) -> DraftSummary:
-    """One call per chapter group, in catalogue order; a quota or the budget stops the rest."""
+    """One call per chapter group, chapter 3 first and in catalogue order within a chapter;
+    a quota or the budget stops the rest."""
     drafted: dict[str, str] = {}
     failed: dict[str, str] = {}
     ctx.record_input(prompt=PROMPT_VERSION, model=model_id)
     recompute_ready(ctx.ws, ctx.job)
     groups, units = chapter_groups(ctx.ws, ctx.job, sections)
+    # Chapter 3 first: budget spent on chapter 2 retries no longer leaves it undrafted (#137).
+    groups = sorted(groups, key=lambda group: -group.chapter)
     used = {2: Used(), 3: Used()}
     stopped: tuple[str, ...] = ()
     for index, group in enumerate(groups):
@@ -102,6 +105,7 @@ def _draft_all(
                     run=ctx.run_id,
                     section=section,
                     code=failed[section],
+                    detail=exc.detail,
                     **provider_failure(exc),
                 )
         if any(failed[section] in STOPPING for section in result.failed):

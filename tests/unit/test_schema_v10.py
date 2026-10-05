@@ -59,7 +59,7 @@ def test_v9_upgrade_and_fresh_workspace_have_both_tables(tmp_path: Path) -> None
     ws = Workspace(tmp_path / "fresh")
     with ws.connect() as db:
         assert {"client_annexes", "job_annotations"} <= _tables(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 12
+        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 13
 
 
 def test_annex_only_file_survives_gc_and_enters_backup(tmp_path: Path) -> None:

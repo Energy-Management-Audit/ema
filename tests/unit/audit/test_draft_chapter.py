@@ -7,10 +7,12 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from tests.unit.audit.test_draft_checks import _fact
 from tests.unit.audit.test_draft_structured import DraftProvider, SupportProvider
 from tests.workspace_jobs import create_job
 
+from ema.audit import draft_chapter
 from ema.audit.draft_agent import chapter_groups
 from ema.audit.draft_chapter import Passes, run_group, unit_issues
 from ema.audit.draft_plan import (
@@ -90,27 +92,38 @@ def test_one_call_drafts_two_sections(tmp_path: Path) -> None:
     assert used.passages == {"audit.process_sections", "audit.equipment"}
 
 
-def test_truncated_chapter_retries_once_with_full_output_room(tmp_path: Path) -> None:
-    class TruncatedDraft(DraftProvider):
-        def __init__(self) -> None:
-            super().__init__([[FLOW, PARAPHRASED]])
-            self.thinking: list[int | None] = []
+class TruncatedDraft(DraftProvider):
+    def __init__(self) -> None:
+        super().__init__([[FLOW, PARAPHRASED]])
+        self.thinking: list[int | None] = []
 
-        def respond(self, *args: object, **kwargs: object) -> Exchange:
-            self.thinking.append(kwargs.get("thinking_tokens"))  # type: ignore[arg-type]
-            if not self.requests:
-                self.requests.append(json.loads(args[1][1]["content"]))  # type: ignore[index]
-                self.limits.append(args[4])  # type: ignore[arg-type]
-                return Exchange('{"sections": [', (), 1, 1, finish_reason="MAX_TOKENS")
-            return super().respond(*args, **kwargs)
+    def respond(self, *args: object, **kwargs: object) -> Exchange:
+        self.thinking.append(kwargs.get("thinking_tokens"))  # type: ignore[arg-type]
+        if not self.requests:
+            self.requests.append(json.loads(args[1][1]["content"]))  # type: ignore[index]
+            self.limits.append(args[4])  # type: ignore[arg-type]
+            return Exchange('{"sections": [', (), 1, 1, finish_reason="MAX_TOKENS")
+        return super().respond(*args, **kwargs)
 
+
+def test_truncated_chapter_retries_once_with_twice_the_allowance(tmp_path: Path) -> None:
     provider = TruncatedDraft()
     _, _, _, result, _, _ = _run(tmp_path, [FLUX, CONSUMERS], [], provider)
     assert set(result.drafted) == {FLUX, CONSUMERS}  # type: ignore[attr-defined]
-    assert provider.limits[0] < MAX_OUTPUT_TOKENS
-    assert provider.limits[1] == MAX_OUTPUT_TOKENS == 65_536
+    assert 2 * provider.limits[0] < MAX_OUTPUT_TOKENS == 65_536
+    assert provider.limits[1] == min(65_536, 2 * provider.limits[0])
     assert provider.thinking == [THINKING_TOKENS, THINKING_TOKENS]
     assert len(provider.requests) == 2
+
+
+def test_the_truncation_retry_never_asks_past_the_output_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(draft_chapter, "MAX_OUTPUT_TOKENS", 20_000)
+    provider = TruncatedDraft()
+    _run(tmp_path, [FLUX, CONSUMERS], [], provider)
+    assert 2 * provider.limits[0] > 20_000
+    assert provider.limits[1] == 20_000
 
 
 def test_a_passage_used_by_an_earlier_section_goes_back_with_what_is_used(tmp_path: Path) -> None:

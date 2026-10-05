@@ -33,7 +33,7 @@ def test_migration_moves_only_recorded_names(tmp_path: Path) -> None:
             ("synthetic", "api", "api.xlsx", "xlsx", 10, "2026-01-01"),
         )
         migrate(db)
-        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 12
+        assert db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 13
         rows = db.execute(
             "SELECT slot,version,origin,original_name FROM slot_versions ORDER BY slot,version"
         ).fetchall()

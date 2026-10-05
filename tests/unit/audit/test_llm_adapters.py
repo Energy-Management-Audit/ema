@@ -11,7 +11,7 @@ from ema.audit.draft_plan import THINKING_TOKENS
 from ema.core.errors import EmaError
 from ema.core.llm.models import curated_models
 from ema.core.llm.providers import GeminiProvider, OpenAIProvider
-from ema.core.llm.types import ToolSpec
+from ema.core.llm.types import Exchange, ToolSpec
 
 
 def test_gemini_keeps_signed_function_history_and_call_id() -> None:
@@ -56,7 +56,7 @@ def test_gemini_keeps_signed_function_history_and_call_id() -> None:
     assert result.text == "done"
 
 
-def test_gemini_draft_thinking_config_and_finish_reason() -> None:
+def _gemini_configs(model: str) -> tuple[list[types.GenerateContentConfig], list[Exchange]]:
     configs: list[types.GenerateContentConfig] = []
 
     class Models:
@@ -65,7 +65,12 @@ def test_gemini_draft_thinking_config_and_finish_reason() -> None:
             return SimpleNamespace(
                 function_calls=[],
                 text='{"item": 1}',
-                usage_metadata=None,
+                usage_metadata=SimpleNamespace(
+                    prompt_token_count=10,
+                    candidates_token_count=20,
+                    thoughts_token_count=300,
+                    cached_content_token_count=None,
+                ),
                 candidates=[
                     SimpleNamespace(content=None, finish_reason=types.FinishReason.MAX_TOKENS)
                 ],
@@ -73,16 +78,33 @@ def test_gemini_draft_thinking_config_and_finish_reason() -> None:
 
     provider = GeminiProvider.__new__(GeminiProvider)
     provider._client = SimpleNamespace(models=Models())
-    for thinking in (THINKING_TOKENS, None):
-        result = provider.respond(
-            "gemini-3.6-flash",
+    results = [
+        provider.respond(
+            model,
             [{"role": "user", "content": "synthetic draft"}],
             (),
             synthetic=True,
             thinking_tokens=thinking,
         )
-        assert result.finish_reason == "MAX_TOKENS"
+        for thinking in (THINKING_TOKENS, None)
+    ]
+    return configs, results
+
+
+def test_gemini_3_thinks_at_a_low_level_and_reports_its_thoughts() -> None:
+    configs, results = _gemini_configs("gemini-3.8-flash")
+    assert configs[0].thinking_config.thinking_level == types.ThinkingLevel.LOW
+    assert configs[0].thinking_config.thinking_budget is None
+    assert configs[1].thinking_config is None
+    assert [result.finish_reason for result in results] == ["MAX_TOKENS", "MAX_TOKENS"]
+    # Thoughts are billed as output and reported apart.
+    assert (results[0].output_tokens, results[0].thoughts_tokens) == (320, 300)
+
+
+def test_older_gemini_keeps_the_thinking_budget() -> None:
+    configs, _ = _gemini_configs("gemini-2.5-flash")
     assert configs[0].thinking_config.thinking_budget == THINKING_TOKENS
+    assert configs[0].thinking_config.thinking_level is None
     assert configs[1].thinking_config is None
 
 
