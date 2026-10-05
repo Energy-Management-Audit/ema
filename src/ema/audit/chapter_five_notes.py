@@ -27,6 +27,7 @@ from ema.audit.draft_checks import (
     NAME_COMMON,
     NUMBER_WORD,
     SENTENCE_WORD,
+    UPPER,
     folded,
     sentence_parts,
     traced,
@@ -56,6 +57,8 @@ MAX_WORDS = 45
 TOKENS_PER_NOTE = 250
 ACTIVITY_FACTS = frozenset({AuditFact.BUSINESS_ACTIVITY, AuditFact.CAEN_DESCRIPTION})
 DIGITS = re.compile(r"\d+")
+# A sentence's opening capitalised words, as "Compresorul" or "Atlas Copco".
+OPENING = re.compile(rf"^[{UPPER}][\w-]*(?:\s+[{UPPER}][\w-]*)*")
 
 
 class EquipmentNote(BaseModel):
@@ -115,6 +118,25 @@ def activity(facts: Mapping[str, Field]) -> list[str]:
     ]
 
 
+def _openings(text: str) -> list[str]:
+    """Opening words that look like a name: followed by another capitalised word, all caps, or
+    with a digit. One ordinary capitalised word, as "Compresorul", only starts a sentence."""
+    found: list[str] = []
+    for sentence in sentence_parts(text, {}):
+        match = OPENING.match(sentence)
+        if match is None:
+            continue
+        words = match.group().split()
+        first = words[0]
+        if (
+            len(words) > 1
+            or any(char.isdigit() for char in first)
+            or (len(first) >= 2 and first.isupper())
+        ):
+            found.append(first)
+    return found
+
+
 def note_issues(text: str, own: Sequence[str], client: Sequence[str]) -> list[str]:
     """Why a note cannot stand: AI wording, its length, or a number or name no fact shows."""
     issues: list[str] = []
@@ -133,7 +155,7 @@ def note_issues(text: str, own: Sequence[str], client: Sequence[str]) -> list[st
     known = [traced(value) for value in (*own, *client)]
     if any(
         name.casefold() not in common and not any(in_quote(traced(name), value) for value in known)
-        for name in (*NAME.findall(marked), *ACRONYM.findall(text))
+        for name in (*NAME.findall(marked), *ACRONYM.findall(text), *_openings(text))
     ):
         issues.append("literal_name")
     return issues
@@ -223,6 +245,9 @@ def write_notes(
             reason = "unknown"
         elif note.id in seen:
             reason = "duplicate"
+        elif not text:
+            # A blank note would leave a field that renders nothing and is never asked again.
+            reason = "blank"
         else:
             reason = ", ".join(note_issues(text, by_id[note.id].texts, client))
         seen.add(note.id)

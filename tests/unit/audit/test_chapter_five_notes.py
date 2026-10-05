@@ -257,7 +257,9 @@ def test_exhausted_budget_leaves_no_notes_and_a_warning(
     ("text", "issues"),
     [
         (PANEL, []),
-        ("Tabloul TG 1 alimentează hala, conform cerințelor ANRE.", []),
+        ("Tabloul general TG 1 alimentează hala, conform cerințelor ANRE.", []),
+        # A capitalised word after the opening one makes it a name candidate (fix round 1).
+        ("Tabloul TG 1 alimentează hala.", ["literal_name"]),
         ("Textul a fost generat automat pentru acest tablou.", ["ai_wording"]),
         ("Tabloul alimentează hala. Este important. Măsurătorile îl descriu.", ["length"]),
         (" ".join(["cuvânt"] * 46) + ".", ["length"]),
@@ -266,6 +268,12 @@ def test_exhausted_budget_leaves_no_notes_and_a_warning(
         ("Tabloul are un analizor Exemplu montat.", []),
         ("Tabloul alimentează hala din Cluj.", ["literal_name"]),
         ("Tabloul alimentează hala firmei Acme.", []),
+        ("Compresorul asigură aerul comprimat.", []),
+        ("Atlas Copco asigură aerul comprimat.", ["literal_name"]),
+        ("Tabloul alimentează hala. Atlas Copco asigură aerul.", ["literal_name"]),
+        ("ABB livrează tabloul.", ["literal_name"]),
+        ("TG1 alimentează hala.", ["literal_name"]),
+        ("Analizor Exemplu măsoară tabloul.", []),
     ],
 )
 def test_note_checks(text: str, issues: list[str]) -> None:
@@ -273,3 +281,20 @@ def test_note_checks(text: str, issues: list[str]) -> None:
         note_issues(text, ("TG 1", "Analizor Exemplu"), ("Societatea Acme produce piese.",))
         == issues
     )
+
+
+def test_leading_multiword_name_passes_when_the_label_holds_it() -> None:
+    assert note_issues("Atlas Copco asigură aerul comprimat.", ("Atlas Copco",), ()) == []
+
+
+def test_blank_note_leaves_no_field_and_is_asked_again(tmp_path: Path, live: FakeNotes) -> None:
+    ws, job, thermal = _job(tmp_path)
+    live.texts["tg-1"] = "   "
+    live.texts["ts-2"] = "Importanța echipamentului:"
+    run_measurements(ws, job)
+    assert set(_notes(ws, job)) == set(thermal)
+
+    live.texts.clear()
+    run_measurements(ws, job)
+    assert [item["id"] for item in live.requests[1]["items"]] == ["tg-1", "ts-2"]
+    assert _notes(ws, job)["tg-1"] == PANEL
