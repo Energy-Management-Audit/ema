@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from pydantic import Field as PydanticField
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.chapter_five_notes import NOTE_PREFIX, write_notes
 from ema.audit.measurement_rules import assess
 from ema.audit.publication import queue_sections, record_field_prefixes
 from ema.audit.sections import Status, get_status, recompute_ready
@@ -86,6 +87,13 @@ def _confirmed(field: Field | None) -> bool:
 
 def _value(field: Field | None) -> str | None:
     return str(field.value) if field is not None and _confirmed(field) else None
+
+
+def _narrative(key: str, field: Field) -> str | None:
+    # An equipment note renders until it is rejected; the other texts once a person confirms them.
+    if key.startswith(NOTE_PREFIX):
+        return str(field.value) if field.value is not None and field.review != "rejected" else None
+    return _value(field)
 
 
 def _phrases() -> dict[str, str]:
@@ -174,7 +182,9 @@ def _plan(view: VisitView, facts: dict[str, Field]) -> ChapterFivePlan:
         client=_value(client),
         missing_narratives=missing,
         narratives={
-            key: _value(field) for key, field in facts.items() if key.startswith("narrative.ch5.")
+            key: _narrative(key, field)
+            for key, field in facts.items()
+            if key.startswith("narrative.ch5.")
         },
     )
 
@@ -183,7 +193,7 @@ def chapter_five_plan(ws: Workspace, job: str) -> ChapterFivePlan:
     return _plan(visit_view(ws, job), {field.key: field for field in fields(ws, job)})
 
 
-def compose_measurements(ctx: StageContext) -> StageOutcome:
+def compose_measurements(ctx: StageContext, recording: Path | None = None) -> StageOutcome:
     ws, job = ctx.ws, ctx.job
     slots = ctx.read_slots("visit")
     current_fields = fields(ws, job)
@@ -193,8 +203,13 @@ def compose_measurements(ctx: StageContext) -> StageOutcome:
             or field.key == "audit.company_name"
         ):
             ctx.record_read("fields", field.id, field.revision)
-    plan = _plan(visit_view_from_slots(slots), {field.key: field for field in current_fields})
+    view = visit_view_from_slots(slots)
     by_key = {field.key: field for field in current_fields}
+    plan = _plan(view, by_key)
+    notes, warnings = write_notes(ctx, plan, by_key, recording)
+    if notes:
+        by_key.update({field.key: field for field in notes})
+        plan = _plan(view, by_key)
     existing = set(by_key)
     labels = {
         photo.narrative_key: f"Interpretarea – {panel.label}, {photo.caption}"
@@ -222,9 +237,9 @@ def compose_measurements(ctx: StageContext) -> StageOutcome:
     (directory / "ch5.json").write_text(plan.model_dump_json(indent=2), encoding="utf-8")
     recompute_ready(ws, job)
     used_keys = {
-        field.key
-        for field in current_fields
-        if field.key.startswith(("meter.", "thermal.", "visit.", "narrative.ch5."))
+        key
+        for key in existing
+        if key.startswith(("meter.", "thermal.", "visit.", "narrative.ch5."))
     }
     used = tuple(
         f"fact:{key}"
@@ -238,17 +253,28 @@ def compose_measurements(ctx: StageContext) -> StageOutcome:
         used,
         facts=by_key,
     )
-    return StageOutcome()
+    return StageOutcome(warnings=warnings)
 
 
-def start_measurements(ws: Workspace, job: str, *, on_revision: int | None = None) -> str:
+def start_measurements(
+    ws: Workspace, job: str, *, on_revision: int | None = None, recording: Path | None = None
+) -> str:
+    """Compose chapter five; its equipment notes replay `recording` when one is given."""
     if get_job(ws, job)["type"] != "audit":
         raise EmaError("wrong_job_type", "Lucrarea nu este un audit.", job)
-    return run_stage(ws, job, "measurements", compose_measurements, on_revision=on_revision)
+    return run_stage(
+        ws,
+        job,
+        "measurements",
+        lambda ctx: compose_measurements(ctx, recording),
+        on_revision=on_revision,
+    )
 
 
-def run_measurements(ws: Workspace, job: str) -> MeasurementsResult:
-    run = start_measurements(ws, job)
+def run_measurements(
+    ws: Workspace, job: str, *, recording: Path | None = None
+) -> MeasurementsResult:
+    run = start_measurements(ws, job, recording=recording)
     for _ in subscribe(ws, job):
         pass
     record = next(item for item in status(ws, job).runs if item["id"] == run)

@@ -6,6 +6,7 @@ import sqlite3
 
 from ema.audit.ai_wording import ai_wording
 from ema.audit.carrier_gap import blocked_message
+from ema.audit.chapter_five_notes import NOTE_PREFIX
 from ema.audit.chapter_four_sentences import sentence_plan
 from ema.audit.render_dataset import reviewed_dataset
 from ema.audit.visit import slug
@@ -163,7 +164,12 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
                 )
             )
         if (field.value is None or field.review == "rejected") and not (
-            key == "narrative.ch4.concluzii" and (blockers or _has_arithmetic_conclusion(fields))
+            # An equipment note is optional: a rejected one is simply not printed.
+            key.startswith(NOTE_PREFIX)
+            or (
+                key == "narrative.ch4.concluzii"
+                and (blockers or _has_arithmetic_conclusion(fields))
+            )
         ):
             issues.append(
                 Issue(

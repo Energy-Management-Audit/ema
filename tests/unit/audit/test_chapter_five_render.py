@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -19,6 +20,7 @@ from ema.audit.chapter_five import (
     PlannedPanel,
     PlannedPhoto,
     PlannedReading,
+    PlannedThermal,
 )
 from ema.audit.chapter_five_fixed import fixed_elements
 from ema.audit.chapter_five_render import render_chapter_five
@@ -157,3 +159,76 @@ def test_missing_instrument_label_rejects_partial_fixed_method(tmp_path: Path) -
     )
     assert not nodes and not keys
     assert issues == ["fixed method instrument label missing in measurement prototype"]
+
+
+def _photo(panel: str, sha: str) -> PlannedPhoto:
+    return PlannedPhoto(
+        slot=f"visit/meter/{panel}/display.png",
+        sha=sha,
+        name="display.png",
+        caption="Valorile Tensiunii de fază",
+        display="voltage_ln",
+        readings=[PlannedReading(key="meter.x.voltage_ln.l1", label="U1", value="230", unit="V")],
+        norm="voltage",
+        narrative_key=None,
+    )
+
+
+def test_equipment_notes_render_in_place_and_only_when_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base, model, image = tmp_path / "base.docx", tmp_path / "model.docx", tmp_path / "d.png"
+    Image.new("RGB", (100, 50), "white").save(image)
+    _base(base)
+    _model(model, image)
+    monkeypatch.setenv("EMA_AUDIT_MEASUREMENT_SHEET_MODEL", str(model))
+    monkeypatch.setenv("EMA_AUDIT_MEASUREMENT_PROTOTYPE", str(base))
+    plan = ChapterFivePlan(
+        panels=[
+            PlannedPanel(
+                id="panel-1", label="Panel 1", device="Meter", photos=[_photo("Panel 1", "a" * 64)]
+            ),
+            PlannedPanel(
+                id="panel-2", label="Panel 2", device="Meter", photos=[_photo("Panel 2", "b" * 64)]
+            ),
+        ],
+        thermal=[
+            PlannedThermal(
+                slot="visit/thermal/c.png", sha="c" * 64, name="c.png", component="Comp C"
+            ),
+            PlannedThermal(
+                slot="visit/thermal/d.png", sha="d" * 64, name="d.png", component="Comp D"
+            ),
+        ],
+        visit_date="2026-09-27",
+        client="Atelier Exemplu",
+        missing_narratives=[],
+        narratives={
+            "narrative.ch5.equipment.panel-1": "Tabloul alimentează hala.",
+            "narrative.ch5.equipment.thermal:cccccccc": "Componenta produce căldura.",
+            # A rejected note reaches the plan as None.
+            "narrative.ch5.equipment.thermal:dddddddd": None,
+        },
+    )
+    images = {key: image for key in ("a" * 64, "b" * 64, "c" * 64, "d" * 64)}
+
+    def texts(rendered: ChapterFivePlan, name: str) -> list[str]:
+        output = tmp_path / name
+        render_chapter_five(base, output, rendered, images, ("Forbidden Client",))
+        # Table-of-contents lines carry a tab; this base numbers every body paragraph there.
+        paragraphs = Document(str(output)).paragraphs
+        return [paragraph.text for paragraph in paragraphs if "\t" not in paragraph.text]
+
+    noted = texts(plan, "noted.docx")
+    plain = texts(plan.model_copy(update={"narratives": {}}), "plain.docx")
+    first = noted.index("Fișa de măsurători electroenergetice pentru Panel 1, la data 2026-09-27.")
+    assert noted[first + 1] == "Importanța echipamentului: Tabloul alimentează hala."
+    second = noted.index("Fișa de măsurători electroenergetice pentru Panel 2, la data 2026-09-27.")
+    assert noted[second + 1] == plain[plain.index(noted[second]) + 1]
+    caption_c = next(i for i, text in enumerate(noted) if text.endswith("a) Termografierea Comp C"))
+    caption_d = next(i for i, text in enumerate(noted) if text.endswith("b) Termografierea Comp D"))
+    note_c = noted.index("Importanța echipamentului: Componenta produce căldura.")
+    assert noted[note_c + 1 : caption_c] == [""]
+    assert noted[caption_c + 1 : caption_d] == [""]
+    assert [text for text in noted if not text.startswith("Importanța echipamentului: ")] == plain
+    assert sum(text.startswith("Importanța echipamentului: ") for text in noted) == 2
