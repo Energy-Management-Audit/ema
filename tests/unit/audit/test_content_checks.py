@@ -230,3 +230,22 @@ def test_total_blocker_issues_point_to_carrier_fields_and_replace_ch4_gap(tmp_pa
             ),
             ("narrative_missing", other.id, "Textul lipseşte: narrative.ch5.summary"),
         ]
+
+
+def test_rejected_equipment_note_does_not_block_final(tmp_path: Path) -> None:
+    ws, job = _job(tmp_path)
+    note = propose(
+        ws,
+        job,
+        FieldSpec(
+            key="narrative.ch5.equipment.panel-1",
+            label="Importanța echipamentului – TG",
+            value_type="text",
+        ),
+        "Tabloul alimentează hala.",
+        [],
+        state="enriched",
+    )
+    decide(ws, job, note.id, "reject", note.revision, "user")
+    with ws.connect() as db:
+        assert content_issues(db, job) == []

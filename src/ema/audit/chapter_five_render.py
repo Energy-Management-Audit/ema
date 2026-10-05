@@ -22,6 +22,7 @@ from ema.audit.base_toc import refresh_toc
 from ema.audit.base_units import heading_spans_document
 from ema.audit.chapter_five import ChapterFivePlan, PlannedPhoto, PlannedReading
 from ema.audit.chapter_five_fixed import fixed_elements
+from ema.audit.chapter_five_notes import NOTE_LABEL, note_key
 from ema.audit.reading_labels import READING_LABELS
 from ema.core.config import Settings
 from ema.core.office.blocks import (
@@ -147,6 +148,13 @@ def _narrative(plan: ChapterFivePlan, key: str) -> Block:
     return Paragraph("body", [value]) if value else Missing("body", MARKER)
 
 
+def _note(plan: ChapterFivePlan, item_id: str) -> list[Block]:
+    # The note is optional: without one the item prints nothing, not a marker. The label is plain
+    # text because the block engine has no bold run.
+    text = plan.narratives.get(note_key(item_id))
+    return [Paragraph("body", [NOTE_LABEL + text])] if text else []
+
+
 def _electric_rules_pass(plan: ChapterFivePlan) -> bool:
     return bool(plan.panels) and all(
         photo.readings
@@ -233,6 +241,7 @@ def _blocks(  # noqa: C901, PLR0912
             blocks.append(
                 Paragraph("body", [phrases["fisa_intro"].format(panel=panel.label, date=date)])
             )
+            blocks.extend(_note(plan, panel.id))
             for photo in panel.photos:
                 blocks.extend(_photo_blocks(photo, panel.id, panel.device, images, phrases, plan))
         results = positions.get("ch5.electric_rezultate")
@@ -295,6 +304,7 @@ def _blocks(  # noqa: C901, PLR0912
             identifier = f"thermal:{photo.sha[:8]}"
             letter = chr(ord("a") + index)
             caption = photo.component or MARKER
+            blocks.extend(_note(plan, identifier))
             blocks.append(
                 Figure(
                     "picture",
