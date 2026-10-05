@@ -9,12 +9,26 @@ from openpyxl import Workbook, load_workbook
 from tests.workspace_jobs import create_job
 
 from ema.audit.chapter_tables_data import boiler_rows
+from ema.audit.draft_render import rendered_value
 from ema.audit.read import read_dossier
 from ema.core.review import fields
 from ema.core.review.models import Cell, Evidence, Field
 from ema.core.workspace import Workspace
 from ema.energy_data.necesar import parse_necesar_info
 from ema.energy_data.necesar_equipment import read_equipment
+
+
+def _transformer_facts(sheet) -> None:
+    for row, label, value in (
+        (15, "An fabricaţie", 1999),
+        (16, "An punere în funcţiune", 2000),
+        (17, "Tensiune [kV]", 0.4),
+    ):
+        sheet.cell(row, 3, label)
+        for column in (4, 5):
+            cell = sheet.cell(row, column, value)
+            if row == 17:
+                cell.number_format = "0.0"
 
 
 def _necesar(path: Path) -> Path:
@@ -64,6 +78,7 @@ def _necesar(path: Path) -> Path:
     forklifts.cell(14, 3, "Putere aparentă nominală [kVA]")
     forklifts.cell(14, 4, 1000)
     forklifts.cell(14, 5, 1000)
+    _transformer_facts(forklifts)
     vehicles = book.create_sheet("Autovehicule")
     for column, label in enumerate(
         ("Denumire autovehicul", "Producător", "Tip", "Nr buc", "An fabricaţie", "Tip combustibil"),
@@ -110,6 +125,33 @@ def test_power_not_in_kilowatts_is_not_read(tmp_path: Path) -> None:
     equipment = read_equipment(parse_necesar_info(path))
     assert equipment.boilers and all("power" not in row for row in equipment.boilers)
     assert equipment.rows and all("power" not in row for row in equipment.rows)
+
+
+def test_transformer_years_render_as_ungrouped_integers(tmp_path: Path) -> None:
+    workspace = Workspace(tmp_path / "workspace")
+    job = create_job(workspace, "audit", "synthetic", 2025)
+    read_dossier(workspace, job, _necesar(tmp_path / "necesar.xlsx"))
+    saved = {field.key: field for field in fields(workspace, job)}
+    for number, key, expected in (
+        (1, "an_fabricatie", "1999"),
+        (2, "an_fabricatie", "1999"),
+        (1, "an_punere_in_functiune", "2000"),
+        (2, "an_punere_in_functiune", "2000"),
+    ):
+        field = saved[f"audit.transformer.{number}.{key}"]
+        assert field.value_type == "year"
+        assert rendered_value(field) == expected
+
+
+def test_transformer_voltage_uses_source_precision_and_unit(tmp_path: Path) -> None:
+    workspace = Workspace(tmp_path / "workspace")
+    job = create_job(workspace, "audit", "synthetic", 2025)
+    read_dossier(workspace, job, _necesar(tmp_path / "necesar.xlsx"))
+    field = next(field for field in fields(workspace, job) if field.key.endswith("tensiune_kv"))
+    assert field.value_type == "number"
+    assert field.decimals == 1
+    assert field.unit == "kV"
+    assert rendered_value(field) == "0,4 kV"
 
 
 def test_shifted_headers_fill_the_general_table_in_sheet_order(tmp_path: Path) -> None:

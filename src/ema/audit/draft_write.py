@@ -13,6 +13,7 @@ from ema.audit.sections import recompute_ready
 from ema.core.jobs import StageContext
 from ema.core.llm import RecordingProvider, ReplayProvider
 from ema.core.llm.types import Provider
+from ema.core.review.models import Field
 
 
 def replay_passes(draft: Path, support: Path) -> Passes:
@@ -38,7 +39,13 @@ def live_passes(provider: Provider, model_id: str, directory: Path, group: str) 
     return Passes(recording, recording, model_id, client_live=True)
 
 
-def write_section(ctx: StageContext, done: Drafted, *, ready: bool = False) -> Path:
+def write_section(
+    ctx: StageContext,
+    done: Drafted,
+    *,
+    ready: bool = False,
+    facts: dict[str, Field] | None = None,
+) -> Path:
     """Write sections/<section>.json and its review beside it; queue a drafted section."""
     section = done.draft.section
     for field in done.facts.values():
@@ -61,6 +68,6 @@ def write_section(ctx: StageContext, done: Drafted, *, ready: bool = False) -> P
             (section,),
             "agent",
             tuple(f"fact:{key}" for key in sorted(keys)),
-            facts=done.facts,
+            facts=done.facts if facts is None else facts,
         )
     return directory

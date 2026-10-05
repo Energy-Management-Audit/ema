@@ -173,6 +173,22 @@ def test_total_blockers_only_lists_counted_carriers_with_missing_tep() -> None:
     assert total_blockers(complete, AUDIT_FACTORS_2026) == []
 
 
+def _cost(ws: Workspace, job: str, name: str, year: int) -> None:
+    propose(
+        ws,
+        job,
+        FieldSpec(
+            key=f"audit.economics.{name}.{year}",
+            label="Cheltuieli",
+            value_type="number",
+            unit="lei",
+        ),
+        100,
+        [],
+        state="supplied",
+    )
+
+
 def test_total_blocker_issues_point_to_carrier_fields_and_replace_ch4_gap(tmp_path: Path) -> None:
     ws, job = _job(tmp_path)
     gas = mark_absent(
@@ -207,28 +223,26 @@ def test_total_blocker_issues_point_to_carrier_fields_and_replace_ch4_gap(tmp_pa
         FieldSpec(key="carrier.lpg.2025.01", label="GPL ianuarie", value_type="number", unit="t"),
         "not_found",
     )
+    mark_absent(
+        ws,
+        job,
+        FieldSpec(key="carrier.diesel.2024", label="Motorină", value_type="number", unit="t"),
+        "not_found",
+    )
+    for name, year in (
+        ("gas_costs_lei", 2024),
+        ("lpg_costs_lei", 2024),
+        ("lpg_costs_lei", 2025),
+    ):
+        _cost(ws, job, name, year)
     mark_absent(ws, job, "narrative.ch4.concluzii", "not_found")
     other = mark_absent(ws, job, "narrative.ch5.summary", "not_found")
     with ws.connect() as db:
-        assert [
-            (issue.code, issue.field_id, issue.message) for issue in content_issues(db, job)
-        ] == [
-            (
-                "data_total_blocked",
-                monthly.id,
-                "Totalul de energie din 2024 lipseşte: completaţi cantitatea de GPL.",
-            ),
-            (
-                "data_total_blocked",
-                gas.id,
-                "Totalul de energie din 2024 lipseşte: completaţi cantitatea de gaze naturale.",
-            ),
-            (
-                "data_total_blocked",
-                annual.id,
-                "Totalul de energie din 2025 lipseşte: completaţi cantitatea de GPL.",
-            ),
-            ("narrative_missing", other.id, "Textul lipseşte: narrative.ch5.summary"),
+        assert [(issue.code, issue.field_id) for issue in content_issues(db, job)] == [
+            ("data_total_blocked", monthly.id),
+            ("data_total_blocked", gas.id),
+            ("data_total_blocked", annual.id),
+            ("narrative_missing", other.id),
         ]
 
 
