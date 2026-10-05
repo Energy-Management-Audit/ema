@@ -182,7 +182,7 @@ def _removable(region: list[etree._Element], section_id: str, blocks: list[Block
     return removed
 
 
-def replace_section_body(
+def replace_section_body(  # noqa: PLR0913
     source: Path,
     output: Path,
     section_id: str,
@@ -190,12 +190,15 @@ def replace_section_body(
     *,
     keep_base: bool = False,
     unit_blocks: Callable[[int], list[Block]] | None = None,
+    pooled: bool = False,
 ) -> RenderReport:
     """Write ``blocks`` over the section's own region, styled after what the region held.
 
     Repeated process headings are separate 3.1.x units: with ``unit_blocks``, unit i (from 1)
     gets only its own blocks (D3); without, the first unit gets ``blocks`` and the others keep
-    the marker rather than repeat it.
+    the marker rather than repeat it. A ``pooled`` draft is all in unit 1, and units 2..N go,
+    heading and all (#155 D2). A unit left empty is its heading and one marker, none of the
+    base's text, tables or figures.
     """
     document = Document(str(source))
     count = sum(item.section_id == section_id for item, _, _ in heading_spans_document(document))
@@ -207,6 +210,14 @@ def replace_section_body(
         for occurrence in reversed(range(count if section_id == "ch3.process" else 1)):
             document = Document(str(current))
             first, end = own_region(document, section_id, occurrence)
+            target = output if occurrence == 0 else Path(directory) / f"{occurrence}.docx"
+            if pooled and occurrence:
+                root: Any = document.element
+                for element in list(root.body)[first - 1 : end]:
+                    root.body.remove(element)
+                document.save(str(target))
+                current = target
+                continue
             elements = _prototypes(document, section_id, first, end)
             unit: list[Block]
             if unit_blocks is not None:
@@ -219,14 +230,15 @@ def replace_section_body(
                     "Baza nu are un model pentru conţinutul secţiunii.",
                     f"{section_id}: {', '.join(missing)}",
                 )
-            target = output if occurrence == 0 else Path(directory) / f"{occurrence}.docx"
             body_element: Any = document.element
             region: list[etree._Element] = list(body_element.body)[first:end]
             removable: set[int] = _removable(region, section_id, unit) if keep_base else set()
+            empty = section_id == "ch3.process" and all(isinstance(b, Missing) for b in unit)
             keep = {
                 index
                 for index, element in enumerate(region)
                 if keep_base
+                and not empty
                 and index not in removable
                 and (
                     element.tag == W + "tbl"
