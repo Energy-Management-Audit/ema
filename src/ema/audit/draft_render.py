@@ -38,6 +38,7 @@ from ema.core.review.models import Field
 # Internal codes a reader never sees: the enum value's wording, and units the prose names itself.
 ENUM_TEXT = {"below_1000_tep": "sub 1.000 tep", "at_least_1000_tep": "de cel puţin 1.000 tep"}
 UNSPOKEN_UNITS = frozenset({"persons"})
+UNSUPPORTED = "unsupported"
 
 
 def rendered_value(field: Field) -> str:
@@ -69,29 +70,24 @@ def _resolved(text: str, facts: dict[str, Field]) -> str:
 
 def _paragraph(
     item: DraftText, location: str, issues: tuple[DraftReview, ...], facts: dict[str, Field]
-) -> Block:
-    relevant = [issue for issue in issues if issue.location == location]
-    if any(issue.code != "uncited_sentence" and issue.sentence is None for issue in relevant):
-        return Missing(item.kind, MARKER)
-    flagged = [
-        support_text(issue.sentence if issue.sentence is not None else issue.detail)
-        for issue in relevant
+) -> Block | None:
+    """The text without its unsupported sentences, which the draft review lists (D4); None
+    when nothing is left."""
+    relevant = [
+        issue for issue in issues if issue.location == location and issue.code == UNSUPPORTED
     ]
-    rendered: list[str] = []
+    if any(issue.sentence is None for issue in relevant):
+        return None
+    flagged = [support_text(issue.sentence or "") for issue in relevant]
+    kept: list[str] = []
     for sentence in sentence_parts(item.text, facts):
         normalized = support_text(sentence)
-        # A verified passage standing alone is the source's own text; a flag never erases it.
-        value = (
-            MARKER
-            if not token_only(sentence)
-            and any(flag and (flag in normalized or normalized in flag) for flag in flagged)
-            else _resolved(sentence, facts)
-        )
-        if value != MARKER or not rendered or rendered[-1] != MARKER:
-            rendered.append(value)
-    if rendered == [MARKER]:
-        return Missing(item.kind, MARKER)
-    return Paragraph(item.kind, [" ".join(rendered)])
+        # A verified fact standing alone is the source's own text; a flag never erases it.
+        if token_only(sentence) or not any(
+            flag and (flag in normalized or normalized in flag) for flag in flagged
+        ):
+            kept.append(_resolved(sentence, facts))
+    return Paragraph(item.kind, [" ".join(kept)]) if kept else None
 
 
 def draft_blocks(
@@ -100,11 +96,13 @@ def draft_blocks(
     issues: tuple[DraftReview, ...],
     unit: int | None = None,
 ) -> list[Block]:
-    """The section as blocks, a flagged text as the marker; with a unit, only that unit's text."""
+    """The section as blocks, unsupported sentences dropped; with a unit, only that unit's
+    text. A section left empty is the marker."""
     blocks: list[Block] = [
-        _paragraph(item, f"paragraph:{index}", issues, facts)
+        block
         for index, item in enumerate(draft.paragraphs)
         if unit is None or item.unit == unit
+        if (block := _paragraph(item, f"paragraph:{index}", issues, facts)) is not None
     ]
     if draft.status == "missing" or not blocks:
         blocks.append(Missing("body", MARKER))

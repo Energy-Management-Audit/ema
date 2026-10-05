@@ -1,4 +1,5 @@
-"""What one chapter call drafts: each section's facts, length target and style example (D2, D8).
+"""What one chapter call drafts: each section's facts, length target and style example (D2, D8;
+#143 D5).
 
 A chapter whose targets exceed one call's output allowance splits, in catalogue order, into
 consecutive groups under it. The process passages split by unit (D3): ch3.process gets those of
@@ -10,7 +11,6 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
-from ema.audit.catalogue import CATALOGUE
 from ema.audit.catalogue_types import AuditFact, fact_key
 from ema.audit.draft_style import Example
 from ema.core.review.models import Field
@@ -21,7 +21,6 @@ TOKENS_PER_WORD = 1.3
 OUTPUT_FACTOR = 2.5
 # A section the base gives no own text to measure counts as a short one in the allowance.
 UNMEASURED_WORDS = 150
-_SECTIONS = {section.id: section for section in CATALOGUE}
 
 
 @dataclass(frozen=True)
@@ -74,15 +73,6 @@ def offered(
     }
 
 
-def _share(section: str, facts: Mapping[str, Field]) -> float:
-    """The share of the section's own catalogue facts the dossier holds."""
-    own = [str(ref) for ref in _SECTIONS[section].facts if isinstance(ref, AuditFact)]
-    if not own:
-        return 0.0
-    found = {fact_key(key) for key, field in facts.items() if usable(field)}
-    return sum(ref in found for ref in own) / len(own)
-
-
 def plan_section(
     section: str,
     facts: Mapping[str, Field],
@@ -90,7 +80,8 @@ def plan_section(
     units: Mapping[str, int | None],
     unit_count: int = 1,
 ) -> SectionPlan:
-    """The section's facts and target: its base own words scaled by the facts found (D8).
+    """The section's facts and target: her base section's own words once it has a usable fact,
+    general text making up the length the facts leave (#143 D5); none without one.
 
     A 3.1.x unit is a copy of the base's unit text, so ch3.process aims at that length for each
     unit that has passages.
@@ -116,7 +107,7 @@ def plan_section(
     elif section == "ch3.process":
         target = example.words * sum(bool(keys) for _, keys in grouped) or None
     else:
-        target = round(example.words * _share(section, own)) or None
+        target = example.words if any(usable(field) for field in own.values()) else None
     return SectionPlan(section, own, target, example.text if example else "", grouped)
 
 

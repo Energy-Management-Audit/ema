@@ -1,5 +1,5 @@
-"""Mechanical traceability checks of a section draft: every number from a token, every name
-from a token or a fact the text cites."""
+"""Mechanical traceability checks of a section draft: every number from a token, every client
+name from a token or a fact the text cites; general sentences need no citation (#143)."""
 
 from __future__ import annotations
 
@@ -33,6 +33,11 @@ NAME = re.compile(
 ACRONYM = re.compile(rf"(?<!\w)[{UPPER}]{{2,}}(?!\w)")
 SENTENCE_WORD = re.compile(rf"[{UPPER}][{LOWER}]+(?!\w)")
 CEDILLAS = str.maketrans("şţ", "st")
+# The regulatory references a general sentence may print in figures (D3).
+REFERENCE_NUMBERS = ("121/2014", "50001", "16247", "1.000 tep", "1000 tep")
+REFERENCE = re.compile(
+    r"(?<![\w.,/])(?:" + "|".join(map(re.escape, REFERENCE_NUMBERS)) + r")(?![\w/]|[.,]\d)"
+)
 FACT_GAP = re.compile(TOKEN.pattern + r"(\s*)")
 # A sentence does not end after an address or legal abbreviation, as in "nr. {{f:...}}", or
 # after an initial, as in "S.R.L.".
@@ -66,6 +71,7 @@ NAME_COMMON = frozenset(
         "Etapa",
         # Regulator, register and legal-form acronyms and units an audit uses as plain words.
         "ANRE",
+        "SEN",
         "CAEN",
         "CUI",
         "SRL",
@@ -74,6 +80,14 @@ NAME_COMMON = frozenset(
         "TEP",
         "MWh",
         "kWh",
+        # The law, standards and institutions a general sentence names (D3); a candidate inside
+        # one of these phrases, as "EN ISO" or "Energetic Național", is part of it.
+        "Legea",
+        "Legii",
+        "SR EN ISO",
+        "Sistemul Energetic Național",
+        "Ministerul Energiei",
+        "Ministerului Energiei",
     }
 )
 
@@ -125,8 +139,13 @@ def traced(text: str) -> str:
     return " ".join(folded(text).translate(CEDILLAS).split())
 
 
+COMMON = tuple(traced(name) for name in NAME_COMMON)
+
+
 def literal_number(plain: str) -> bool:
-    """Text outside fact tokens that states a quantity: a digit or a Romanian number word."""
+    """Text outside fact tokens that states a quantity: a digit or a Romanian number word,
+    a regulatory reference aside (D3)."""
+    plain = REFERENCE.sub(" ", plain)
     return bool(NUMBER.search(plain) or NUMBER_WORD.search(folded(plain)))
 
 
@@ -178,44 +197,40 @@ def texts(draft: SectionDraft) -> list[tuple[str, DraftText]]:
     return [(f"paragraph:{i}", paragraph) for i, paragraph in enumerate(draft.paragraphs)]
 
 
-def _passage_number(key: str) -> int:
-    """A passage's place among its fact's passages; 0 for a fact that is not a passage."""
-    base = fact_key(key)
-    if base not in PASSAGE_FACTS:
-        return 0
-    return 1 if base == key else int(key.rpartition(".")[2])
+def _names(sentence: str, facts: dict[str, Field], known: set[str]) -> set[str]:
+    """The sentence's name candidates, once each: title-case runs, acronyms and known client
+    names, as written where the text has them."""
+    plain = ANY_TOKEN.sub("", sentence)
+    found: dict[str, str] = {}
+    for name in (
+        *NAME.findall(_sentence_marked(CITE_GAP.sub("", sentence), facts)),
+        *ACRONYM.findall(plain),
+        *(name for name in sorted(known) if in_quote(name, traced(plain))),
+    ):
+        found.setdefault(traced(name), name)
+    return {
+        name for key, name in found.items() if not any(in_quote(key, common) for common in COMMON)
+    }
 
 
-def _passage_layout(draft: SectionDraft) -> list[DraftReview]:
-    """One body paragraph per passage, and a fact's passages in their source order."""
-    issues: list[DraftReview] = []
-    last: dict[str, int] = {}
-    for index, item in enumerate(draft.paragraphs):
-        location = f"paragraph:{index}"
-        passages = [key for key in TOKEN.findall(item.text) if _passage_number(key)]
-        if item.kind == "body" and len(passages) > 1:
-            issues.append(DraftReview("passage_paragraph", location, ", ".join(passages)))
-        for key in passages:
-            number, base = _passage_number(key), fact_key(key)
-            if number <= last.get(base, 0):
-                issues.append(DraftReview("passage_order", location, key))
-            last[base] = max(number, last.get(base, 0))
-    return issues
+def _passage(key: str) -> bool:
+    """A key of a passage fact, its first passage numbered or not."""
+    base, _, number = key.rpartition(".")
+    return fact_key(key) in PASSAGE_FACTS or (base in PASSAGE_FACTS and number.isdigit())
 
 
 def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> DraftCheck:
     fatal: list[DraftReview] = []
-    review: list[DraftReview] = []
-    known_names = {
-        unicodedata.normalize("NFKC", str(field.value)).casefold()
+    known = {
+        traced(str(field.value))
         for field in facts.values()
         if field.key.endswith(("company_name", "client_name")) and field.job_id == job
-    }
-    common = {name.casefold() for name in NAME_COMMON}
+    } - {""}
+    # Any value the section is offered is client data: an uncited sentence may not name it.
+    offered = [traced(str(field.value)) for field in facts.values() if field.value is not None]
     cited = total = 0
     for location, item in texts(draft):
         tokens = set(ANY_TOKEN.findall(item.text))
-        plain = ANY_TOKEN.sub("", item.text)
         if tokens != set(item.fact_ids):
             fatal.append(DraftReview("fact_refs", location, "tokens and listed fact ids differ"))
         fatal.extend(
@@ -223,7 +238,13 @@ def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> Draft
             for key in sorted(tokens | set(item.fact_ids))
             if not citable_fact(draft.section, key, facts.get(key), job)
         )
-        if literal_number(plain):
+        # A passage is rewritten in her register and cited, never printed as the source has it.
+        fatal.extend(
+            DraftReview("passage_verbatim", location, key)
+            for key in sorted(set(TOKEN.findall(item.text)))
+            if _passage(key)
+        )
+        if literal_number(ANY_TOKEN.sub("", item.text)):
             fatal.append(DraftReview("literal_number", location, "number outside fact reference"))
         resolved = TOKEN.sub(
             lambda match: str(facts[match.group(1)].value) if match.group(1) in facts else "",
@@ -231,42 +252,34 @@ def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> Draft
         )
         if ai_wording(resolved):
             fatal.append(DraftReview("ai_mention", location, "AI or disclaimer wording"))
-        candidates = {
-            candidate
-            for candidate in (
-                *NAME.findall(_sentence_marked(CITE_GAP.sub("", item.text), facts)),
-                *ACRONYM.findall(plain),
-            )
-            if candidate.casefold() not in common
-        }
-        normal_plain = unicodedata.normalize("NFKC", plain).casefold()
-        candidates.update(name for name in known_names if name and name in normal_plain)
-        # A name the item's cited passage holds, as whole words, is traceable whether quoted or
+        # A name the item's cited facts hold, as whole words, is traceable whether quoted or
         # paraphrased (#137).
         values = [
             traced(str(facts[key].value))
             for key in tokens
             if citable_fact(draft.section, key, facts.get(key), job)
         ]
-        candidates = {
-            name
-            for name in candidates
-            if not any(in_quote(traced(name), value) for value in values)
-        }
-        fatal.extend(DraftReview("literal_name", location, name) for name in sorted(candidates))
+        names: set[str] = set()
         for sentence in sentence_parts(item.text, facts):
             total += 1
             if ANY_TOKEN.search(sentence):
                 cited += 1
+                names |= {
+                    name
+                    for name in _names(sentence, facts, known)
+                    if not any(in_quote(traced(name), value) for value in values)
+                }
             else:
-                # Body text without a fact is filler and goes back to the drafter; a bullet is a
-                # label, which the auditor reviews.
-                issues = fatal if item.kind == "body" else review
-                issues.append(DraftReview("uncited_sentence", location, sentence))
-    fatal.extend(_passage_layout(draft))
+                # A general sentence names institutions and standards freely, never the client.
+                names |= {
+                    name
+                    for name in _names(sentence, facts, known)
+                    if any(in_quote(traced(name), value) for value in (*known, *offered))
+                }
+        fatal.extend(DraftReview("literal_name", location, name) for name in sorted(names))
     for key in draft.missing_fact_ids:
         if not citable(draft.section, key) or (
             key in facts and (facts[key].job_id != job or facts[key].presence == "found")
         ):
             fatal.append(DraftReview("missing_status_invalid", "section", key))
-    return DraftCheck(cited / total if total else 0.0, cited, total, tuple(fatal), tuple(review))
+    return DraftCheck(cited / total if total else 0.0, cited, total, tuple(fatal), ())

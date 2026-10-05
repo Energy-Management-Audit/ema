@@ -1,15 +1,17 @@
-"""The support pass: one verdict per drafted sentence, fail-closed (D1).
+"""The support pass: one verdict per drafted sentence, fail-closed (D4).
 
-A sentence without a verdict is unsupported. When the pass cannot run, or answers a sentence
-twice, every sentence that carries a citation is unsupported; one whose facts are all rendered
-keeps its text.
+A client sentence is supported by the facts it cites; a general one unless it states or implies
+something about the client, or is technically wrong. A sentence without a verdict is
+unsupported. When the pass cannot run, or answers a sentence twice, every sentence that cites a
+fact without printing it, or cites none, is unsupported; one whose facts are all rendered keeps
+its text.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 from pydantic import Field as ModelField
@@ -30,10 +32,16 @@ from ema.core.review.models import Field
 
 SUPPORT_PROMPT = (
     "Each item is a sentence of an energy audit, with the values of the facts it cites. Return "
-    "one verdict per item, with its location and sentence_index: supported is true only when the "
-    "cited facts state everything the sentence claims, including any qualitative claim. A claim "
-    "beyond them, a quantity, a cause or an assessment the facts do not state, is unsupported. "
-    "Do not infer missing facts. Keep each reason under fifteen words."
+    'one verdict per item, with its location, sentence_index and kind. kind is "client" when '
+    "the sentence says something about this client (its company, sites, activity, equipment, "
+    'suppliers, consumption or history), and "general" when it explains a process, an '
+    "equipment type, a utility, standard practice or the regulatory context, or introduces or "
+    "links ideas. A client sentence is supported only when the cited facts state everything it "
+    "claims, including any qualitative claim; a quantity, a cause or an assessment the facts do "
+    "not state is unsupported. A general sentence is supported unless it states or implies a "
+    "fact about this client, such as a named supplier, site, equipment or practice of the "
+    "client, or is technically wrong. Do not infer missing facts. Keep each reason under "
+    "fifteen words."
 )
 # Per sentence: a verdict of at most 40 tokens, after the model's thinking (D2).
 THINKING_TOKENS = 16_000
@@ -44,6 +52,7 @@ MAX_OUTPUT_TOKENS = 65_536
 class Verdict(BaseModel):
     location: str
     sentence_index: int
+    kind: Literal["client", "general"]
     supported: bool
     reason: str = ""
 
@@ -86,7 +95,8 @@ def support_request(drafts: Sequence[SectionDraft], facts: dict[str, Field]) -> 
 def support_pass(
     context: AgentContext, drafts: Sequence[SectionDraft], facts: dict[str, Field]
 ) -> dict[str, tuple[DraftReview, ...]]:
-    """Per section, its unsupported sentences; a failed pass marks the cited ones instead."""
+    """Per section, its unsupported sentences, which the render drops; a failed pass marks
+    every sentence that does not print all it rests on."""
     sentences = _sentences(drafts, facts)
     flags: dict[str, list[DraftReview]] = {draft.section: [] for draft in drafts}
     if not sentences:
@@ -113,7 +123,7 @@ def support_pass(
             verdicts[key] = verdict
     except EmaError as exc:
         for section, location, _, sentence in sentences:
-            if CITE.search(sentence):
+            if CITE.search(sentence) or not ANY_TOKEN.search(sentence):
                 flags[section].append(
                     DraftReview("unsupported", location, "support_unavailable", sentence)
                 )

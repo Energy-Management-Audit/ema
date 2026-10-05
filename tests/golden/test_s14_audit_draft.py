@@ -97,7 +97,7 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
             status="drafted",
             paragraphs=[
                 DraftText(
-                    text="Fluxul {{f:audit.process_sections}} este descris.",
+                    text="Fluxul de asamblare este descris {{c:audit.process_sections}}.",
                     fact_ids=["audit.process_sections"],
                 )
             ],
@@ -150,7 +150,8 @@ def test_synthetic_chapters_replay_render_and_compare(tmp_path: Path) -> None:
     texts = [p.text for p in Document(str(rendered)).paragraphs]
     general = texts.index(TITLES["ch2.date_generale"]) + 1
     assert "Atelier Exemplu" in texts[general] and "85" in texts[general]
-    assert texts[general + 1] == "[de completat]"  # unsupported prose withheld
+    # Unsupported prose is dropped, not marked (#143 D4).
+    assert not any("echipamente moderne" in text for text in texts)
     assert "asamblare" in texts[texts.index(TITLES["ch3.flux"]) + 1]
     assert coverage == [1.0, 1.0]
     # A ch. 2-3 draft holds no tables: the deterministic tables are the only ones (D6).

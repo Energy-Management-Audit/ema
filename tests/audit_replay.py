@@ -115,6 +115,7 @@ def support_recording(
         {
             "location": item["location"],
             "sentence_index": item["sentence_index"],
+            "kind": "client",
             "supported": item["location"] != f"{draft.section}:paragraph:{flagged}",
             "reason": "The cited fact does not support a claim about efficiency.",
         }
