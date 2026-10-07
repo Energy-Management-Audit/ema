@@ -21,6 +21,9 @@ uv run pre-commit install --install-hooks -t pre-commit -t pre-push
 scripts/check              # non-mutating gate, same command as CI and pre-push
 ```
 
+`scripts/dev` runs the UI locally: the API on 127.0.0.1:8766 and Vite on 127.0.0.1:5173, and opens
+the one-time sign-in link. `scripts/dev --mock` serves mock data. Zed runs both as tasks (`.zed/tasks.json`).
+
 Configuration uses `EMA_*` environment variables before `settings.toml` in the workspace, then
 defaults. Set provider keys with `EMA_GEMINI_API_KEY` / `EMA_OPENAI_API_KEY` for development and CI;
 they override OS keyring entries under service `Ema` and usernames `gemini_api_key` /

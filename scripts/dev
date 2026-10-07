@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Dev loop (docs/PLAN.md §5.1): `ema serve` on 127.0.0.1:8766 plus the Vite dev server on
+# 127.0.0.1:5173, which proxies the API, so the browser sees one origin.
+# Usage: scripts/dev [--mock]   Runs the checkout it lives in, so any worktree can run its branch.
+# Workspace: EMA_WORKSPACE if set, else the configured one. Ctrl-C stops both servers.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+if (( $# > 1 )) || { (( $# == 1 )) && [[ "$1" != --mock ]]; }; then
+  printf '%s\n' 'usage: scripts/dev [--mock]' >&2
+  exit 2
+fi
+
+uv sync --all-groups -q
+[[ -d frontend/node_modules ]] || npm ci --prefix frontend
+
+log="$(mktemp "${TMPDIR:-/tmp}/ema-serve.XXXXXX")"
+uv run ema serve --dev-origin http://127.0.0.1:5173 "$@" >"$log" 2>&1 &
+api=$!
+trap 'kill "$api" 2>/dev/null; wait "$api" 2>/dev/null; rm -f "$log"' EXIT INT TERM
+
+# The API prints a one-time sign-in link; wait for it, then open it once Vite is up.
+link=""
+for _ in $(seq 1 60); do
+  link="$(grep -o 'http://127.0.0.1:5173/app/#code=[^[:space:]]*' "$log" || true)"
+  [[ -n "$link" ]] && break
+  kill -0 "$api" 2>/dev/null || { cat "$log"; exit 1; }
+  sleep 0.5
+done
+[[ -n "$link" ]] || { cat "$log"; echo 'ema serve printed no sign-in link' >&2; exit 1; }
+printf 'API log: %s\nOpen: %s\n' "$log" "$link"
+(sleep 2; open "$link" 2>/dev/null || true) &
+
+npm --prefix frontend run dev
