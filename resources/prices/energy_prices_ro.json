@@ -9,7 +9,9 @@
       "note": "preț cu accize, fără TVA, curs mediu BNR 4,9464 lei/EUR, 0,84 kg/l",
       "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
       "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx; https://curs.bnr.ro/files/xml/years/nbrfxrates2023.xml",
+      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx",
+      "fx_source_name": "BNR, curs mediu anual EUR/RON",
+      "fx_source_url": "https://curs.bnr.ro/files/xml/years/nbrfxrates2023.xml",
       "retrieved": "2026-10-08"
     },
     {
@@ -21,7 +23,9 @@
       "note": "preț cu accize, fără TVA, curs mediu BNR 4,9746 lei/EUR, 0,84 kg/l",
       "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
       "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx; https://curs.bnr.ro/files/xml/years/nbrfxrates2024.xml",
+      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx",
+      "fx_source_name": "BNR, curs mediu anual EUR/RON",
+      "fx_source_url": "https://curs.bnr.ro/files/xml/years/nbrfxrates2024.xml",
       "retrieved": "2026-10-08"
     },
     {
@@ -33,7 +37,9 @@
       "note": "preț cu accize, fără TVA, curs mediu BNR 5,0431 lei/EUR, 0,84 kg/l",
       "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
       "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx; https://curs.bnr.ro/files/xml/years/nbrfxrates2025.xml",
+      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx",
+      "fx_source_name": "BNR, curs mediu anual EUR/RON",
+      "fx_source_url": "https://curs.bnr.ro/files/xml/years/nbrfxrates2025.xml",
       "retrieved": "2026-10-08"
     },
     {
@@ -297,7 +303,9 @@
       "note": "preț cu accize, fără TVA, curs mediu BNR 4,9464 lei/EUR, 0,54 kg/l",
       "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
       "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx; https://curs.bnr.ro/files/xml/years/nbrfxrates2023.xml",
+      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx",
+      "fx_source_name": "BNR, curs mediu anual EUR/RON",
+      "fx_source_url": "https://curs.bnr.ro/files/xml/years/nbrfxrates2023.xml",
       "retrieved": "2026-10-08"
     },
     {
@@ -309,7 +317,9 @@
       "note": "preț cu accize, fără TVA, curs mediu BNR 4,9746 lei/EUR, 0,54 kg/l",
       "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
       "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx; https://curs.bnr.ro/files/xml/years/nbrfxrates2024.xml",
+      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx",
+      "fx_source_name": "BNR, curs mediu anual EUR/RON",
+      "fx_source_url": "https://curs.bnr.ro/files/xml/years/nbrfxrates2024.xml",
       "retrieved": "2026-10-08"
     },
     {
@@ -321,7 +331,9 @@
       "note": "preț cu accize, fără TVA, curs mediu BNR 5,0431 lei/EUR, 0,54 kg/l",
       "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
       "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx; https://curs.bnr.ro/files/xml/years/nbrfxrates2025.xml",
+      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx",
+      "fx_source_name": "BNR, curs mediu anual EUR/RON",
+      "fx_source_url": "https://curs.bnr.ro/files/xml/years/nbrfxrates2025.xml",
       "retrieved": "2026-10-08"
     },
     {
@@ -549,7 +561,9 @@
       "note": "preț cu accize, fără TVA, curs mediu BNR 4,9464 lei/EUR, 0,77 kg/l",
       "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
       "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx; https://curs.bnr.ro/files/xml/years/nbrfxrates2023.xml",
+      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx",
+      "fx_source_name": "BNR, curs mediu anual EUR/RON",
+      "fx_source_url": "https://curs.bnr.ro/files/xml/years/nbrfxrates2023.xml",
       "retrieved": "2026-10-08"
     },
     {
@@ -561,7 +575,9 @@
       "note": "preț cu accize, fără TVA, curs mediu BNR 4,9746 lei/EUR, 0,77 kg/l",
       "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
       "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx; https://curs.bnr.ro/files/xml/years/nbrfxrates2024.xml",
+      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx",
+      "fx_source_name": "BNR, curs mediu anual EUR/RON",
+      "fx_source_url": "https://curs.bnr.ro/files/xml/years/nbrfxrates2024.xml",
       "retrieved": "2026-10-08"
     },
     {
@@ -573,7 +589,9 @@
       "note": "preț cu accize, fără TVA, curs mediu BNR 5,0431 lei/EUR, 0,77 kg/l",
       "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
       "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx; https://curs.bnr.ro/files/xml/years/nbrfxrates2025.xml",
+      "source_url": "https://energy.ec.europa.eu/document/download/906e60ca-8b6a-44e7-8589-652854d2fd3f_en?filename=Weekly_Oil_Bulletin_Prices_History_maticni_4web.xlsx",
+      "fx_source_name": "BNR, curs mediu anual EUR/RON",
+      "fx_source_url": "https://curs.bnr.ro/files/xml/years/nbrfxrates2025.xml",
       "retrieved": "2026-10-08"
     }
   ]

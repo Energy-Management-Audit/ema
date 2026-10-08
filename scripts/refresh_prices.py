@@ -157,7 +157,9 @@ def _weekly_oil(years: list[int], retrieved: str) -> list[dict[str, Any]]:
                     ),
                     "vat_basis": WOB_VAT,
                     "source_name": "Comisia Europeană, Weekly Oil Bulletin",
-                    "source_url": f"{WOB}; {BNR.format(year=year)}",
+                    "source_url": WOB,
+                    "fx_source_name": "BNR, curs mediu anual EUR/RON",
+                    "fx_source_url": BNR.format(year=year),
                     "retrieved": retrieved,
                 }
             )

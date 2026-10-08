@@ -67,6 +67,9 @@ class PriceRow:
     source_name: str
     source_url: str
     retrieved: str
+    # Fuel prices are in EUR; the exchange rate that turned them into lei has its own source.
+    fx_source_name: str | None = None
+    fx_source_url: str | None = None
 
     def __post_init__(self) -> None:
         texts = (self.unit, self.note, self.vat_basis, self.source_name, self.source_url)
@@ -111,6 +114,8 @@ def _row(raw: Mapping[str, Any]) -> PriceRow:
         source_name=str(raw["source_name"]),
         source_url=str(raw["source_url"]),
         retrieved=str(raw["retrieved"]),
+        fx_source_name=raw.get("fx_source_name"),
+        fx_source_url=raw.get("fx_source_url"),
     )
 
 

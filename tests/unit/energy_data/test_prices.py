@@ -2,6 +2,7 @@
 
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
@@ -194,3 +195,17 @@ def test_piee_total_stays_when_a_carrier_is_unpriced() -> None:
         result, notes = inferred_energy_costs(dataset, FIXTURE)
         assert result.energy_costs_lei == costs
         assert notes == {}
+
+
+def test_every_stored_url_is_one_openable_url() -> None:
+    rows = bundled_prices()
+    urls = [row.source_url for row in rows] + [
+        row.fx_source_url for row in rows if row.fx_source_url
+    ]
+    for url in urls:
+        parsed = urlparse(url)
+        assert parsed.scheme == "https" and parsed.netloc, url
+        assert not any(mark in url for mark in (" ", ";", ","))
+    fuels = [row for row in rows if row.unit == "t"]
+    assert fuels and all(row.fx_source_name and row.fx_source_url for row in fuels)
+    assert all("bnr.ro" not in row.source_url for row in fuels)
