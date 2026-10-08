@@ -104,8 +104,8 @@ _ANRE_2025 = "raportul ANRE pentru anul 2025"
 _ORDINS = "Ordin 2057/2020, Ordin 1548/2021"
 _GHG = "GHG Protocol"
 # Diesel and petrol are stated per litre; tonnes convert through the density she states.
-_DIESEL_KG_PER_L = 0.84
-_PETROL_KG_PER_L = 0.77
+DIESEL_KG_PER_L = 0.84
+PETROL_KG_PER_L = 0.77
 # The CO₂ factors her 2026 audits print, with her sources. PIEE keeps FACTORS_2026.
 AUDIT_FACTORS_2026 = replace(
     FACTORS_2026,
@@ -113,8 +113,8 @@ AUDIT_FACTORS_2026 = replace(
     co2=(
         Factor(Carrier.electricity_grid, "MWh", 0.172, _ANRE_2025),
         Factor(Carrier.natural_gas, "MWh", 0.205, _ORDINS),
-        Factor(Carrier.diesel, "t", 2.91 / _DIESEL_KG_PER_L, _GHG),
-        Factor(Carrier.petrol, "t", 2.29 / _PETROL_KG_PER_L, _GHG),
+        Factor(Carrier.diesel, "t", 2.91 / DIESEL_KG_PER_L, _GHG),
+        Factor(Carrier.petrol, "t", 2.29 / PETROL_KG_PER_L, _GHG),
         *(factor for factor in FACTORS_2026.co2 if factor.carrier in _ZERO_CO2),
     ),
 )

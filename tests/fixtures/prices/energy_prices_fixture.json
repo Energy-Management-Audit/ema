@@ -1,0 +1,40 @@
+{
+  "rows": [
+    {
+      "carrier": "electricity_grid",
+      "year": 2024,
+      "band": "IC",
+      "value": 812.4,
+      "unit": "MWh",
+      "note": "consumatori non-casnici, fără TVA",
+      "vat_basis": "fără TVA și alte taxe recuperabile (Eurostat tax=X_VAT)",
+      "source_name": "Eurostat nrg_pc_205",
+      "source_url": "https://example.invalid/nrg_pc_205",
+      "retrieved": "2026-10-08"
+    },
+    {
+      "carrier": "natural_gas",
+      "year": 2024,
+      "band": "I2",
+      "value": 264.55,
+      "unit": "MWh",
+      "note": "consumatori non-casnici, fără TVA",
+      "vat_basis": "fără TVA și alte taxe recuperabile (Eurostat tax=X_VAT)",
+      "source_name": "Eurostat nrg_pc_203",
+      "source_url": "https://example.invalid/nrg_pc_203",
+      "retrieved": "2026-10-08"
+    },
+    {
+      "carrier": "diesel",
+      "year": 2024,
+      "band": null,
+      "value": 7280.53,
+      "unit": "t",
+      "note": "preț cu accize, fără TVA, curs mediu BNR 4,9746 lei/EUR, 0,84 kg/l",
+      "vat_basis": "preț cu taxe, din care TVA scăzut săptămână de săptămână: 19 % până la 2025-07-31, 21 % de la 2025-08-01 (Legea 141/2025)",
+      "source_name": "Comisia Europeană, Weekly Oil Bulletin",
+      "source_url": "https://example.invalid/weekly-oil-bulletin",
+      "retrieved": "2026-10-08"
+    }
+  ]
+}
