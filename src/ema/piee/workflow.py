@@ -28,7 +28,7 @@ from ema.energy_data.prelucrare import import_prelucrare
 from ema.energy_data.prelucrare_writer import write_prelucrare
 from ema.piee.base import build_local_base
 from ema.piee.compose import compose_draft, load_approved_base
-from ema.piee.dataset import PieeData, load
+from ema.piee.dataset import PieeData, load, with_inferred_costs
 from ema.piee.intake import import_piee_into_job
 from ema.piee.review_overlay import apply_review
 from ema.piee.views import prelucrare_state
@@ -250,7 +250,7 @@ def start_generate_for_job(
     def stage(ctx: StageContext) -> StageOutcome:
         ctx.progress(0, 2, "Pregătire date PIEE")
         _check_reads(ctx, source_shas)
-        data = _reviewed(ws, ctx, base_data)
+        data = with_inferred_costs(_reviewed(ws, ctx, base_data))
         ctx.record_input(template=load_approved_base(base).base_sha, factors=data.factors.version)
         temporary = ctx.artifact_dir() / "PIEE-draft.docx"
         result = compose_draft(data, base, temporary, today)
@@ -292,6 +292,7 @@ def start_generate_for_job(
             workbook,
             data.factors,
             firm_name=load_settings(ws).firm_name,
+            cost_notes=data.cost_notes,
         )
         ctx.save_output(workbook, "Prelucrare-date.xlsx")
         ctx.save_output(temporary, "PIEE-draft.docx")

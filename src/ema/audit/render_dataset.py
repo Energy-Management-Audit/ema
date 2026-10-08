@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from decimal import Decimal
 from typing import Any
 
 from ema.core.review.fields import decided
-from ema.core.review.models import Field
+from ema.core.review.models import Candidate, Derivation, Field
 from ema.energy_data.carriers import Carrier, counts_in_total
 from ema.energy_data.model import CarrierSeries, EnergyDataset, FiledValue, Reading
+from ema.energy_data.prices import CostSettlement, PriceRow, bundled_prices, settle_cost
 
 # Where a carrier's yearly spend sits among the Necesar's economic rows; the others have none.
 COST_KEYS: dict[Carrier, str] = {
@@ -173,6 +175,7 @@ def reviewed_dataset(dataset: EnergyDataset, fields: Iterable[Field]) -> EnergyD
     printing a stale total; untouched filed values keep their cell source.
     """
     overlay = _Overlay(dataset, fields)
+    overlay.by_key.update(reviewed_costs(overlay.by_key))
     for field in overlay.by_key.values():
         counts, value = _value(field)
         if counts:
@@ -187,3 +190,101 @@ def reviewed_dataset(dataset: EnergyDataset, fields: Iterable[Field]) -> EnergyD
         energy_costs_lei=overlay.money["energy_costs"],
         filed_indicators=overlay.indicators,
     )
+
+
+@dataclass(frozen=True)
+class CostCheck:
+    settlement: CostSettlement
+    quantities: tuple[Field, ...]
+    declared: Field | None
+
+
+def _amount(field: Field | None) -> float | None:
+    if field is None or field.value is None or field.value_type != "number":
+        return None
+    return float(field.value)
+
+
+def cost_checks(
+    by_key: Mapping[str, Field], rows: Iterable[PriceRow] | None = None
+) -> list[CostCheck]:
+    """Each carrier-year with a positive quantity, its declared cost and quantity × price.
+
+    The quantity is the annual value, else the sum of all twelve months; a rejected value is
+    absent, so a rejected cost counts as not declared."""
+    rows = tuple(bundled_prices() if rows is None else rows)
+    result: list[CostCheck] = []
+    for carrier, name in COST_KEYS.items():
+        years = sorted(
+            {
+                int(parts[2])
+                for key in by_key
+                if len(parts := key.split(".")) >= 3
+                and parts[:2] == ["carrier", carrier.value]
+                and parts[2].isdecimal()
+            }
+        )
+        for year in years:
+            prefix = f"carrier.{carrier.value}.{year}"
+            used = tuple(
+                field
+                for key in (prefix, *(f"{prefix}.{month:02d}" for month in range(1, 13)))
+                if (field := by_key.get(key)) is not None and field.review != "rejected"
+            )
+            months = [f for f in used if f.key != prefix and _amount(f) is not None]
+            quantity = _amount(next((f for f in used if f.key == prefix), None))
+            if quantity is None and len(months) == 12:
+                quantity = sum(_amount(f) or 0 for f in months)
+            unit = next((f.unit for f in used if f.unit), None)
+            if quantity is None or quantity <= 0 or unit is None:
+                continue
+            cost = by_key.get(f"audit.economics.{name}.{year}")
+            cost = cost if cost is not None and cost.review != "rejected" else None
+            settled = settle_cost(rows, carrier, year, quantity, unit, _amount(cost))
+            result.append(CostCheck(settled, used, cost))
+    return result
+
+
+def reviewed_costs(
+    by_key: Mapping[str, Field], rows: Iterable[PriceRow] | None = None
+) -> dict[str, Field]:
+    """The cost fields whose value is quantity × price: a missing declaration, or one further than
+    the tolerance from it. The declaration stays as the field's alternative, with its evidence."""
+    result: dict[str, Field] = {}
+    for check in cost_checks(by_key, rows):
+        settled = check.settlement
+        if settled.status != "inferred" or settled.expected is None or settled.row is None:
+            continue
+        key = f"audit.economics.{COST_KEYS[settled.carrier]}.{settled.year}"
+        declared = check.declared
+        base = declared or Field(
+            id=f"{check.quantities[0].job_id}:{key}",
+            job_id=check.quantities[0].job_id,
+            key=key,
+            label=key,
+            value_type="number",
+            unit="lei",
+            state="calculated",
+            presence="not_found",
+        )
+        result[key] = base.model_copy(
+            update={
+                "value": Decimal(str(round(settled.expected, 2))),
+                "decimals": 2,
+                "state": "calculated",
+                "evidence": list(
+                    dict.fromkeys(ref for field in check.quantities for ref in field.evidence)
+                ),
+                "derivation": Derivation(
+                    formula_id="cost.quantity_x_price",
+                    inputs=[field.key for field in check.quantities],
+                    factor_version=settled.source or "",
+                ),
+                "alternatives": (
+                    [Candidate(id="declared", value=declared.value, evidence=declared.evidence)]
+                    if declared is not None and declared.value is not None
+                    else []
+                ),
+            }
+        )
+    return result

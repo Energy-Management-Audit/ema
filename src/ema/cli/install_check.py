@@ -29,6 +29,7 @@ RESOURCE_FILES = (
     ("consumption_analysis", "phrases.jsonl"),
     ("consumption_analysis", "trend_rules.json"),
     ("llm", "models.toml"),
+    ("prices", "energy_prices_ro.json"),
     ("selfcheck", "ocr-ro.pdf"),
     ("frontend", "index.html"),
 )

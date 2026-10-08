@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from itertools import pairwise
 from statistics import median
 
 from ema.audit.chapter_four_sentences import change_refusal
-from ema.audit.render_dataset import COST_KEYS, carrier_cost
+from ema.audit.render_dataset import COST_KEYS, carrier_cost, cost_checks
 from ema.core.office.numbers_ro import format_number
 from ema.core.review.models import Field, Issue
 from ema.energy_data.carriers import CARRIER_NAMES_RO, Carrier
 from ema.energy_data.model import Derived
 from ema.energy_data.prelucrare_tables import MONTHS
+from ema.energy_data.prices import PriceRow
 
 QUARTER_FACTOR = 2.5
 
@@ -191,4 +192,40 @@ def flags(fields: Mapping[str, Field]) -> list[Issue]:
                 )
                 if issue:
                     result.append(issue)
+    result.extend(cost_flags(fields))
+    return result
+
+
+def cost_flags(fields: Mapping[str, Field], rows: Iterable[PriceRow] | None = None) -> list[Issue]:
+    """A year's declared cost that is missing or off from quantity × official price is replaced
+    by the expected cost; a quantity the price table cannot price is named instead."""
+    result: list[Issue] = []
+    for check in cost_checks(fields, rows):
+        settled, cost = check.settlement, check.declared
+        label = CARRIER_NAMES_RO[settled.carrier]
+        label = f"{label[:1].upper()}{label[1:]} {settled.year}"
+        if settled.status == "unpriced":
+            code = "data_cost_unpriced"
+            message = (
+                f"{label}: costul nu poate fi estimat "
+                f"(unitatea {settled.unit} nu are preț oficial în tabel)."
+            )
+        elif settled.status == "inferred":
+            code = "data_cost_inferred"
+            expected = format_number(settled.expected or 0, 2)
+            message = (
+                f"{label}: cost nedeclarat; se folosește costul estimat "
+                f"{expected} lei ({settled.source})."
+                if settled.declared is None
+                else f"{label}: cost declarat {format_number(settled.declared, 2)} lei, diferit "
+                "de consumul din foaia de consumuri; se folosește costul estimat "
+                f"{expected} lei ({settled.source})."
+            )
+        else:
+            continue
+        sources = [*([cost] if cost else []), *check.quantities]
+        evidence = tuple(dict.fromkeys(ref for field in sources for ref in field.evidence))
+        result.append(
+            Issue(code=code, field_id=sources[0].id, message=message, evidence_ids=evidence)
+        )
     return result

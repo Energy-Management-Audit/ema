@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from collections.abc import Iterable
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import cast
 
@@ -20,6 +21,7 @@ from ema.energy_data.prelucrare import import_prelucrare
 from ema.energy_data.prelucrare_factors import factors_for_output
 from ema.energy_data.prelucrare_merge import annual_readings_match, merge_prelucrare
 from ema.energy_data.prelucrare_types import PrelucrareData
+from ema.energy_data.prices import PriceRow, bundled_prices, inferred_energy_costs
 from ema.energy_data.reconcile import reconcile
 from ema.energy_data.source import Located
 from ema.piee.annual_check import AnnualCheck, annual_check
@@ -58,6 +60,7 @@ class PieeData:
     pie_representation: str = "normalized"
     pie_representation_source: str = "base"
     layout: LayoutProfile = field(default_factory=LayoutProfile)
+    cost_notes: dict[int, tuple[str, ...]] = field(default_factory=dict[int, tuple[str, ...]])
 
 
 def _anexa_series(anexa: AnexaData, year: int) -> dict[Carrier, tuple[CarrierSeries, Located]]:
@@ -383,3 +386,11 @@ def load(
         existing_piee_readings(import_prelucrare(prelucrare)) if prelucrare is not None else None,
         previous_piee,
     )
+
+
+def with_inferred_costs(data: PieeData, rows: Iterable[PriceRow] | None = None) -> PieeData:
+    """The reviewed data with each year's energy cost total settled against official prices,
+    and the footnotes of every total it replaced."""
+    prices = bundled_prices() if rows is None else rows
+    dataset, notes = inferred_energy_costs(data.dataset, prices)
+    return replace(data, dataset=dataset, cost_notes=notes)
