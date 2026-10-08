@@ -4,6 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from ema.audit.data_flags import cost_flags, flags
+from ema.audit.render_dataset import reviewed_costs
 from ema.core.review.models import Field
 from ema.energy_data.prices import read_prices
 
@@ -106,3 +107,44 @@ def test_no_positive_quantity_or_partial_months_raise_nothing() -> None:
 def test_flags_include_the_cost_flags_from_the_bundled_table() -> None:
     fields = _fields(_field("carrier.diesel.2024", 10, "t"))
     assert [issue.code for issue in flags(fields)] == ["data_cost_inferred"]
+
+
+def test_off_declaration_becomes_the_inferred_reviewed_cost() -> None:
+    fields = _fields(
+        _field("carrier.electricity_grid.2024", 1_068.47, "MWh"),
+        _field("audit.economics.electricity_costs_lei.2024", 500_000, "lei"),
+    )
+    reviewed = reviewed_costs(fields, FIXTURE)["audit.economics.electricity_costs_lei.2024"]
+    assert reviewed.value == Decimal("868025.03")
+    assert reviewed.state == "calculated"
+    assert reviewed.evidence == ["evidence:carrier.electricity_grid.2024"]
+    assert reviewed.derivation is not None
+    assert reviewed.derivation.inputs == ["carrier.electricity_grid.2024"]
+    assert reviewed.derivation.factor_version == "Eurostat nrg_pc_205, 2024"
+    [declared] = reviewed.alternatives
+    assert declared.value == Decimal("500000")
+    assert declared.evidence == ["evidence:audit.economics.electricity_costs_lei.2024"]
+    # The warning still names the declaration and its evidence.
+    [issue] = cost_flags(fields, FIXTURE)
+    assert "cost declarat 500.000,00 lei" in issue.message
+    assert "evidence:audit.economics.electricity_costs_lei.2024" in issue.evidence_ids
+
+
+def test_missing_declaration_becomes_the_inferred_reviewed_cost() -> None:
+    fields = _fields(_field("carrier.diesel.2024", 10, "t"))
+    reviewed = reviewed_costs(fields, FIXTURE)["audit.economics.diesel_costs_lei.2024"]
+    assert reviewed.value == Decimal("72805.30")
+    assert reviewed.unit == "lei"
+    assert reviewed.state == "calculated"
+    assert reviewed.alternatives == []
+    assert reviewed.evidence == ["evidence:carrier.diesel.2024"]
+
+
+def test_kept_declaration_and_unpriced_quantity_are_not_rewritten() -> None:
+    fields = _fields(
+        _field("carrier.electricity_grid.2024", 1_000, "MWh"),
+        _field("audit.economics.electricity_costs_lei.2024", 1_000 * 812.4 * 1.24, "lei"),
+        _field("carrier.natural_gas.2024", 5_000, "Nm3"),
+        _field("audit.economics.gas_costs_lei.2024", 10_000, "lei"),
+    )
+    assert reviewed_costs(fields, FIXTURE) == {}
