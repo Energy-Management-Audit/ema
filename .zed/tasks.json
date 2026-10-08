@@ -1,0 +1,19 @@
+// Zed tasks for this checkout (https://zed.dev/docs/tasks).
+[
+  {
+    "label": "Ema: dev stack",
+    "command": "scripts/dev",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Ema: dev stack (mock data)",
+    "command": "scripts/dev --mock",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  }
+]
