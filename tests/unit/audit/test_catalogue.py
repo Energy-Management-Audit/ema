@@ -108,3 +108,32 @@ def test_every_audit_fact_has_a_catalogue_user() -> None:
     used = {ref for section in CATALOGUE for ref in section.facts if isinstance(ref, AuditFact)}
     assert used == set(AuditFact)
     assert any(isinstance(ref, CarrierPattern) for section in CATALOGUE for ref in section.facts)
+
+
+def test_her_latest_flat_chapter_three_maps_each_heading_to_its_section(tmp_path: Path) -> None:
+    """#163: her latest audits put every ch. 3 heading at one level; each still maps to its own
+    section, a process unit to ch3.process."""
+    doc = Document()
+    doc.add_paragraph("DESCRIEREA SITUAŢIEI EXISTENTE", style="Heading 1")
+    for title in (
+        "DESCRIEREA PROCESULUI TEHNOLOGIC",
+        "Fabricarea produselor finite",
+        "DESCRIEREA ALIMENTĂRII CU UTILITĂȚI",
+        "Alimentarea cu apă a societății",
+        "Alimentarea cu gaz natural și energie termică a societății",
+        "SITUAŢIA CONTORIZĂRII ȘI AUTOMATIZĂRII CONSUMATORILOR DE ENERGIE DIN CADRUL SOCIETĂȚII",
+        "SITUAŢIA PARCULUI AUTO ÎN CADRUL SOCIETĂȚII",
+    ):
+        doc.add_paragraph(title, style="Heading 2")
+    path = tmp_path / "flat.docx"
+    doc.save(path)
+    assert [item.section_id for item in map_headings(path, "audit-01").mapped] == [
+        "ch3",
+        "ch3.flux",
+        "ch3.process",
+        "ch3.utilitati",
+        "ch3.apa",
+        "ch3.gaz",
+        "ch3.contorizare",
+        "ch3.parc_auto",
+    ]
