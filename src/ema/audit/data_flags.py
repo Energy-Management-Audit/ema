@@ -7,6 +7,8 @@ from itertools import pairwise
 from statistics import median
 
 from ema.audit.chapter_four_sentences import change_refusal
+from ema.audit.render_dataset import COST_KEYS, carrier_cost
+from ema.core.office.numbers_ro import format_number
 from ema.core.review.models import Field, Issue
 from ema.energy_data.carriers import CARRIER_NAMES_RO, Carrier
 from ema.energy_data.model import Derived
@@ -35,17 +37,31 @@ def _issue(code: str, message: str, *fields: Field) -> Issue | None:
     return Issue(code=code, field_id=fields[0].id, message=message, evidence_ids=evidence)
 
 
-def _paired_flags(fields: Mapping[str, Field]) -> list[Issue]:
+def _paired_flags(fields: Mapping[str, Field]) -> list[Issue]:  # noqa: C901
     result: list[Issue] = []
     for key, field in sorted(fields.items()):
-        if key.startswith("carrier.lpg.") and key.count(".") == 2 and _number(field) == 0:
-            year = key.rsplit(".", 1)[1]
-            cost = fields.get(f"audit.economics.lpg_costs_lei.{year}")
-            if cost is not None and (_number(cost) or 0) > 0:
+        if key.startswith("audit.economics."):
+            for carrier, cost_key in COST_KEYS.items():
+                prefix = f"audit.economics.{cost_key}."
+                if not key.startswith(prefix) or not key[len(prefix) :].isdigit():
+                    continue
+                year = int(key[len(prefix) :])
+                cost = carrier_cost(fields, carrier, year)
+                quantity_key = f"carrier.{carrier.value}.{year}"
+                quantities = [
+                    quantity
+                    for candidate, quantity in sorted(fields.items())
+                    if candidate == quantity_key or candidate.startswith(f"{quantity_key}.")
+                ]
+                if cost is None or not quantities or any((_number(q) or 0) > 0 for q in quantities):
+                    continue
+                name = CARRIER_NAMES_RO[carrier]
                 issue = _issue(
-                    "data_gpl_cost_no_quantity",
-                    f"GPL: cost pozitiv şi cantitate zero în {year}.",
-                    field,
+                    "data_cost_without_quantity",
+                    f"{name[0].upper() + name[1:]}: {format_number(cost.value, 2)} lei "
+                    f"declarate în {year}, fără consum în foaia de consumuri. "
+                    "Consumul primează; costul nu este folosit.",
+                    quantities[0],
                     cost,
                 )
                 if issue:

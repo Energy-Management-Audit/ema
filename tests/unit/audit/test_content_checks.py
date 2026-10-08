@@ -189,9 +189,9 @@ def _cost(ws: Workspace, job: str, name: str, year: int) -> None:
     )
 
 
-def test_total_blocker_issues_point_to_carrier_fields_and_replace_ch4_gap(tmp_path: Path) -> None:
+def test_empty_carriers_with_cost_do_not_block_or_require_ch4_gap(tmp_path: Path) -> None:
     ws, job = _job(tmp_path)
-    gas = mark_absent(
+    mark_absent(
         ws,
         job,
         FieldSpec(
@@ -199,7 +199,7 @@ def test_total_blocker_issues_point_to_carrier_fields_and_replace_ch4_gap(tmp_pa
         ),
         "not_found",
     )
-    monthly = mark_absent(
+    mark_absent(
         ws,
         job,
         FieldSpec(key="carrier.lpg.2024.01", label="GPL ianuarie", value_type="number", unit="t"),
@@ -211,7 +211,7 @@ def test_total_blocker_issues_point_to_carrier_fields_and_replace_ch4_gap(tmp_pa
         FieldSpec(key="carrier.lpg.2024.02", label="GPL februarie", value_type="number", unit="t"),
         "not_found",
     )
-    annual = mark_absent(
+    mark_absent(
         ws,
         job,
         FieldSpec(key="carrier.lpg.2025", label="GPL", value_type="number", unit="t"),
@@ -239,10 +239,7 @@ def test_total_blocker_issues_point_to_carrier_fields_and_replace_ch4_gap(tmp_pa
     other = mark_absent(ws, job, "narrative.ch5.summary", "not_found")
     with ws.connect() as db:
         assert [(issue.code, issue.field_id) for issue in content_issues(db, job)] == [
-            ("data_total_blocked", monthly.id),
-            ("data_total_blocked", gas.id),
-            ("data_total_blocked", annual.id),
-            ("narrative_missing", other.id),
+            ("narrative_missing", other.id)
         ]
 
 

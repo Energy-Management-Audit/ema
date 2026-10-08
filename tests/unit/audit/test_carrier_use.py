@@ -1,4 +1,4 @@
-"""A carrier with no quantity is not used unless its spend says so; the item names the place."""
+"""A carrier with no positive quantity is omitted even when spend is declared."""
 
 from __future__ import annotations
 
@@ -13,11 +13,12 @@ from ema.audit.carrier_gap import blocked_message
 from ema.audit.chapter_four_blocks import chapter_four_blocks
 from ema.audit.chapter_four_sentences import sentence_plan
 from ema.audit.content_checks import content_issues
+from ema.audit.data_flags import flags
 from ema.audit.read import read_dossier
 from ema.audit.render_dataset import reviewed_dataset
 from ema.core.office.blocks import Missing
-from ema.core.review import decide, fields
-from ema.core.review.models import Field
+from ema.core.review import decide, fields, propose
+from ema.core.review.models import Field, FieldSpec
 from ema.core.workspace import Workspace
 from ema.energy_data.calc import shares, tep_total
 from ema.energy_data.carriers import Carrier
@@ -129,11 +130,21 @@ def test_absent_quantity_and_no_cost_is_not_used_and_totals_compute(tmp_path: Pa
     assert tep_total(result, AUDIT_FACTORS_2026, 2023).value is not None
 
 
-def test_zero_quantity_with_positive_cost_blocks_the_total(tmp_path: Path) -> None:
-    ws, job = _job(tmp_path, {"GPL": {2023: 12345}})
-    messages = _blocked(ws, job)
-    assert len(messages) == 1
-    assert messages[0].startswith("Totalul de energie din 2023 lipseşte: cantitatea de GPL")
+def test_zero_quantity_with_positive_cost_does_not_block_the_total(tmp_path: Path) -> None:
+    ws, job = _job(tmp_path, {"GPL": {2024: 12000}})
+    assert _blocked(ws, job) == []
+    dataset = EnergyDataset((2024,), {LPG: {2024: CarrierSeries(annual=Reading(0, "t"))}})
+    assert LPG not in reviewed_dataset(dataset, fields(ws, job)).carriers
+    warnings = [
+        i
+        for i in flags({f.key: f for f in fields(ws, job)})
+        if i.code == "data_cost_without_quantity"
+    ]
+    assert len(warnings) == 1
+    assert warnings[0].message == (
+        "GPL: 12.000,00 lei declarate în 2024, fără consum în foaia de consumuri. "
+        "Consumul primează; costul nu este folosit."
+    )
 
 
 def test_rejected_quantity_is_marked_not_used(tmp_path: Path) -> None:
@@ -143,13 +154,15 @@ def test_rejected_quantity_is_marked_not_used(tmp_path: Path) -> None:
     assert _blocked(ws, job) == []
 
 
-def test_all_rejected_month_fields_mark_not_used_but_one_is_not_enough() -> None:
+def test_rejected_months_are_unused_until_a_positive_month_is_decided() -> None:
     dataset = EnergyDataset((2024,), {LPG: {2024: CarrierSeries(annual=Reading(None, "t"))}})
     cost = _number("audit.economics.lpg_costs_lei.2024", 500, unit="lei")
     rejected = [_number(f"carrier.lpg.2024.{m:02d}", 1, review="rejected") for m in (1, 2)]
     assert LPG not in reviewed_dataset(dataset, [*rejected, cost]).carriers
     pending = _number("carrier.lpg.2024.02", 1)
-    assert LPG in reviewed_dataset(dataset, [rejected[0], pending, cost]).carriers
+    assert LPG not in reviewed_dataset(dataset, [rejected[0], pending, cost]).carriers
+    corrected = _number("carrier.lpg.2024.02", 1, review="corrected")
+    assert LPG in reviewed_dataset(dataset, [rejected[0], corrected, cost]).carriers
 
 
 def test_carrier_used_in_one_year_is_excluded_in_the_others(tmp_path: Path) -> None:
@@ -168,39 +181,19 @@ def test_carrier_used_in_one_year_is_excluded_in_the_others(tmp_path: Path) -> N
     assert _blocked(ws, job) == []
 
 
-def test_message_names_file_sheet_row_and_cost_cell(tmp_path: Path) -> None:
-    ws, job = _job(tmp_path, {"GPL": {2023: 12345}})
-    assert _blocked(ws, job) == [
-        "Totalul de energie din 2023 lipseşte: cantitatea de GPL nu este completată în "
-        f"«{FILE}», foaia «Cons energetice», rândul 25 (lunile goale, total 0); societatea are "
-        f"cheltuieli cu GPL de 12.345,00 lei în 2023 («{FILE}», foaia «Cifre economice», "
-        "celula B4). Completaţi cantitatea din facturi sau marcaţi combustibilul ca neutilizat."
-    ]
-
-
-def test_message_drops_a_missing_place_and_falls_back_without_cost(tmp_path: Path) -> None:
-    ws, job = _job(tmp_path, {"GPL": {2023: 12345}})
-    with ws.connect() as db:
-        db.execute("UPDATE slot_versions SET original_name=NULL WHERE job_id=?", (job,))
-    assert _blocked(ws, job) == [
-        "Totalul de energie din 2023 lipseşte: cantitatea de GPL nu este completată; societatea "
-        "are cheltuieli cu GPL de 12.345,00 lei în 2023. Completaţi cantitatea din facturi sau "
-        "marcaţi combustibilul ca neutilizat."
-    ]
-
-
-def test_plain_message_when_there_is_no_cost_or_the_quantity_is_partly_filled(
-    tmp_path: Path,
-) -> None:
+def test_partly_filled_quantity_still_blocks_with_plain_message(tmp_path: Path) -> None:
     ws, job = _job(tmp_path, {"GPL": {2023: 12345}})
     plain = "Totalul de energie din 2023 lipseşte: completaţi cantitatea de GPL."
-    by_key = {f.key: f for f in fields(ws, job)}
-    filled = CarrierSeries({1: Reading(3, "t")})
-    with ws.connect() as db:
-        assert blocked_message(db, job, by_key, filled, LPG, 2023) == plain
-        assert blocked_message(db, job, by_key, CarrierSeries(), LPG, 2025) == plain.replace(
-            "2023", "2025"
-        )
+    assert blocked_message(LPG, 2023) == plain
+    propose(
+        ws,
+        job,
+        FieldSpec(key="carrier.lpg.2023.01", label="GPL ianuarie", value_type="number", unit="t"),
+        Decimal(3),
+        [],
+        state="supplied",
+    )
+    assert _blocked(ws, job) == [plain]
 
 
 def _ch4_dataset(*, lpg_cost: bool) -> tuple[EnergyDataset, list[Field]]:
@@ -249,9 +242,9 @@ def test_ch4_with_a_not_used_carrier_computes_totals_shares_and_conclusions() ->
     assert sentence_plan(unused, FACTORS_2026).sections.get("ch4.concluzii")
 
 
-def test_ch4_with_a_used_carrier_without_quantity_shows_the_gap() -> None:
+def test_ch4_with_a_cost_but_no_quantity_omits_the_carrier() -> None:
     raw, cost = _ch4_dataset(lpg_cost=True)
     used = reviewed_dataset(raw, cost)
-    assert LPG in used.carriers
-    assert tep_total(used, FACTORS_2026, 2025).value is None
-    assert len(_missing(used)) > len(_missing(reviewed_dataset(raw, [])))
+    assert LPG not in used.carriers
+    assert tep_total(used, FACTORS_2026, 2025).value is not None
+    assert _missing(used) == _missing(reviewed_dataset(raw, []))

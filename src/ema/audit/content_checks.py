@@ -83,7 +83,6 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
     issues: list[Issue] = []
     dataset = _fields_dataset(fields)
     blockers = total_blockers(dataset, AUDIT_FACTORS_2026) if dataset is not None else []
-    series_by_carrier = dataset.carriers if dataset is not None else {}
     for carrier, year in blockers:
         key = f"carrier.{carrier.value}.{year}"
         annual = fields.get(key)
@@ -103,9 +102,7 @@ def content_issues(db: sqlite3.Connection, job: str) -> list[Issue]:
             Issue(
                 code="data_total_blocked",
                 field_id=field_id,
-                message=blocked_message(
-                    db, job, fields, series_by_carrier[carrier][year], carrier, year
-                ),
+                message=blocked_message(carrier, year),
             )
         )
     active_slots = [
