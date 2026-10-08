@@ -15474,7 +15474,7 @@
                 }
               }
             },
-            "description": "cover_photo_type"
+            "description": "cover_photo_type, previous_audit_type"
           },
           "421": {
             "content": {
@@ -15528,7 +15528,7 @@
                 }
               }
             },
-            "description": "validation_error"
+            "description": "previous_audit_unusable, validation_error"
           }
         },
         "summary": "Put Slot",

@@ -1,6 +1,7 @@
 """Hand-authored, request-bound replay recordings for the audit Draft agent (synthetic only)."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -74,7 +75,7 @@ def write_recording(path: Path, rows: list[dict[str, Any]]) -> Path:
 def section_group(ws: Workspace, job: str, section: str) -> Group:
     """The one-section group the single-section path drafts, as `draft_one` builds it."""
     (group,), _ = chapter_groups(ws, job, (section,))
-    return Group(section, group.chapter, group.sections)
+    return replace(group, id=section)
 
 
 def draft_recording(ws: Workspace, job: str, draft: SectionDraft, path: Path) -> Path:

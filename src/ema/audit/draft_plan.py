@@ -40,6 +40,8 @@ class Group:
     id: str
     chapter: int
     sections: tuple[SectionPlan, ...]
+    # The reference audit's identity, recorded in each draft's fingerprint (#163).
+    reference: str = ""
 
     @property
     def allowance(self) -> int:

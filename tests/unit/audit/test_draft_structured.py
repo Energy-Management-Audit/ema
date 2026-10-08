@@ -269,7 +269,9 @@ def test_provider_receives_only_redacted_base_example(tmp_path: Path, monkeypatc
     identity.write_text(json.dumps(["Atelier Exemplu"]), encoding="utf-8")
     monkeypatch.setenv("EMA_AUDIT_BASE_DOCUMENT", str(base))
     monkeypatch.setenv("EMA_AUDIT_BASE_IDENTITY", str(identity))
-    provider, _, _, _ = _run(tmp_path, [CH2_DRAFT])
+    # The reference has one part: the draft's paragraph rewrites it (#163).
+    first = CH2_DRAFT.paragraphs[0].model_copy(update={"part": 1})
+    provider, _, _, _ = _run(tmp_path, [CH2_DRAFT.model_copy(update={"paragraphs": [first]})])
     example = " ".join(part["text"] for part in provider.requests[0]["sections"][0]["reference"])
     assert example
     assert "Atelier Exemplu" not in example

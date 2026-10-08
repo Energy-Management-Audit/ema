@@ -24,8 +24,9 @@ from ema.api.models import (
     SlotVersion,
 )
 from ema.api.provisional import install_provisional_routes
+from ema.audit.draft_style import PREVIOUS_AUDIT_SLOT, checked_previous_audit
 from ema.audit.render_bindings import COVER_SLOT, checked_photo
-from ema.audit.sections import Status, set_status, statuses
+from ema.audit.sections import Status, refresh_staleness, set_status, statuses
 from ema.clients.registry import get_client
 from ema.core.errors import EmaError
 from ema.core.jobs import cancel, create_job, get_job, list_jobs, status
@@ -193,7 +194,11 @@ def install_routes(app: FastAPI, ws: Workspace, *, mock: bool = False) -> None: 
         validate_slot(str(job["type"]), slot)
         if slot == COVER_SLOT:
             checked_photo(ws.file_path(str(job["client_slug"]), body.file_sha))
+        if slot == PREVIOUS_AUDIT_SLOT:
+            checked_previous_audit(ws.file_path(str(job["client_slug"]), body.file_sha))
         version, revision = ws.set_slot_with_revision(job_id, slot, body.file_sha)
+        if slot == PREVIOUS_AUDIT_SLOT:
+            refresh_staleness(ws, job_id)
         return {**asdict(version), "slot_revision": revision}
 
     @app.delete(

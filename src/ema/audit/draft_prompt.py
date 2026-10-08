@@ -13,6 +13,7 @@ from ema.audit.draft_checks import DraftReview, sentence_parts
 from ema.audit.draft_plan import Group, SectionPlan, usable
 from ema.audit.draft_render import rendered_value
 from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
+from ema.audit.draft_style import ExamplePart
 from ema.core.resources import resource_path
 from ema.core.review.models import Field
 
@@ -33,6 +34,9 @@ RULES = {
     "missing_status_invalid": 15,
     "status_invalid": 16,
     "missing_item_invalid": 18,
+    "part_invalid": 19,
+    "part_order": 19,
+    "part_omitted": 19,
 }
 OMITTED_RULE = (
     "Fiecare secțiune cerută apare o singură dată în sections, cu id-ul ei exact, într-un "
@@ -71,6 +75,20 @@ class Used:
         return {"used_passages": sorted(self.passages), "opening_sentences": self.openings}
 
 
+def reference_parts(plan: SectionPlan) -> list[tuple[int | None, ExamplePart]]:
+    """The reference's parts numbered from 1 in order: a list's consecutive items share one
+    number, since the client's list has its own length; a table has none, since the draft
+    writes no table (#163 D2)."""
+    numbered: list[tuple[int | None, ExamplePart]] = []
+    number, previous = 0, ""
+    for part in plan.example:
+        if part.kind != "table" and not (part.kind == previous == "bullet"):
+            number += 1
+        numbered.append((None if part.kind == "table" else number, part))
+        previous = part.kind
+    return numbered
+
+
 def _missing(plan: SectionPlan) -> list[str]:
     """The section's keys without a usable value, a fact never recorded included: a reference
     part that needs one keeps its place as a missing item (#163 D2)."""
@@ -86,7 +104,10 @@ def _section(plan: SectionPlan) -> dict[str, Any]:
         "section": plan.section,
         "title": _TITLES[plan.section],
         "target_words": plan.target,
-        "reference": [{"kind": part.kind, "text": part.text} for part in plan.example],
+        "reference": [
+            {"part": number, "kind": part.kind, "text": part.text}
+            for number, part in reference_parts(plan)
+        ],
         "facts": [
             {"key": key, "text": rendered_value(value), "unit": value.unit}
             for key, value in sorted(plan.facts.items())

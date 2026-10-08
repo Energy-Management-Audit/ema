@@ -55,10 +55,23 @@ def _base(tmp_path: Path, monkeypatch: Any, *parts: tuple[str, str]) -> None:
     monkeypatch.setenv("EMA_AUDIT_BASE_IDENTITY", str(identity))
 
 
-def _request(tmp_path: Path) -> dict[str, Any]:
+def covering(parts: int) -> SectionDraft:
+    """The synthetic draft with one item for each of the reference's first `parts` parts."""
+    general = DraftText(text="Activitatea respectă cadrul normativ în vigoare.")
+    return CH2_DRAFT.model_copy(
+        update={
+            "paragraphs": [
+                CH2_DRAFT.paragraphs[0].model_copy(update={"part": 1}),
+                *(general.model_copy(update={"part": number}) for number in range(2, parts + 1)),
+            ]
+        }
+    )
+
+
+def _request(tmp_path: Path, parts: int) -> dict[str, Any]:
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
-    provider = DraftProvider([CH2_DRAFT])
+    provider = DraftProvider([covering(parts)])
     draft_section_run(
         ws,
         job,
@@ -82,7 +95,9 @@ def test_the_draft_request_keeps_the_reference_order(tmp_path: Path, monkeypatch
         ("table", "Indicator | Valoare"),
         ("body", "Regimul de lucru este continuu."),
     )
-    reference = _request(tmp_path)["reference"]
+    reference = _request(tmp_path, 4)["reference"]
+    # A list's items share its number; a table has none (#163 fix round 1).
+    assert [part["part"] for part in reference] == [1, 2, 3, 3, None, 4]
     assert [part["kind"] for part in reference] == [
         "body",
         "body",
@@ -95,7 +110,7 @@ def test_the_draft_request_keeps_the_reference_order(tmp_path: Path, monkeypatch
     assert reference[2]["text"] == "denumirea societății;"
     assert reference[4]["text"] == "{{…}} | {{…}}"
     assert reference[5]["text"].endswith("de lucru este continuu.")
-    assert "style_example" not in _request(tmp_path / "again")
+    assert "style_example" not in _request(tmp_path / "again", 4)
 
 
 def test_redaction_strips_numbers_and_names_from_every_part(tmp_path: Path) -> None:
@@ -122,9 +137,9 @@ def test_the_previous_audit_is_the_reference_over_the_base(
     _base(tmp_path, monkeypatch, ("body", "Textul bazei configurate."))
     ws = Workspace(tmp_path / "ws")
     job = audit_job_with_facts(ws)
-    assert [part.text for part in reference_examples(ws, job, (SECTION,))[SECTION].parts] == [
-        "{{…}} bazei configurate."
-    ]
+    base = reference_examples(ws, job, (SECTION,))
+    assert base.identity.startswith("base:") and base.identity != "base:none"
+    assert [part.text for part in base.examples[SECTION].parts] == ["{{…}} bazei configurate."]
     client = get_client(ws, "synthetic")
     update_client(ws, "synthetic", {"name": "Fabrica Model", "cui": "RO98765"}, client["revision"])
     previous = _audit(
@@ -133,7 +148,9 @@ def test_the_previous_audit_is_the_reference_over_the_base(
         ("bullet", "primul element;"),
     )
     add_document(ws, job, previous, PREVIOUS_AUDIT_SLOT)
-    parts = reference_examples(ws, job, (SECTION,))[SECTION].parts
+    reference = reference_examples(ws, job, (SECTION,))
+    assert reference.identity.startswith("previous_audit@1:")
+    parts = reference.examples[SECTION].parts
     assert [(part.kind, part.text) for part in parts] == [
         ("body", "{{…}} anterior pentru {{…}}, cod {{…}}."),
         ("bullet", "primul element;"),
@@ -156,7 +173,7 @@ def test_the_request_lists_section_keys_never_recorded_as_missing(
     tmp_path: Path, monkeypatch: Any
 ) -> None:
     _base(tmp_path, monkeypatch, ("body", "Text."))
-    missing = _request(tmp_path)["missing"]
+    missing = _request(tmp_path, 1)["missing"]
     assert {"audit.address", "audit.cui", "audit.work_regime"} <= set(missing)
     assert not {"audit.company_name", "audit.employees"} & set(missing)
 

@@ -49,6 +49,9 @@ class DraftText(BaseModel):
     # The 3.1.x process unit a ch3.process paragraph describes, from 1; None elsewhere (D3).
     unit: int | None = None
     missing_fact_ids: list[str] = Field(default_factory=list[str])
+    # The numbered reference part the item rewrites, a list item its list's; None without a
+    # reference (#163 D2).
+    part: int | None = None
 
 
 class SectionDraft(BaseModel):

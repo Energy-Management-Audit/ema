@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 from ema.audit.catalogue import CATALOGUE
@@ -54,7 +55,7 @@ def chapter_groups(
 ) -> tuple[list[Group], dict[str, int | None]]:
     """The sections' chapter groups in catalogue order, with each process passage's unit."""
     facts = job_facts(ws, job) if facts is None else facts
-    examples = reference_examples(ws, job, sections)
+    reference = reference_examples(ws, job, sections)
     units, count = _units(ws, job) if {"ch3.flux", "ch3.process"} & set(sections) else ({}, 1)
     groups: list[Group] = []
     for chapter in (2, 3):
@@ -62,7 +63,7 @@ def chapter_groups(
             plan_section(
                 section,
                 {key: value for key, value in facts.items() if citable(section, key)},
-                examples.get(section),
+                reference.examples.get(section),
                 units,
                 count,
             )
@@ -70,7 +71,9 @@ def chapter_groups(
             if _CHAPTERS[section] == chapter
         ]
         if plans:
-            groups.extend(split(chapter, plans))
+            groups.extend(
+                replace(group, reference=reference.identity) for group in split(chapter, plans)
+            )
     return groups, units
 
 
@@ -114,7 +117,7 @@ def draft_one(
     ws: Workspace, job: str, section: str, passes: Passes, facts: dict[str, Field] | None = None
 ) -> Drafted:
     (group,), units = chapter_groups(ws, job, (section,), facts)
-    group = Group(section, group.chapter, group.sections)
+    group = replace(group, id=section)
     result = run_group(ws, job, group, passes, Used(), units)
     if section in result.failed:
         raise result.failed[section]

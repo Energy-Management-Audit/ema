@@ -12,6 +12,7 @@ from typing import Literal
 from ema.audit import base_entry
 from ema.audit.applicability import applies, condition_source, fact_fields
 from ema.audit.catalogue import CATALOGUE, MaterialKind, Section
+from ema.audit.draft_style import reference_identity
 from ema.audit.readiness import audit_readiness as audit_readiness  # noqa: PLC0414
 from ema.audit.staleness import base_changed, capture_inputs, current_inputs, snapshot_inputs
 from ema.core.config import load_settings
@@ -312,6 +313,7 @@ def refresh_staleness(
 
 def _refresh_inputs(ws: Workspace, job: str, db: sqlite3.Connection) -> list[SectionState]:
     facts, materials = current_inputs(db, job)
+    reference: str | None = None
     result: list[SectionState] = []
     for section, before in zip(CATALOGUE, statuses(ws, job, db), strict=True):
         if (
@@ -352,6 +354,17 @@ def _refresh_inputs(ws: Workspace, job: str, db: sqlite3.Connection) -> list[Sec
                     if row is None or int(row["revision"]) != int(expected):
                         changed = entry
                         break
+        if changed is None and any(item.startswith("reference:") for item in before.fingerprint):
+            # A ch. 2-3 draft follows the reference audit it was written from (#163).
+            reference = reference or f"reference:{reference_identity(ws, job, db)}"
+            changed = next(
+                (
+                    item
+                    for item in before.fingerprint
+                    if item.startswith("reference:") and item != reference
+                ),
+                None,
+            )
         if changed is None:
             result.append(before)
             continue

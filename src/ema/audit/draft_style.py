@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sqlite3
 import unicodedata
 from collections.abc import Collection
 from dataclasses import dataclass
@@ -21,6 +22,8 @@ from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
+from ema.audit.base_entry import base_sha
+from ema.audit.draft_schema import SECTION_FACTS
 from ema.audit.headings import headings, map_headings
 from ema.clients.registry import get_client
 from ema.core.config import load_settings
@@ -161,20 +164,49 @@ def style_example(base: Path, identity: tuple[str, ...], section: str) -> str:
     return example.text if example is not None else ""
 
 
-def previous_audit(ws: Workspace, job: str) -> tuple[Path, tuple[str, ...]] | None:
-    """The job's previous audit of this client, a .docx, with the client's registry name and
-    CUI to redact; none when the slot is empty or holds another kind of file."""
-    version = active_version(ws, job, PREVIOUS_AUDIT_SLOT)
-    if version is None:
-        return None
-    client, path = stored_file(ws, job, version.file_sha)
-    if sniff(path).kind != FileKind.DOCX:
-        logging.getLogger(__name__).warning(
-            "Previous audit is not a .docx; the audit base is the reference"
+def checked_previous_audit(path: Path) -> Path:
+    """A .docx with the own text of at least one ch. 2-3 section; refused before the slot
+    changes, so a draft never falls back from the audit the auditor chose."""
+    kind = sniff(path).kind
+    if kind != FileKind.DOCX:
+        raise EmaError(
+            "previous_audit_type", "Auditul anterior nu este un document Word .docx.", kind.value
         )
-        return None
-    record = get_client(ws, client)
-    return path, tuple(str(record[key]) for key in ("name", "cui") if record.get(key))
+    try:
+        parts = _own_parts(path, SECTION_FACTS)
+    except Exception as exc:  # python-docx raises many types on a damaged package
+        raise EmaError(
+            "previous_audit_unusable",
+            "Auditul anterior nu poate fi citit.",
+            f"{type(exc).__name__}: {exc}",
+        ) from exc
+    if not any(parts.values()):
+        raise EmaError(
+            "previous_audit_unusable",
+            "Auditul anterior nu are secţiuni din capitolele 2-3.",
+            path.name,
+        )
+    return path
+
+
+def _previous_identity(version: int, file_sha: str) -> str:
+    return f"{PREVIOUS_AUDIT_SLOT}@{version}:{file_sha}"
+
+
+def _base_identity(ws: Workspace) -> str:
+    return f"base:{base_sha(load_settings(ws)) or 'none'}"
+
+
+def reference_identity(ws: Workspace, job: str, db: sqlite3.Connection) -> str:
+    """The current reference of the job's ch. 2-3 drafts, as their fingerprint records it."""
+    row = db.execute(
+        "SELECT v.version,v.file_sha FROM slots s JOIN slot_versions v ON v.job_id=s.job_id "
+        "AND v.slot=s.name AND v.version=s.active_version WHERE s.job_id=? AND s.name=?",
+        (job, PREVIOUS_AUDIT_SLOT),
+    ).fetchone()
+    if row is None:
+        return _base_identity(ws)
+    return _previous_identity(int(row["version"]), str(row["file_sha"]))
 
 
 def configured_examples(ws: Workspace, sections: Collection[str]) -> dict[str, Example]:
@@ -200,10 +232,25 @@ def configured_examples(ws: Workspace, sections: Collection[str]) -> dict[str, E
     return style_examples(base, tuple(cast(list[str], identity)), sections)
 
 
-def reference_examples(ws: Workspace, job: str, sections: Collection[str]) -> dict[str, Example]:
+@dataclass(frozen=True)
+class Reference:
+    """The reference audit the drafts follow: its identity, an input of each draft, and its
+    sections' examples, both from one read of the slot."""
+
+    identity: str
+    examples: dict[str, Example]
+
+
+def reference_examples(ws: Workspace, job: str, sections: Collection[str]) -> Reference:
     """The sections' examples from the client's previous audit when the job holds one, else
     from the configured audit base (#163 D1)."""
-    previous = previous_audit(ws, job)
-    if previous is None:
-        return configured_examples(ws, sections)
-    return style_examples(*previous, sections)
+    version = active_version(ws, job, PREVIOUS_AUDIT_SLOT)
+    if version is None:
+        return Reference(_base_identity(ws), configured_examples(ws, sections))
+    client, path = stored_file(ws, job, version.file_sha)
+    record = get_client(ws, client)
+    terms = tuple(str(record[key]) for key in ("name", "cui") if record.get(key))
+    return Reference(
+        _previous_identity(version.version, version.file_sha),
+        style_examples(checked_previous_audit(path), terms, sections),
+    )
