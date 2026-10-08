@@ -5,20 +5,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ema.audit.catalogue import CATALOGUE
-from ema.audit.chapter_four_blocks import FUEL, TITLES, emission_carriers
+from ema.audit.chapter_four_blocks import emission_carriers
 from ema.audit.chapter_four_chart_text import (
     ANNUAL,
     MONTHS,
     STYLE_PART,
     SUBJECT,
     WATER_ANNUAL,
-    is_turnover_unit,
+    figure_text,
 )
 from ema.audit.chapter_four_chart_values import chart_series, display_unit, has_chart_data
+from ema.audit.chapter_four_comments import figure_blocks
 from ema.audit.chapter_four_pies import mix_pies, pv_pies
+from ema.audit.chapter_four_resources import FUEL, TITLES
 from ema.consumption_analysis.analysis import Metric
 from ema.consumption_analysis.metric_kind import MetricKind
-from ema.core.office.blocks import Block, Missing, NativeChart, Paragraph
+from ema.core.office.blocks import Block, Missing, NativeChart
 from ema.core.office.missing_text import MISSING_TEXT
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FactorTable
@@ -30,6 +32,8 @@ class ChartGroup:
     label: str | None
     monthly: list[Block]
     annual: list[Block]
+    # Share pies close the resource: after its variable factors, where she places them.
+    pies: bool = False
 
 
 @dataclass(frozen=True)
@@ -289,27 +293,13 @@ def _specs(dataset: EnergyDataset) -> tuple[list[_Spec], list[str]]:  # noqa: C9
     return result, skipped
 
 
-def _caption(spec: _Spec, client: str, k: int, letter: str | None, year: int | None) -> str:
-    prefix = f"Fig. nr. 4.{k} " + (f"{letter}) " if letter else "")
-    if spec.production:
-        if year is not None:
-            subject = (
-                "cifrei lunare de afaceri" if is_turnover_unit(spec.unit) else "producției lunare"
-            )
-            return (
-                prefix + f"Evoluția lunară a {subject} înregistrate de către {client} "
-                f"la nivelul anului {year}"
-            )
-        return prefix + f"Evoluția anuală a producției înregistrate la nivelul {client}"
-    if spec.annual_text is not None:
-        return prefix + spec.annual_text.format(client=client)
-    assert spec.subject is not None
-    if year is not None:
-        return (
-            prefix + f"Evoluția lunară a {spec.subject} înregistrat de către {client} "
-            f"la nivelul anului {year}"
-        )
-    return prefix + f"Evoluția anuală a {spec.subject} înregistrat la nivelul {client}"
+def _caption(
+    spec: _Spec, client: str, k: int, letter: str | None, year: int | None
+) -> tuple[str, str, str, str]:
+    """The figure's number, caption, and the period and subject her comments repeat."""
+    number = f"4.{k}" + (f" {letter})" if letter else "")
+    unit = spec.unit if spec.production else None
+    return number, *figure_text(number, client, year, unit, spec.annual_text, spec.subject)
 
 
 def _group(
@@ -337,33 +327,27 @@ def _group(
     if spec.monthly and monthly_series:
         for year in spec.years:
             series = chart_series(dataset, factors, monthly_series, scale, list(MONTHS), year)
-            caption = _caption(spec, client, k, chr(ord("a") + letter), year)
+            number, caption, when, subject = _caption(spec, client, k, chr(ord("a") + letter), year)
             letter += 1
             if not has_chart_data(series):
                 monthly.append(Missing("body", f"{caption}: {MISSING_TEXT}"))
                 skipped.append(f"{key}:{year}:no_data")
                 continue
-            monthly.extend(
-                (
-                    NativeChart("chart", STYLE_PART, series, column_axis_title=unit + "/lună"),
-                    Paragraph("chart_caption", [caption, "", "", ""]),
-                )
-            )
+            chart = NativeChart("chart", STYLE_PART, series, column_axis_title=unit + "/lună")
+            monthly.extend(figure_blocks(chart, number, caption, when, subject))
     annual_series = chart_series(
         dataset, factors, spec.series, scale, [str(year) for year in spec.years], None
     )
     annual: list[Block] = []
-    caption = _caption(spec, client, k, chr(ord("a") + letter) if letter else None, None)
+    number, caption, when, subject = _caption(
+        spec, client, k, chr(ord("a") + letter) if letter else None, None
+    )
     if has_chart_data(annual_series):
         axis = unit
         if spec.series[0][1].kind not in {"specific", "water_specific", "intensity"}:
             axis += "/an"
-        annual.extend(
-            (
-                NativeChart("chart", STYLE_PART, annual_series, column_axis_title=axis),
-                Paragraph("chart_caption", [caption, "", "", ""]),
-            )
-        )
+        chart = NativeChart("chart", STYLE_PART, annual_series, column_axis_title=axis)
+        annual.extend(figure_blocks(chart, number, caption, when, subject))
     else:
         annual.append(Missing("body", f"{caption}: {MISSING_TEXT}"))
         skipped.append(f"{key}:annual:no_data")
@@ -385,7 +369,7 @@ def chapter_chart_groups(
         pie = {"ch4.echiv_total": mix_pies, "ch4.electricitate_pv": pv_pies}.get(section)
         pies = pie(dataset, factors, client, number, skipped) if pie else []
         if pies:
-            groups.setdefault(section, []).append(ChartGroup(None, [], pies))
+            groups.setdefault(section, []).append(ChartGroup(None, [], pies, pies=True))
             number += 1
     return groups, skipped
 

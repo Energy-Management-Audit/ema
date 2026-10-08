@@ -182,8 +182,21 @@ def _prototypes(
     )
     if table is None or caption is None or paragraph is None:
         raise ValueError("audit base lacks chapter-four block prototypes")
+    # Her chapter's own list paragraph for the annual and factor lists; a body one without.
+    headings = set(positions.values())
+    bullet = next(
+        (
+            body[index]
+            for index in range(chapter + 1, following)
+            if index not in headings
+            and body[index].tag == W + "p"
+            and body[index].find(f".//{W}numPr") is not None
+        ),
+        paragraph,
+    )
     elements = {
         "body": paragraph,
+        "bullet": bullet,
         "caption": caption,
         "months_first": _table_proto(table, 1),
         "months_second": _table_proto(table, 7),

@@ -1,6 +1,7 @@
 """Annual chapter-four values and compact tables for annual-only carriers."""
 
 from ema.audit.chapter_four_chart_values import display_unit
+from ema.audit.chapter_four_comments import period, table_lead
 from ema.consumption_analysis.analysis import Metric, value
 from ema.core.office.blocks import Block, Caption, Missing, Num, Paragraph, Ref, Segment, Table
 from ema.core.office.missing_text import MISSING_TEXT, TABLE_MISSING_TEXT
@@ -56,6 +57,7 @@ def annual_carrier_table(  # noqa: PLR0913
     *,
     label: str,
     section: str,
+    subject: str,
 ) -> list[Block]:
     carrier = metric.carriers[0]
     caption_id = (
@@ -71,6 +73,7 @@ def annual_carrier_table(  # noqa: PLR0913
             [Num(number * scale if number is not None else None, 2, fact=fact, scale=scale)]
         )
     return [
+        table_lead(caption_id, f"evoluția anuală a {subject} {period(years)}"),
         Caption(
             "caption",
             "tab",

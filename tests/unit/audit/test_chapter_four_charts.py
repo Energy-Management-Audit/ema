@@ -39,7 +39,11 @@ def _dataset() -> EnergyDataset:
 
 
 def _captions(blocks: list[object]) -> list[str]:
-    return [str(block.segments[0]) for block in blocks if isinstance(block, Paragraph)]
+    return [
+        str(block.segments[0])
+        for block in blocks
+        if isinstance(block, Paragraph) and block.proto == "chart_caption"
+    ]
 
 
 def _charts(blocks: list[object]) -> list[NativeChart]:

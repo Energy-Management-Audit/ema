@@ -149,7 +149,8 @@ def test_mixed_fuel_chart_keeps_monthly_carrier_and_all_annual_carriers() -> Non
     blocks, skipped = chart_blocks("ch4.carburant", dataset, FACTORS_2026, "Client")
     charts = [block for block in blocks if isinstance(block, NativeChart)]
     section = _section(chapter_four_blocks(dataset, FACTORS_2026), "ch4.carburant")
-    assert len([block for block in section if isinstance(block, Table)]) == 8
+    # GPL's half-year pair, a row per year, and one annual table per annual-only fuel.
+    assert len([block for block in section if isinstance(block, Table)]) == 4
     assert not skipped
     assert len(charts) == 4
     assert all(
@@ -198,7 +199,9 @@ def _emissions_base(path: Path, columns: int) -> tuple[Prototypes, ElementLocato
         for cell in row.cells:
             cell.text = "x"
     doc.save(path)
-    prototypes = Prototypes({"caption": caption._p, "emissions": table._tbl}, chapter=4)
+    prototypes = Prototypes(
+        {"body": caption._p, "caption": caption._p, "emissions": table._tbl}, chapter=4
+    )
     parts = read_parts(path)
     root = etree.fromstring(parts["word/document.xml"])
     body = root.find(W + "body")
@@ -233,6 +236,7 @@ def test_the_annual_table_renders_on_the_horizontal_emissions_prototype(
         "t",
         label="Motorină",
         section="ch4.carburant",
+        subject="consumului de motorină",
     )
     source, out = tmp_path / "base.docx", tmp_path / "out.docx"
     prototypes, locator = _emissions_base(source, len(years) + 1)

@@ -6,6 +6,7 @@ from docx.shared import Pt
 from lxml import etree
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.chapter_four_comments import FACTOR_LEAD
 from ema.audit.chapter_four_format import format_chapter_four
 from ema.core.errors import EmaError
 
@@ -190,3 +191,25 @@ def test_first_half_table_rows_link_to_second_half_caption() -> None:
         for cell in row.cells:
             assert cell.paragraphs[0]._p.find(W + "pPr/" + W + "keepNext") is not None
     assert second.cell(1, 1).paragraphs[0]._p.find(W + "pPr/" + W + "keepNext") is None
+
+
+def test_her_lead_ins_stay_with_what_they_open():
+    document = Document()
+    document.add_heading(TITLES["ch4"], 1)
+    document.add_heading(TITLES["ch4.gaz"], 3)
+    leads = [
+        document.add_paragraph(text)
+        for text in (
+            "În figura numărul 4.1 a) se prezintă evoluția lunară a consumului de gaz natural.",
+            "În tabelul numărul 4.1 se prezintă evoluția lunară a consumului de gaz natural.",
+            "În ceea ce privește consumurile anuale de gaz natural înregistrate de către "
+            "societate în perioada de analiză, se desprind următoarele:",
+            FACTOR_LEAD["ch4.gaz"],
+        )
+    ]
+    comment = document.add_paragraph("Conform figurii numărul 4.1 a) se observă tendința.")
+    document.add_heading(TITLES["ch5"], 1)
+    format_chapter_four(document)
+    for lead in leads:
+        assert lead._p.find(W + "pPr/" + W + "keepNext").get(W + "val") == "1"
+    assert comment._p.find(W + "pPr/" + W + "keepNext") is None

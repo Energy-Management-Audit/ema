@@ -8,12 +8,20 @@ from docx.document import Document as DocumentObject
 from lxml import etree
 
 from ema.audit.base_units import heading_spans_document
-from ema.audit.chapter_four_blocks import TITLES
+from ema.audit.chapter_four_comments import ANNUAL_OPENING, FACTOR_LEAD
+from ema.audit.chapter_four_resources import TITLES
 from ema.core.errors import EmaError
 from ema.core.office.missing_text import MISSING_TEXT, TABLE_MISSING_TEXT
 from ema.core.office.paragraph_properties import keep_paragraph
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+# Her lead-ins stay on the page of the figure, table or list they open.
+LEAD_INS = (
+    "În figura numărul 4.",
+    "În tabelul numărul 4.",
+    ANNUAL_OPENING,
+    *FACTOR_LEAD.values(),
+)
 
 _BEFORE = {
     "jc": (
@@ -185,7 +193,12 @@ def format_chapter_four(document: DocumentObject, *, missing_text: str = MISSING
             _keep_first_half(node)
         elif node.tag == W + "p":
             text = "".join(item.text or "" for item in node.iter(W + "t"))
-            if index in headings or text in labels or node.find(".//" + W + "drawing") is not None:
+            if (
+                index in headings
+                or text in labels
+                or text.startswith(LEAD_INS)
+                or node.find(".//" + W + "drawing") is not None
+            ):
                 keep_paragraph(node, "keepNext")
             if text.startswith(("Fig. nr. 4.", "Tabelul 4.")):
                 keep_paragraph(node, "keepLines")

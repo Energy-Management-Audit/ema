@@ -1,5 +1,6 @@
 """The annual intensity table, using the chapter-four emissions-width prototype."""
 
+from ema.audit.chapter_four_comments import period, table_lead
 from ema.consumption_analysis.analysis import Metric, value
 from ema.core.office.blocks import Block, Caption, Num, Ref, Segment, Table
 from ema.core.office.missing_text import TABLE_MISSING_TEXT
@@ -27,6 +28,7 @@ def intensity_table(dataset: EnergyDataset, factors: FactorTable) -> list[Block]
             ]
         )
     return [
+        table_lead("ch4.intensitate", f"evoluția intensității energetice {period(years)}"),
         Caption(
             "caption",
             "tab",

@@ -7,9 +7,11 @@ import pytest
 from ema.audit.chapter_four_blocks import chapter_four_blocks
 from ema.audit.chapter_four_chart_placement import place_chart_groups
 from ema.audit.chapter_four_charts import chapter_chart_groups
+from ema.audit.chapter_four_comments import FACTOR_LEAD
 from ema.audit.chapter_four_pies import mix_pies, pv_pies
 from ema.audit.chapter_four_sentences import sentence_plan
 from ema.core.office.blocks import Block, Missing, NativeChart, Paragraph
+from ema.core.office.missing_text import MISSING_TEXT
 from ema.energy_data.calc import tep
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FACTORS_2026, Factor
@@ -84,7 +86,12 @@ def test_mix_pies_sum_fuels_into_carburant_and_continue_the_section_numbering() 
     dataset = _dataset()
     groups, skipped = chapter_chart_groups(dataset, FACTORS_2026, CLIENT)
     annual, pies = groups["ch4.echiv_total"]
-    number = int(_texts(annual.annual)[0].split()[2].removeprefix("4."))
+    caption = next(
+        block
+        for block in annual.annual
+        if isinstance(block, Paragraph) and block.proto == "chart_caption"
+    )
+    number = int(str(caption.segments[0]).split()[2].removeprefix("4."))
     assert (pies.label, pies.monthly) == (None, [])
     assert _texts(pies.annual) == [
         MIX_PLURAL.format(k=number + 1),
@@ -316,7 +323,7 @@ def test_a_dataset_without_pv_has_no_pv_pies_or_notes() -> None:
         ("ch4.electricitate_pv", "Evoluția anuală a consumului de energie electrică fotovolt"),
     ],
 )
-def test_pies_follow_the_annual_chart_and_precede_the_section_sentences(
+def test_pies_follow_the_annual_chart_or_the_factors_and_precede_the_section_sentences(
     section: str, annual: str
 ) -> None:
     dataset = _dataset()
@@ -335,9 +342,22 @@ def test_pies_follow_the_annual_chart_and_precede_the_section_sentences(
     pies = groups[section][-1].annual
     at = next(i for i, block in enumerate(body) if block is pies[0])
     assert body[at : at + len(pies)] == pies
-    caption = body[at - 1]
-    assert isinstance(caption, Paragraph) and caption.proto == "chart_caption"
+    caption = next(
+        block
+        for block in reversed(body[:at])
+        if isinstance(block, Paragraph) and block.proto == "chart_caption"
+    )
     assert annual in str(caption.segments[0])
+    if section == "ch4.electricitate_pv":
+        # Her order: the PV share pies close the resource, after its variable factors.
+        assert body[at - 2 : at] == [
+            Paragraph("body", [FACTOR_LEAD[section]]),
+            Missing("body", MISSING_TEXT),
+        ]
+    else:
+        trend = body[at - 1]
+        assert isinstance(trend, Paragraph)
+        assert str(trend.segments[0]).startswith("Conform figurii numărul ")
     sentences = sentence_plan(dataset, FACTORS_2026).sections.get(section, [])
     assert body[at + len(pies) :] == sentences
     if section == "ch4.echiv_total":

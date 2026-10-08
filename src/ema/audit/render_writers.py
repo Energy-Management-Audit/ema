@@ -15,6 +15,7 @@ from ema.audit.chapter_five import ChapterFivePlan
 from ema.audit.chapter_five_render import render_chapter_five
 from ema.audit.chapter_four import render_chapter_four
 from ema.audit.chapter_four_blocks import _written
+from ema.audit.chapter_four_comments import FACTOR_PREFIX
 from ema.audit.chapter_four_sentences import sentence_plan, write_sentence_record
 from ema.audit.chapter_six import ChapterSixPlan, render_chapter_six
 from ema.audit.chapter_tables import write_charts, write_tables
@@ -194,6 +195,10 @@ def write_four(  # noqa: PLR0913
         section_id: text
         for section_id in NARRATIVE_SECTIONS
         if (text := text_of(by_key, f"narrative.{section_id}")) is not None
+    } | {
+        key.removeprefix("narrative."): text
+        for key in by_key
+        if key.startswith(FACTOR_PREFIX) and (text := text_of(by_key, key)) is not None
     }
     _, skipped = render_chapter_four(
         source,
