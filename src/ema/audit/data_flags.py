@@ -53,16 +53,23 @@ def _paired_flags(fields: Mapping[str, Field]) -> list[Issue]:  # noqa: C901
                     for candidate, quantity in sorted(fields.items())
                     if candidate == quantity_key or candidate.startswith(f"{quantity_key}.")
                 ]
-                if cost is None or not quantities or any((_number(q) or 0) > 0 for q in quantities):
+                if cost is None or any((_number(q) or 0) > 0 for q in quantities):
                     continue
                 name = CARRIER_NAMES_RO[carrier]
-                issue = _issue(
-                    "data_cost_without_quantity",
+                message = (
                     f"{name[0].upper() + name[1:]}: {format_number(cost.value, 2)} lei "
                     f"declarate în {year}, fără consum în foaia de consumuri. "
-                    "Consumul primează; costul nu este folosit.",
-                    quantities[0],
-                    cost,
+                    "Consumul primează; costul nu este folosit."
+                )
+                issue = (
+                    _issue("data_cost_without_quantity", message, quantities[0], cost)
+                    if quantities
+                    else Issue(
+                        code="data_cost_without_quantity",
+                        field_id=cost.id,
+                        message=message,
+                        evidence_ids=tuple(cost.evidence),
+                    )
                 )
                 if issue:
                     result.append(issue)

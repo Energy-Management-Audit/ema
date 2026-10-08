@@ -78,6 +78,20 @@ def test_cost_without_quantity_applies_to_every_cost_carrier() -> None:
         assert not any(issue.code == "data_cost_without_quantity" for issue in flags(fields))
 
 
+def test_cost_without_any_quantity_fields_uses_cost_evidence() -> None:
+    cost = _field("audit.economics.diesel_costs_lei.2024", 12000, "cost")
+    warnings = [
+        issue for issue in flags({cost.key: cost}) if issue.code == "data_cost_without_quantity"
+    ]
+    assert len(warnings) == 1
+    assert warnings[0].field_id == cost.id
+    assert warnings[0].evidence_ids == ("cost",)
+    assert warnings[0].message == (
+        "Motorină: 12.000,00 lei declarate în 2024, fără consum în foaia de consumuri. "
+        "Consumul primează; costul nu este folosit."
+    )
+
+
 def test_month_repeat_and_quarter_suspicion_require_two_sources() -> None:
     values = {1: 10, 2: 10, 3: 0, 4: 2, 5: 3, 6: 4}
     fields = {
