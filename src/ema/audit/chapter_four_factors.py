@@ -1,9 +1,12 @@
-"""Chapter four's variable factors: one call per Draft run for the resources without a list (#162).
+"""Chapter four's variable factors: one call per Draft run for the resources without a current
+list (#162).
 
 Electricity, PV, natural gas, fuel and water each get the factors that shape their consumption
-curve, from the client's activity and processes, without numbers. A list is optional: with no
-call, a failed call or no factor passing its checks, the resource prints her lead-in and the
-missing marker.
+curve, without numbers: general ones for the industry, and the client's own only as its facts
+state them. Each list records the prompt and the facts it was written from; when they change it
+is stale, Draft writes it again and render prints the marker until then. A list the auditor
+corrected stands. A list is optional: with no call, a failed call or no factor passing its
+checks, the resource prints her lead-in and the missing marker.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ from pydantic import BaseModel
 
 from ema.audit.ai_wording import ai_wording
 from ema.audit.catalogue_types import AuditFact, fact_key
-from ema.audit.chapter_four_comments import FACTOR_LEAD, factor_key
+from ema.audit.chapter_four_comments import FACTOR_LEAD, FACTOR_PREFIX, factor_key
 from ema.audit.draft_checks import ACRONYM, NAME, NAME_COMMON, NUMBER_WORD, folded, traced
 from ema.audit.draft_plan import MAX_OUTPUT_TOKENS, THINKING_TOKENS, usable
 from ema.audit.research_quote import in_quote
@@ -30,11 +33,15 @@ from ema.core.llm import AgentContext, complete_json
 from ema.core.llm.types import Provider
 from ema.core.logging import write_event
 from ema.core.resources import resource_path
-from ema.core.review import propose
-from ema.core.review.models import Evidence, Field, FieldSpec, Manual
+from ema.core.review import mark_absent, propose
+from ema.core.review.evidence import get_evidence
+from ema.core.review.models import Derivation, Evidence, Field, FieldSpec, Manual
 from ema.core.review.section_transition import Status
+from ema.core.workspace import Workspace
 
-PROMPT_VERSION = "audit-ch4-factors-v1"
+PROMPT_VERSION = "audit-ch4-factors-v2"
+# The recorded inputs of a list: this formula at the prompt version, over facts at revisions.
+FORMULA = "ch4_factors"
 MAX_FACTORS = 8
 MAX_WORDS = 60
 # A list is a few long bullets; its JSON, at about this many tokens, follows the thinking.
@@ -58,6 +65,7 @@ CONTEXT = {
     "activity": (AuditFact.BUSINESS_ACTIVITY, AuditFact.CAEN_DESCRIPTION),
     "work_regime": (AuditFact.WORK_REGIME,),
     "processes": (AuditFact.PROCESS_SECTIONS,),
+    "equipment": (AuditFact.EQUIPMENT,),
 }
 
 
@@ -72,17 +80,60 @@ class FactorLists(BaseModel):
 
 @cache
 def instructions() -> str:
-    path = resource_path("audit", "prompts", "ch4_factors_v1.txt")
+    path = resource_path("audit", "prompts", "ch4_factors_v2.txt")
     return path.read_text(encoding="utf-8").strip()
 
 
+def factor_inputs(section: str, facts: Mapping[str, Field]) -> list[str]:
+    """The facts a resource's list is written from, each as `key@revision`."""
+    wanted = (*(key for keys in CONTEXT.values() for key in keys), *SUPPLY[section])
+    return sorted(
+        f"{key}@{field.revision}"
+        for key, field in facts.items()
+        if fact_key(key) in wanted and usable(field)
+    )
+
+
+def current(ws: Workspace, field: Field, facts: Mapping[str, Field]) -> bool:
+    """A list stands when the auditor wrote or corrected it, or while a drafted one's prompt
+    and facts are those it was written from; a rejected one never."""
+    if field.value is None or field.review == "rejected":
+        return False
+    if field.review == "corrected" or field.state == "manual":
+        return True
+    section = "ch4." + field.key.removeprefix(FACTOR_PREFIX)
+    recorded = [
+        derivation
+        for evidence_id in field.evidence
+        if (derivation := get_evidence(ws, evidence_id).derivation) is not None
+    ]
+    expected = Derivation(
+        formula_id=FORMULA, inputs=factor_inputs(section, facts), factor_version=PROMPT_VERSION
+    )
+    return section in FACTOR_LEAD and recorded == [expected]
+
+
+def current_texts(ws: Workspace, facts: Mapping[str, Field]) -> dict[str, str]:
+    """Each current list by its text key, `ch4.factors.gaz`, as the chapter renders it."""
+    return {
+        key.removeprefix("narrative."): str(field.value)
+        for key, field in facts.items()
+        if key.startswith(FACTOR_PREFIX) and current(ws, field, facts)
+    }
+
+
 def factor_sections(ctx: StageContext, facts: Mapping[str, Field]) -> list[str]:
-    """The resources the audit analyses that have no list field yet: a rerun never proposes
-    over one, which would make it a conflict."""
+    """The resources the audit analyses without a current list: none yet, rejected, or stale
+    since its facts or the prompt changed."""
     result: list[str] = []
     for section in FACTOR_LEAD:
         state = get_status(ctx.ws, ctx.job, section)
-        if state.applicability and state.status != Status.NA and factor_key(section) not in facts:
+        field = facts.get(factor_key(section))
+        if (
+            state.applicability
+            and state.status != Status.NA
+            and (field is None or not current(ctx.ws, field, facts))
+        ):
             result.append(section)
     return result
 
@@ -132,14 +183,21 @@ def _log(ctx: StageContext, event: str, **values: object) -> None:
         write_event(handle, event, run=ctx.run_id, **values)
 
 
-def _evidence(job: str, section: str, text: str, model_id: str) -> Evidence:
+def _evidence(
+    ctx: StageContext, section: str, text: str, model_id: str, inputs: list[str]
+) -> Evidence:
+    """Agent provenance, with the prompt and the facts the list was written from; one per run,
+    as the same words may be drafted again from other facts."""
     return Evidence(
-        id=hashlib.sha256(f"{job}:ch4-factors:{section}:{text}".encode()).hexdigest(),
+        id=hashlib.sha256(
+            f"{ctx.job}:{ctx.run_id}:ch4-factors:{section}:{text}".encode()
+        ).hexdigest(),
         provenance="manual",
         locator=Manual(who="agent", note=f"{PROMPT_VERSION} {model_id}"),
         method="manual",
         retrieved_at=datetime.now(UTC),
         highlight="none",
+        derivation=Derivation(formula_id=FORMULA, inputs=inputs, factor_version=PROMPT_VERSION),
     )
 
 
@@ -166,11 +224,30 @@ def _accepted(
     return {section: factors for section, factors in kept.items() if factors}, dropped
 
 
+def _propose(
+    ctx: StageContext, facts: Mapping[str, Field], section: str, text: str, model_id: str
+) -> Field:
+    """The list with its inputs. A stale or rejected list drafted again in the same words is
+    cleared first: a proposal of an unchanged value would keep its old inputs and review."""
+    spec = FieldSpec(
+        key=factor_key(section),
+        label=f"Factori variabili – {RESOURCES[section]}",
+        value_type="text",
+        chapter="ch4",
+    )
+    old = facts.get(spec.key)
+    if old is not None and old.value == text:
+        mark_absent(ctx.ws, ctx.job, spec, "not_found")
+    inputs = factor_inputs(section, facts)
+    evidence = _evidence(ctx, section, text, model_id, inputs)
+    return propose(ctx.ws, ctx.job, spec, text, [evidence], state="enriched")
+
+
 def write_factors(
     ctx: StageContext, provider: Provider, model_id: str, facts: Mapping[str, Field]
 ) -> tuple[list[Field], list[str]]:
-    """Ask once for every resource without a list, propose each list with a passing factor;
-    the proposed fields and the stage warnings."""
+    """Ask once for every resource without a current list, with the job's relevant facts, and
+    propose each list with a passing factor; the proposed fields and the stage warnings."""
     sections = factor_sections(ctx, facts)
     if not sections:
         return [], []
@@ -207,19 +284,7 @@ def write_factors(
     if dropped:
         _log(ctx, "ch4_factors_dropped", factors=dropped)
     proposed = [
-        propose(
-            ctx.ws,
-            ctx.job,
-            FieldSpec(
-                key=factor_key(section),
-                label=f"Factori variabili – {RESOURCES[section]}",
-                value_type="text",
-                chapter="ch4",
-            ),
-            "\n".join(factors),
-            [_evidence(ctx.job, section, "\n".join(factors), model_id)],
-            state="enriched",
-        )
+        _propose(ctx, facts, section, "\n".join(factors), model_id)
         for section, factors in lists.items()
     ]
     return proposed, []

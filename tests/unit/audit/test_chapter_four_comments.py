@@ -124,6 +124,24 @@ def test_trend_reads_the_least_squares_change_against_a_three_percent_band(
     assert trend(_linear(change, 12)) == word
 
 
+@pytest.mark.parametrize(
+    ("values", "word"),
+    [
+        ([0, 0, 0], "relativ constantă"),
+        # Mean zero, slope not: measured against the mean absolute value.
+        ([-10, 0, 10], "de creștere"),
+        ([10, 0, -10], "de scădere"),
+        ([-1, 0, 0, 1.02], "de creștere"),
+        # Negative means: the sign of the fitted change, its size against |mean|.
+        ([-110, -100], "de creștere"),
+        ([-100, -110], "de scădere"),
+        ([-101.45, -98.55], "relativ constantă"),
+    ],
+)
+def test_trend_around_zero_and_below_it(values: list[float | None], word: str) -> None:
+    assert trend(values) == word
+
+
 def test_trend_fits_noisy_and_gappy_series_and_needs_two_points() -> None:
     # Noise around a level line: the fit changes by under 1 % of the mean.
     assert trend([98, 104, 99, 105, 97]) == "relativ constantă"

@@ -85,7 +85,9 @@ def trend(values: Sequence[float | None]) -> str | None:
         (x - mean_x) ** 2 for x, _ in points
     )
     change = slope * (points[-1][0] - points[0][0])
-    if abs(change) < TREND_BAND * abs(mean_y) or mean_y == 0:
+    # A series around zero, as [-10, 0, 10], is measured against its mean absolute value.
+    scale = abs(mean_y) or sum(abs(y) for _, y in points) / count
+    if scale == 0 or abs(change) < TREND_BAND * scale:
         return FLAT
     return GROWTH if change > 0 else DECLINE
 
