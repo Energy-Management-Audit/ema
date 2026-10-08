@@ -144,7 +144,7 @@ def test_the_support_prompt_judges_client_and_general_sentences() -> None:
 
 def test_the_prompt_version_keys_recordings_of_this_task() -> None:
     # Recordings are keyed by version: one made for an earlier prompt is never replayed.
-    assert PROMPT_VERSION == "audit-draft-v5"
+    assert PROMPT_VERSION == "audit-draft-v6"
 
 
 def test_a_multi_paragraph_draft_over_numbered_passages_is_accepted(tmp_path: Path) -> None:

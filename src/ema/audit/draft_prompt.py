@@ -8,14 +8,16 @@ from functools import cache
 from typing import Any
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.catalogue_types import fact_key
 from ema.audit.draft_checks import DraftReview, sentence_parts
 from ema.audit.draft_plan import Group, SectionPlan, usable
 from ema.audit.draft_render import rendered_value
-from ema.audit.draft_schema import SectionDraft
+from ema.audit.draft_schema import SECTION_FACTS, SectionDraft
+from ema.audit.draft_style import ExamplePart
 from ema.core.resources import resource_path
 from ema.core.review.models import Field
 
-PROMPT_VERSION = "audit-draft-v5"
+PROMPT_VERSION = "audit-draft-v6"
 SUPPORT_VERSION = PROMPT_VERSION + "-support"
 # The prompt's numbered rule each check enforces: a retry quotes it beside the error.
 RULES = {
@@ -31,6 +33,10 @@ RULES = {
     "unit_outside": 14,
     "missing_status_invalid": 15,
     "status_invalid": 16,
+    "missing_item_invalid": 18,
+    "part_invalid": 19,
+    "part_order": 19,
+    "part_omitted": 19,
 }
 OMITTED_RULE = (
     "Fiecare secțiune cerută apare o singură dată în sections, cu id-ul ei exact, într-un "
@@ -41,7 +47,7 @@ _TITLES = {section.id: section.title for section in CATALOGUE}
 
 @cache
 def instructions() -> str:
-    return resource_path("audit", "prompts", "draft_v5.txt").read_text(encoding="utf-8").strip()
+    return resource_path("audit", "prompts", "draft_v6.txt").read_text(encoding="utf-8").strip()
 
 
 def rule_text(code: str) -> str:
@@ -61,7 +67,7 @@ class Used:
 
     def add(self, draft: SectionDraft, passages: set[str], facts: Mapping[str, Field]) -> None:
         self.passages |= passages
-        first = next(iter(draft.paragraphs), None)
+        first = next((item for item in draft.paragraphs if item.kind != "missing"), None)
         if first is not None and (parts := sentence_parts(first.text, dict(facts))):
             self.openings[draft.section] = parts[0]
 
@@ -69,18 +75,45 @@ class Used:
         return {"used_passages": sorted(self.passages), "opening_sentences": self.openings}
 
 
+def reference_parts(plan: SectionPlan) -> list[tuple[int | None, ExamplePart]]:
+    """The reference's parts numbered from 1 in order: a list's consecutive items share one
+    number, since the client's list has its own length; a table has none, since the draft
+    writes no table (#163 D2)."""
+    numbered: list[tuple[int | None, ExamplePart]] = []
+    number, previous = 0, ""
+    for part in plan.example:
+        if part.kind != "table" and not (part.kind == previous == "bullet"):
+            number += 1
+        numbered.append((None if part.kind == "table" else number, part))
+        previous = part.kind
+    return numbered
+
+
+def _missing(plan: SectionPlan) -> list[str]:
+    """The section's keys without a usable value, a fact never recorded included: a reference
+    part that needs one keeps its place as a missing item (#163 D2)."""
+    recorded = {fact_key(key) for key in plan.facts}
+    return sorted(
+        {key for key, value in plan.facts.items() if not usable(value)}
+        | (SECTION_FACTS.get(plan.section, frozenset()) - recorded)
+    )
+
+
 def _section(plan: SectionPlan) -> dict[str, Any]:
     entry: dict[str, Any] = {
         "section": plan.section,
         "title": _TITLES[plan.section],
         "target_words": plan.target,
-        "style_example": plan.example,
+        "reference": [
+            {"part": number, "kind": part.kind, "text": part.text}
+            for number, part in reference_parts(plan)
+        ],
         "facts": [
             {"key": key, "text": rendered_value(value), "unit": value.unit}
             for key, value in sorted(plan.facts.items())
             if usable(value)
         ],
-        "missing": sorted(key for key, value in plan.facts.items() if not usable(value)),
+        "missing": _missing(plan),
     }
     if plan.section == "ch3.process":
         entry["units"] = [{"unit": number, "passages": list(keys)} for number, keys in plan.units]

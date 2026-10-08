@@ -20,6 +20,7 @@ from ema.audit.draft_prompt import (
     Used,
     chapter_request,
     instructions,
+    reference_parts,
     retry_request,
 )
 from ema.audit.draft_schema import ChapterDraft, SectionDraft
@@ -48,6 +49,8 @@ class Drafted:
     check: DraftCheck
     flags: tuple[DraftReview, ...]
     facts: dict[str, Field]
+    # The reference audit's identity the draft followed (#163).
+    reference: str = ""
 
 
 @dataclass(frozen=True)
@@ -77,6 +80,31 @@ def unit_issues(
             DraftReview("unit_passage", location, key)
             for key in ANY_TOKEN.findall(item.text)
             if fact_key(key) == AuditFact.PROCESS_SECTIONS and key not in pools[item.unit]
+        )
+    return issues
+
+
+def part_issues(draft: SectionDraft, plan: SectionPlan) -> list[DraftReview]:
+    """Each item names the reference part it rewrites; the items follow the reference's order
+    and every part appears, written or as a missing item, per unit in ch3.process (#163 D2)."""
+    parts = {number for number, _ in reference_parts(plan) if number is not None}
+    if not parts or draft.status != "drafted":
+        return []
+    issues: list[DraftReview] = []
+    sequences: dict[int | None, list[int]] = {}
+    for index, item in enumerate(draft.paragraphs):
+        if item.part not in parts:
+            issues.append(DraftReview("part_invalid", f"paragraph:{index}", str(item.part)))
+            continue
+        unit = item.unit if draft.section == "ch3.process" else None
+        sequences.setdefault(unit, []).append(item.part)
+    for unit, sequence in sequences.items():
+        location = "section" if unit is None else f"unit:{unit}"
+        if sequence != sorted(sequence):
+            issues.append(DraftReview("part_order", location, " ".join(map(str, sequence))))
+        issues.extend(
+            DraftReview("part_omitted", location, str(number))
+            for number in sorted(parts - set(sequence))
         )
     return issues
 
@@ -135,6 +163,7 @@ def _sorted(
         issues = [
             *check.fatal,
             *unit_issues(draft, plan, units),
+            *part_issues(draft, plan),
             *(
                 DraftReview("passage_reused", "section", key)
                 for key in sorted(passages & used.passages)
@@ -234,7 +263,9 @@ def run_group(
         return GroupResult(failed={**failed, **{draft.section: exc for draft, _ in ordered}})
     return GroupResult(
         {
-            draft.section: Drafted(draft, check, flags[draft.section], plans[draft.section].facts)
+            draft.section: Drafted(
+                draft, check, flags[draft.section], plans[draft.section].facts, group.reference
+            )
             for draft, check in ordered
         },
         failed,

@@ -90,7 +90,8 @@ GENERAL: tuple[Section, ...] = (
         "ch3",
         "narrative",
         ("dossier", "visit"),
-        aliases=("Descrierea fluxului tehnologic",),
+        # Her latest audits head the overview with the process description itself (#163).
+        aliases=("Descrierea fluxului tehnologic", "Descrierea procesului tehnologic"),
         templates=(
             "DESCRIEREA FLUX {process}",
             "DESCRIEREA FLUXURILOR TEHNOLOGICE {site}",
@@ -122,6 +123,7 @@ GENERAL: tuple[Section, ...] = (
         aliases=(
             "Descrierea situației privind alimentarea cu utilități",
             "Descrierea utilităților",
+            "Descrierea alimentării cu utilități",
         ),
         templates=(
             "SITUAŢIA EXISTENTĂ LA NIVELUL ALIMENTĂRII CU UTILITĂȚI A {client}",
@@ -169,6 +171,7 @@ GENERAL: tuple[Section, ...] = (
         templates=(
             "Situația existentă privind alimentarea cu gaz natural a {client}",
             "Alimentarea cu gaz natural a {client}",
+            "Alimentarea cu gaz natural și energie termică a {client}",
             "Situația alimentării cu gaz natural și a utilizării energiei termice "
             "în cadrul {client}",
             "Situația alimentării cu gaz natural și a utilizării energie termice "
@@ -227,7 +230,10 @@ GENERAL: tuple[Section, ...] = (
         prototype="audit-05",
         when=fact(AuditFact.FLEET),
         aliases=("Situația parcului auto",),
-        templates=("Situația parcului auto din cadrul {client}",),
+        templates=(
+            "Situația parcului auto din cadrul {client}",
+            "Situația parcului auto în cadrul {client}",
+        ),
     ),
     section(
         "ch3.contorizare",
@@ -240,7 +246,11 @@ GENERAL: tuple[Section, ...] = (
             "SITUAŢIA EXISTENTĂ PRIVIND CONTORIZAREA",
             "Situația contorizării consumurilor de energie",
         ),
-        templates=("SITUAŢIA CONTORIZĂRII CONSUMATORILOR DE ENERGIE DIN CADRUL {client}",),
+        templates=(
+            "SITUAŢIA CONTORIZĂRII CONSUMATORILOR DE ENERGIE DIN CADRUL {client}",
+            # One heading in her latest audits for metering and automation together (#163).
+            "SITUAŢIA CONTORIZĂRII ȘI AUTOMATIZĂRII CONSUMATORILOR DE ENERGIE DIN CADRUL {client}",
+        ),
     ),
     section(
         "ch3.automatizare",

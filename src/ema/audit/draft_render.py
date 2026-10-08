@@ -94,6 +94,8 @@ def kept(
 def _paragraph(
     item: DraftText, location: str, issues: tuple[DraftReview, ...], facts: dict[str, Field]
 ) -> Block | None:
+    if item.kind == "missing":
+        return Missing("body", MARKER)
     sentences = [_resolved(sentence, facts) for sentence in kept(item, location, issues, facts)]
     return Paragraph(item.kind, [" ".join(sentences)]) if sentences else None
 
@@ -105,7 +107,7 @@ def draft_blocks(
     unit: int | None = None,
 ) -> list[Block]:
     """The section as blocks, unsupported sentences dropped; with a unit, only that unit's
-    text. A section left empty is the marker."""
+    text. A missing item, or a section left empty, is the marker."""
     blocks: list[Block] = [
         block
         for index, item in enumerate(draft.paragraphs)

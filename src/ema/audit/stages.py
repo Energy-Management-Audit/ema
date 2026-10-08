@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ema.audit.chapter_five import start_measurements
 from ema.audit.draft_live import start_draft
+from ema.audit.draft_style import PREVIOUS_AUDIT_SLOT, checked_previous_audit
 from ema.audit.fill_stage import start_fill
 from ema.audit.intake import audit_intake, select_checklist
 from ema.audit.measures import compose_measures, validate_measures_form
@@ -13,6 +14,7 @@ from ema.audit.read import read_job
 from ema.audit.render import start_audit_render
 from ema.audit.render_bindings import checked_photo
 from ema.audit.research_stage import start_research
+from ema.audit.sections import refresh_staleness
 from ema.audit.visit import start_visit
 from ema.audit.workflow import AuditWorkflow
 from ema.clients.registry import find_by_cui
@@ -37,8 +39,13 @@ def add_document(ws: Workspace, job: str, source: Path, slot: str | None = None)
         raise EmaError("file_missing", "Fişierul nu există.", str(source))
     if target == "cover/photo":
         checked_photo(source)
+    if target == PREVIOUS_AUDIT_SLOT:
+        checked_previous_audit(source)
     sha = ws.add_file(str(record["client_slug"]), source)
-    return ws.set_slot(job, target, sha, original_name=upload_name(source.name)).version
+    version = ws.set_slot(job, target, sha, original_name=upload_name(source.name)).version
+    if target == PREVIOUS_AUDIT_SLOT:
+        refresh_staleness(ws, job)
+    return version
 
 
 def start_audit_stage(ws: Workspace, job: str, stage: str, on_revision: int) -> str:

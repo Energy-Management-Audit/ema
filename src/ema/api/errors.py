@@ -247,12 +247,15 @@ ROUTE_ERRORS[("POST", "/jobs/{job_id}/stages/{stage}")] += (
     "audit_ai_wording",
 )
 
-# s17b-audit-final: only an audit's cover photo is checked for its type when it is set.
+# s17b-audit-final: only an audit's cover photo is checked for its type when it is set;
+# #163: a previous audit is a .docx with ch. 2-3 sections.
 ROUTE_ERRORS[("PUT", "/jobs/{job_id}/slots/{slot:path}")] = (
     "job_missing",
     "invalid_slot",
     "file_missing",
     "cover_photo_type",
+    "previous_audit_type",
+    "previous_audit_unusable",
 )
 
 _PROBLEM_SCHEMA = {
@@ -290,7 +293,7 @@ def install_error_contract(app: FastAPI) -> None:
                 else STATUS[code]
             )
             by_status.setdefault(status, []).append(code)
-        by_status[422] = ["validation_error"]
+        by_status.setdefault(422, []).append("validation_error")
         for status, names in by_status.items():
             route.responses[status] = {
                 "description": ", ".join(sorted(set(names))),

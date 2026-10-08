@@ -63,11 +63,13 @@ def write_section(
         if not ready:
             recompute_ready(ctx.ws, ctx.job)
         keys = {*SECTION_FACTS[section], *done.facts}
+        # A replaced previous audit, or another base, leaves the draft stale (#163).
+        reference = (f"reference:{done.reference}",) if done.reference else ()
         queue_sections(
             ctx,
             (section,),
             "agent",
-            tuple(f"fact:{key}" for key in sorted(keys)),
+            (*reference, *(f"fact:{key}" for key in sorted(keys))),
             facts=done.facts if facts is None else facts,
         )
     return directory

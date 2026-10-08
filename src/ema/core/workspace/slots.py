@@ -17,7 +17,8 @@ def validate_slot(job_type: str, slot: str) -> None:
         allowed = re.fullmatch(r"invoices/[0-9]{4}", slot) is not None
     elif job_type == "audit":
         # cover/photo: the job's own cover photo, a one-file collection so its absence is read.
-        if slot in {"anexa", "measures", "cover/photo"}:
+        # previous_audit: the client's previous audit, the reference for ch. 2-3 (#163 D1).
+        if slot in {"anexa", "measures", "cover/photo", "previous_audit"}:
             allowed = True
         else:
             prefix, separator, tail = slot.partition("/")
