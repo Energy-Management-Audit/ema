@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from itertools import pairwise
 from statistics import median
 
@@ -13,6 +13,7 @@ from ema.core.review.models import Field, Issue
 from ema.energy_data.carriers import CARRIER_NAMES_RO, Carrier
 from ema.energy_data.model import Derived
 from ema.energy_data.prelucrare_tables import MONTHS
+from ema.energy_data.prices import PriceRow, bundled_prices, settle_cost
 
 QUARTER_FACTOR = 2.5
 
@@ -191,4 +192,68 @@ def flags(fields: Mapping[str, Field]) -> list[Issue]:
                 )
                 if issue:
                     result.append(issue)
+    result.extend(cost_flags(fields))
+    return result
+
+
+def cost_flags(fields: Mapping[str, Field], rows: Iterable[PriceRow] | None = None) -> list[Issue]:
+    """A year's declared cost that is missing or off from quantity × official price is replaced
+    by the expected cost; a quantity the price table cannot price is named instead."""
+    rows = tuple(bundled_prices() if rows is None else rows)
+    result: list[Issue] = []
+    for carrier, name in COST_KEYS.items():
+        years = sorted(
+            {
+                int(parts[2])
+                for key in fields
+                if len(parts := key.split(".")) >= 3
+                and parts[:2] == ["carrier", carrier.value]
+                and parts[2].isdecimal()
+            }
+        )
+        for year in years:
+            prefix = f"carrier.{carrier.value}.{year}"
+            used = [
+                field
+                for key in (prefix, *(f"{prefix}.{month:02d}" for month in range(1, 13)))
+                if (field := fields.get(key)) is not None and field.review != "rejected"
+            ]
+            months = [field for field in used if field.key != prefix and _number(field) is not None]
+            annual = next((field for field in used if field.key == prefix), None)
+            quantity = _number(annual) if annual is not None else None
+            if quantity is None and len(months) == 12:
+                quantity = sum(_number(field) or 0 for field in months)
+            unit = next((field.unit for field in used if field.unit), None)
+            if quantity is None or quantity <= 0 or unit is None:
+                continue
+            cost = fields.get(f"audit.economics.{name}.{year}")
+            cost = cost if cost is not None and cost.review != "rejected" else None
+            declared = _number(cost)
+            settled = settle_cost(rows, carrier, year, quantity, unit, declared)
+            label = CARRIER_NAMES_RO[carrier]
+            label = label[:1].upper() + label[1:]
+            if settled.status == "unpriced":
+                code = "data_cost_unpriced"
+                message = (
+                    f"{label} {year}: costul nu poate fi estimat "
+                    f"(unitatea {unit} nu are preț oficial în tabel)."
+                )
+            elif settled.status == "inferred":
+                code = "data_cost_inferred"
+                expected = format_number(settled.expected or 0, 2)
+                message = (
+                    f"{label} {year}: cost nedeclarat; se folosește costul estimat "
+                    f"{expected} lei ({settled.source})."
+                    if declared is None
+                    else f"{label} {year}: cost declarat {format_number(declared, 2)} lei, diferit "
+                    "de consumul din foaia de consumuri; se folosește costul estimat "
+                    f"{expected} lei ({settled.source})."
+                )
+            else:
+                continue
+            sources = [*([cost] if cost else []), *used]
+            evidence = tuple(dict.fromkeys(ref for field in sources for ref in field.evidence))
+            result.append(
+                Issue(code=code, field_id=sources[0].id, message=message, evidence_ids=evidence)
+            )
     return result

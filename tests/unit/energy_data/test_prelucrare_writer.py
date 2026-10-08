@@ -200,3 +200,14 @@ def test_writer_names_cogeneration_and_coke_and_omits_internal_generation_from_t
     labels = {book["TEP"].cell(row, 3).value for row in range(1, book["TEP"].max_row + 1)}
     assert "coke [tep]" in labels
     assert "electricity_cogen [tep]" not in labels
+
+
+def test_inferred_cost_footnotes_follow_the_cost_row_and_survive_reimport(tmp_path: Path) -> None:
+    path = tmp_path / "notes.xlsx"
+    note = "Cost estimat: 12,00 t × 7.280,53 lei/t (Sursa, 2024, fără TVA)."
+    write_prelucrare(_dataset(), (2024, 2025), path, cost_notes={2024: (note,)})
+    sheet = load_workbook(path)["Chelt-Cifra afaceri"]
+    assert sheet.cell(4, 3).value == "Cheltuieli cu energia [lei]"
+    assert sheet.cell(7, 3).value == f"2024: {note}"
+    imported = import_prelucrare(path)
+    assert imported.dataset.energy_costs_lei == _dataset().energy_costs_lei

@@ -24,6 +24,7 @@ def _data(*_args: object) -> SimpleNamespace:
         pie_representation="synthetic",
         pie_representation_source="base",
         layout=SimpleNamespace(separate_pv_figures=False),
+        cost_notes={},
     )
 
 
@@ -35,9 +36,8 @@ def _compose(_data: object, _base: Path, output: Path, _today: object) -> Simple
 
 
 def _workbook(
-    _dataset: object, _years: object, path: Path, _factors: object, *, firm_name: str | None = None
+    _dataset: object, _years: object, path: Path, _factors: object, **_kwargs: object
 ) -> None:
-    del firm_name
     Workbook().save(str(path))
 
 
@@ -54,7 +54,7 @@ def _import(ws: Workspace, job: str, *_args: object, **_kwargs: object) -> None:
 
 
 def stub_piee_seams(monkeypatch: pytest.MonkeyPatch, base: Path) -> None:
-    """Replace the seven document seams of ema.piee.workflow; base is any existing folder."""
+    """Replace the eight document seams of ema.piee.workflow; base is any existing folder."""
     monkeypatch.setattr("ema.piee.workflow.load", _data)
     monkeypatch.setattr("ema.piee.workflow.base_directory", lambda _ws: base)
     monkeypatch.setattr(
@@ -62,6 +62,7 @@ def stub_piee_seams(monkeypatch: pytest.MonkeyPatch, base: Path) -> None:
     )
     monkeypatch.setattr("ema.piee.workflow.import_piee_into_job", _import)
     monkeypatch.setattr("ema.piee.workflow.apply_review", lambda data, *_args: data)
+    monkeypatch.setattr("ema.piee.workflow.with_inferred_costs", lambda data: data)
     monkeypatch.setattr("ema.piee.workflow.compose_draft", _compose)
     monkeypatch.setattr("ema.piee.workflow.write_prelucrare", _workbook)
 

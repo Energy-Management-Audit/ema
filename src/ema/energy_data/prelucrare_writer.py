@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -230,6 +231,7 @@ def _economics(
     ds: EnergyDataset,
     years: tuple[int, ...],
     tep: dict[tuple[Carrier | None, int], str],
+    cost_notes: Mapping[int, Sequence[str]],
 ) -> None:
     sheet = _sheet(book, "Chelt-Cifra afaceri")
     sheet.cell(2, 3, "Anul")
@@ -248,6 +250,9 @@ def _economics(
             sheet.cell(
                 5, col, f"={tep[None, year]}/({get_column_letter(col)}3/1000)"
             ).number_format = NUMBER
+    notes = [f"{year}: {note}" for year in years for note in cost_notes.get(year, ())]
+    for row, note in enumerate(notes, 7):
+        sheet.cell(row, 3, note)
     sheet.column_dimensions["C"].width = 42
 
 
@@ -321,6 +326,7 @@ def write_prelucrare(
     factors: FactorTable = FACTORS_2026,
     *,
     firm_name: str | None = None,
+    cost_notes: Mapping[int, Sequence[str]] | None = None,
 ) -> None:
     if (
         not years
@@ -336,7 +342,7 @@ def write_prelucrare(
     factor_refs = _factor_sheet(book, dataset, years, factors)
     tep = _tep(book, dataset, years, sources, factor_refs)
     production = _production(book, dataset, years)
-    _economics(book, dataset, years, tep)
+    _economics(book, dataset, years, tep, cost_notes or {})
     _specific(book, years, tep, production)
     _impact(book, dataset, years, sources, factors)
     _mwh_factor_sheet(book, factors, factor_refs)

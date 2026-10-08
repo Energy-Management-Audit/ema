@@ -244,7 +244,8 @@ def test_no_internal_key_reaches_a_message() -> None:
         "data_quarter_in_month",
         "data_change_refused",
     }
-    assert not [issue.message for issue in found if re.search(r"\w\.\w", issue.message)]
+    # A dot between letters is an internal key; 74.953,70 is a Romanian number.
+    assert not [issue.message for issue in found if re.search(r"[^\W\d]\.[^\W\d]", issue.message)]
 
 
 def test_unknown_carrier_is_not_flagged() -> None:
