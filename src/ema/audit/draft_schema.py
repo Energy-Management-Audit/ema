@@ -42,10 +42,13 @@ class DraftText(BaseModel):
 
     text: str
     fact_ids: list[str] = Field(default_factory=list[str])
-    # Ch. 2-3 drafts hold prose only: the deterministic tables are the only tables (D6).
-    kind: Literal["body", "bullet"] = "body"
+    # Ch. 2-3 drafts hold prose only: the deterministic tables are the only tables (D6). A
+    # "missing" item keeps the place of a reference paragraph whose client fact Ema lacks: no
+    # text, the keys it needs, printed as the marker (#163 D2).
+    kind: Literal["body", "bullet", "missing"] = "body"
     # The 3.1.x process unit a ch3.process paragraph describes, from 1; None elsewhere (D3).
     unit: int | None = None
+    missing_fact_ids: list[str] = Field(default_factory=list[str])
 
 
 class SectionDraft(BaseModel):

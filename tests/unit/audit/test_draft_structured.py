@@ -270,7 +270,7 @@ def test_provider_receives_only_redacted_base_example(tmp_path: Path, monkeypatc
     monkeypatch.setenv("EMA_AUDIT_BASE_DOCUMENT", str(base))
     monkeypatch.setenv("EMA_AUDIT_BASE_IDENTITY", str(identity))
     provider, _, _, _ = _run(tmp_path, [CH2_DRAFT])
-    example = provider.requests[0]["sections"][0]["style_example"]
+    example = " ".join(part["text"] for part in provider.requests[0]["sections"][0]["reference"])
     assert example
     assert "Atelier Exemplu" not in example
     assert not re.search(r"\d", example)

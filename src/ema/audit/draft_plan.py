@@ -13,7 +13,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from ema.audit.catalogue_types import AuditFact, fact_key
-from ema.audit.draft_style import Example
+from ema.audit.draft_style import Example, ExamplePart
 from ema.core.review.models import Field
 
 THINKING_TOKENS = 16_000
@@ -29,7 +29,8 @@ class SectionPlan:
     section: str
     facts: dict[str, Field]
     target: int | None
-    example: str
+    # The reference audit's section, redacted, in its order (#163 D2).
+    example: tuple[ExamplePart, ...]
     # ch3.process only: every 3.1.x unit, from 1, with the passage keys that are its own.
     units: tuple[tuple[int, tuple[str, ...]], ...] = ()
 
@@ -129,7 +130,7 @@ def plan_section(
         target = example.words * described or None
     else:
         target = example.words if any(usable(field) for field in own.values()) else None
-    return SectionPlan(section, own, target, example.text if example else "", grouped)
+    return SectionPlan(section, own, target, example.parts if example else (), grouped)
 
 
 def split(chapter: int, plans: Iterable[SectionPlan]) -> list[Group]:

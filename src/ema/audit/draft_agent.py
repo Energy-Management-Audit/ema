@@ -11,7 +11,7 @@ from ema.audit.draft_checks import DraftCheck, DraftReview
 from ema.audit.draft_plan import Group, plan_section, split
 from ema.audit.draft_prompt import PROMPT_VERSION, Used
 from ema.audit.draft_schema import SECTION_FACTS, SectionDraft, citable
-from ema.audit.draft_style import configured_examples
+from ema.audit.draft_style import reference_examples
 from ema.audit.process_units import ProcessUnits, job_process_units, passage_units
 from ema.core.errors import EmaError
 from ema.core.llm import ReplayProvider
@@ -54,7 +54,7 @@ def chapter_groups(
 ) -> tuple[list[Group], dict[str, int | None]]:
     """The sections' chapter groups in catalogue order, with each process passage's unit."""
     facts = job_facts(ws, job) if facts is None else facts
-    examples = configured_examples(ws, sections)
+    examples = reference_examples(ws, job, sections)
     units, count = _units(ws, job) if {"ch3.flux", "ch3.process"} & set(sections) else ({}, 1)
     groups: list[Group] = []
     for chapter in (2, 3):

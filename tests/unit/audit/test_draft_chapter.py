@@ -27,7 +27,7 @@ from ema.audit.draft_plan import (
 )
 from ema.audit.draft_prompt import Used
 from ema.audit.draft_schema import DraftText, SectionDraft
-from ema.audit.draft_style import Example
+from ema.audit.draft_style import Example, ExamplePart
 from ema.core.llm.models import default_model
 from ema.core.llm.types import Exchange
 from ema.core.review.fields import propose
@@ -219,7 +219,7 @@ PASSAGES = {key: _fact(key, "etapa") for key in UNITS} | {
 
 def test_the_overview_goes_to_the_flux_and_unit_passages_to_the_process() -> None:
     assert set(offered(FLUX, PASSAGES, UNITS)) == {"audit.process_sections", "audit.equipment"}
-    process = plan_section("ch3.process", PASSAGES, Example("", 100), UNITS, 3)
+    process = plan_section("ch3.process", PASSAGES, Example((), 100), UNITS, 3)
     assert set(process.facts) == {
         "audit.process_sections.2",
         "audit.process_sections.3",
@@ -264,15 +264,15 @@ UNITLESS: dict[str, int | None] = dict.fromkeys(UNITS)
 
 def test_unitless_passages_pool_on_the_process_and_leave_the_flux() -> None:
     # #155 D1: two units' length in unit 1; the flux keeps only its other facts.
-    process = plan_section("ch3.process", PASSAGES, Example("", 100), UNITLESS, 6)
+    process = plan_section("ch3.process", PASSAGES, Example((), 100), UNITLESS, 6)
     assert process.units == ((1, tuple(sorted(UNITLESS))),)
     assert set(process.facts) == {*UNITLESS, "audit.equipment"}
     assert process.target == 200
-    flux = plan_section(FLUX, PASSAGES, Example("", 10), UNITLESS)
+    flux = plan_section(FLUX, PASSAGES, Example((), 10), UNITLESS)
     assert set(flux.facts) == {"audit.equipment"}
     only = {key: PASSAGES[key] for key in UNITLESS}
-    assert plan_section(FLUX, only, Example("", 10), UNITLESS) == (
-        SectionPlan(FLUX, {}, None, "", ())
+    assert plan_section(FLUX, only, Example((), 10), UNITLESS) == (
+        SectionPlan(FLUX, {}, None, (), ())
     )
     # An unreadable dossier gives no units at all: the same pool.
     assert plan_section("ch3.process", PASSAGES, None, {}, 1).units == process.units
@@ -294,15 +294,25 @@ def test_a_pooled_paragraph_may_cite_any_passage_of_the_pool() -> None:
 def test_a_section_with_a_fact_aims_at_her_full_length() -> None:
     # #143 D5: her base section's own words, however few of its facts the dossier holds.
     facts = {"audit.water_supply": _fact("audit.water_supply", "reţea")}
-    utilities = plan_section("ch3.utilitati", facts, Example("exemplu", 400), {})
-    water = plan_section("ch3.apa", facts, Example("exemplu", 120), {})
+    utilities = plan_section(
+        "ch3.utilitati", facts, Example((ExamplePart("body", "exemplu"),), 400), {}
+    )
+    water = plan_section("ch3.apa", facts, Example((ExamplePart("body", "exemplu"),), 120), {})
     assert (utilities.target, water.target) == (400, 120)
     assert plan_section("ch3.apa", facts, None, {}).target is None
-    assert plan_section("ch3.apa", {}, Example("exemplu", 120), {}).target is None
+    assert (
+        plan_section("ch3.apa", {}, Example((ExamplePart("body", "exemplu"),), 120), {}).target
+        is None
+    )
     rejected = {
         "audit.water_supply": facts["audit.water_supply"].model_copy(update={"review": "rejected"})
     }
-    assert plan_section("ch3.apa", rejected, Example("exemplu", 120), {}).target is None
+    assert (
+        plan_section(
+            "ch3.apa", rejected, Example((ExamplePart("body", "exemplu"),), 120), {}
+        ).target
+        is None
+    )
 
 
 def test_the_share_scaling_is_gone() -> None:
@@ -313,7 +323,7 @@ def test_the_allowance_and_the_split_follow_the_targets() -> None:
     assert allowance([1000]) == 16_000 + int(2.5 * 1000 * 1.3)
     assert allowance([20_000]) == MAX_OUTPUT_TOKENS
     plans = [
-        SectionPlan(f"ch3.{name}", {}, words, "")
+        SectionPlan(f"ch3.{name}", {}, words, ())
         for name, words in zip("abcd", (9000, 5000, 6000, 100), strict=True)
     ]
     groups = split(3, plans)
@@ -323,7 +333,7 @@ def test_the_allowance_and_the_split_follow_the_targets() -> None:
     ]
     assert [group.id for group in groups] == ["3-1", "3-2"]
     assert all(group.allowance < MAX_OUTPUT_TOKENS for group in groups)
-    assert [len(group.sections) for group in split(3, [SectionPlan("ch3.a", {}, 30_000, "")])] == [
+    assert [len(group.sections) for group in split(3, [SectionPlan("ch3.a", {}, 30_000, ())])] == [
         1
     ]
 
@@ -349,9 +359,9 @@ def test_chapter_three_at_full_length_still_plans_as_one_group() -> None:
     # #143 D6: every ch. 3 section with a fact, at full length, and ch3.process at her unit text
     # for each of audit-case-a's six process units (test_s10b_audit_base).
     plans = [
-        SectionPlan(section, {}, words * 6 if section == "ch3.process" else words, "")
+        SectionPlan(section, {}, words * 6 if section == "ch3.process" else words, ())
         for section, words in BASE_CH3_WORDS.items()
-    ] + [SectionPlan(section, {}, None, "") for section in (*UNMEASURED_CH3, CONSUMERS)]
+    ] + [SectionPlan(section, {}, None, ()) for section in (*UNMEASURED_CH3, CONSUMERS)]
     assert sum(plan.target or 0 for plan in plans) == 10_766
     (group,) = split(3, plans)
     assert len(group.sections) == 15

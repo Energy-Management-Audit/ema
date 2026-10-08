@@ -291,6 +291,23 @@ def _passage(key: str) -> bool:
     return fact_key(key) in PASSAGE_FACTS or (base in PASSAGE_FACTS and number.isdigit())
 
 
+def _missing_item(
+    section: str, location: str, item: DraftText, facts: dict[str, Field], job: str
+) -> list[DraftReview]:
+    """A missing item has no text and names the section's keys it lacks, none with a usable
+    value; any other item names none (#163 D2)."""
+    if item.kind != "missing":
+        return [DraftReview("missing_item_invalid", location, key) for key in item.missing_fact_ids]
+    issues = [
+        DraftReview("missing_item_invalid", location, key)
+        for key in item.missing_fact_ids
+        if not citable(section, key) or citable_fact(section, key, facts.get(key), job)
+    ]
+    if item.text.strip() or not item.missing_fact_ids:
+        issues.append(DraftReview("missing_item_invalid", location, "text or keys"))
+    return issues
+
+
 def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> DraftCheck:
     fatal: list[DraftReview] = []
     known = {
@@ -350,6 +367,7 @@ def check_draft(draft: SectionDraft, facts: dict[str, Field], job: str) -> Draft
                     if shaped or any(in_quote(traced(name), value) for value in (*known, *offered))
                 }
         fatal.extend(DraftReview("literal_name", location, name) for name in sorted(names))
+        fatal.extend(_missing_item(draft.section, location, item, facts, job))
     if draft.status == "drafted" and not any(
         citable_fact(draft.section, key, field, job) for key, field in facts.items()
     ):

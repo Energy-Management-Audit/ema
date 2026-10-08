@@ -96,6 +96,7 @@ STATUS: dict[str, int] = {
     "file_ambiguous": 400,
     "file_missing": 404,
     "page_missing": 404,
+    "previous_audit_type": 415,
     "query_missing": 400,
     "file_too_large": 413,
     "file_type": 415,
