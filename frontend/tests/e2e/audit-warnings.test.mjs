@@ -56,8 +56,8 @@ const WARNING_FIELDS = [
 // One warning per readiness code, with the field each of its two sources must open with.
 const CASES = [
   [
-    'data_gpl_cost_no_quantity',
-    'GPL: cost pozitiv şi cantitate zero în 2025.',
+    'data_cost_without_quantity',
+    'GPL: 18.400,00 lei declarate în 2025, fără consum în foaia de consumuri. Consumul primează; costul nu este folosit.',
     [
       ['ev-gpl-qty', 'A1', 'Cantitate GPL 2025'],
       ['ev-gpl-cost', 'A2', 'Cost GPL 2025'],

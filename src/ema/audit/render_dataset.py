@@ -64,7 +64,7 @@ def _series(
 
 
 def carrier_cost(by_key: Mapping[str, Field], carrier: Carrier, year: int) -> Field | None:
-    """The carrier's positive, unrejected spend for the year: proof that the fuel was used."""
+    """The carrier's positive, unrejected spend for the year."""
     name = COST_KEYS.get(carrier)
     field = by_key.get(f"audit.economics.{name}.{year}") if name else None
     if field is None or field.review == "rejected" or field.value is None:
@@ -130,21 +130,13 @@ class _Overlay:
                 self.changed.add((carrier, year))
 
     def settle_use(self) -> None:
-        """A carrier with no quantity in a year is dropped, unless its spend proves it was used."""
+        """A carrier with no positive quantity in a year is dropped."""
         for carrier, years in list(self.carriers.items()):
             if not counts_in_total(carrier):
                 continue
             for year, series in list(years.items()):
-                if _marked_unused(self.by_key, carrier, year):
+                if _marked_unused(self.by_key, carrier, year) or quantity_empty(series):
                     del years[year]
-                    self.changed.add((carrier, year))
-                elif not quantity_empty(series):
-                    continue
-                elif carrier_cost(self.by_key, carrier, year) is None:
-                    del years[year]
-                else:
-                    if readings := _readings(series):
-                        years[year] = CarrierSeries(annual=Reading(None, readings[0].unit))
                     self.changed.add((carrier, year))
             if not years:
                 del self.carriers[carrier]
@@ -174,8 +166,8 @@ def reviewed_dataset(dataset: EnergyDataset, fields: Iterable[Field]) -> EnergyD
     """Decided values replace parsed ones; a rejected value is absent; the rest is untouched.
 
     A counted carrier with no quantity in a year has no series that year, so ch. 4 and the content
-    checks agree; with a positive spend for that year its quantity stays missing instead. The
-    auditor's rejection of the year marks the fuel as not used.
+    checks agree even if spend was declared. The auditor's rejection of the year marks the fuel as
+    not used.
 
     A changed carrier value drops the filed tep of that year so ch. 4 recomputes it instead of
     printing a stale total; untouched filed values keep their cell source.

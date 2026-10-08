@@ -7,10 +7,12 @@ from decimal import Decimal
 from tests.workspace_jobs import create_job
 
 from ema.audit.data_flags import QUARTER_FACTOR, flags
+from ema.audit.render_dataset import COST_KEYS
 from ema.audit.sections import audit_readiness
 from ema.core.review.fields import propose
 from ema.core.review.models import Candidate, Cell, Evidence, Field, FieldSpec
 from ema.core.workspace import Workspace
+from ema.energy_data.carriers import CARRIER_NAMES_RO
 
 
 def _field(key: str, value: int, ref: str, *, candidates: list[Candidate] | None = None) -> Field:
@@ -47,8 +49,47 @@ def test_gpl_cost_and_count_conflict() -> None:
         ),
     }
     found = {issue.code: issue for issue in flags(fields)}
-    assert found["data_gpl_cost_no_quantity"].evidence_ids == ("quantity", "cost")
+    assert found["data_cost_without_quantity"].evidence_ids == ("quantity", "cost")
+    assert found["data_cost_without_quantity"].message == (
+        "GPL: 100,00 lei declarate în 2025, fără consum în foaia de consumuri. "
+        "Consumul primează; costul nu este folosit."
+    )
     assert found["data_count_conflict"].evidence_ids == ("document-a", "document-b")
+
+
+def test_cost_without_quantity_applies_to_every_cost_carrier() -> None:
+    for carrier, cost_key in COST_KEYS.items():
+        fields = {
+            f"carrier.{carrier.value}.2024": _field(f"carrier.{carrier.value}.2024", 0, "quantity"),
+            f"audit.economics.{cost_key}.2024": _field(
+                f"audit.economics.{cost_key}.2024", 12000, "cost"
+            ),
+        }
+        warnings = [issue for issue in flags(fields) if issue.code == "data_cost_without_quantity"]
+        assert len(warnings) == 1
+        name = CARRIER_NAMES_RO[carrier]
+        assert warnings[0].message == (
+            f"{name[0].upper() + name[1:]}: 12.000,00 lei declarate în 2024, "
+            "fără consum în foaia de consumuri. Consumul primează; costul nu este folosit."
+        )
+        fields[f"carrier.{carrier.value}.2024.01"] = _field(
+            f"carrier.{carrier.value}.2024.01", 1, "month"
+        )
+        assert not any(issue.code == "data_cost_without_quantity" for issue in flags(fields))
+
+
+def test_cost_without_any_quantity_fields_uses_cost_evidence() -> None:
+    cost = _field("audit.economics.diesel_costs_lei.2024", 12000, "cost")
+    warnings = [
+        issue for issue in flags({cost.key: cost}) if issue.code == "data_cost_without_quantity"
+    ]
+    assert len(warnings) == 1
+    assert warnings[0].field_id == cost.id
+    assert warnings[0].evidence_ids == ("cost",)
+    assert warnings[0].message == (
+        "Motorină: 12.000,00 lei declarate în 2024, fără consum în foaia de consumuri. "
+        "Consumul primează; costul nu este folosit."
+    )
 
 
 def test_month_repeat_and_quarter_suspicion_require_two_sources() -> None:
@@ -108,8 +149,8 @@ def test_flags_reach_audit_readiness_without_blocking(tmp_path) -> None:
             state="supplied",
         )
     readiness = audit_readiness(ws, job)
-    assert any(issue.code == "data_gpl_cost_no_quantity" for issue in readiness.warnings)
-    assert not any(issue.code == "data_gpl_cost_no_quantity" for issue in readiness.blocking)
+    assert any(issue.code == "data_cost_without_quantity" for issue in readiness.warnings)
+    assert not any(issue.code == "data_cost_without_quantity" for issue in readiness.blocking)
 
 
 def test_zero_summer_months_are_not_repeats() -> None:
@@ -197,7 +238,7 @@ def test_no_internal_key_reaches_a_message() -> None:
     }
     found = flags(fields)
     assert {issue.code for issue in found} >= {
-        "data_gpl_cost_no_quantity",
+        "data_cost_without_quantity",
         "data_count_conflict",
         "data_month_repeat",
         "data_quarter_in_month",
