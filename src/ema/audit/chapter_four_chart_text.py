@@ -99,3 +99,40 @@ WATER_ANNUAL = {
         "Evoluția anuală a consumului specific de apă industrială înregistrat la nivelul {client}"
     ),
 }
+# How her annual captions open; the comments repeat what follows.
+ANNUAL_LEADS = ("Evoluția anuală a ", "Tendința ")
+
+
+def figure_text(
+    number: str,
+    client: str,
+    year: int | None,
+    production_unit: str | None,
+    annual_text: str | None,
+    subject: str | None,
+) -> tuple[str, str, str]:
+    """A figure's caption, and the period and subject her lead-in and trend comment repeat; a
+    production figure has its unit, a carrier one its subject, an annual one may have its text."""
+    if production_unit is not None:
+        if year is not None:
+            kind = (
+                "cifrei lunare de afaceri"
+                if is_turnover_unit(production_unit)
+                else "producției lunare"
+            )
+            when = "lunară"
+            subject = f"{kind} înregistrate de către {client} la nivelul anului {year}"
+        else:
+            when, subject = "anuală", f"producției înregistrate la nivelul {client}"
+    elif annual_text is not None:
+        text = annual_text.format(client=client)
+        lead = next(lead for lead in ANNUAL_LEADS if text.startswith(lead))
+        return f"Fig. nr. {number} {text}", "anuală", text.removeprefix(lead)
+    else:
+        assert subject is not None
+        if year is not None:
+            when = "lunară"
+            subject = f"{subject} înregistrat de către {client} la nivelul anului {year}"
+        else:
+            when, subject = "anuală", f"{subject} înregistrat la nivelul {client}"
+    return f"Fig. nr. {number} Evoluția {when} a {subject}", when, subject

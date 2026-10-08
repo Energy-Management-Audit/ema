@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ema.audit.chapter_four_blocks import FUEL
 from ema.audit.chapter_four_chart_text import STYLE_PART
+from ema.audit.chapter_four_resources import FUEL
 from ema.core.office.blocks import Block, Missing, NativeChart, Paragraph
 from ema.core.office.chart_series import Series
 from ema.core.office.missing_text import MISSING_TEXT

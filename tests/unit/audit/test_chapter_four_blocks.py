@@ -4,8 +4,8 @@ import pytest
 
 from ema.audit.chapter_four_blocks import chapter_four_blocks
 from ema.audit.chapter_four_charts import chart_blocks
-from ema.core.office.blocks import Caption, Missing, NativeChart, Num, Paragraph, Table
-from ema.core.office.missing_text import TABLE_MISSING_NOTE, TABLE_MISSING_TEXT
+from ema.core.office.blocks import BulletList, Caption, Missing, NativeChart, Num, Paragraph, Table
+from ema.core.office.missing_text import MISSING_TEXT, TABLE_MISSING_NOTE, TABLE_MISSING_TEXT
 from ema.energy_data.carriers import Carrier
 from ema.energy_data.factors import FACTORS_2026
 from ema.energy_data.model import CarrierSeries, EnergyDataset, Reading
@@ -58,12 +58,13 @@ def test_chapter_four_has_source_backed_tables_and_missing_sections() -> None:
     annual = [
         segment
         for block in blocks
-        if isinstance(block, Paragraph)
-        for segment in block.segments
+        if isinstance(block, BulletList)
+        for item in block.items
+        for segment in item
         if isinstance(segment, Num)
     ]
-    assert any(number.value == 10 and number.unit == "MWh" for number in annual)
-    assert any(number.value == 20 and number.unit == "MWh" for number in annual)
+    assert any(number.value == 10 and number.unit == "MWh/an" for number in annual)
+    assert any(number.value == 20 and number.unit == "MWh/an" for number in annual)
 
 
 def test_empty_dataset_marks_unavailable_values() -> None:
@@ -127,9 +128,11 @@ def test_gpl_total_without_readings_is_missing_but_entered_zero_stays_zero() -> 
     )
     blocks = chapter_four_blocks(dataset, FACTORS_2026)
     totals = [
-        b.segments[1]
-        for b in blocks
-        if isinstance(b, Paragraph) and str(b.segments[0]).startswith("Total anual")
+        item[1]
+        for b in _section(blocks, "ch4.carburant")
+        if isinstance(b, BulletList)
+        for item in b.items
+        if str(item[0]).startswith("pentru anul")
     ]
     assert isinstance(totals[0], Num) and totals[0].value is None
     assert isinstance(totals[1], Num) and totals[1].value == 0
@@ -240,9 +243,11 @@ def test_production_titles_classify_lei_as_a_word_and_keep_source_unit(
     )
     title = "".join(segment for segment in table.segments if isinstance(segment, str))
     assert f"Centralizator al {table_subject} înregistrate de către Client" in title
-    assert f"{suffix} – 2025 ({unit})" in title
+    assert f"{suffix} ({unit})" in title
     charts, _ = chart_blocks("ch4.productie", dataset, FACTORS_2026, "Client")
-    caption = next(block for block in charts if isinstance(block, Paragraph))
+    caption = next(
+        block for block in charts if isinstance(block, Paragraph) and block.proto == "chart_caption"
+    )
     assert f"Evoluția lunară a {figure_subject}" in caption.segments[0]
 
 
@@ -275,7 +280,11 @@ def test_monthly_missing_note_follows_only_the_table_with_missing_cells():
     first, second = (i for i, _ in tables)
     assert not isinstance(section[first + 1], Missing)
     assert section[second + 1] == Missing("body", "—: date indisponibile")
-    assert [b for b in section if isinstance(b, Missing)] == [Missing("body", TABLE_MISSING_NOTE)]
+    # The other marker is the undrafted factor list (#162 D4).
+    assert [b for b in section if isinstance(b, Missing)] == [
+        Missing("body", TABLE_MISSING_NOTE),
+        Missing("body", MISSING_TEXT),
+    ]
     assert TABLE_MISSING_TEXT == "—"
 
 
@@ -307,7 +316,7 @@ def test_specific_product_name_is_present_only_for_multiple_active_products():
     )
 
 
-def test_year_blocks_have_two_six_month_tables_with_unit_captions() -> None:
+def test_a_resource_has_one_half_year_table_pair_with_a_row_per_year() -> None:
     dataset = EnergyDataset(
         (2024, 2025),
         {
@@ -322,14 +331,15 @@ def test_year_blocks_have_two_six_month_tables_with_unit_captions() -> None:
     electric = _section(blocks, "ch4.electricitate")
     tables = [block for block in electric if isinstance(block, Table)]
     captions = [block for block in electric if isinstance(block, Caption)]
-    assert len(tables) == len(captions) == 4
-    assert [table.rows[0][0] for table in tables] == [["2024"], ["2024"], ["2025"], ["2025"]]
-    assert [caption.segments[-1] for caption in captions] == [
-        " – 2024 (MWh)",
-        " – 2024 (MWh)",
-        " – 2025 (MWh)",
-        " – 2025 (MWh)",
+    # Her shape (#162 D5): one caption over January-June and July-December, a row per year.
+    assert len(tables) == 2 and len(captions) == 1
+    assert [table.proto for table in tables] == ["months_first", "months_second"]
+    assert [[row[0] for row in table.rows] for table in tables] == [
+        [["2024"], ["2025"]],
+        [["2024"], ["2025"]],
     ]
+    assert [len(row) for table in tables for row in table.rows] == [7, 7, 7, 7]
+    assert captions[0].segments[-1] == " (MWh)"
     intensity = _section(blocks, "ch4.intensitate")
     table = next(block for block in intensity if isinstance(block, Table))
     assert table.header == [["Indicator", "2024", "2025"]]

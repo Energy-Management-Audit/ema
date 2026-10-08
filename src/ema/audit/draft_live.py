@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ema.audit.catalogue import CATALOGUE
+from ema.audit.chapter_four_factors import write_factors
 from ema.audit.draft_agent import chapter_groups, job_facts
 from ema.audit.draft_chapter import run_group
 from ema.audit.draft_plan import usable
@@ -129,15 +130,19 @@ def start_draft(
 
     def stage(ctx: StageContext) -> StageOutcome:
         before = job_spend(ctx.ws, ctx.job)
+        factors: list[str] = []
         try:
             summary = _draft_all(ctx, provider, model_id, sections, skipped, absent)
+            # The ch. 4 variable factors (#162 D4), unless a quota or the budget stopped Draft.
+            if not any(code in STOPPING for code in summary.failed.values()):
+                _, factors = write_factors(ctx, provider, model_id, job_facts(ctx.ws, ctx.job))
         finally:
             log_spend(ctx, "draft", before)
         if summaries is not None:
             summaries.append(summary)
         return StageOutcome(
             item_failures=[f"{key}: {code}" for key, code in summary.failed.items()],
-            warnings=stopped_warning(summary.failed, summary.stopped),
+            warnings=[*stopped_warning(summary.failed, summary.stopped), *factors],
         )
 
     return run_stage(ws, job, "draft", stage, on_revision=on_revision)
