@@ -123,3 +123,68 @@ def test_missing_toc_and_com_error_close(tmp_path: Path) -> None:
         "code": "word_automation",
         "detail": "COM failed",
     }
+
+
+def _toc_pdf_request(folder: Path) -> None:
+    (folder / "request.json").write_text(
+        json.dumps({"action": "toc_pdf", "input": "in.docx", "output": "out.pdf"})
+    )
+
+
+def test_toc_pdf_updates_saves_and_exports_in_one_open(tmp_path: Path) -> None:
+    _toc_pdf_request(tmp_path)
+    app = App()
+    assert perform(app, "toc_pdf", tmp_path) == {"ok": True, "tables": None}
+    assert app.events == [
+        (
+            "Open",
+            {
+                "FileName": str(tmp_path / "in.docx"),
+                "ConfirmConversions": False,
+                "ReadOnly": False,
+                "AddToRecentFiles": False,
+                "Visible": False,
+                "OpenAndRepair": False,
+                "NoEncodingDialog": True,
+            },
+        ),
+        ("UpdatePageNumbers", None),
+        ("Save", None),
+        (
+            "ExportAsFixedFormat",
+            {
+                "OutputFileName": str(tmp_path / "out.pdf"),
+                "ExportFormat": 17,
+                "OpenAfterExport": False,
+            },
+        ),
+        ("Close", {"SaveChanges": 0}),
+    ]
+
+
+def test_toc_pdf_without_toc_is_the_toc_error(tmp_path: Path) -> None:
+    _toc_pdf_request(tmp_path)
+    app = App(toc_count=0)
+    assert perform(app, "toc_pdf", tmp_path) == {
+        "ok": False,
+        "code": "word_automation",
+        "detail": "no table of contents",
+    }
+    assert [name for name, _ in app.events] == ["Open", "Close"]
+
+
+@pytest.mark.parametrize("output", ["out.pdf", None])
+def test_unknown_action_and_toc_pdf_without_output_are_errors(
+    tmp_path: Path, output: str | None
+) -> None:
+    action = "print" if output else "toc_pdf"
+    (tmp_path / "request.json").write_text(
+        json.dumps({"action": action, "input": "in.docx", "output": output})
+    )
+    app = App()
+    assert perform(app, action, tmp_path) == {
+        "ok": False,
+        "code": "word_automation",
+        "detail": f"Unknown Word action: {action}",
+    }
+    assert app.events[-1] == ("Close", {"SaveChanges": 0})

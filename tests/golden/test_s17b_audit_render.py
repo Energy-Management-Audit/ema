@@ -319,7 +319,7 @@ def test_audit_case_a_audit_render_through_word(
     outputs = _outputs(ws, job, run)
     assert list(outputs) == ["Audit-ciorna.pdf", "Audit-ciorna.docx"]
     docx, pdf = outputs["Audit-ciorna.docx"], outputs["Audit-ciorna.pdf"]
-    # D9.1: Word opened it without repair (open_check), numbered the TOC and made the PDF.
+    # D9.1: Word opened it without repair, numbered the TOC and made the PDF in one open.
     assert summary.pdf and summary.toc_pages_set and pdf.stat().st_size > 0
     assert pdf.read_bytes().startswith(b"%PDF")
     pages = _toc_pages(docx)

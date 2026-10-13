@@ -168,6 +168,10 @@ class WordMac:
             check=True,
         )
 
+    def _budget(self, action: str) -> float:
+        # The combined step replaces two steps, so it keeps their time budget.
+        return self.timeout_s * 2 if action == "toc_pdf" else self.timeout_s
+
     def _script(self, action: str, document: Path, output: Path | None = None) -> str:
         path = _apple_string(str(document))
         name = _apple_string(document.name)
@@ -180,6 +184,14 @@ class WordMac:
         elif action == "pdf" and output is not None:
             commands.append(
                 f"save as d file name {_apple_string(str(output))} file format format PDF"
+            )
+        elif action == "toc_pdf" and output is not None:
+            commands.extend(
+                [
+                    "update page numbers of table of contents 1 of d",
+                    "save d",
+                    f"save as d file name {_apple_string(str(output))} file format format PDF",
+                ]
             )
         elif action == "docx" and output is not None:
             commands.append(
@@ -198,7 +210,7 @@ class WordMac:
         if action == "text":
             commands.append("return table_count as string")
         body = "\n".join(commands)
-        seconds = max(1, int(self.timeout_s))
+        seconds = max(1, int(self._budget(action)))
         return (
             f"with timeout of {seconds} seconds\n"
             'tell application "Microsoft Word"\n'
@@ -253,7 +265,12 @@ class WordMac:
     ) -> int | None:
         if target is not None:
             if not source.is_file():
-                code = {"pdf": "word_pdf", "docx": "word_docx", "text": "word_text"}[action]
+                code = {
+                    "pdf": "word_pdf",
+                    "toc_pdf": "word_pdf",
+                    "docx": "word_docx",
+                    "text": "word_text",
+                }[action]
                 raise OfficeError(code, f"Word reported success without a {source.suffix} file")
             shutil.copy2(source, target)
         if action == "text":
@@ -267,13 +284,13 @@ class WordMac:
         folder = self.work_root / str(uuid.uuid4())
         folder.mkdir(parents=True)
         copy = folder / f"{uuid.uuid4()}-{document.name}"
-        suffix = {"pdf": ".pdf", "docx": ".docx", "text": ".txt"}.get(action)
+        suffix = {"pdf": ".pdf", "toc_pdf": ".pdf", "docx": ".docx", "text": ".txt"}.get(action)
         basename = uuid.uuid4().hex if action in {"docx", "text"} else "converted"
         output = folder / f"{basename}{suffix}" if suffix is not None else None
         try:
             shutil.copy2(document, copy)
             try:
-                result = self.runner(self._script(action, copy, output), self.timeout_s + 5)
+                result = self.runner(self._script(action, copy, output), self._budget(action) + 5)
             except (TimeoutError, subprocess.TimeoutExpired) as exc:
                 try:
                     self._force_quit()
@@ -292,7 +309,7 @@ class WordMac:
                 raise OfficeError("word_automation", detail) from exc
             if result.returncode:
                 self._failed_script(result, copy, output)
-            if action == "toc":
+            if action in {"toc", "toc_pdf"}:
                 shutil.copy2(copy, document)
             if output is not None:
                 return self._copy_result(action, output, target, result)
@@ -325,6 +342,9 @@ class WordMac:
 
     def render_pdf(self, docx: Path, pdf: Path) -> None:
         self._perform("pdf", docx, pdf)
+
+    def toc_and_pdf(self, docx: Path, pdf: Path) -> None:
+        self._perform("toc_pdf", docx, pdf)
 
     def convert_doc(self, doc: Path, out_docx: Path) -> None:
         self._perform("docx", doc, out_docx)

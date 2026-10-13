@@ -142,7 +142,7 @@ def test_word_sets_pages_and_pdf_comes_before_docx(
     monkeypatch.setattr(render, "word_available", lambda settings: True)
     monkeypatch.setattr(render, "word_automation", lambda settings: word)
     summary = summary_of(ws, job_id, str(run_render(ws, job_id)["id"]))
-    assert word.calls == ["toc", "pdf", "open"]
+    assert word.calls == ["toc_pdf"]
     assert (summary.pdf, summary.toc_pages_set) == (True, True)
     assert all(item.page is not None for item in summary.chapters)
     assert outputs(ws, job_id) == [("Audit-ciorna.pdf", "draft"), ("Audit-ciorna.docx", "draft")]

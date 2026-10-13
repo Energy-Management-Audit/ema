@@ -116,6 +116,9 @@ def test_review_decision_and_final_gate(  # noqa: C901, PLR0915
         def render_pdf(self, _docx: Path, pdf: Path) -> None:
             pdf.write_bytes(b"%PDF-1.4\n")
 
+        def toc_and_pdf(self, _docx: Path, pdf: Path) -> None:
+            pdf.write_bytes(b"%PDF-1.4\n")
+
         def open_check(self, _docx: Path) -> None:
             pass
 

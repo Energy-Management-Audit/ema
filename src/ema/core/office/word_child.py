@@ -215,16 +215,25 @@ class WordChild:
             self._failed_result(folder, result)
         self._kill_word(folder, self.word_image, wait_s=10)
         input_name = f"in{source.suffix}"
-        if action == "toc":
+        if action in {"toc", "toc_pdf"}:
             source.write_bytes((folder / input_name).read_bytes())
-            return None
-        output_name = {"pdf": "out.pdf", "docx": "out.docx", "text": "out.txt"}.get(action)
+        output_name = {
+            "pdf": "out.pdf",
+            "toc_pdf": "out.pdf",
+            "docx": "out.docx",
+            "text": "out.txt",
+        }.get(action)
         if output_name is None:
             return None
         output = folder / output_name
         if not output.is_file():
             raise OfficeError(
-                {"pdf": "word_pdf", "docx": "word_docx", "text": "word_text"}[action],
+                {
+                    "pdf": "word_pdf",
+                    "toc_pdf": "word_pdf",
+                    "docx": "word_docx",
+                    "text": "word_text",
+                }[action],
                 f"Word reported success without {output_name}",
             )
         if action == "text":
@@ -259,17 +268,26 @@ class WordChild:
         self._kill_word(folder, self.word_image, identity=identity)
         if stop_error is not None:
             raise stop_error
-        detail = f"{action} exceeded {self.timeout_s} s; worker log: {self._tail(folder)}"
+        detail = f"{action} exceeded {self._budget(action)} s; worker log: {self._tail(folder)}"
         if identity is None and launch.exists():
             detail += "; word process unidentified"
         raise TimeoutError(detail) from cause
+
+    def _budget(self, action: str) -> float:
+        # The combined step replaces two steps, so it keeps their time budget.
+        return self.timeout_s * 2 if action == "toc_pdf" else self.timeout_s
 
     def _attempt(self, action: str, source: Path, target: Path | None) -> DocText | None:
         folder = self.scratch_root / uuid.uuid4().hex[:12]
         folder.mkdir()
         try:
             input_name = f"in{source.suffix}"
-            output_name = {"pdf": "out.pdf", "docx": "out.docx", "text": "out.txt"}.get(action)
+            output_name = {
+                "pdf": "out.pdf",
+                "toc_pdf": "out.pdf",
+                "docx": "out.docx",
+                "text": "out.txt",
+            }.get(action)
             (folder / input_name).write_bytes(source.read_bytes())
             owner = psutil.Process()
             (folder / "owner.json").write_text(
@@ -293,7 +311,7 @@ class WordChild:
                     raise OfficeError("word_launch", str(exc)) from exc
                 self._active[folder] = (child, self.word_image)
                 try:
-                    exit_code = child.wait(timeout=self.timeout_s)
+                    exit_code = child.wait(timeout=self._budget(action))
                 except subprocess.TimeoutExpired as exc:
                     self._timed_out(folder, child, action, exc)
             return self._result(folder, action, source, target, exit_code)
@@ -321,6 +339,9 @@ class WordChild:
 
     def render_pdf(self, docx: Path, pdf: Path) -> None:
         self._perform("pdf", docx, pdf)
+
+    def toc_and_pdf(self, docx: Path, pdf: Path) -> None:
+        self._perform("toc_pdf", docx, pdf)
 
     def convert_doc(self, doc: Path, out_docx: Path) -> None:
         self._perform("docx", doc, out_docx)

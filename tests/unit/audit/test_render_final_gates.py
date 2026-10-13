@@ -128,7 +128,7 @@ def test_sourced_missing_cells_keep_dev_counts_and_final_gate_outcome(
     assert record["state"] == "ready", record["error"]
     stage = "audit_render" if kind == "draft" else "audit_final"
     assert summary_of(ws, job, str(record["id"]), stage).markers == []
-    assert word.calls == ["toc", "pdf", "open"]
+    assert word.calls == ["toc_pdf"]
     name = "ciorna" if kind == "draft" else "final"
     assert [output for output, _ in outputs(ws, job)] == [f"Audit-{name}.pdf", f"Audit-{name}.docx"]
 
