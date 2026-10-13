@@ -93,6 +93,17 @@ def test_page_run_is_one_invocation_with_both_renderers(
     assert commands[1][:3] == [str(Path("/opt/homebrew/bin/tesseract")), "stdin", "page"]
 
 
+def test_page_run_with_relative_executable_gets_an_absolute_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runs = _fake_run(monkeypatch)
+    relative = Path("bin") / "tesseract"
+
+    pdf._run_tesseract_page(relative, b"image", "ron", 2)
+    assert runs.commands[0][0] == str(relative.absolute())
+    assert Path(runs.commands[0][0]).is_absolute()
+
+
 def test_page_run_without_output_files_is_ocr_failed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

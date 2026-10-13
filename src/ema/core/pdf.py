@@ -257,7 +257,8 @@ def _run_tesseract_page(
     """
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as directory:
         folder = Path(directory)
-        command = _tesseract_command(executable, "page")
+        # cwd is the temporary directory, so a relative executable must not depend on it.
+        command = _tesseract_command(executable.absolute(), "page")
         command.extend(["--dpi", "200", "-l", lang, "--psm", "6", "txt", "tsv"])
         _, stderr = _execute_tesseract(command, image, timeout_s, folder)
         try:
