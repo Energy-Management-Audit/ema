@@ -427,7 +427,7 @@ Out of scope for now: the prospecting list (Anexa 3 public emails), the website.
 | `core.workspace` | workspace folders, content-addressed files, file slots + versions | `add_file`, `set_slot`, `list_versions`, `remove_version` |
 | `core.jobs` | the job store (SQLite, §5.3), stage runs + fingerprints, runner, cancellation, progress events | `create_job`, `run_stage`, `cancel`, `status`, `subscribe` |
 | `core.review` | fields and their evidence, decisions (the Jurnal), conflicts, undo — the same for every workflow | `fields`, `decide` (accept / correct / reject / choose), `undo`, `conflicts` |
-| `core.office` | xls/xlsx label-finding readers, file-type sniffing, docx block engine, native charts, the supervised Office adapter (§5.5) | `find_label`, `read_block`, `sniff`, `render(template, blocks)`, `convert_doc`, `render_pdf`, `update_toc_pages` |
+| `core.office` | xls/xlsx label-finding readers, file-type sniffing, docx block engine, native charts, the supervised Office adapter (§5.5) | `find_label`, `read_block`, `sniff`, `render(template, blocks)`, `convert_doc`, `render_pdf`, `update_toc_pages`, `toc_and_pdf` |
 | `core.pdf` | text extraction, OCR (Tesseract ron+eng) | `text(pdf)`, `ocr(pdf)` |
 | `core.llm` | OpenAI + Gemini behind one interface, structured output, the tool-calling agent loop, cost logging | `complete_json(schema, prompt, context)`, `run_agent(instructions, tools, context, limits)` |
 | `core.web` | allow-listed HTTP fetch + search for enrichment, caching, rate limits | `search`, `fetch` |

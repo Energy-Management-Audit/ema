@@ -50,6 +50,7 @@ def test_toc_and_pdf_without_pdf_is_an_error(tmp_path):
         word.toc_and_pdf(source, pdf)
     assert error.value.code == "word_pdf"
     assert not pdf.exists()
+    assert source.read_bytes() == b"page numbers set"
     assert copies(word) == []
 
 
@@ -106,3 +107,19 @@ def test_toc_and_pdf_failed_open_closes_before_copy_cleanup(tmp_path):
     assert f'-{source.name}" then close document' in scripts[1]
     assert source.read_bytes() == b"synthetic"
     assert copies(word) == []
+
+
+def test_toc_and_pdf_has_twice_the_budget_and_pdf_keeps_one(tmp_path):
+    seen = []
+
+    def runner(script, timeout):
+        seen.append((script.splitlines()[0], timeout))
+        copy = Path(re.search(r'open \(POSIX file "([^"]+)"\)', script).group(1))
+        copy.write_bytes(b"x")
+        Path(re.search(r'save as d file name "([^"]+)"', script).group(1)).write_bytes(b"%PDF")
+        return OsaResult(0, "", "")
+
+    word, source = adapter(tmp_path, runner)
+    word.toc_and_pdf(source, tmp_path / "a.pdf")
+    word.render_pdf(source, tmp_path / "b.pdf")
+    assert seen == [("with timeout of 4 seconds", 9), ("with timeout of 2 seconds", 7)]

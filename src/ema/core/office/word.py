@@ -168,6 +168,10 @@ class WordMac:
             check=True,
         )
 
+    def _budget(self, action: str) -> float:
+        # The combined step replaces two steps, so it keeps their time budget.
+        return self.timeout_s * 2 if action == "toc_pdf" else self.timeout_s
+
     def _script(self, action: str, document: Path, output: Path | None = None) -> str:
         path = _apple_string(str(document))
         name = _apple_string(document.name)
@@ -206,7 +210,7 @@ class WordMac:
         if action == "text":
             commands.append("return table_count as string")
         body = "\n".join(commands)
-        seconds = max(1, int(self.timeout_s))
+        seconds = max(1, int(self._budget(action)))
         return (
             f"with timeout of {seconds} seconds\n"
             'tell application "Microsoft Word"\n'
@@ -286,7 +290,7 @@ class WordMac:
         try:
             shutil.copy2(document, copy)
             try:
-                result = self.runner(self._script(action, copy, output), self.timeout_s + 5)
+                result = self.runner(self._script(action, copy, output), self._budget(action) + 5)
             except (TimeoutError, subprocess.TimeoutExpired) as exc:
                 try:
                     self._force_quit()

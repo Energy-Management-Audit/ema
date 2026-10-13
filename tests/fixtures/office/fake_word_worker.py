@@ -68,9 +68,9 @@ def main() -> int:  # noqa: C901
         )
         return 1
     output = data["output"]
-    if data["action"] == "toc":
+    if data["action"] in {"toc", "toc_pdf"}:
         (folder / data["input"]).write_bytes(b"updated toc")
-    elif output is not None and mode != "missing":
+    if output is not None and mode != "missing" and data["action"] != "toc":
         (folder / output).write_bytes(
             "text with accent".encode("utf-16") if data["action"] == "text" else b"result"
         )

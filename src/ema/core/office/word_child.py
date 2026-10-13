@@ -268,10 +268,14 @@ class WordChild:
         self._kill_word(folder, self.word_image, identity=identity)
         if stop_error is not None:
             raise stop_error
-        detail = f"{action} exceeded {self.timeout_s} s; worker log: {self._tail(folder)}"
+        detail = f"{action} exceeded {self._budget(action)} s; worker log: {self._tail(folder)}"
         if identity is None and launch.exists():
             detail += "; word process unidentified"
         raise TimeoutError(detail) from cause
+
+    def _budget(self, action: str) -> float:
+        # The combined step replaces two steps, so it keeps their time budget.
+        return self.timeout_s * 2 if action == "toc_pdf" else self.timeout_s
 
     def _attempt(self, action: str, source: Path, target: Path | None) -> DocText | None:
         folder = self.scratch_root / uuid.uuid4().hex[:12]
@@ -307,7 +311,7 @@ class WordChild:
                     raise OfficeError("word_launch", str(exc)) from exc
                 self._active[folder] = (child, self.word_image)
                 try:
-                    exit_code = child.wait(timeout=self.timeout_s)
+                    exit_code = child.wait(timeout=self._budget(action))
                 except subprocess.TimeoutExpired as exc:
                     self._timed_out(folder, child, action, exc)
             return self._result(folder, action, source, target, exit_code)
