@@ -5,7 +5,9 @@ from __future__ import annotations
 import io
 import re
 import subprocess
+import tempfile
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -198,6 +200,36 @@ def text(pdf: Path) -> list[PageText]:
         raise EmaError("pdf_read_failed", "PDF-ul nu a putut fi citit.", str(exc)) from exc
 
 
+def _tesseract_command(executable: Path, *outputs: str) -> list[str]:
+    command = [str(executable), "stdin", *outputs]
+    if executable.parent == resource_path("tesseract"):
+        command.extend(["--tessdata-dir", str(resource_path("tesseract", "tessdata"))])
+    return command
+
+
+def _execute_tesseract(
+    command: list[str], image: bytes, timeout_s: float, cwd: Path | None = None
+) -> tuple[bytes, str]:
+    try:
+        result = subprocess.run(
+            command,
+            input=image,
+            capture_output=True,
+            check=False,
+            timeout=timeout_s,
+            cwd=cwd,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise EmaError("ocr_timeout", "OCR-ul a depăşit timpul permis.", str(exc)) from exc
+    except OSError as exc:
+        raise EmaError("ocr_start_failed", "OCR-ul nu a putut porni.", str(exc)) from exc
+    stderr = result.stderr.decode("utf-8", errors="replace")[:1000]
+    if result.returncode:
+        raise EmaError("ocr_failed", "OCR-ul a eşuat.", stderr)
+    return result.stdout, stderr
+
+
 def _run_tesseract(
     executable: Path,
     image: bytes,
@@ -206,27 +238,35 @@ def _run_tesseract(
     psm: int,
     format_: str,
 ) -> str:
-    command = [str(executable), "stdin", "stdout"]
-    if executable.parent == resource_path("tesseract"):
-        command.extend(["--tessdata-dir", str(resource_path("tesseract", "tessdata"))])
+    command = _tesseract_command(executable, "stdout")
     command.extend(["--dpi", "200", "-l", lang, "--psm", str(psm), format_])
-    try:
-        result = subprocess.run(
-            command,
-            input=image,
-            capture_output=True,
-            check=False,
-            timeout=timeout_s,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise EmaError("ocr_timeout", "OCR-ul a depăşit timpul permis.", str(exc)) from exc
-    except OSError as exc:
-        raise EmaError("ocr_start_failed", "OCR-ul nu a putut porni.", str(exc)) from exc
-    if result.returncode:
-        stderr = result.stderr.decode("utf-8", errors="replace")[:1000]
-        raise EmaError("ocr_failed", "OCR-ul a eşuat.", stderr)
-    return result.stdout.decode("utf-8", errors="replace")
+    stdout, _ = _execute_tesseract(command, image, timeout_s)
+    return stdout.decode("utf-8", errors="replace")
+
+
+def _run_tesseract_page(
+    executable: Path, image: bytes, lang: str, timeout_s: float
+) -> tuple[str, str]:
+    """One --psm 6 run that yields the text and the word boxes.
+
+    stdout cannot carry both formats (the TSV header precedes the text), so the
+    renderers write files. Tesseract runs inside the temporary directory with the
+    literal output base ``page``: it takes narrow arguments on Windows, which a
+    path outside the ANSI code page would not survive. It exits 0 when it cannot
+    create its files, so a missing file is an OCR failure carrying its stderr.
+    """
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as directory:
+        folder = Path(directory)
+        # cwd is the temporary directory, so a relative executable must not depend on it.
+        command = _tesseract_command(executable.absolute(), "page")
+        command.extend(["--dpi", "200", "-l", lang, "--psm", "6", "txt", "tsv"])
+        _, stderr = _execute_tesseract(command, image, timeout_s, folder)
+        try:
+            text = (folder / "page.txt").read_bytes().decode("utf-8", errors="replace")
+            tsv = (folder / "page.tsv").read_bytes().decode("utf-8", errors="replace")
+        except OSError as exc:
+            raise EmaError("ocr_failed", "OCR-ul a eşuat.", stderr or str(exc)) from exc
+    return text, tsv
 
 
 def _words(tsv: str, dpi: int) -> tuple[Word, ...]:
@@ -250,7 +290,7 @@ def _words(tsv: str, dpi: int) -> tuple[Word, ...]:
     return tuple(result)
 
 
-def ocr(
+def ocr(  # noqa: PLR0913
     pdf: Path,
     settings: Settings,
     *,
@@ -258,6 +298,7 @@ def ocr(
     timeout_s: float = 120,
     pages: set[int] | None = None,
     alternatives: bool = False,
+    base: Mapping[int, PageText] | None = None,
 ) -> list[PageText]:
     executable = settings.tesseract_path
     if not executable.is_file():
@@ -274,10 +315,15 @@ def ocr(
                 render_page: Any = (
                     page  # PDFium's render stub types scale as int, but accepts float.
                 )
-                render_page.render(scale=dpi / 72).to_pil().save(image, format="PNG")
+                render_page.render(scale=dpi / 72).to_pil().save(
+                    image, format="PNG", compress_level=1
+                )
                 png = image.getvalue()
-                raw_text = _run_tesseract(executable, png, lang, timeout_s, 6, "txt")
-                tsv = _run_tesseract(executable, png, lang, timeout_s, 6, "tsv")
+                if base is not None and number in base:
+                    raw_text, words = base[number].text, base[number].words
+                else:
+                    raw_text, tsv = _run_tesseract_page(executable, png, lang, timeout_s)
+                    words = _words(tsv, dpi)
                 if alternatives:
                     oriented = _run_tesseract(executable, png, lang, timeout_s, 1, "txt")
                     sparse = _run_tesseract(executable, png, lang, timeout_s, 11, "txt")
@@ -290,7 +336,7 @@ def ocr(
                             crop = (0, (2 - strip) * height / 3, 0, strip * height / 3)
                             strip_png = io.BytesIO()
                             render_page.render(scale=dpi / 72, crop=crop).to_pil().save(
-                                strip_png, format="PNG"
+                                strip_png, format="PNG", compress_level=1
                             )
                             strips.append(
                                 _run_tesseract(
@@ -298,7 +344,7 @@ def ocr(
                                 )
                             )
                         raw_text = _merge_strips(raw_text, strips)
-                output.append(PageText(number, raw_text, _words(tsv, dpi), "ocr"))
+                output.append(PageText(number, raw_text, words, "ocr"))
     except EmaError:
         raise
     except Exception as exc:
