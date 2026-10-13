@@ -266,9 +266,7 @@ def start_word_render(ws: Workspace, job: str, *, on_revision: int | None = None
         office = word_automation(settings)
         pdf = ctx.artifact_dir() / "PIEE-final.pdf"
         with word_session(office):
-            office.update_toc_pages(original)
-            office.render_pdf(original, pdf)
-            office.open_check(original)
+            office.toc_and_pdf(original, pdf)
         issues = check_standalone(original)
         denylist = tuple(json.loads((base_dir / "base-identity.json").read_text(encoding="utf-8")))
         leftovers = leftover_issues(original, denylist)

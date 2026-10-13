@@ -61,8 +61,8 @@ class FakeWord:
     def __init__(self) -> None:
         self.calls = []
 
-    def update_toc_pages(self, docx: Path) -> None:
-        self.calls.append("toc")
+    def toc_and_pdf(self, docx: Path, pdf: Path) -> None:
+        self.calls.append("toc_pdf")
         document = Document(str(docx))
         for number, node in enumerate(
             (node for node in document.element.body.iter(qn("w:t")) if node.text == "0"),
@@ -70,13 +70,16 @@ class FakeWord:
         ):
             node.text = str(number)
         document.save(str(docx))
-
-    def render_pdf(self, docx: Path, pdf: Path) -> None:
-        self.calls.append("pdf")
         pdf.write_bytes(b"%PDF-1.7 synthetic")
 
+    def update_toc_pages(self, docx: Path) -> None:
+        raise AssertionError("not used")
+
+    def render_pdf(self, docx: Path, pdf: Path) -> None:
+        raise AssertionError("not used")
+
     def open_check(self, docx: Path) -> None:
-        self.calls.append("open")
+        raise AssertionError("not used")
 
     def convert_doc(self, doc: Path, out_docx: Path) -> None:
         raise AssertionError("not used")

@@ -215,16 +215,25 @@ class WordChild:
             self._failed_result(folder, result)
         self._kill_word(folder, self.word_image, wait_s=10)
         input_name = f"in{source.suffix}"
-        if action == "toc":
+        if action in {"toc", "toc_pdf"}:
             source.write_bytes((folder / input_name).read_bytes())
-            return None
-        output_name = {"pdf": "out.pdf", "docx": "out.docx", "text": "out.txt"}.get(action)
+        output_name = {
+            "pdf": "out.pdf",
+            "toc_pdf": "out.pdf",
+            "docx": "out.docx",
+            "text": "out.txt",
+        }.get(action)
         if output_name is None:
             return None
         output = folder / output_name
         if not output.is_file():
             raise OfficeError(
-                {"pdf": "word_pdf", "docx": "word_docx", "text": "word_text"}[action],
+                {
+                    "pdf": "word_pdf",
+                    "toc_pdf": "word_pdf",
+                    "docx": "word_docx",
+                    "text": "word_text",
+                }[action],
                 f"Word reported success without {output_name}",
             )
         if action == "text":
@@ -269,7 +278,12 @@ class WordChild:
         folder.mkdir()
         try:
             input_name = f"in{source.suffix}"
-            output_name = {"pdf": "out.pdf", "docx": "out.docx", "text": "out.txt"}.get(action)
+            output_name = {
+                "pdf": "out.pdf",
+                "toc_pdf": "out.pdf",
+                "docx": "out.docx",
+                "text": "out.txt",
+            }.get(action)
             (folder / input_name).write_bytes(source.read_bytes())
             owner = psutil.Process()
             (folder / "owner.json").write_text(
@@ -321,6 +335,9 @@ class WordChild:
 
     def render_pdf(self, docx: Path, pdf: Path) -> None:
         self._perform("pdf", docx, pdf)
+
+    def toc_and_pdf(self, docx: Path, pdf: Path) -> None:
+        self._perform("toc_pdf", docx, pdf)
 
     def convert_doc(self, doc: Path, out_docx: Path) -> None:
         self._perform("docx", doc, out_docx)

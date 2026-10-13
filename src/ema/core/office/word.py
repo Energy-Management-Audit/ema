@@ -181,6 +181,14 @@ class WordMac:
             commands.append(
                 f"save as d file name {_apple_string(str(output))} file format format PDF"
             )
+        elif action == "toc_pdf" and output is not None:
+            commands.extend(
+                [
+                    "update page numbers of table of contents 1 of d",
+                    "save d",
+                    f"save as d file name {_apple_string(str(output))} file format format PDF",
+                ]
+            )
         elif action == "docx" and output is not None:
             commands.append(
                 f"save as d file name {_apple_string(str(output))} file format format document"
@@ -253,7 +261,12 @@ class WordMac:
     ) -> int | None:
         if target is not None:
             if not source.is_file():
-                code = {"pdf": "word_pdf", "docx": "word_docx", "text": "word_text"}[action]
+                code = {
+                    "pdf": "word_pdf",
+                    "toc_pdf": "word_pdf",
+                    "docx": "word_docx",
+                    "text": "word_text",
+                }[action]
                 raise OfficeError(code, f"Word reported success without a {source.suffix} file")
             shutil.copy2(source, target)
         if action == "text":
@@ -267,7 +280,7 @@ class WordMac:
         folder = self.work_root / str(uuid.uuid4())
         folder.mkdir(parents=True)
         copy = folder / f"{uuid.uuid4()}-{document.name}"
-        suffix = {"pdf": ".pdf", "docx": ".docx", "text": ".txt"}.get(action)
+        suffix = {"pdf": ".pdf", "toc_pdf": ".pdf", "docx": ".docx", "text": ".txt"}.get(action)
         basename = uuid.uuid4().hex if action in {"docx", "text"} else "converted"
         output = folder / f"{basename}{suffix}" if suffix is not None else None
         try:
@@ -292,7 +305,7 @@ class WordMac:
                 raise OfficeError("word_automation", detail) from exc
             if result.returncode:
                 self._failed_script(result, copy, output)
-            if action == "toc":
+            if action in {"toc", "toc_pdf"}:
                 shutil.copy2(copy, document)
             if output is not None:
                 return self._copy_result(action, output, target, result)
@@ -325,6 +338,9 @@ class WordMac:
 
     def render_pdf(self, docx: Path, pdf: Path) -> None:
         self._perform("pdf", docx, pdf)
+
+    def toc_and_pdf(self, docx: Path, pdf: Path) -> None:
+        self._perform("toc_pdf", docx, pdf)
 
     def convert_doc(self, doc: Path, out_docx: Path) -> None:
         self._perform("docx", doc, out_docx)

@@ -20,18 +20,18 @@ def perform(app: Any, action: str, folder: Path) -> dict[str, object]:
         document = app.Documents.Open(
             FileName=str(source),
             ConfirmConversions=False,
-            ReadOnly=action != "toc",
+            ReadOnly=action not in {"toc", "toc_pdf"},
             AddToRecentFiles=False,
             Visible=False,
             OpenAndRepair=False,
             NoEncodingDialog=True,
         )
-        if action == "toc":
+        if action in {"toc", "toc_pdf"}:
             if document.TablesOfContents.Count < 1:
                 return {"ok": False, "code": "word_automation", "detail": "no table of contents"}
             document.TablesOfContents(1).UpdatePageNumbers()
             document.Save()
-        elif action == "pdf" and output is not None:
+        if action in {"pdf", "toc_pdf"} and output is not None:
             document.ExportAsFixedFormat(
                 OutputFileName=str(output), ExportFormat=17, OpenAfterExport=False
             )
@@ -41,7 +41,7 @@ def perform(app: Any, action: str, folder: Path) -> dict[str, object]:
             tables = int(document.Tables.Count)
             document.SaveAs2(FileName=str(output), FileFormat=7)
             return {"ok": True, "tables": tables}
-        elif action != "open":
+        elif action not in {"toc", "open"}:
             raise ValueError(f"Unknown Word action: {action}")
         return {"ok": True, "tables": None}
     except Exception as exc:

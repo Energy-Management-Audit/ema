@@ -327,9 +327,7 @@ def _render(  # noqa: C901, PLR0912, PLR0915
     if word_available(settings):
         office = word_automation(settings)
         with word_session(office):
-            office.update_toc_pages(docx)
-            office.render_pdf(docx, pdf)
-            office.open_check(docx)
+            office.toc_and_pdf(docx, pdf)
         pages = toc_pages(docx)
     elif kind == "final":
         raise EmaError("word_unavailable", "Microsoft Word nu este disponibil.", "")
