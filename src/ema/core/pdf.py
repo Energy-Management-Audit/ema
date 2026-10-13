@@ -207,7 +207,9 @@ def _tesseract_command(executable: Path, *outputs: str) -> list[str]:
     return command
 
 
-def _execute_tesseract(command: list[str], image: bytes, timeout_s: float) -> bytes:
+def _execute_tesseract(
+    command: list[str], image: bytes, timeout_s: float, cwd: Path | None = None
+) -> tuple[bytes, str]:
     try:
         result = subprocess.run(
             command,
@@ -215,16 +217,17 @@ def _execute_tesseract(command: list[str], image: bytes, timeout_s: float) -> by
             capture_output=True,
             check=False,
             timeout=timeout_s,
+            cwd=cwd,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except subprocess.TimeoutExpired as exc:
         raise EmaError("ocr_timeout", "OCR-ul a depăşit timpul permis.", str(exc)) from exc
     except OSError as exc:
         raise EmaError("ocr_start_failed", "OCR-ul nu a putut porni.", str(exc)) from exc
+    stderr = result.stderr.decode("utf-8", errors="replace")[:1000]
     if result.returncode:
-        stderr = result.stderr.decode("utf-8", errors="replace")[:1000]
         raise EmaError("ocr_failed", "OCR-ul a eşuat.", stderr)
-    return result.stdout
+    return result.stdout, stderr
 
 
 def _run_tesseract(
@@ -237,7 +240,8 @@ def _run_tesseract(
 ) -> str:
     command = _tesseract_command(executable, "stdout")
     command.extend(["--dpi", "200", "-l", lang, "--psm", str(psm), format_])
-    return _execute_tesseract(command, image, timeout_s).decode("utf-8", errors="replace")
+    stdout, _ = _execute_tesseract(command, image, timeout_s)
+    return stdout.decode("utf-8", errors="replace")
 
 
 def _run_tesseract_page(
@@ -246,15 +250,21 @@ def _run_tesseract_page(
     """One --psm 6 run that yields the text and the word boxes.
 
     stdout cannot carry both formats (the TSV header precedes the text), so the
-    renderers write next to an output base.
+    renderers write files. Tesseract runs inside the temporary directory with the
+    literal output base ``page``: it takes narrow arguments on Windows, which a
+    path outside the ANSI code page would not survive. It exits 0 when it cannot
+    create its files, so a missing file is an OCR failure carrying its stderr.
     """
-    with tempfile.TemporaryDirectory() as directory:
-        outbase = Path(directory) / "page"
-        command = _tesseract_command(executable, str(outbase))
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as directory:
+        folder = Path(directory)
+        command = _tesseract_command(executable, "page")
         command.extend(["--dpi", "200", "-l", lang, "--psm", "6", "txt", "tsv"])
-        _execute_tesseract(command, image, timeout_s)
-        text = outbase.with_suffix(".txt").read_bytes().decode("utf-8", errors="replace")
-        tsv = outbase.with_suffix(".tsv").read_bytes().decode("utf-8", errors="replace")
+        _, stderr = _execute_tesseract(command, image, timeout_s, folder)
+        try:
+            text = (folder / "page.txt").read_bytes().decode("utf-8", errors="replace")
+            tsv = (folder / "page.tsv").read_bytes().decode("utf-8", errors="replace")
+        except OSError as exc:
+            raise EmaError("ocr_failed", "OCR-ul a eşuat.", stderr or str(exc)) from exc
     return text, tsv
 
 

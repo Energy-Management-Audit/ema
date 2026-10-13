@@ -61,8 +61,8 @@ def test_ocr_uses_configured_child_and_word_boxes(tmp_path: Path) -> None:
         tmp_path / "fake-tesseract",
         'cat >/dev/null\nprintf "Token\\n" >"$2.txt"\n'
         'printf "text\\tleft\\ttop\\twidth\\theight\\nToken\\t20\\t30\\t10\\t12\\n" >"$2.tsv"',
-        'more >nul\necho Token>"%2.txt"\n'
-        '(echo text\tleft\ttop\twidth\theight& echo Token\t20\t30\t10\t12)>"%2.tsv"',
+        'more >nul\necho Token>"%~2.txt"\n'
+        '(echo text\tleft\ttop\twidth\theight& echo Token\t20\t30\t10\t12)>"%~2.tsv"',
     )
     pages = pdf.ocr(_pdf(tmp_path / "invoice.pdf"), Settings(tesseract_path=binary))
     assert pages[0].text.strip() == "Token"
