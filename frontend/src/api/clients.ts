@@ -16,7 +16,8 @@ export const clientsApi = {
   patchClient: (id: string, patch: { contacts?: Contact[]; sites?: Site[] }, revision: number) =>
     request<Client>('PATCH', path(id), { ...patch, on_revision: revision }),
   createFromAnaf: (cui: string) => request<Client>('POST', '/clients/from-anaf', { cui }),
-  createClient: (name: string, cui: string) => request<Client>('POST', '/clients', { name, cui }),
+  createClient: (name: string, cui: string | null) =>
+    request<Client>('POST', '/clients', { name, cui }),
   refreshAnaf: (id: string) => request<unknown>('POST', `${path(id)}/anaf/refresh`, {}),
   importAnnexes: (files: File[]) => {
     const form = new FormData()

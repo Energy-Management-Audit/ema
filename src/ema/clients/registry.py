@@ -43,6 +43,8 @@ def get_client(ws: Workspace, client_id: str) -> dict[str, Any]:
 
 def create_client(ws: Workspace, name: str | None, cui: str | None = None) -> dict[str, Any]:
     client_id = uuid.uuid4().hex
+    if cui is not None and not cui.strip():
+        cui = None
     with ws.connect() as db:
         db.execute("BEGIN IMMEDIATE")
         if cui and db.execute("SELECT 1 FROM clients WHERE cui=?", (cui,)).fetchone():
