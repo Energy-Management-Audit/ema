@@ -155,6 +155,60 @@ test('new job leaves a problem in the dialog and adds a client typed by name whe
   )
 })
 
+test('a job that fails after its client was added keeps the client and the retry reuses it', async () => {
+  await withHarness(
+    {
+      path: '/app/clienti',
+      routes: {
+        'GET /clients': { status: 200, body: [] },
+        'POST /clients': {
+          status: 201,
+          body: { id: 'client-new', name: 'Client nou', cui: null, revision: 1 },
+        },
+        'POST /jobs': problem('request_error', 409, 'Conflict.'),
+        'GET /jobs/new-invoice': {
+          status: 200,
+          body: {
+            id: 'new-invoice',
+            type: 'invoices',
+            client_slug: 'client-new',
+            year: 2026,
+            state: 'created',
+            revision: 1,
+          },
+        },
+      },
+    },
+    async ({ page, requests, setRoute }) => {
+      const count = (method, path) =>
+        requests.filter((item) => item.method === method && item.path === path).length
+      await page.getByRole('button', { name: 'Lucrare nouă' }).click()
+      const dialog = page.getByRole('dialog')
+      await dialog.getByText('Facturi', { exact: true }).click()
+      await dialog.getByRole('combobox').fill('Client nou')
+      await dialog.getByRole('option', { name: 'Adaugă clientul „Client nou”' }).click()
+      await dialog.getByRole('textbox').fill('2026')
+      const overviewBefore = count('GET', '/clients/overview')
+      await dialog.getByRole('button', { name: 'Creează lucrarea' }).click()
+      await dialog.getByRole('alert').getByText('Nu am putut crea lucrarea').waitFor()
+      assert.equal(count('POST', '/clients'), 1)
+      setRoute('POST /jobs', { status: 200, body: { id: 'new-invoice' } })
+      await dialog.getByRole('button', { name: 'Creează lucrarea' }).click()
+      await page.waitForURL('**/app/facturi/new-invoice')
+      assert.equal(count('POST', '/clients'), 1)
+      const jobs = requests.filter((item) => item.method === 'POST' && item.path === '/jobs')
+      assert.deepEqual(
+        jobs.map((item) => item.body),
+        [
+          { type: 'invoices', client: 'client-new', year: 2026 },
+          { type: 'invoices', client: 'client-new', year: 2026 },
+        ],
+      )
+      assert.ok(count('GET', '/clients/overview') > overviewBefore)
+    },
+  )
+})
+
 test('a PIEE job opened with the audit prefix redirects to its own route', async () => {
   await withHarness({ path: `/app/audit/${JOB}/masuratori` }, async ({ page }) => {
     await page.waitForURL(`**/app/piee/${JOB}/date`)

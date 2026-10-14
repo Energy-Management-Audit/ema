@@ -37,11 +37,13 @@ export function clientMatches<T extends NamedClient>(clients: T[], query: string
     .sort((a, b) => clientLabel(a).localeCompare(clientLabel(b), 'ro'))
 }
 
-/** Whether the list ends with the row that adds the typed text as a new client: only for a
- * non-empty text that is no existing client's name (case and diacritics ignored). */
+/** Whether the list ends with the row that adds the typed text as a new client: only for a text
+ * with at least one letter that is no existing client's name (case and diacritics ignored). */
 export function offersNewClient(clients: NamedClient[], query: string): boolean {
   const text = plain(query.trim())
-  return text !== '' && !clients.some((client) => plain((client.name ?? '').trim()) === text)
+  return (
+    /\p{L}/u.test(text) && !clients.some((client) => plain((client.name ?? '').trim()) === text)
+  )
 }
 
 /** The existing client that a new one would duplicate: the same name or the same CUI digits. */

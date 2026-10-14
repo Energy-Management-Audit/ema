@@ -83,7 +83,7 @@ export function ClientsScreen() {
               />
             </label>
             <Button height={32} icon={Plus} onClick={open}>
-              Client nou după CUI
+              Client nou
             </Button>
           </div>
         </header>
@@ -137,9 +137,9 @@ export function ClientsScreen() {
             <EmptyState
               mark="brand"
               title="Niciun client nu se potriveşte."
-              actions={<Button onClick={open}>Client nou după CUI</Button>}
+              actions={<Button onClick={open}>Client nou</Button>}
             >
-              Caută după alt nume sau adaugă clientul după CUI.
+              Caută după alt nume sau adaugă clientul.
             </EmptyState>
           ))}
       </section>

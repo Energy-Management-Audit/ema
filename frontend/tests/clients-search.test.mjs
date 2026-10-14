@@ -62,6 +62,12 @@ test('the add row is offered for a new name only', () => {
   assert.equal(offersNewClient(clients, 'Client A'), true)
   assert.equal(offersNewClient(clients, 'Client C SRL'), true)
   assert.equal(offersNewClient([], 'Client C SRL'), true)
+  assert.equal(offersNewClient(clients, '345'), false)
+  assert.equal(offersNewClient(clients, ' 12 345 678 '), false)
+  assert.deepEqual(
+    clientMatches([client, second], '345').map((item) => item.id),
+    ['client-one'],
+  )
 })
 
 test('an existing client is found by the same name or the same CUI digits', () => {

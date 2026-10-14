@@ -25,6 +25,7 @@ export function NewClientDialog({
   const [pending, setPending] = useState<'anaf' | 'add' | null>(null)
   const digits = cui.replace(/\D/g, '')
   const duplicate = existingClient(clients, name, cui)
+  const cuiTaken = existingClient(clients, '', cui) !== undefined
   const exists = duplicate !== undefined || problem?.code === 'client_exists'
 
   async function submit(useAnaf: boolean) {
@@ -57,7 +58,7 @@ export function NewClientDialog({
           <Button variant="secondary" height={36} onClick={onClose}>
             Renunţă
           </Button>
-          {digits.length >= 2 && (
+          {digits.length >= 2 && !cuiTaken && (
             <Button
               variant="secondary"
               height={36}
