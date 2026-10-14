@@ -145,12 +145,12 @@ class Contact(BaseModel):
 
 
 class ClientIn(BaseModel):
-    name: str = PydanticField(min_length=1)
+    name: str = PydanticField(min_length=1, pattern=r"\S")
     cui: str | None = None
 
 
 class ClientPatch(BaseModel):
-    name: str | None = PydanticField(default=None, min_length=1)
+    name: str | None = PydanticField(default=None, min_length=1, pattern=r"\S")
     cui: str | None = None
     caen: str | None = None
     sites: list[Site] = PydanticField(default_factory=list[Site])

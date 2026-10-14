@@ -7,7 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from ema.cli import _app
-from ema.clients.registry import get_client
+from ema.clients.registry import create_client, get_client
 from ema.core.errors import EmaError
 from ema.core.workspace import Workspace
 
@@ -72,3 +72,15 @@ def test_registered_client_can_extract_invoices(tmp_path: Path, monkeypatch) -> 
     assert extracted.exit_code == 0, extracted.output
     assert "synthetic.pdf: failed" in extracted.stdout
     assert "Lucrare: " in extracted.stdout
+
+
+@pytest.mark.parametrize("cui", ["", "   ", None])
+def test_create_client_stores_empty_cui_as_null(tmp_path: Path, cui: str | None) -> None:
+    ws = Workspace(tmp_path / "workspace")
+    first = create_client(ws, "Synthetic", cui)
+    second = create_client(ws, "Second synthetic", cui)
+    assert first["cui"] is None
+    assert second["cui"] is None
+    with ws.connect() as db:
+        stored = db.execute("SELECT cui FROM clients WHERE id=?", (first["id"],)).fetchone()
+    assert stored["cui"] is None

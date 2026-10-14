@@ -4,6 +4,7 @@ import { clientsApi } from '../../api/clients.ts'
 import type { ClientOverview } from '../../api/clients-types.ts'
 import { navigate } from '../../app/navigate.ts'
 import { clientHref } from '../../app/route.ts'
+import { existingClient } from '../../clients/search.ts'
 import { invalidate } from '../../state/resource.ts'
 import { Button } from '../../ui/Button.tsx'
 import { Dialog } from '../../ui/Dialog.tsx'
@@ -18,21 +19,22 @@ export function NewClientDialog({
   clients: ClientOverview[]
   onClose: () => void
 }) {
-  const [cui, setCui] = useState('')
   const [name, setName] = useState('')
+  const [cui, setCui] = useState('')
   const [problem, setProblem] = useState<ApiProblem | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [pending, setPending] = useState<'anaf' | 'add' | null>(null)
   const digits = cui.replace(/\D/g, '')
-  const duplicate = clients.find((item) => (item.cui ?? '').replace(/\D/g, '') === digits)
-  const manual = problem?.code === 'anaf_missing' || problem?.code === 'anaf_unavailable'
+  const duplicate = existingClient(clients, name, cui)
+  const cuiTaken = existingClient(clients, '', cui) !== undefined
+  const exists = duplicate !== undefined || problem?.code === 'client_exists'
 
   async function submit(useAnaf: boolean) {
-    setBusy(true)
+    setPending(useAnaf ? 'anaf' : 'add')
     setProblem(null)
     try {
       const client = useAnaf
         ? await clientsApi.createFromAnaf(cui)
-        : await clientsApi.createClient(name.trim(), digits)
+        : await clientsApi.createClient(name.trim(), digits || null)
       invalidate('clients', 'clientsOverview')
       onClose()
       navigate(clientHref(client.id))
@@ -43,7 +45,7 @@ export function NewClientDialog({
           : new ApiProblem('request_error', 500, 'Cererea nu poate fi procesată.'),
       )
     } finally {
-      setBusy(false)
+      setPending(null)
     }
   }
 
@@ -56,7 +58,20 @@ export function NewClientDialog({
           <Button variant="secondary" height={36} onClick={onClose}>
             Renunţă
           </Button>
-          {problem?.code === 'client_exists' && duplicate ? (
+          {digits.length >= 2 && !cuiTaken && (
+            <Button
+              variant="secondary"
+              height={36}
+              disabled={pending !== null}
+              loading={pending === 'anaf'}
+              onClick={() => {
+                void submit(true)
+              }}
+            >
+              Caută în ANAF
+            </Button>
+          )}
+          {duplicate ? (
             <Button
               height={36}
               onClick={() => {
@@ -66,27 +81,16 @@ export function NewClientDialog({
             >
               Deschide clientul
             </Button>
-          ) : manual ? (
+          ) : (
             <Button
               height={36}
-              disabled={!name.trim() || busy}
-              loading={busy}
+              disabled={!name.trim() || pending !== null}
+              loading={pending === 'add'}
               onClick={() => {
                 void submit(false)
               }}
             >
-              Adaugă fără ANAF
-            </Button>
-          ) : (
-            <Button
-              height={36}
-              disabled={digits.length < 2 || busy}
-              loading={busy}
-              onClick={() => {
-                void submit(true)
-              }}
-            >
-              Caută în ANAF
+              Adaugă clientul
             </Button>
           )}
         </>
@@ -94,7 +98,16 @@ export function NewClientDialog({
       content={
         <div className="clients-dialog-fields">
           <label>
-            CUI
+            Denumire
+            <TextField
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value)
+              }}
+            />
+          </label>
+          <label>
+            CUI (opţional)
             <TextField
               value={cui}
               placeholder="RO 12345678"
@@ -103,29 +116,21 @@ export function NewClientDialog({
               }}
             />
           </label>
-          {manual && (
-            <label>
-              Denumire
-              <TextField
-                value={name}
-                onChange={(event) => {
-                  setName(event.target.value)
-                }}
-              />
-            </label>
-          )}
-          {problem && (
-            <FailureNotice
-              title={problem.code === 'client_exists' ? 'Clientul există deja.' : problem.title}
-              actions={null}
-            >
-              {problem.title}
+          {exists ? (
+            <FailureNotice title="Clientul există deja." actions={null}>
+              {null}
             </FailureNotice>
+          ) : (
+            problem && (
+              <FailureNotice title={problem.title} actions={null}>
+                {problem.title}
+              </FailureNotice>
+            )
           )}
         </div>
       }
     >
-      Caută clientul după CUI.
+      Adaugă clientul după denumire. CUI-ul este opţional.
     </Dialog>
   )
 }

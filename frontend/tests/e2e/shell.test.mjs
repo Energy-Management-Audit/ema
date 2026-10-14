@@ -76,17 +76,13 @@ test('new job posts the selected type, client and year, then opens its first ste
     async ({ page, requests }) => {
       await page.getByRole('button', { name: 'Lucrare nouă' }).click()
       const dialog = page.getByRole('dialog', { name: 'Lucrare nouă' })
-      const selectBox = await dialog.getByRole('combobox').boundingBox()
+      const clientBox = await dialog.getByRole('combobox').boundingBox()
       const yearBox = await dialog.getByRole('textbox').boundingBox()
-      const chevronBox = await dialog.locator('.ema-select__chevron').boundingBox()
-      assert.ok(selectBox && yearBox && chevronBox)
-      assert.ok(Math.abs(selectBox.width - yearBox.width) <= 1)
-      assert.ok(
-        chevronBox.x >= selectBox.x &&
-          chevronBox.x + chevronBox.width <= selectBox.x + selectBox.width,
-      )
+      assert.ok(clientBox && yearBox)
+      assert.ok(Math.abs(clientBox.width - yearBox.width) <= 1)
       await dialog.getByText('Facturi', { exact: true }).click()
-      await dialog.getByRole('combobox').selectOption('client-exemplu')
+      await dialog.getByRole('combobox').fill('exemplu en')
+      await dialog.getByRole('option', { name: /Exemplu Energie SA/ }).click()
       await dialog.getByRole('textbox').fill('2026')
       await dialog.getByRole('button', { name: 'Creează lucrarea' }).click()
       await page.waitForURL(`**/app/facturi/${created.id}`)
@@ -98,7 +94,7 @@ test('new job posts the selected type, client and year, then opens its first ste
   )
 })
 
-test('new job leaves a problem in the dialog and links to clients when none exist', async () => {
+test('new job leaves a problem in the dialog and adds a client typed by name when none exist', async () => {
   await withHarness(
     {
       path: '/app/clienti',
@@ -108,19 +104,107 @@ test('new job leaves a problem in the dialog and links to clients when none exis
       await page.getByRole('button', { name: 'Lucrare nouă' }).click()
       const dialog = page.getByRole('dialog')
       await dialog.getByText('PIEE', { exact: true }).click()
-      await dialog.getByRole('combobox').selectOption('client-exemplu')
+      await dialog.getByRole('combobox').fill('exemplu en')
+      await dialog.getByRole('option', { name: /Exemplu Energie SA/ }).click()
       await dialog.getByRole('button', { name: 'Creează lucrarea' }).click()
       await dialog.getByRole('alert').getByText('Clientul lipseşte.').first().waitFor()
     },
   )
   await withHarness(
-    { path: '/app/clienti', routes: { 'GET /clients': { status: 200, body: [] } } },
-    async ({ page }) => {
+    {
+      path: '/app/clienti',
+      routes: {
+        'GET /clients': { status: 200, body: [] },
+        'POST /clients': {
+          status: 201,
+          body: { id: 'client-new', name: 'Client nou', cui: null, revision: 1 },
+        },
+        'POST /jobs': { status: 200, body: { id: 'new-invoice' } },
+        'GET /jobs/new-invoice': {
+          status: 200,
+          body: {
+            id: 'new-invoice',
+            type: 'invoices',
+            client_slug: 'client-new',
+            year: 2026,
+            state: 'created',
+            revision: 1,
+          },
+        },
+      },
+    },
+    async ({ page, requests }) => {
       await page.getByRole('button', { name: 'Lucrare nouă' }).click()
       const dialog = page.getByRole('dialog')
-      await dialog.getByText('Adaugă întâi clientul.').waitFor()
-      await dialog.getByRole('link', { name: 'Clienţi' }).click()
-      await page.waitForURL('**/app/clienti')
+      assert.equal(await dialog.getByText('Adaugă întâi clientul.').count(), 0)
+      await dialog.getByText('Facturi', { exact: true }).click()
+      await dialog.getByRole('combobox').fill('Client nou')
+      await dialog.getByRole('option', { name: 'Adaugă clientul „Client nou”' }).click()
+      await dialog.getByRole('textbox').fill('2026')
+      await dialog.getByRole('button', { name: 'Creează lucrarea' }).click()
+      await page.waitForURL('**/app/facturi/new-invoice')
+      assert.deepEqual(
+        requests.find((item) => item.method === 'POST' && item.path === '/clients')?.body,
+        { name: 'Client nou', cui: null },
+      )
+      assert.deepEqual(
+        requests.find((item) => item.method === 'POST' && item.path === '/jobs')?.body,
+        { type: 'invoices', client: 'client-new', year: 2026 },
+      )
+    },
+  )
+})
+
+test('a job that fails after its client was added keeps the client and the retry reuses it', async () => {
+  await withHarness(
+    {
+      path: '/app/clienti',
+      routes: {
+        'GET /clients': { status: 200, body: [] },
+        'POST /clients': {
+          status: 201,
+          body: { id: 'client-new', name: 'Client nou', cui: null, revision: 1 },
+        },
+        'POST /jobs': problem('request_error', 409, 'Conflict.'),
+        'GET /jobs/new-invoice': {
+          status: 200,
+          body: {
+            id: 'new-invoice',
+            type: 'invoices',
+            client_slug: 'client-new',
+            year: 2026,
+            state: 'created',
+            revision: 1,
+          },
+        },
+      },
+    },
+    async ({ page, requests, setRoute }) => {
+      const count = (method, path) =>
+        requests.filter((item) => item.method === method && item.path === path).length
+      await page.getByRole('button', { name: 'Lucrare nouă' }).click()
+      const dialog = page.getByRole('dialog')
+      await dialog.getByText('Facturi', { exact: true }).click()
+      await dialog.getByRole('combobox').fill('Client nou')
+      await dialog.getByRole('option', { name: 'Adaugă clientul „Client nou”' }).click()
+      await dialog.getByRole('textbox').fill('2026')
+      const overviewBefore = count('GET', '/clients/overview')
+      await dialog.getByRole('button', { name: 'Creează lucrarea' }).click()
+      await dialog.getByRole('alert').getByText('Nu am putut crea lucrarea').waitFor()
+      assert.equal(count('POST', '/clients'), 1)
+      setRoute('POST /jobs', { status: 200, body: { id: 'new-invoice' } })
+      await dialog.getByRole('button', { name: 'Creează lucrarea' }).click()
+      await page.waitForURL('**/app/facturi/new-invoice')
+      assert.equal(count('POST', '/clients'), 1)
+      const jobs = requests.filter((item) => item.method === 'POST' && item.path === '/jobs')
+      assert.deepEqual(
+        jobs.map((item) => item.body),
+        [
+          { type: 'invoices', client: 'client-new', year: 2026 },
+          { type: 'invoices', client: 'client-new', year: 2026 },
+        ],
+      )
+      assert.ok(count('GET', '/clients/overview') > overviewBefore)
     },
   )
 })

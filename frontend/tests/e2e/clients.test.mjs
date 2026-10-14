@@ -41,23 +41,18 @@ test('new client lookup handles existing and unavailable ANAF', async () => {
       },
     },
     async ({ page, requests, setRoute }) => {
-      await page.getByRole('button', { name: 'Client nou după CUI' }).click()
+      await page.getByRole('button', { name: 'Client nou', exact: true }).click()
       let dialog = page.getByRole('dialog', { name: 'Client nou' })
       await dialog.getByRole('textbox', { name: 'CUI' }).fill('RO 1234567')
-      await dialog.getByRole('button', { name: 'Caută în ANAF' }).click()
+      await dialog.getByRole('button', { name: 'Deschide clientul' }).waitFor()
+      assert.equal(await dialog.getByRole('button', { name: 'Caută în ANAF' }).count(), 0)
       await dialog.getByRole('button', { name: 'Deschide clientul' }).click()
       await page.waitForURL('**/app/clienti/client-exemplu/date')
-      assert.deepEqual(requests.find((item) => item.path === '/clients/from-anaf')?.body, {
-        cui: 'RO 1234567',
-      })
+      assert.equal(requests.filter((item) => item.path === '/clients/from-anaf').length, 0)
       await page
         .locator('.ema-sidebar')
         .getByRole('button', { name: /Clienţi/ })
         .click()
-      setRoute(
-        'POST /clients/from-anaf',
-        problem('anaf_unavailable', 424, 'Registrul ANAF nu este disponibil.'),
-      )
       setRoute('POST /clients', {
         status: 201,
         body: { ...PROFILE.client, id: 'client-new', name: 'Client nou' },
@@ -66,17 +61,44 @@ test('new client lookup handles existing and unavailable ANAF', async () => {
         status: 200,
         body: { ...PROFILE, client: { ...PROFILE.client, id: 'client-new', name: 'Client nou' } },
       })
-      await page.getByRole('button', { name: 'Client nou după CUI' }).click()
+      await page.getByRole('button', { name: 'Client nou', exact: true }).click()
+      dialog = page.getByRole('dialog', { name: 'Client nou' })
+      await dialog.getByRole('button', { name: 'Adaugă clientul' }).waitFor()
+      assert.equal(await dialog.getByRole('button', { name: 'Caută în ANAF' }).count(), 0)
+      assert.equal(await dialog.getByRole('button', { name: 'Adaugă clientul' }).isDisabled(), true)
+      await dialog.getByRole('textbox', { name: 'Denumire' }).fill('Client nou')
+      await dialog.getByRole('button', { name: 'Adaugă clientul' }).click()
+      await page.waitForURL('**/app/clienti/client-new/date')
+      const added = () =>
+        requests
+          .filter((item) => item.path === '/clients' && item.method === 'POST')
+          .map((item) => item.body)
+      assert.deepEqual(added(), [{ name: 'Client nou', cui: null }])
+      assert.equal(requests.filter((item) => item.path === '/clients/from-anaf').length, 0)
+      await page
+        .locator('.ema-sidebar')
+        .getByRole('button', { name: /Clienţi/ })
+        .click()
+      setRoute(
+        'POST /clients/from-anaf',
+        problem('anaf_unavailable', 424, 'Registrul ANAF nu este disponibil.'),
+      )
+      await page.getByRole('button', { name: 'Client nou', exact: true }).click()
       dialog = page.getByRole('dialog', { name: 'Client nou' })
       await dialog.getByRole('textbox', { name: 'CUI' }).fill('RO 98765432')
       await dialog.getByRole('button', { name: 'Caută în ANAF' }).click()
+      await dialog
+        .getByRole('alert')
+        .getByText('Registrul ANAF nu este disponibil.')
+        .first()
+        .waitFor()
       await dialog.getByRole('textbox', { name: 'Denumire' }).fill('Client nou')
-      await dialog.getByRole('button', { name: 'Adaugă fără ANAF' }).click()
+      await dialog.getByRole('button', { name: 'Adaugă clientul' }).click()
       await page.waitForURL('**/app/clienti/client-new/date')
-      assert.deepEqual(
-        requests.find((item) => item.path === '/clients' && item.method === 'POST')?.body,
+      assert.deepEqual(added(), [
+        { name: 'Client nou', cui: null },
         { name: 'Client nou', cui: '98765432' },
-      )
+      ])
     },
   )
 })
@@ -98,7 +120,7 @@ test('new client uses ANAF identity when the lookup succeeds', async () => {
       },
     },
     async ({ page, requests }) => {
-      await page.getByRole('button', { name: 'Client nou după CUI' }).click()
+      await page.getByRole('button', { name: 'Client nou', exact: true }).click()
       const dialog = page.getByRole('dialog', { name: 'Client nou' })
       await dialog.getByRole('textbox', { name: 'CUI' }).fill('RO 22334455')
       await dialog.getByRole('button', { name: 'Caută în ANAF' }).click()
