@@ -96,6 +96,19 @@ def test_slot_and_quote_responses_keep_recorded_name_only_in_view(tmp_path: Path
     assert client.get("/evidence/unnamed-evidence/quote").json()["file_name"] is None
 
 
+def test_client_name_needs_a_non_space_character(tmp_path: Path) -> None:
+    client, headers = session(Workspace(tmp_path / "workspace"))
+    created = client.post("/clients", json={"name": "Synthetic Client"}, headers=headers)
+    assert created.status_code == 201
+    assert client.post("/clients", json={"name": "   "}, headers=headers).status_code == 422
+    patch = client.patch(
+        f"/clients/{created.json()['id']}",
+        json={"name": "   ", "on_revision": created.json()["revision"]},
+        headers=headers,
+    )
+    assert patch.status_code == 422
+
+
 def test_openapi_snapshot_and_provisional_mock(tmp_path: Path) -> None:
     ws = Workspace(tmp_path / "workspace")
     seed(ws)

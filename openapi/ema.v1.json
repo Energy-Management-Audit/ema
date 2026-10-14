@@ -877,6 +877,7 @@
           },
           "name": {
             "minLength": 1,
+            "pattern": "\\S",
             "title": "Name",
             "type": "string"
           }
@@ -1034,6 +1035,7 @@
             "anyOf": [
               {
                 "minLength": 1,
+                "pattern": "\\S",
                 "type": "string"
               },
               {
